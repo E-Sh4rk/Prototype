@@ -1,0 +1,7 @@
+
+ (ocamllex lexer)
+ (menhir (modules parser))
+
+(executable
+ (name prototype)
+ (libraries dynlink camlp4.lib ulex unix num str cduce))

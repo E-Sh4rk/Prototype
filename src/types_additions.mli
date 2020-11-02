@@ -36,6 +36,8 @@ val get_atom : type_env -> string -> typ
 
 val get_type : type_env -> string -> typ
 
+val has_type_or_atom : type_env -> string -> bool
+
 (* Operations on types *)
 
 val conj : typ list -> typ

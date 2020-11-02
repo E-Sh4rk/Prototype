@@ -93,6 +93,10 @@ let get_type env name =
     try descr (StrMap.find name env)
     with Not_found -> failwith (Printf.sprintf "Type %s undefined!" name)
 
+let has_type_or_atom env name =
+    let name = String.capitalize_ascii name in
+    StrMap.mem name env
+
 (* Operations on types *)
 
 let conj ts = List.fold_left cap any ts

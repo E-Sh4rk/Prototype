@@ -83,9 +83,12 @@ let parser_expr_to_annot_expr tenv id_map e =
         let e = match e with
         | Const c -> Const c
         | Var str ->
-            if StrMap.mem str env
-            then Var (StrMap.find str env)
-            else Const (Atom str)
+            if has_type_or_atom tenv str
+            then Const (Atom str)
+            else (
+                assert (StrMap.mem str env) ;
+                Var (StrMap.find str env)
+            )
         | Lambda (t,str,e) ->
             let t = match t with
             | Unnanoted -> Unnanoted

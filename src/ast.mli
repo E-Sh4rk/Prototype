@@ -4,6 +4,7 @@ type typ = Cduce.typ
 type varname = string
 type varid = int (* It is NOT De Bruijn indexes, but unique IDs *)
 type exprid = int
+(* TODO: Use Nf_ast.Variable.t for varid *)
 
 type annotation = exprid Position.located
 

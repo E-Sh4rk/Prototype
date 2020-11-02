@@ -1,5 +1,6 @@
-
 open Cduce
+
+module StrMap = Map.Make(String)
 
 (* Construction of types *)
 
@@ -18,7 +19,6 @@ type type_expr =
 | TDiff of type_expr * type_expr
 | TNeg of type_expr
 
-module StrMap = Map.Make(String)
 type type_env = node StrMap.t
 
 let empty_tenv = StrMap.empty
@@ -69,12 +69,14 @@ let define_atom env atom =
 
 let define_types env defs =
     let declare_type env (name,_) =
+        let name = String.capitalize_ascii name in
         if StrMap.mem name env
         then failwith (Printf.sprintf "Type %s already defined!" name)
         else StrMap.add name (mk_new_typ ()) env
     in
     let env = List.fold_left declare_type env defs in
     let define_type (name,decl) =
+        let name = String.capitalize_ascii name in
         let t = type_expr_to_typ env decl in
         define_typ (StrMap.find name env) t
     in
@@ -85,6 +87,11 @@ let get_atom env atom =
     let atom = String.capitalize_ascii atom in
     try descr (StrMap.find atom env)
     with Not_found -> failwith (Printf.sprintf "Atom %s undefined!" atom)
+
+let get_type env name =
+    let name = String.capitalize_ascii name in
+    try descr (StrMap.find name env)
+    with Not_found -> failwith (Printf.sprintf "Type %s undefined!" name)
 
 (* Operations on types *)
 

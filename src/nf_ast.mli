@@ -1,4 +1,3 @@
-
 type typ = Cduce.typ
 
 module Variable : sig
@@ -10,6 +9,9 @@ module Variable : sig
     val get_locations : t -> Position.t list
     val get_name : t -> string option
 end
+
+module VarMap : Map.S with type key=Variable.t
+module SetMap : Set.S with type elt=Variable.t
 
 type a =
   | Const of Ast.const
@@ -26,4 +28,4 @@ and e =
   | Let of Variable.t * a * e
   | Atomic of a
 
-val convert_to_normal_form : Ast.annot_expr -> e
+val convert_to_normal_form : Variable.t Ast.ExprMap.t -> Ast.annot_expr -> e

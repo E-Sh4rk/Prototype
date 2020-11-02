@@ -1,6 +1,8 @@
 
 open Cduce
 
+module StrMap : Map.S with type key = String.t
+
 (* Construction of types *)
 
 type type_base =
@@ -18,8 +20,7 @@ type type_expr =
 | TDiff of type_expr * type_expr
 | TNeg of type_expr
 
-module StrMap : Map.S with type key = string
-type type_env = node StrMap.t
+type type_env
 
 val empty_tenv : type_env
 
@@ -32,6 +33,8 @@ val define_atom : type_env -> string -> type_env
 val define_types : type_env -> (string * type_expr) list -> type_env
 
 val get_atom : type_env -> string -> typ
+
+val get_type : type_env -> string -> typ
 
 (* Operations on types *)
 

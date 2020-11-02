@@ -34,6 +34,9 @@ module Variable = struct
     in name
 end
 
+module VarMap = Map.Make(Variable)
+module SetMap = Set.Make(Variable)
+
 type a =
   | Const of Ast.const
   | Var of Variable.t
@@ -50,7 +53,7 @@ and e =
   | Atomic of a
 
 (* TODO: test if ast is already in expr_var_map (in order to factorize common sub-expressions) *)
-let convert_to_normal_form ast =
+let convert_to_normal_form expr_var_map ast =
   let rec aux expr_var_map ast =
     let rec to_defs_and_a expr_var_map ast =
       let ((_, pos), e) = ast in
@@ -118,4 +121,4 @@ let convert_to_normal_form ast =
       Let (v, d, nf)
     ) (Atomic a)
 
-  in aux ExprMap.empty ast
+  in aux expr_var_map ast

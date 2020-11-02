@@ -1,41 +1,6 @@
-
+open Variable
 type typ = Cduce.typ
 module ExprMap = Ast.ExprMap
-
-module Variable = struct
-
-  let data = Hashtbl.create 100
-
-  type t = int
-  let compare = compare
-  let equals a b = a = b
-
-  let next_id =
-    let last = ref 0 in
-    fun () ->
-      last := !last + 1 ;
-      !last
-
-  let create display_name =
-    let id = next_id () in
-    Hashtbl.add data id (display_name, []) ;
-    id
-
-  let attach_location id loc =
-    let (name, locs) = Hashtbl.find data id in
-    Hashtbl.replace data id (name, loc::locs)
-
-  let get_locations id =
-    let (_, locs) = Hashtbl.find data id
-    in locs
-
-  let get_name id =
-    let (name, _) = Hashtbl.find data id
-    in name
-end
-
-module VarMap = Map.Make(Variable)
-module SetMap = Set.Make(Variable)
 
 type a =
   | Const of Ast.const
@@ -53,31 +18,25 @@ and e =
   | Atomic of a
 
 (* TODO: test if ast is already in expr_var_map (in order to factorize common sub-expressions) *)
-let convert_to_normal_form expr_var_map ast =
+let convert_to_normal_form ast =
   let rec aux expr_var_map ast =
     let rec to_defs_and_a expr_var_map ast =
-      let ((_, pos), e) = ast in
+      let (_, e) = ast in
       match e with
       | Ast.Const c -> ([], expr_var_map, Const c)
-      | Ast.Var v ->
-        assert (ExprMap.mem ((), Ast.Var v) expr_var_map) ;
-        ([], expr_var_map, Var (ExprMap.find ((), Ast.Var v) expr_var_map))
+      | Ast.Var v -> ([], expr_var_map, Var v)
       | Ast.Lambda (t, v, e) ->
-        let var = Variable.create None in
-        Variable.attach_location var pos ;
-        let e = aux (ExprMap.add ((), Ast.Var v) var expr_var_map) e in
-        ([], expr_var_map, Lambda (t, var, e))
+        let e = aux expr_var_map e in
+        ([], expr_var_map, Lambda (t, v, e))
       | Ast.Ite (e, t, e1, e2) ->
         let (defs, expr_var_map, x) = to_defs_and_x expr_var_map e in
         let nf1 = aux expr_var_map e1 in
         let nf2 = aux expr_var_map e2 in
         (defs, expr_var_map, Ite (x, t, nf1, nf2))
       | Ast.Let (v, e1, e2) ->
-        let var = Variable.create None in
-        Variable.attach_location var pos ;
         let (defs1, expr_var_map, a1) = to_defs_and_a expr_var_map e1 in
-        let expr_var_map = ExprMap.add ((), Ast.Var v) var expr_var_map in
-        let defs1 = (var, a1)::defs1 in
+        let defs1 = (v, a1)::defs1 in
+        let expr_var_map = ExprMap.add (Ast.unannot e1) v expr_var_map in
         let (defs2, expr_var_map, a2) = to_defs_and_a expr_var_map e2 in
         (defs2@defs1, expr_var_map, a2)
       | Ast.App (e1, e2) ->
@@ -121,4 +80,4 @@ let convert_to_normal_form expr_var_map ast =
       Let (v, d, nf)
     ) (Atomic a)
 
-  in aux expr_var_map ast
+  in aux ExprMap.empty ast

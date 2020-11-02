@@ -1,8 +1,8 @@
 open Types_additions
+open Variable
 type typ = Cduce.typ
 
 type varname = string
-type varid = int (* It is NOT De Bruijn indexes, but unique IDs *)
 type exprid = int
 
 type annotation = exprid Position.located
@@ -34,8 +34,8 @@ type ('a, 'typ, 'v) ast =
 
 and ('a, 'typ, 'v) t = 'a * ('a, 'typ, 'v) ast
 
-type annot_expr = (annotation, typ, varid) t
-type expr = (unit, typ, varid) t
+type annot_expr = (annotation, typ, Variable.t) t
+type expr = (unit, typ, Variable.t) t
 type parser_expr = (annotation, type_expr, varname) t
 
 module Expr = struct
@@ -44,16 +44,10 @@ module Expr = struct
     let equiv t1 t2 = (compare t1 t2) = 0
 end
 module ExprMap = Map.Make(Expr)
-module VarId = struct
-    type t = varid
-    let compare = compare
-end
-module VarIdMap = Map.Make(VarId)
-module VarIdSet = Set.Make(VarId)
 
-type id_map = int StrMap.t
+type name_var_map = Variable.t StrMap.t
 
-let empty_id_map = StrMap.empty
+let empty_name_var_map = StrMap.empty
 
 let unique_exprid =
     let last_id = ref 0 in
@@ -61,14 +55,6 @@ let unique_exprid =
         last_id := !last_id + 1 ;
         !last_id
     )
-
-let unique_varid =
-    let last_id = ref 0 in
-    fun _ -> (
-        last_id := !last_id + 1 ;
-        !last_id
-    )
-
 let identifier_of_expr (a,_) = Position.value a
 let position_of_expr (a,_) = Position.position a
 
@@ -78,8 +64,8 @@ let new_annot p =
 let copy_annot a =
     new_annot (Position.position a)
 
-let parser_expr_to_annot_expr tenv id_map e =
-    let rec aux env (a,e) =
+let parser_expr_to_annot_expr tenv name_var_map e =
+    let rec aux env ((exprid,pos),e) =
         let e = match e with
         | Const c -> Const c
         | Var str ->
@@ -95,17 +81,19 @@ let parser_expr_to_annot_expr tenv id_map e =
             | ADomain t -> ADomain (type_expr_to_typ tenv t)
             | AArrow t -> AArrow (type_expr_to_typ tenv t)
             in
-            let varid = unique_varid () in
-            let env = StrMap.add str varid env in
-            Lambda (t, varid, aux env e)
+            let var = Variable.create (Some str) in
+            Variable.attach_location var pos ;
+            let env = StrMap.add str var env in
+            Lambda (t, var, aux env e)
         | Ite (e, t, e1, e2) ->
             Ite (aux env e, type_expr_to_typ tenv t, aux env e1, aux env e2)
         | App (e1, e2) ->
             App (aux env e1, aux env e2)
         | Let (str, e1, e2) ->
-            let varid = unique_varid () in
-            let env' = StrMap.add str varid env in
-            Let (varid, aux env e1, aux env' e2)
+            let var = Variable.create (Some str) in
+            Variable.attach_location var pos ;
+            let env' = StrMap.add str var env in
+            Let (var, aux env e1, aux env' e2)
         | Pair (e1, e2) ->
             Pair (aux env e1, aux env e2)
         | Projection (p, e) -> Projection (p, aux env e)
@@ -113,9 +101,9 @@ let parser_expr_to_annot_expr tenv id_map e =
             RecordUpdate (aux env e1, l, Utils.option_map (aux env) e2)
         | Debug (str, e) -> Debug (str, aux env e)
         in
-        (a,e)
+        ((exprid,pos),e)
     in
-    aux id_map e
+    aux name_var_map e
 
 let rec unannot (_,e) =
     let e = match e with
@@ -135,17 +123,17 @@ let rec unannot (_,e) =
 
 let rec fv (_, expr) =
   match expr with
-  | Const _ -> VarIdSet.empty
-  | Var v -> VarIdSet.singleton v
-  | Lambda (_, v, e) -> VarIdSet.remove v (fv e)
-  | Ite (e, _, e1, e2) -> VarIdSet.union (VarIdSet.union (fv e) (fv e1)) (fv e2)
-  | App (e1, e2) -> VarIdSet.union (fv e1) (fv e2)
-  | Let (v, e1, e2) -> VarIdSet.union (fv e1) (VarIdSet.remove v (fv e2))
-  | Pair (e1, e2) -> VarIdSet.union (fv e1) (fv e2)
+  | Const _ -> VarSet.empty
+  | Var v -> VarSet.singleton v
+  | Lambda (_, v, e) -> VarSet.remove v (fv e)
+  | Ite (e, _, e1, e2) -> VarSet.union (VarSet.union (fv e) (fv e1)) (fv e2)
+  | App (e1, e2) -> VarSet.union (fv e1) (fv e2)
+  | Let (v, e1, e2) -> VarSet.union (fv e1) (VarSet.remove v (fv e2))
+  | Pair (e1, e2) -> VarSet.union (fv e1) (fv e2)
   | Projection (_, e) -> fv e
   | RecordUpdate (e1, _, e2) ->
     begin match e2 with
-    | Some e2 -> VarIdSet.union (fv e1) (fv e2)
+    | Some e2 -> VarSet.union (fv e1) (fv e2)
     | None -> fv e1
     end
   | Debug (_, e) -> fv e

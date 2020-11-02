@@ -1,5 +1,5 @@
-open Nf_ast
 open Cduce
+open Variable
 
 type env = typ VarMap.t
 let empty_env = VarMap.empty

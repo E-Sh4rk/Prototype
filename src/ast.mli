@@ -1,10 +1,9 @@
 open Types_additions
+open Variable
 type typ = Cduce.typ
 
 type varname = string
-type varid = int (* It is NOT De Bruijn indexes, but unique IDs *)
 type exprid = int
-(* TODO: Use Nf_ast.Variable.t for varid *)
 
 type annotation = exprid Position.located
 
@@ -35,8 +34,8 @@ type ('a, 'typ, 'v) ast =
 
 and ('a, 'typ, 'v) t = 'a * ('a, 'typ, 'v) ast
 
-type annot_expr = (annotation, typ, varid) t
-type expr = (unit, typ, varid) t
+type annot_expr = (annotation, typ, Variable.t) t
+type expr = (unit, typ, Variable.t) t
 type parser_expr = (annotation, type_expr, varname) t
 
 module Expr : sig
@@ -45,25 +44,21 @@ module Expr : sig
     val equiv : t -> t -> bool
 end
 module ExprMap : Map.S with type key = expr
-module VarIdMap : Map.S with type key = varid
-module VarIdSet : Set.S with type elt = varid
 
-type id_map = int StrMap.t
-val empty_id_map : id_map
+type name_var_map = Variable.t StrMap.t
+val empty_name_var_map : name_var_map
 
 val unique_exprid : unit -> exprid
-val unique_varid : unit -> varid
-
 val identifier_of_expr : (annotation, 'a, 'b) t -> exprid
 val position_of_expr : (annotation, 'a, 'b) t -> Position.t
 
 val new_annot : Position.t -> annotation
 val copy_annot : annotation -> annotation
 
-val parser_expr_to_annot_expr : type_env -> id_map -> parser_expr -> annot_expr
+val parser_expr_to_annot_expr : type_env -> name_var_map -> parser_expr -> annot_expr
 
 val unannot : annot_expr -> expr
-val fv : annot_expr -> VarIdSet.t
+val fv : annot_expr -> VarSet.t
 
 val const_to_typ : const -> typ
 

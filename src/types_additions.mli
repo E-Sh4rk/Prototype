@@ -44,3 +44,6 @@ val disj : typ list -> typ
 val square : typ -> typ -> (typ * typ) list
 val square_approx : typ -> typ -> typ
 val square_exact : typ -> typ -> typ
+
+val triangle : typ -> typ -> (typ * typ) list
+val triangle_exact : typ -> typ -> typ

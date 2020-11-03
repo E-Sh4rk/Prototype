@@ -98,8 +98,7 @@ let conj ts = List.fold_left cap any ts
 let disj ts = List.fold_left cup empty ts
 
 let square_approx f out =
-    let dnf = dnf f in
-    let res = dnf |> List.map begin
+    let res = dnf f |> List.map begin
         fun lst ->
             let is_impossible (_,t) = is_empty (cap out t) in
             let impossibles = List.filter is_impossible lst |> List.map fst in
@@ -114,8 +113,7 @@ let rec take_one lst =
         (e, lst)::(List.map (fun (e',lst) -> (e',e::lst)) (take_one lst))
 
 let square_exact f out =
-    let dnf = dnf f in
-    let res = dnf |> List.map begin
+    let res = dnf f |> List.map begin
         fun lst ->
             let rec impossible_inputs current_set lst =
                 let t = List.map snd current_set in
@@ -129,16 +127,15 @@ let square_exact f out =
     end in
     cap (domain f) (disj res)
 
+let branch_type lst =
+    lst
+    |> List.map (fun (a, b) -> mk_arrow (cons a) (cons b))
+    |> conj
+
 let square f out =
-    let dnf = dnf f in
-    dnf |>
+    dnf f |>
     List.map begin
         fun lst ->
-            let branch_type =
-                lst
-                |> List.map (fun (a, b) -> mk_arrow (cons a) (cons b))
-                |> conj
-            in
             let rec impossible_inputs current_set lst =
                 let t = List.map snd current_set in
                 if subtype out (neg (conj t)) then [conj (List.map fst current_set)]
@@ -149,5 +146,22 @@ let square f out =
             in
             neg (disj (impossible_inputs [] lst))
             |> cap (domain f)
-            |> (fun t -> (branch_type, t))
-    end 
+            |> (fun t -> (branch_type lst, t))
+    end
+
+let triangle_exact f out =
+    let res = dnf f |> List.map begin
+        fun lst ->
+            let rec possible_inputs current_set lst =
+                let t = List.map snd current_set in
+                if subtype (conj t) out then [conj (List.map fst current_set)]
+                else begin
+                    let aux (e,lst) = possible_inputs (e::current_set) lst in
+                    List.flatten (List.map aux (take_one lst))
+                end
+            in
+            disj (possible_inputs [] lst)
+    end in
+    conj res
+
+let triangle f out = [f, triangle_exact f out]

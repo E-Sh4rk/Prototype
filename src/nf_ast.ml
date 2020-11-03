@@ -17,12 +17,14 @@ and e =
   | Let of Variable.t * a * e
   | Atomic of a
 
-(* TODO: test if ast is already in expr_var_map (in order to factorize common sub-expressions) *)
 let convert_to_normal_form ast =
   let rec aux expr_var_map ast =
     let rec to_defs_and_a expr_var_map ast =
       let (_, e) = ast in
-      match e with
+      let uast = Ast.unannot ast in
+      if ExprMap.mem uast expr_var_map
+      then ([], expr_var_map, Var (ExprMap.find uast expr_var_map))
+      else match e with
       | Ast.Const c -> ([], expr_var_map, Const c)
       | Ast.Var v -> ([], expr_var_map, Var v)
       | Ast.Lambda (t, v, e) ->

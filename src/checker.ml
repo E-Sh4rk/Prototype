@@ -95,7 +95,7 @@ let rec typeof tenv env e =
     | Lambda (Ast.ADomain s, x, e) ->
       let refine_env_cont env t = [t, env] in
       split_and_refine tenv env e x s refine_env_cont
-      |> List.map (fun (t, env) -> mk_arrow (cons t) (cons (aux_e pos env e)))
+      |> List.map (fun (s, env) -> mk_arrow (cons s) (cons (aux_e pos env e)))
       |> conj
     | Lambda _ -> failwith "Only abstractions with typed domain are supported for now."
   and aux_e pos env e =
@@ -152,9 +152,9 @@ and refine ~backward tenv env e t =
     let t = cap t (typeof tenv env (Atomic a)) in
     begin match a with
     (* Var & const *)
-    | Const c -> [t, env]
+    | Const _ -> [t, env]
     | Var v -> [t, VarMap.add v t env]
-    | Debug (str, v) -> [t, VarMap.add v t env]
+    | Debug (_, v) -> [t, VarMap.add v t env]
     (* Projections & Pairs *)
     | Projection (Fst, v) ->
       let tv = VarMap.find v env in
@@ -174,18 +174,40 @@ and refine ~backward tenv env e t =
             then VarMap.add x1 (cap t1 t2) env
             else VarMap.add x1 t1 (VarMap.add x2 t2 env)
           in
-          [mk_times (cons t1) (cons t2), env]
+          (mk_times (cons t1) (cons t2), env)
       )
-    | RecordUpdate (x1, str, x2) ->
+    | RecordUpdate (*(x1, str, x2)*) _ ->
       failwith "Refinement of records not implemented yet."
     (* App & Case *)
     | App (x1, x2) ->
-      
+      let t1 = VarMap.find x1 env in
+      let t2 = VarMap.find x2 env in
+      (if backward then square t1 t else triangle t1 t)
+      |> List.map (
+        fun (t1', t2') ->
+          let t1 = cap t1 t1' in
+          let t2 = cap t2 t2' in
+          let env =
+            if Variable.equals x1 x2
+            then VarMap.add x1 (cap t1 t2) env
+            else VarMap.add x1 t1 (VarMap.add x2 t2 env)
+          in
+          (apply t1 t2, env)
+      )
     | Ite (v,t,e1,e2) ->
-
+      let vt = VarMap.find v env in
+      let env1 = VarMap.add v (cap vt t) env in
+      let env2 = VarMap.add v (cap vt (neg t)) env in
+      (aux_e env1 e1 t)@(aux_e env2 e2 t)
     (* Abstractions *)
     | Lambda (Ast.ADomain s, x, e) ->
-
+      let dom = domain t in
+      if subtype dom s then
+        let refine_env_cont env t = [t, env] in
+        split_and_refine tenv env e x dom refine_env_cont
+        |> List.map (fun (s, env) -> aux_e env e (apply t s))
+        |> List.flatten
+      else []
     | Lambda _ -> failwith "Only abstractions with typed domain are supported for now."
     end
     |> filter_res
@@ -202,5 +224,4 @@ and refine ~backward tenv env e t =
       |> List.map (fun (_, env) -> aux_e env e t)
       |> List.flatten
   in
-  ignore backward ; (* TODO: remove *)
   aux_e env e t

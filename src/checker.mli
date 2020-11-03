@@ -12,4 +12,4 @@ exception Ill_typed of Position.t list * string
 
 val typeof : type_env -> env -> e -> typ
 val candidates : type_env -> env -> e -> Variable.t -> typ list
-val refine : forward:bool -> type_env -> env -> e -> typ -> type_env list
+val refine : backward:bool -> type_env -> env -> e -> typ -> (typ * env) list

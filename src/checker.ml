@@ -104,7 +104,12 @@ let rec typeof tenv env e =
     else match e with 
     | Atomic a -> aux_a pos env a
     (* Let bindings *)
-    | _ -> failwith "TODO"
+    | Let (x, a, e) ->
+      let s = aux_a (Variable.get_locations x) env a in
+      let refine_env_cont env t = refine ~backward:true tenv env (Atomic a) t in
+      split_and_refine tenv env e x s refine_env_cont
+      |> List.map (fun (_, env) -> aux_e pos env e)
+      |> disj
   in
   aux_e [] env e
 
@@ -140,6 +145,6 @@ and candidates_partition tenv env e x t =
 and candidates (*tenv env e x*) _ _ _ _ =
   failwith "TODO"
 
-and refine ~forward (*tenv env e t*) _ _ _ _ =
-  ignore forward ;
+and refine ~backward (*tenv env e t*) _ _ _ _ =
+  ignore backward ;
   failwith "TODO"

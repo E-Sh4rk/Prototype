@@ -83,12 +83,7 @@ let define_types env defs =
     (* TODO: normalize? *)
     List.iter define_type defs ; env
 
-let get_atom env atom =
-    let atom = String.capitalize_ascii atom in
-    try descr (StrMap.find atom env)
-    with Not_found -> failwith (Printf.sprintf "Atom %s undefined!" atom)
-
-let get_type env name =
+let get_type_or_atom env name =
     let name = String.capitalize_ascii name in
     try descr (StrMap.find name env)
     with Not_found -> failwith (Printf.sprintf "Type %s undefined!" name)

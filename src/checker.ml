@@ -1,16 +1,111 @@
 open Cduce
 open Variable
+open Nf_ast
+open Types_additions
 
 type env = typ VarMap.t
 let empty_env = VarMap.empty
 
 let is_bottom env =
-    let is_bottom (_,v) = is_empty v in
+    let is_bottom (_,t) = is_empty t in
     List.exists is_bottom (VarMap.bindings env)
 
 let add_to_env v t env = VarMap.add v t env
 
-exception Ill_typed of Position.t * string
+exception Ill_typed of Position.t list * string
 
-let typeof (*tenv env e*) _ _ _ =
+let (*rec*) typeof tenv env e =
+  let rec aux_a pos env a =
+    (* NOTE: I think we do not need to test EFQ here...
+       doing it in aux_e should be enough. *)
+    match a with
+    (* Var & const *)
+    | Const (Atom str) -> get_type_or_atom tenv str
+    | Const c -> Ast.const_to_typ c
+    | Var v -> VarMap.find v env
+    | Debug (str, v) ->
+      let res = VarMap.find v env in
+      Format.printf "%s (typeof): " str ; Utils.print_type res ;
+      res
+    (* Projections & Pairs *)
+    | Projection (Fst, v) ->
+      let t = VarMap.find v env in
+      if subtype t pair_any then pi1 t
+      else raise (Ill_typed (pos, "Fst can only be applied to a pair."))
+    | Projection (Snd, v) ->
+      let t = VarMap.find v env in
+      if subtype t pair_any then pi2 t
+      else raise (Ill_typed (pos, "Snd can only be applied to a pair."))
+    | Projection (Field str, v) ->
+      let t = VarMap.find v env in
+      if subtype t record_any
+      then
+        try get_field t str
+        with Not_found ->
+        raise (Ill_typed (pos, Printf.sprintf "The record does not surely contains the field %s." str))
+      else raise (Ill_typed (pos, "Field projection can only be applied to a record."))
+    | Pair (x1, x2) ->
+      let t1 = VarMap.find x1 env in
+      let t2 = VarMap.find x2 env in
+      mk_times (cons t1) (cons t2)
+    | RecordUpdate (x1, str, x2) ->
+      let t1 = VarMap.find x1 env in
+      if subtype t1 record_any
+      then begin
+        match x2 with
+        | None -> remove_field t1 str
+        | Some x2 ->
+          let t2 = VarMap.find x2 env in
+          let t' = mk_record false [str, cons t2] in
+          merge_records t1 t'
+      end else raise (Ill_typed (pos, "Field assignation can only be applied to a record."))
+    (* App & Case *)
+    | App (x1, x2) ->
+      let t1 = VarMap.find x1 env in
+      let t2 = VarMap.find x2 env in
+      let dom_t1 = domain t1 in
+      if subtype t2 dom_t1
+      then apply t1 t2
+      else
+        let error = Printf.sprintf
+          "Bad domain for the application: expected %s - found: %s" 
+          (string_of_type dom_t1) (string_of_type t2) in
+        raise (Ill_typed (pos, error))
+    | Ite (v,t,e1,e2) ->
+      let vt = VarMap.find v env in
+      let env1 = VarMap.add v (cap vt t) env in
+      let env2 = VarMap.add v (cap vt (neg t)) env in
+      (* TODO: some marking in order to detect unreachable code *)
+      (*let logs1 = get_logs_expr e1 in
+      let logs2 = get_logs_expr e2 in
+      let bottom_1 = is_bottom env1 in
+      let t1 = if bottom_1
+      then (set_logs e1 {logs1 with ignored=logs1.ignored+1} ; empty)
+      else (set_logs e1 {logs1 with visited=logs1.visited+1} ; self (env1, e1)) in
+      let t2 = if is_bottom env2
+        then
+          (* Remove false to experiment with failure instead of empty *)
+          if false && bottom_1 then raise (Ill_typed (pos, "No branch can be selected"))
+          else (set_logs e2 {logs2 with ignored=logs2.ignored+1} ; empty)
+        else (set_logs e2 {logs2 with visited=logs2.visited+1} ; self (env2, e2)) in*)
+      let t1 = aux_e pos env1 e1 in
+      let t2 = aux_e pos env2 e2 in
+      cup t1 t2
+    (* Abstractions *)
+    | _ -> failwith "TODO"
+  and aux_e pos env e =
+    if is_bottom env
+    then empty
+    else match e with 
+    | Atomic a -> aux_a pos env a
+    (* Let bindings *)
+    | _ -> failwith "TODO"
+  in
+  aux_e [] env e
+
+and candidates (*tenv env e x*) _ _ _ _ =
+  failwith "TODO"
+
+and refine ~forward (*tenv env e t*) _ _ _ _ =
+  ignore forward ;
   failwith "TODO"

@@ -7,10 +7,18 @@ let print_type t =
     (*Format.printf "%s\n" (Cduce.string_of_type (Cduce.domain t))*)
 
 let warning pos msg =
-  Format.printf "Warning: %s\t%s\n" (Position.string_of_pos pos) msg
+  let pos = List.fold_left (
+    fun acc pos ->
+    Format.asprintf "%s %s" acc (Position.string_of_pos pos)
+  ) "" pos in
+  Format.printf "Warning:%s\t%s\n" pos msg
 
 let error pos msg =
-  Format.printf "Error: %s\t%s\n" (Position.string_of_pos pos) msg
+  let pos = List.fold_left (
+    fun acc pos ->
+    Format.asprintf "%s %s" acc (Position.string_of_pos pos)
+  ) "" pos in
+  Format.printf "Error:%s\t%s\n" pos msg
 
 
 

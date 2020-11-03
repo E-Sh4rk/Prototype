@@ -145,6 +145,26 @@ and candidates_partition tenv env e x t =
 and candidates (*tenv env e x*) _ _ _ _ =
   failwith "TODO"
 
-and refine ~backward (*tenv env e t*) _ _ _ _ =
-  ignore backward ;
-  failwith "TODO"
+and refine ~backward tenv env e t =
+  let res_non_empty (t, _) = non_empty t in
+  let filter_res lst = List.filter res_non_empty lst in
+  let rec aux_a _ _ _ =
+    begin
+      failwith "TODO"
+    end
+    |> filter_res
+  and aux_e env e t =
+    (* NOTE: I think we do not need to filter_res (EFQ) here...
+       doing it in aux_a should be enough. *)
+    match e with 
+    | Atomic a -> aux_a env a t
+    (* Let bindings *)
+    | Let (x, a, e) ->
+      let s = typeof tenv env (Atomic a) in
+      let refine_env_cont env t = refine ~backward:true tenv env (Atomic a) t in
+      split_and_refine tenv env e x s refine_env_cont
+      |> List.map (fun (_, env) -> aux_e env e t)
+      |> List.flatten
+  in
+  ignore backward ; (* TODO: remove *)
+  aux_e env e t

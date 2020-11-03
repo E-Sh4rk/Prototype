@@ -14,7 +14,7 @@ let add_to_env v t env = VarMap.add v t env
 
 exception Ill_typed of Position.t list * string
 
-let (*rec*) typeof tenv env e =
+let rec typeof tenv env e =
   let rec aux_a pos env a =
     (* NOTE: I think we do not need to test EFQ here...
        doing it in aux_e should be enough. *)
@@ -92,7 +92,12 @@ let (*rec*) typeof tenv env e =
       let t2 = aux_e pos env2 e2 in
       cup t1 t2
     (* Abstractions *)
-    | _ -> failwith "TODO"
+    | Lambda (Ast.ADomain s, x, e) ->
+      let refine_env_cont env t = [t, env] in
+      split_and_refine tenv env e x s refine_env_cont
+      |> List.map (fun (t, env) -> mk_arrow (cons t) (cons (aux_e pos env e)))
+      |> conj
+    | Lambda _ -> failwith "Only abstractions with typed domain are supported for now."
   and aux_e pos env e =
     if is_bottom env
     then empty
@@ -102,6 +107,35 @@ let (*rec*) typeof tenv env e =
     | _ -> failwith "TODO"
   in
   aux_e [] env e
+
+and split_and_refine tenv env e x initial_t refine_env_cont =
+  let rec aux env t =
+    let envs = refine_env_cont env t in
+    let treat_env (t, env) =
+      let env = VarMap.add x t env in
+      match candidates_partition tenv env e x t with
+      | [] -> assert false
+      | [t] -> [t, env]
+      | lst ->
+        List.map (aux env) lst
+        |> List.flatten
+    in
+    List.map treat_env envs
+    |> List.flatten
+  in
+  aux env initial_t
+
+and candidates_partition tenv env e x t =
+  let ts =
+    candidates tenv env e x
+    |> List.map (cap t)
+  in
+  let aux (u, ts) t =
+    (cup u t, (diff t u)::ts)
+  in
+  let (u, ts) = List.fold_left aux (empty, []) ts in
+  let ts = (diff t u)::ts in
+  List.filter non_empty ts
 
 and candidates (*tenv env e x*) _ _ _ _ =
   failwith "TODO"

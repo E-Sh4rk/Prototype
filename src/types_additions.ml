@@ -129,4 +129,25 @@ let square_exact f out =
     end in
     cap (domain f) (disj res)
 
-let square = square_exact (* You can switch between square_exact and square_approx *)
+let square f out =
+    let dnf = dnf f in
+    dnf |>
+    List.map begin
+        fun lst ->
+            let branch_type =
+                lst
+                |> List.map (fun (a, b) -> mk_arrow (cons a) (cons b))
+                |> conj
+            in
+            let rec impossible_inputs current_set lst =
+                let t = List.map snd current_set in
+                if subtype out (neg (conj t)) then [conj (List.map fst current_set)]
+                else begin
+                    let aux (e,lst) = impossible_inputs (e::current_set) lst in
+                    List.flatten (List.map aux (take_one lst))
+                end
+            in
+            neg (disj (impossible_inputs [] lst))
+            |> cap (domain f)
+            |> (fun t -> (branch_type, t))
+    end 

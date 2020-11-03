@@ -41,6 +41,7 @@ val mk_times : node -> node -> typ
 val pair_any : typ
 val pi1 : typ -> typ
 val pi2 : typ -> typ
+val split_pair : typ -> (typ * typ) list
 
 val mk_record : bool -> (string * node) list -> typ
 val record_any : typ

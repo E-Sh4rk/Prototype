@@ -148,14 +148,50 @@ and candidates (*tenv env e x*) _ _ _ _ =
 and refine ~backward tenv env e t =
   let res_non_empty (t, _) = non_empty t in
   let filter_res lst = List.filter res_non_empty lst in
-  let rec aux_a _ _ _ =
-    begin
-      failwith "TODO"
+  let rec aux_a env a t =
+    let t = cap t (typeof tenv env (Atomic a)) in
+    begin match a with
+    (* Var & const *)
+    | Const c -> [t, env]
+    | Var v -> [t, VarMap.add v t env]
+    | Debug (str, v) -> [t, VarMap.add v t env]
+    (* Projections & Pairs *)
+    | Projection (Fst, v) ->
+      let tv = VarMap.find v env in
+      [t, VarMap.add v (cap tv (mk_times (cons t) any_node)) env]
+    | Projection (Snd, v) ->
+      let tv = VarMap.find v env in
+      [t, VarMap.add v (cap tv (mk_times any_node (cons t))) env]
+    | Projection (Field str, v) ->
+      let tv = VarMap.find v env in
+      [t, VarMap.add v (cap tv (mk_record true [str, cons t])) env]
+    | Pair (x1, x2) ->
+      split_pair t
+      |> List.map (
+        fun (t1, t2) ->
+          let env =
+            if Variable.equals x1 x2
+            then VarMap.add x1 (cap t1 t2) env
+            else VarMap.add x1 t1 (VarMap.add x2 t2 env)
+          in
+          [mk_times (cons t1) (cons t2), env]
+      )
+    | RecordUpdate (x1, str, x2) ->
+      failwith "Refinement of records not implemented yet."
+    (* App & Case *)
+    | App (x1, x2) ->
+      
+    | Ite (v,t,e1,e2) ->
+
+    (* Abstractions *)
+    | Lambda (Ast.ADomain s, x, e) ->
+
+    | Lambda _ -> failwith "Only abstractions with typed domain are supported for now."
     end
     |> filter_res
   and aux_e env e t =
-    (* NOTE: I think we do not need to filter_res (EFQ) here...
-       doing it in aux_a should be enough. *)
+    (* NOTE: I think we do not need to filter_res (EFQ)
+       and intersect with typeof here... doing it in aux_a should be enough. *)
     match e with 
     | Atomic a -> aux_a env a t
     (* Let bindings *)

@@ -145,7 +145,7 @@ and normalize_candidates t ts =
   |> List.filter non_empty
   |> List.filter (fun t' -> equiv t t' |> not)
 
-and candidates_a (*pos tenv*) _ _ env a x =
+and candidates_a pos tenv env a x =
   begin match a with
   (* Var & const *)
   | Const _ -> []
@@ -153,6 +153,23 @@ and candidates_a (*pos tenv*) _ _ env a x =
   | Var _ -> []
   | Debug _ -> []
   (* Projections & Pairs *)
+  | Projection (Fst, y) | Projection (Snd, y) when Variable.equals x y ->
+    [mk_times any_node any_node]
+  | Projection (Field str, y) when Variable.equals x y ->
+    [mk_record true [str, any_node]]
+  | Projection _ -> []
+  | Pair (x1, x2) ->
+    let p1 = candidates_a pos tenv env (Var x1) x in
+    if p1 == []
+    then candidates_a pos tenv env (Var x2) x
+    else p1
+  | RecordUpdate (x1, _, x2) ->
+    let p1 = candidates_a pos tenv env (Var x1) x in
+    if p1 == []
+    then begin match x2 with
+    | None -> []
+    | Some x2 -> candidates_a pos tenv env (Var x2) x
+    end else p1
   (* App & Case *)
   (* Abstractions *)
   | _ -> failwith "TODO"

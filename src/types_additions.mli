@@ -41,6 +41,8 @@ val has_type_or_atom : type_env -> string -> bool
 val conj : typ list -> typ
 val disj : typ list -> typ
 
+val split_arrow : typ -> typ list
+
 val square : typ -> typ -> (typ * typ) list
 val square_approx : typ -> typ -> typ
 val square_exact : typ -> typ -> typ

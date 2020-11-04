@@ -154,23 +154,39 @@ and candidates_a pos tenv env a x =
   | Debug _ -> []
   (* Projections & Pairs *)
   | Projection (Fst, y) | Projection (Snd, y) when Variable.equals x y ->
-    [mk_times any_node any_node]
+    [pair_any]
   | Projection (Field str, y) when Variable.equals x y ->
     [mk_record true [str, any_node]]
   | Projection _ -> []
   | Pair (x1, x2) ->
     let p1 = candidates_a pos tenv env (Var x1) x in
-    if p1 == []
+    if p1 = []
     then candidates_a pos tenv env (Var x2) x
     else p1
   | RecordUpdate (x1, _, x2) ->
     let p1 = candidates_a pos tenv env (Var x1) x in
-    if p1 == []
+    if p1 = []
     then begin match x2 with
     | None -> []
     | Some x2 -> candidates_a pos tenv env (Var x2) x
     end else p1
   (* App & Case *)
+  | App (x1, x2) ->
+    let tx = Env.find x env in
+    let r =
+      if Variable.equals x1 x
+      then
+        cap tx arrow_any
+        |> split_arrow
+        |> List.filter (fun t -> equiv t tx |> not)
+      else []
+    in
+    if r = [] && Variable.equals x2 x
+    then
+      dnf tx
+      |> List.flatten
+      |> List.map fst
+    else r
   (* Abstractions *)
   | _ -> failwith "TODO"
   end

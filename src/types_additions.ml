@@ -97,6 +97,15 @@ let has_type_or_atom env name =
 let conj ts = List.fold_left cap any ts
 let disj ts = List.fold_left cup empty ts
 
+let branch_type lst =
+    lst
+    |> List.map (fun (a, b) -> mk_arrow (cons a) (cons b))
+    |> conj
+
+let split_arrow t =
+  dnf t
+  |> List.map branch_type
+
 let square_approx f out =
     let res = dnf f |> List.map begin
         fun lst ->
@@ -126,11 +135,6 @@ let square_exact f out =
             neg (disj (impossible_inputs [] lst))
     end in
     cap (domain f) (disj res)
-
-let branch_type lst =
-    lst
-    |> List.map (fun (a, b) -> mk_arrow (cons a) (cons b))
-    |> conj
 
 let square f out =
     dnf f |>

@@ -120,17 +120,17 @@ let mk_arrow = CD.Types.arrow
 let arrow_any = CD.Types.Arrow.any
 
 let domain t =
-    if subtype t arrow_any then
-      let t = CD.Types.Arrow.get t in
-      CD.Types.Arrow.domain t
-    else empty
+  if subtype t arrow_any then
+    let t = CD.Types.Arrow.get t in
+    CD.Types.Arrow.domain t
+  else empty
 
 let apply t args =
-    let t = CD.Types.Arrow.get t in
-    CD.Types.Arrow.apply t args
+  let t = CD.Types.Arrow.get t in
+  CD.Types.Arrow.apply t args
 
 let dnf t =
-    snd (CD.Types.Arrow.get t)
+  snd (CD.Types.Arrow.get t)
 
 
 let true_typ = mk_atom "true"

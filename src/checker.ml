@@ -146,6 +146,7 @@ and normalize_candidates t ts =
   |> List.filter (fun t' -> equiv t t' |> not)
 
 and candidates_a pos tenv env a x =
+  let tx = Env.find x env in
   begin match a with
   (* Var & const *)
   | Const _ -> []
@@ -155,8 +156,10 @@ and candidates_a pos tenv env a x =
   (* Projections & Pairs *)
   | Projection (Fst, y) | Projection (Snd, y) when Variable.equals x y ->
     [pair_any]
+    |> normalize_candidates tx
   | Projection (Field str, y) when Variable.equals x y ->
     [mk_record true [str, any_node]]
+    |> normalize_candidates tx
   | Projection _ -> []
   | Pair (x1, x2) ->
     let p1 = candidates_a pos tenv env (Var x1) x in
@@ -172,13 +175,12 @@ and candidates_a pos tenv env a x =
     end else p1
   (* App & Case *)
   | App (x1, x2) ->
-    let tx = Env.find x env in
     let r =
       if Variable.equals x1 x
       then
         cap tx arrow_any
         |> split_arrow
-        |> List.filter (fun t -> equiv t tx |> not)
+        |> normalize_candidates tx
       else []
     in
     if r = [] && Variable.equals x2 x
@@ -186,11 +188,33 @@ and candidates_a pos tenv env a x =
       dnf tx
       |> List.flatten
       |> List.map fst
+      |> normalize_candidates tx
+    else r
+  | Ite (y, t, e1, e2) ->
+    let r =
+      if Variable.equals y x
+      then
+        [t ; neg t]
+        |> normalize_candidates tx
+      else []
+    in
+    let r =
+      if r = []
+      then candidates tenv (Env.add x (cap tx t) env) e1 x
+      else r
+    in
+    if r = []
+    then candidates tenv (Env.add x (cap tx (neg t)) env) e2 x
     else r
   (* Abstractions *)
-  | _ -> failwith "TODO"
+  | Lambda (Ast.ADomain s, y, e) -> (* y is necessary different from x *)
+    let refine_env_cont env t = [t, env] in
+    split_and_refine tenv env e y s refine_env_cont
+    |> List.map (fun (_, env) -> candidates tenv env e x)
+    |> List.flatten
+  | Lambda _ -> failwith "Only abstractions with typed domain are supported for now."
   end
-  |> normalize_candidates (Env.find x env)
+  (*|> normalize_candidates (Env.find x env)*) (* NOTE: Already done when necessary. *)
 
 and candidates (*tenv env e x*) _ _ e _ =
   begin match e with

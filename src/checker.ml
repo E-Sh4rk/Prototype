@@ -107,7 +107,7 @@ and typeof tenv env e =
   if Env.is_bottom env
   then empty
   else match e with 
-  | Atomic a -> typeof_a [] tenv env a
+  | EVar x -> typeof_a [] tenv env (Var x)
   (* Let bindings *)
   | Let (x, a, e) ->
     let pos = Variable.get_locations x in
@@ -222,7 +222,7 @@ and refine_a pos ~backward tenv env a t =
 and refine ~backward tenv env e t =
   (*let t = cap t (typeof tenv env e) in*) (* NOTE: Only needed in refine_a. *)
   begin match e with 
-  | Atomic a -> refine_a [] ~backward tenv env a t
+  | EVar x -> refine_a [] ~backward tenv env (Var x) t
   (* Let bindings *)
   | Let (x, a, e) ->
     let pos = Variable.get_locations x in

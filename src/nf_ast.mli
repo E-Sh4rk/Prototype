@@ -13,6 +13,7 @@ type a =
 
 and e =
   | Let of Variable.t * a * e
-  | Atomic of a
+  | EVar of Variable.t (* We restrict to variables instead of atomics,
+                          in order for every atomic to be localized by a variable *)
 
 val convert_to_normal_form : Ast.annot_expr -> e

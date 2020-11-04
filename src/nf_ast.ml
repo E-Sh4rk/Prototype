@@ -15,7 +15,7 @@ type a =
 
 and e =
   | Let of Variable.t * a * e
-  | Atomic of a
+  | EVar of Variable.t
 
 let convert_to_normal_form ast =
   let rec aux expr_var_map ast =
@@ -75,11 +75,11 @@ let convert_to_normal_form ast =
         let defs = (var, a)::defs in
         (defs, expr_var_map, var)
     in
-    let (defs, _, a) = to_defs_and_a expr_var_map ast in
+    let (defs, _, x) = to_defs_and_x expr_var_map ast in
     List.rev defs |>
     List.fold_left (
       fun nf (v, d) ->
       Let (v, d, nf)
-    ) (Atomic a)
+    ) (EVar x)
 
   in aux ExprMap.empty ast

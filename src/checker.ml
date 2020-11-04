@@ -110,8 +110,9 @@ and typeof tenv env e =
   | Atomic a -> typeof_a [] tenv env a
   (* Let bindings *)
   | Let (x, a, e) ->
-    let s = typeof_a (Variable.get_locations x) tenv env a in
-    let refine_env_cont env t = refine_a ~backward:true tenv env a t in
+    let pos = Variable.get_locations x in
+    let s = typeof_a pos tenv env a in
+    let refine_env_cont env t = refine_a pos ~backward:true tenv env a t in
     split_and_refine tenv env e x s refine_env_cont
     |> List.map (fun (_, env) -> typeof tenv env e)
     |> disj
@@ -145,7 +146,7 @@ and candidates_partition tenv env e x t =
   let ts = (diff t u)::ts in
   List.filter non_empty ts
 
-and candidates_a (*tenv env a x*) _ _ _ _ =
+and candidates_a (*pos tenv env a x*) _ _ _ _ _ =
   failwith "TODO"
 
 and candidates (*tenv env e x*) _ _ _ _ =
@@ -154,8 +155,8 @@ and candidates (*tenv env e x*) _ _ _ _ =
 and res_non_empty (t, _) = non_empty t
 and filter_res lst = List.filter res_non_empty lst
 
-and refine_a ~backward tenv env a t =
-  let t = cap t (typeof_a [] tenv env a) in
+and refine_a pos ~backward tenv env a t =
+  let t = cap t (typeof_a pos tenv env a) in
   begin match a with
   (* Var & const *)
   | Const _ -> [t, env]
@@ -221,11 +222,12 @@ and refine_a ~backward tenv env a t =
 and refine ~backward tenv env e t =
   (*let t = cap t (typeof tenv env e) in*) (* NOTE: Only needed in refine_a. *)
   begin match e with 
-  | Atomic a -> refine_a ~backward tenv env a t
+  | Atomic a -> refine_a [] ~backward tenv env a t
   (* Let bindings *)
   | Let (x, a, e) ->
-    let s = typeof_a (Variable.get_locations x) tenv env a in
-    let refine_env_cont env t = refine_a ~backward:true tenv env a t in
+    let pos = Variable.get_locations x in
+    let s = typeof_a pos tenv env a in
+    let refine_env_cont env t = refine_a pos ~backward:true tenv env a t in
     split_and_refine tenv env e x s refine_env_cont
     |> List.map (fun (_, env) -> refine ~backward tenv env e t)
     |> List.flatten

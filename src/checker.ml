@@ -122,7 +122,7 @@ and split_and_refine tenv env e x initial_t refine_env_cont =
     let envs = refine_env_cont env t in
     let treat_env (t, env) =
       let env = Env.add x t env in
-      match candidates_partition tenv env e x t with
+      match candidates_completed tenv env e x with
       | [] -> assert false
       | [t] -> [t, env]
       | lst ->
@@ -134,23 +134,36 @@ and split_and_refine tenv env e x initial_t refine_env_cont =
   in
   aux env initial_t
 
-and candidates_partition tenv env e x t =
-  let ts =
-    candidates tenv env e x
-    |> List.map (cap t)
-  in
-  let aux (u, ts) t =
-    (cup u t, (diff t u)::ts)
-  in
-  let (u, ts) = List.fold_left aux (empty, []) ts in
-  let ts = (diff t u)::ts in
-  List.filter non_empty ts
+and candidates_completed tenv env e x =
+  let ts = candidates tenv env e x in
+  let r = diff (Env.find x env) (disj ts) in
+  if non_empty r then r::ts else ts
 
-and candidates_a (*pos tenv env a x*) _ _ _ _ _ =
-  failwith "TODO"
+and normalize_candidates t ts =
+  ts
+  |> List.map (cap t)
+  |> List.filter non_empty
+  |> List.filter (fun t' -> equiv t t' |> not)
 
-and candidates (*tenv env e x*) _ _ _ _ =
-  failwith "TODO"
+and candidates_a (*pos tenv*) _ _ env a x =
+  begin match a with
+  (* Var & const *)
+  | Const _ -> []
+  | Var y when Variable.equals x y -> []
+  | Var _ -> []
+  | Debug _ -> []
+  (* Projections & Pairs *)
+  (* App & Case *)
+  (* Abstractions *)
+  | _ -> failwith "TODO"
+  end
+  |> normalize_candidates (Env.find x env)
+
+and candidates (*tenv env e x*) _ _ e _ =
+  begin match e with
+  | _ -> failwith "TODO"
+  end
+  (*|> normalize_candidates (Env.find x env)*) (* NOTE: Only needed in candidates_a. *)
 
 and res_non_empty (t, _) = non_empty t
 and filter_res lst = List.filter res_non_empty lst

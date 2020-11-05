@@ -216,9 +216,36 @@ and candidates_a pos tenv env a x =
   end
   (*|> normalize_candidates (Env.find x env)*) (* NOTE: Already done when necessary. *)
 
-and candidates (*tenv env e x*) _ _ e _ =
+and candidates tenv env e x =
+  let tx = Env.find x env in
   begin match e with
-  | _ -> failwith "TODO"
+  | EVar y -> candidates_a [] tenv env (Var y) x
+  (* Let bindings *)
+  | Let (y, a, e) -> (* y is necessary different from x *)
+    let pos = Variable.get_locations y in
+    let r = candidates_a pos tenv env a x in
+    if r = []
+    then
+      let s = typeof_a pos tenv env a in
+      let refine_env_cont env t = refine_a pos ~backward:true tenv env a t in
+      split_and_refine tenv env e y s refine_env_cont
+      |> List.map (
+        fun (_, env) ->
+          let tsx = candidates tenv env e x in
+          let tsy = candidates tenv env e y in
+          let tsx' =
+            tsy
+            |> List.map (refine ~backward:false tenv env e)
+            |> List.flatten
+            |> List.map snd
+            |> List.map (Env.find x)
+            |> normalize_candidates tx
+          in (* TODO: the projection above can generate the same type many times...
+                we should clean it *)
+          tsx@tsx'
+        )
+      |> List.flatten
+    else r
   end
   (*|> normalize_candidates (Env.find x env)*) (* NOTE: Only needed in candidates_a. *)
 

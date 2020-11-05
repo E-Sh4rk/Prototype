@@ -6,9 +6,12 @@ open Variable
 module Env : sig
   type t
   val empty : t
+  val bottom : t
   val is_bottom : t -> bool
   val add : Variable.t -> typ -> t -> t
   val find : Variable.t -> t -> typ
+  val rm : Variable.t -> t -> t
+  val conj : t list -> t
 end
 
 exception Ill_typed of Position.t list * string

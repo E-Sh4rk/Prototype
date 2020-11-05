@@ -4,18 +4,46 @@ open Nf_ast
 open Types_additions
 
 module Env = struct
-  type t = typ VarMap.t * VarSet.t (* bottom vars *)
-  let empty = (VarMap.empty, VarSet.empty)
-  let is_bottom (_, bvs) = VarSet.is_empty bvs |> not
-  let add v t (env, bvs) =
-    let bvs =
-      if is_empty t
-      then VarSet.add v bvs
-      else VarSet.remove v bvs
+  type t =
+  | EnvBottom
+  | EnvOk of typ VarMap.t
+  let empty = EnvOk VarMap.empty
+  let bottom = EnvBottom
+  let is_bottom = function EnvBottom -> true | EnvOk _ -> false
+  let add v t env =
+    match env with
+    | EnvBottom -> EnvBottom
+    | EnvOk _ when is_empty t -> EnvBottom
+    | EnvOk env -> EnvOk (VarMap.add v t env)
+  let rm v env =
+    match env with
+    | EnvBottom -> EnvBottom
+    | EnvOk env -> EnvOk (VarMap.remove v env)
+  let find v env =
+    match env with
+    | EnvBottom -> Cduce.empty
+    | EnvOk env -> VarMap.find v env
+  let from_map map =
+    if List.exists (fun (_,t) -> is_empty t) (VarMap.bindings map)
+    then EnvBottom else EnvOk map
+  let conj lst =
+    let aux env1 env2 = match env1, env2 with
+    | EnvBottom, _ | _, EnvBottom -> EnvBottom
+    | EnvOk env1, EnvOk env2 ->
+      from_map (VarMap.union (fun _ t1 t2 -> Some (cap t1 t2)) env1 env2)
     in
-    (VarMap.add v t env, bvs)
-  let find v (env, _) = VarMap.find v env
+    List.fold_left aux empty lst
 end
+
+let all_possibilities lst =
+  let rec aux acc lst =
+    match lst with
+    | [] -> [List.rev acc]
+    | a::lst ->
+      List.map (fun x -> aux (x::acc) lst) a
+      |> List.flatten
+  in
+  aux [] lst
 
 exception Ill_typed of Position.t list * string
 
@@ -101,6 +129,7 @@ let rec typeof_a pos tenv env a =
     split_and_refine tenv env e x s refine_env_cont
     |> List.map (fun (s, env) -> mk_arrow (cons s) (cons (typeof tenv env e)))
     |> conj
+    |> (fun t -> Format.printf "Lambda: %a\n" Cduce.pp t ; t)
   | Lambda _ -> failwith "Only abstractions with typed domain are supported for now."
 
 and typeof tenv env e =
@@ -112,6 +141,7 @@ and typeof tenv env e =
   | Let (x, a, e) ->
     let pos = Variable.get_locations x in
     let s = typeof_a pos tenv env a in
+    Format.printf "Let S: %a\n" Cduce.pp s ;
     let refine_env_cont env t = refine_a pos ~backward:true tenv env a t in
     split_and_refine tenv env e x s refine_env_cont
     |> List.map (fun (_, env) -> typeof tenv env e)
@@ -143,7 +173,7 @@ and normalize_candidates t ts =
   ts
   |> List.map (cap t)
   |> List.filter non_empty
-  |> List.filter (fun t' -> equiv t t' |> not)
+  |> List.filter (fun t' -> subtype t t' |> not)
 
 and candidates_a pos tenv env a x =
   let tx = Env.find x env in
@@ -309,8 +339,25 @@ and refine_a pos ~backward tenv env a t =
     if subtype dom s then
       let refine_env_cont env t = [t, env] in
       split_and_refine tenv env e x dom refine_env_cont
-      |> List.map (fun (s, env) -> refine ~backward tenv env e (apply t s))
-      |> List.flatten
+      |> List.map (
+        fun (s, env) ->
+        refine ~backward tenv env e (apply t s)
+        |> List.filter (
+          fun (_, env) ->
+          Env.find x env
+          |> subtype s
+        )
+        |> List.map (
+          fun (tres, env) ->
+          let env = Env.rm x env in
+          (mk_arrow (cons s) (cons tres), env)
+        )
+      )
+      |> all_possibilities
+      |> List.map (fun lst ->
+          let (tres, envs) = List.split lst 
+          in (conj (t::tres), Env.conj (env::envs))
+      )
     else []
   | Lambda _ -> failwith "Only abstractions with typed domain are supported for now."
   end
@@ -326,7 +373,17 @@ and refine ~backward tenv env e t =
     let s = typeof_a pos tenv env a in
     let refine_env_cont env t = refine_a pos ~backward:true tenv env a t in
     split_and_refine tenv env e x s refine_env_cont
-    |> List.map (fun (_, env) -> refine ~backward tenv env e t)
+    |> List.map (
+      fun (_, env) ->
+      refine ~backward tenv env e t
+      |> List.map (
+        fun (tres, env) ->
+        let (xt, env) = (Env.find x env, Env.rm x env) in
+        refine_a pos ~backward tenv env a xt
+        |> List.map (fun (_, env) -> (tres, env))
+      )
+      |> List.flatten
+    )
     |> List.flatten
   end
   (*|> filter_res*) (* NOTE: Only needed in refine_a. *)

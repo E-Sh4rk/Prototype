@@ -129,7 +129,6 @@ let rec typeof_a pos tenv env a =
     split_and_refine tenv env e x s refine_env_cont
     |> List.map (fun (s, env) -> mk_arrow (cons s) (cons (typeof tenv env e)))
     |> conj
-    |> (fun t -> Format.printf "Lambda: %a\n" Cduce.pp t ; t)
   | Lambda _ -> failwith "Only abstractions with typed domain are supported for now."
 
 and typeof tenv env e =
@@ -141,7 +140,6 @@ and typeof tenv env e =
   | Let (x, a, e) ->
     let pos = Variable.get_locations x in
     let s = typeof_a pos tenv env a in
-    Format.printf "Let S: %a\n" Cduce.pp s ;
     let refine_env_cont env t = refine_a pos ~backward:true tenv env a t in
     split_and_refine tenv env e x s refine_env_cont
     |> List.map (fun (_, env) -> typeof tenv env e)
@@ -246,7 +244,7 @@ and candidates_a pos tenv env a x =
   end
   (*|> normalize_candidates (Env.find x env)*) (* NOTE: Already done when necessary. *)
 
-and candidates tenv env e x =
+and candidates tenv env e x = (* TODO: Normalize types (in particular arrow conjuncts) *)
   let tx = Env.find x env in
   begin match e with
   | EVar y -> candidates_a [] tenv env (Var y) x
@@ -328,10 +326,10 @@ and refine_a pos ~backward tenv env a t =
         in
         (apply t1 t2, env)
     )
-  | Ite (v,t,e1,e2) ->
+  | Ite (v,s,e1,e2) ->
     let vt = Env.find v env in
-    let env1 = Env.add v (cap vt t) env in
-    let env2 = Env.add v (cap vt (neg t)) env in
+    let env1 = Env.add v (cap vt s) env in
+    let env2 = Env.add v (cap vt (neg s)) env in
     (refine ~backward tenv env1 e1 t)@(refine ~backward tenv env2 e2 t)
   (* Abstractions *)
   | Lambda (Ast.ADomain s, x, e) ->

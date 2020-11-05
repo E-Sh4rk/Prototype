@@ -1,6 +1,5 @@
 open Types_additions
 open Variable
-type typ = Cduce.typ
 
 type varname = string
 type exprid = int
@@ -34,8 +33,8 @@ type ('a, 'typ, 'v) ast =
 
 and ('a, 'typ, 'v) t = 'a * ('a, 'typ, 'v) ast
 
-type annot_expr = (annotation, typ, Variable.t) t
-type expr = (unit, typ, Variable.t) t
+type annot_expr = (annotation, Cduce.typ, Variable.t) t
+type expr = (unit, Cduce.typ, Variable.t) t
 type parser_expr = (annotation, type_expr, varname) t
 
 module Expr : sig
@@ -60,7 +59,7 @@ val parser_expr_to_annot_expr : type_env -> name_var_map -> parser_expr -> annot
 val unannot : annot_expr -> expr
 val fv : annot_expr -> VarSet.t
 
-val const_to_typ : const -> typ
+val const_to_typ : const -> Cduce.typ
 
 type parser_element =
 | Definition of (string * parser_expr)
@@ -68,3 +67,14 @@ type parser_element =
 | Types of (string * type_expr) list
 
 type parser_program = parser_element list
+
+(* Pretty printers *)
+
+val pp_const : Format.formatter -> const -> unit
+val pp_projection : Format.formatter -> projection -> unit
+val pp_type_annot : (Format.formatter -> 'a -> unit) ->
+                    Format.formatter -> 'a type_annot -> unit
+val show_const : const -> string
+val show_projection : projection -> string
+val show_type_annot : (Format.formatter -> 'a -> unit) ->
+                    'a type_annot -> string

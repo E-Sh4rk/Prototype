@@ -6,7 +6,7 @@ type t =
     {
       start_p : lexing_position;
       end_p   : lexing_position
-    } [@@deriving sexp]
+    }(*[@@deriving sexp]*)
 
 type position = t
 

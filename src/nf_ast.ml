@@ -1,21 +1,22 @@
 open Variable
-type typ = Cduce.typ
 module ExprMap = Ast.ExprMap
 
 type a =
   | Const of Ast.const
   | Var of Variable.t
-  | Lambda of (typ Ast.type_annot) * Variable.t * e
-  | Ite of Variable.t * typ * e * e
+  | Lambda of (Cduce.typ Ast.type_annot) * Variable.t * e
+  | Ite of Variable.t * Cduce.typ * e * e
   | App of Variable.t * Variable.t
   | Pair of Variable.t * Variable.t
   | Projection of Ast.projection * Variable.t
   | RecordUpdate of Variable.t * string * Variable.t option
   | Debug of string * Variable.t
+  [@@deriving show]
 
 and e =
   | Let of Variable.t * a * e
   | EVar of Variable.t
+  [@@deriving show]
 
 let convert_to_normal_form ast =
   let rec aux expr_var_map ast =
@@ -76,7 +77,7 @@ let convert_to_normal_form ast =
         (defs, expr_var_map, var)
     in
     let (defs, _, x) = to_defs_and_x expr_var_map ast in
-    List.rev defs |>
+    defs |>
     List.fold_left (
       fun nf (v, d) ->
       Let (v, d, nf)

@@ -4,6 +4,9 @@ module CD = Cduce_lib
 type typ = CD.Types.t
 type node = CD.Types.Node.t
 
+val pp_typ : Format.formatter -> typ -> unit
+val show_typ : typ -> string
+
 val pp : Format.formatter -> typ -> unit
 val printf : typ -> unit
 val dump : Format.formatter -> typ -> unit

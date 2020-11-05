@@ -28,6 +28,17 @@ module Variable = struct
   let get_name id =
     let (name, _) = Hashtbl.find data id
     in name
+
+  let pp fmt t =
+    match get_name t with
+    | None -> Format.fprintf fmt "%d" t
+    | Some str -> Format.fprintf fmt "%s" str
+    
+  let show t =
+    match get_name t with
+    | None -> string_of_int t
+    | Some str -> str
+
 end
 
 module VarMap = Map.Make(Variable)

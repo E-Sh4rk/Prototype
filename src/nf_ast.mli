@@ -17,3 +17,8 @@ and e =
                           in order for every atomic to be localized by a variable *)
 
 val convert_to_normal_form : Ast.annot_expr -> e
+
+val pp_a : Format.formatter -> a -> unit
+val pp_e : Format.formatter -> e -> unit
+val show_a : a -> string
+val show_e : e -> string

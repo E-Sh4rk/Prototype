@@ -1,6 +1,5 @@
 open Types_additions
 open Variable
-type typ = Cduce.typ
 
 type varname = string
 type exprid = int
@@ -15,10 +14,13 @@ type const =
 | Int of int
 | Char of char
 | Atom of string
+[@@deriving show]
 
 type projection = Fst | Snd | Field of string
+[@@deriving show]
 
 type 'typ type_annot = Unnanoted | ADomain of 'typ | AArrow of 'typ
+[@@deriving show]
 
 type ('a, 'typ, 'v) ast =
 | Const of const
@@ -34,8 +36,8 @@ type ('a, 'typ, 'v) ast =
 
 and ('a, 'typ, 'v) t = 'a * ('a, 'typ, 'v) ast
 
-type annot_expr = (annotation, typ, Variable.t) t
-type expr = (unit, typ, Variable.t) t
+type annot_expr = (annotation, Cduce.typ, Variable.t) t
+type expr = (unit, Cduce.typ, Variable.t) t
 type parser_expr = (annotation, type_expr, varname) t
 
 module Expr = struct

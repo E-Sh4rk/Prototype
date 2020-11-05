@@ -1,6 +1,8 @@
 
 module Variable : sig
   type t
+  val pp : Format.formatter -> t -> unit
+  val show : t -> string
   val compare : t -> t -> int
   val equals : t -> t -> bool
   val create : string option -> t

@@ -35,7 +35,7 @@ module Env = struct
     List.fold_left aux empty lst
 end
 
-let all_possibilities lst =
+(*let all_possibilities lst =
   let rec aux acc lst =
     match lst with
     | [] -> [List.rev acc]
@@ -43,7 +43,7 @@ let all_possibilities lst =
       List.map (fun x -> aux (x::acc) lst) a
       |> List.flatten
   in
-  aux [] lst
+  aux [] lst*)
 
 exception Ill_typed of Position.t list * string
 
@@ -281,7 +281,8 @@ and res_non_empty (t, _) = non_empty t
 and filter_res lst = List.filter res_non_empty lst
 
 and refine_a pos ~backward tenv env a t =
-  let t = cap t (typeof_a pos tenv env a) in
+  let ta = typeof_a pos tenv env a in
+  let t = cap t ta in
   begin match a with
   (* Var & const *)
   | Const _ -> [t, env]
@@ -332,30 +333,13 @@ and refine_a pos ~backward tenv env a t =
     let env2 = Env.add v (cap vt (neg s)) env in
     (refine ~backward tenv env1 e1 t)@(refine ~backward tenv env2 e2 t)
   (* Abstractions *)
-  | Lambda (Ast.ADomain s, x, e) ->
-    let dom = domain t in
-    if subtype dom s then
-      let refine_env_cont env t = [t, env] in
-      split_and_refine tenv env e x dom refine_env_cont
-      |> List.map (
-        fun (s, env) ->
-        refine ~backward tenv env e (apply t s)
-        |> List.filter (
-          fun (_, env) ->
-          Env.find x env
-          |> subtype s
-        )
-        |> List.map (
-          fun (tres, env) ->
-          let env = Env.rm x env in
-          (mk_arrow (cons s) (cons tres), env)
-        )
-      )
-      |> all_possibilities
-      |> List.map (fun lst ->
-          let (tres, envs) = List.split lst 
-          in (conj (t::tres), Env.conj (env::envs))
-      )
+  | Lambda (Ast.ADomain s, _, _) when backward ->
+    if subtype (domain t) s
+    then [(t, env)]
+    else []
+  | Lambda (Ast.ADomain s, _, _) ->
+    if subtype ta t
+    then [(t, env)]
     else []
   | Lambda _ -> failwith "Only abstractions with typed domain are supported for now."
   end

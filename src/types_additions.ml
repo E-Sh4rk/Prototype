@@ -80,7 +80,6 @@ let define_types env defs =
         let t = type_expr_to_typ env decl in
         define_typ (StrMap.find name env) t
     in
-    (* TODO: normalize? *)
     List.iter define_type defs ; env
 
 let get_type_or_atom env name =

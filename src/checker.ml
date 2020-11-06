@@ -135,6 +135,7 @@ let rec typeof_a pos tenv env a =
     split_and_refine tenv env e x s refine_env_cont
     |> List.map (fun (s, env) -> mk_arrow (cons s) (cons (typeof tenv env e)))
     |> conj
+    |> normalize_typ
   | Lambda _ -> failwith "Only abstractions with typed domain are supported for now."
 
 and typeof tenv env e =
@@ -150,6 +151,7 @@ and typeof tenv env e =
     split_and_refine tenv env e x s refine_env_cont
     |> List.map (fun (_, env) -> typeof tenv env e)
     |> disj
+    |> normalize_typ
 
 and split_and_refine tenv env e x initial_t refine_env_cont =
   let rec aux env t =
@@ -251,7 +253,7 @@ and candidates_a pos tenv env a x =
   end
   (*|> normalize_candidates (Env.find x env)*) (* NOTE: Already done when necessary. *)
 
-and candidates tenv env e x = (* TODO: Normalize types (in particular arrow conjuncts) *)
+and candidates tenv env e x =
   let tx = Env.find x env in
   begin match e with
   | EVar y -> candidates_a [] tenv env (Var y) x

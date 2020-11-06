@@ -45,6 +45,12 @@ end
   in
   aux [] lst*)
 
+let rec remove_duplicates equiv lst =
+  let remove elt lst = List.filter (equiv elt) lst in
+  match lst with
+  | [] -> []
+  | e::lst -> e::(remove e lst |> remove_duplicates equiv)
+
 exception Ill_typed of Position.t list * string
 
 let rec typeof_a pos tenv env a =
@@ -172,6 +178,7 @@ and normalize_candidates t ts =
   |> List.map (cap t)
   |> List.filter non_empty
   |> List.filter (fun t' -> subtype t t' |> not)
+  |> remove_duplicates equiv
 
 and candidates_a pos tenv env a x =
   let tx = Env.find x env in
@@ -268,8 +275,7 @@ and candidates tenv env e x = (* TODO: Normalize types (in particular arrow conj
             |> List.map snd
             |> List.map (Env.find x)
             |> normalize_candidates tx
-          in (* TODO: the projection above can generate the same type many times...
-                we should clean it *)
+          in
           tsx@tsx'
         )
       |> List.flatten
@@ -333,12 +339,12 @@ and refine_a pos ~backward tenv env a t =
     let env2 = Env.add v (cap vt (neg s)) env in
     (refine ~backward tenv env1 e1 t)@(refine ~backward tenv env2 e2 t)
   (* Abstractions *)
-  | Lambda (Ast.ADomain s, _, _) when backward ->
-    if subtype (domain t) s
+  | Lambda _ when not backward ->
+    if subtype ta t
     then [(t, env)]
     else []
   | Lambda (Ast.ADomain s, _, _) ->
-    if subtype ta t
+    if subtype (domain t) s
     then [(t, env)]
     else []
   | Lambda _ -> failwith "Only abstractions with typed domain are supported for now."

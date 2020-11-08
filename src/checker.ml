@@ -64,8 +64,12 @@ let rec remove_duplicates equiv lst =
 
 exception Ill_typed of Position.t list * string
 
+(* TODO: function to simplify DNF (regroup similar inputs, regroup similar outputs,
+        remove useless conjuncts, etc) *)
+
 let rec typeof_a pos tenv env a =
-  if Env.is_bottom env
+  Format.printf "typeof_a@." ;
+  begin if Env.is_bottom env
   then empty
   else match a with 
   (* Var & const *)
@@ -148,9 +152,12 @@ let rec typeof_a pos tenv env a =
     |> conj
     |> normalize_typ
   | Lambda _ -> failwith "Only abstractions with typed domain are supported for now."
+  end
+  |> (fun x -> Format.printf "end typeof_a@." ; x)
 
 and typeof tenv env e =
-  if Env.is_bottom env
+  Format.printf "typeof@." ;
+  begin if Env.is_bottom env
   then empty
   else match e with 
   | EVar x -> typeof_a [] tenv env (Var x)
@@ -163,19 +170,26 @@ and typeof tenv env e =
     |> List.map (fun (_, env) -> typeof tenv env e)
     |> disj
     |> normalize_typ
+  end
+  |> (fun x -> Format.printf "end typeof@." ; x)
 
+(* TODO: Add memoisation when possible... *)
 and split_and_refine tenv env e x initial_t refine_env_cont =
+  Format.printf "Start " ;
   let rec aux ~first env t =
     let envs =
       if first (* no need to refine with initial_t *)
       then [(t, env)]
       else refine_env_cont env t in
+    let depth = ref 0 in
     let treat_env (t, env) =
       let env = Env.add x t env in
       match candidates_completed tenv env e x with
       | [] -> [] (* Can happen if initial_t is empty *)
       | [t] -> [t, env]
       | lst ->
+        depth := (!depth) + 1;
+        Format.printf "%i@." !depth ;
         List.map (aux ~first:false env) lst
         |> List.flatten
     in
@@ -183,6 +197,7 @@ and split_and_refine tenv env e x initial_t refine_env_cont =
     |> List.flatten
   in
   aux ~first:true env initial_t
+  |> (fun r -> Format.printf "End@." ; r)
   (*|> (fun r ->
         match Variable.get_name x with
         | None -> r
@@ -208,6 +223,7 @@ and normalize_candidates t ts =
 and remove_duplicate_candidates = remove_duplicates equiv
 
 and candidates_a pos tenv env a x =
+  Format.printf "candidates_a@." ;
   let tx = Env.find x env in
   begin match a with
   (* Var & const *)
@@ -277,8 +293,10 @@ and candidates_a pos tenv env a x =
   | Lambda _ -> failwith "Only abstractions with typed domain are supported for now."
   end
   (*|> normalize_candidates (Env.find x env)*) (* NOTE: Already done when necessary. *)
+  |> (fun x -> Format.printf "end candidates_a@." ; x)
 
 and candidates tenv env e x =
+  Format.printf "candidates@." ;
   let tx = Env.find x env in
   begin match e with
   | EVar y -> candidates_a [] tenv env (Var y) x
@@ -309,12 +327,14 @@ and candidates tenv env e x =
     else r
   end
   (*|> normalize_candidates (Env.find x env)*) (* NOTE: Only needed in candidates_a. *)
+  |> (fun x -> Format.printf "end candidates@." ; x)
 
 and res_non_empty (t, _) = non_empty t
 and filter_res lst = List.filter res_non_empty lst
 
 (* TODO: refine seems to complexify arrow types (conjuncts are duplicated). Investigate... *)
 and refine_a pos ~backward tenv env a t =
+  Format.printf "refine_a@." ;
   let ta = typeof_a pos tenv env a in
   let t = cap t ta in
   begin match a with
@@ -378,8 +398,10 @@ and refine_a pos ~backward tenv env a t =
   | Lambda _ -> failwith "Only abstractions with typed domain are supported for now."
   end
   |> filter_res
+  |> (fun x -> Format.printf "end refine_a@." ; x)
 
 and refine ~backward tenv env e t =
+  Format.printf "refine@." ;
   (*let t = cap t (typeof tenv env e) in*) (* NOTE: Only needed in refine_a. *)
   begin match e with 
   | EVar x -> refine_a [] ~backward tenv env (Var x) t
@@ -403,3 +425,4 @@ and refine ~backward tenv env e t =
     |> List.flatten
   end
   (*|> filter_res*) (* NOTE: Only needed in refine_a. *)
+  |> (fun x -> Format.printf "end refine@." ; x)

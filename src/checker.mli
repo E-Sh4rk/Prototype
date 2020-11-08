@@ -12,6 +12,8 @@ module Env : sig
   val find : Variable.t -> t -> typ
   val rm : Variable.t -> t -> t
   val conj : t list -> t
+  val show : t -> string
+  val pp : Format.formatter -> t -> unit
 end
 
 exception Ill_typed of Position.t list * string

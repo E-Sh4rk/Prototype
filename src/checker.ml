@@ -33,6 +33,17 @@ module Env = struct
       from_map (VarMap.union (fun _ t1 t2 -> Some (cap t1 t2)) env1 env2)
     in
     List.fold_left aux empty lst
+
+  let pp fmt env =
+    match env with
+    | EnvBottom -> Format.fprintf fmt "Bottom\n"
+    | EnvOk env ->
+      VarMap.bindings env
+      |> List.iter (fun (v, t) ->
+        Format.fprintf fmt "%a: %a\n" Variable.pp v Cduce.pp t
+      )
+
+  let show = Format.asprintf "%a" pp
 end
 
 (*let all_possibilities lst =
@@ -154,21 +165,34 @@ and typeof tenv env e =
     |> normalize_typ
 
 and split_and_refine tenv env e x initial_t refine_env_cont =
-  let rec aux env t =
-    let envs = refine_env_cont env t in
+  let rec aux ~first env t =
+    let envs =
+      if first (* no need to refine with initial_t *)
+      then [(t, env)]
+      else refine_env_cont env t in
     let treat_env (t, env) =
       let env = Env.add x t env in
       match candidates_completed tenv env e x with
-      | [] -> assert false
+      | [] -> [] (* Can happen if initial_t is empty *)
       | [t] -> [t, env]
       | lst ->
-        List.map (aux env) lst
+        List.map (aux ~first:false env) lst
         |> List.flatten
     in
     List.map treat_env envs
     |> List.flatten
   in
-  aux env initial_t
+  aux ~first:true env initial_t
+  (*|> (fun r ->
+        match Variable.get_name x with
+        | None -> r
+        | Some n ->
+          Format.printf "--- %s ---\n" n ;
+          Format.printf "%aCandidates: " Env.pp env ;
+          List.iter (fun (t,_) -> Format.printf "%s  ;  " (Cduce.string_of_type t)) r;
+          Format.printf "\n" ;
+          r
+      )*)
 
 and candidates_completed tenv env e x =
   let ts = candidates tenv env e x in
@@ -180,7 +204,8 @@ and normalize_candidates t ts =
   |> List.map (cap t)
   |> List.filter non_empty
   |> List.filter (fun t' -> subtype t t' |> not)
-  |> remove_duplicates equiv
+
+and remove_duplicate_candidates = remove_duplicates equiv
 
 and candidates_a pos tenv env a x =
   let tx = Env.find x env in
@@ -230,18 +255,17 @@ and candidates_a pos tenv env a x =
   | Ite (y, t, e1, e2) ->
     let r =
       if Variable.equals y x
-      then
-        [t ; neg t]
-        |> normalize_candidates tx
+      then [t ; neg t] |> normalize_candidates tx
       else []
     in
+    let ty = Env.find y env in
     let r =
       if r = []
-      then candidates tenv (Env.add x (cap tx t) env) e1 x
+      then candidates tenv (Env.add y (cap ty t) env) e1 x
       else r
     in
     if r = []
-    then candidates tenv (Env.add x (cap tx (neg t)) env) e2 x
+    then candidates tenv (Env.add y (cap ty (neg t)) env) e2 x
     else r
   (* Abstractions *)
   | Lambda (Ast.ADomain s, y, e) -> (* y is necessary different from x *)
@@ -249,6 +273,7 @@ and candidates_a pos tenv env a x =
     split_and_refine tenv env e y s refine_env_cont
     |> List.map (fun (_, env) -> candidates tenv env e x)
     |> List.flatten
+    |> remove_duplicate_candidates
   | Lambda _ -> failwith "Only abstractions with typed domain are supported for now."
   end
   (*|> normalize_candidates (Env.find x env)*) (* NOTE: Already done when necessary. *)
@@ -278,7 +303,7 @@ and candidates tenv env e x =
             |> List.map (Env.find x)
             |> normalize_candidates tx
           in
-          tsx@tsx'
+          tsx@tsx' |> remove_duplicate_candidates
         )
       |> List.flatten
     else r
@@ -288,6 +313,7 @@ and candidates tenv env e x =
 and res_non_empty (t, _) = non_empty t
 and filter_res lst = List.filter res_non_empty lst
 
+(* TODO: refine seems to complexify arrow types (conjuncts are duplicated). Investigate... *)
 and refine_a pos ~backward tenv env a t =
   let ta = typeof_a pos tenv env a in
   let t = cap t ta in

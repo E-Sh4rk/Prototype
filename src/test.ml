@@ -5,5 +5,6 @@ let not = fun (a : Any) ->
 let or = fun (a : Any) -> fun (b : Any) ->
   if a is False then if b is False then false else true else true
 
-let test = fun (x:Any) ->
+(*let test = fun (x:Any) ->
   if or x (not x) is True then true else false
+*)

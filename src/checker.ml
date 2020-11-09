@@ -175,7 +175,6 @@ and typeof tenv env e =
 
 (* TODO: Add memoisation when possible... *)
 and split_and_refine tenv env e x initial_t refine_env_cont =
-  Format.printf "Start " ;
   let rec aux ~first env t =
     let envs =
       if first (* no need to refine with initial_t *)
@@ -197,7 +196,6 @@ and split_and_refine tenv env e x initial_t refine_env_cont =
     |> List.flatten
   in
   aux ~first:true env initial_t
-  |> (fun r -> Format.printf "End@." ; r)
   (*|> (fun r ->
         match Variable.get_name x with
         | None -> r

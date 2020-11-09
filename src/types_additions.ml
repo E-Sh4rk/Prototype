@@ -101,6 +101,30 @@ let branch_type lst =
     |> List.map (fun (a, b) -> mk_arrow (cons a) (cons b))
     |> conj
 
+let rec take_one lst =
+    match lst with
+    | [] -> []
+    | e::lst ->
+        (e, lst)::(List.map (fun (e',lst) -> (e',e::lst)) (take_one lst))
+
+let simplify_dnf dnf =
+    let splits = List.map branch_type dnf in
+    let splits = List.combine dnf splits in
+    let rec aux f kept lst = match lst with
+    | [] -> kept
+    | (dnf, t)::lst ->
+        let (_, ts1) = List.split lst in
+        let (_, ts2) = List.split kept in
+        if f t (ts1@ts2) then aux f kept lst else aux f ((dnf, t)::kept) lst
+    in
+    let simplify_conjuncts (conjuncts, _) =
+        let conjuncts = List.map (fun (a, b) -> ((a,b), mk_arrow (cons a) (cons b))) conjuncts in
+        aux (fun t ts -> subtype (conj ts) t) [] conjuncts
+        |> List.split |> fst (* TODO: regroup conjuncts when similar domain/codomain *)
+    in
+    aux (fun t ts -> subtype t (disj ts)) [] splits
+    |> List.map simplify_conjuncts
+    
 let split_arrow t =
   dnf t
   |> List.map branch_type
@@ -113,12 +137,6 @@ let square_approx f out =
             neg (disj impossibles)
     end in
     cap (domain f) (disj res)
-
-let rec take_one lst =
-    match lst with
-    | [] -> []
-    | e::lst ->
-        (e, lst)::(List.map (fun (e',lst) -> (e',e::lst)) (take_one lst))
 
 let square_exact f out =
     let res = dnf f |> List.map begin

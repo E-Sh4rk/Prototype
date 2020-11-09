@@ -24,8 +24,18 @@ let any_node = CD.Types.any_node
 let empty_node = CD.Types.empty_node
 
 
-let cup = CD.Types.cup
-let cap = CD.Types.cap
+let is_empty = CD.Types.is_empty
+let non_empty = CD.Types.non_empty
+let subtype = CD.Types.subtype
+let disjoint = CD.Types.disjoint
+let equiv = CD.Types.equiv
+
+
+(* TODO: Not very optimized... but temporary fix for the fact that arrows are not simplified *)
+let cup t1 t2 = if subtype t1 t2 then t2
+                else if subtype t2 t1 then t1 else CD.Types.cup t1 t2
+let cap t1 t2 = if subtype t1 t2 then t1
+                else if subtype t2 t1 then t2 else CD.Types.cap t1 t2
 let diff = CD.Types.diff
 let neg = CD.Types.neg
 
@@ -108,13 +118,6 @@ let merge_records = CD.Types.Record.merge
 
 let remove_field record field =
   CD.Types.Record.remove_field record (to_label field)
-
-
-let is_empty = CD.Types.is_empty
-let non_empty = CD.Types.non_empty
-let subtype = CD.Types.subtype
-let disjoint = CD.Types.disjoint
-let equiv = CD.Types.equiv
 
 
 (* Maybe not optimised (if no memoisation for Arrow.get). We'll see that later. *)

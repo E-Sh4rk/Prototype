@@ -25,7 +25,7 @@ let type_check_program
         let time = Unix.gettimeofday () in
         let nf_expr = convert_to_normal_form annot_expr in
         (*Format.printf "%a\n" pp_e nf_expr ;*)
-        let typ = Checker.typeof tenv env nf_expr in
+        let typ = Checker.typeof_simple tenv env nf_expr in
         let time = (Unix.gettimeofday ()) -. time in
         let varm = StrMap.add name var varm in
         let env = Env.add var typ env in

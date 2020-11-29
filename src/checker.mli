@@ -4,7 +4,19 @@ open Cduce
 
 exception Ill_typed of Position.t list * string
 
-val typeof : type_env -> Env.t -> e -> typ
-val typeof_a : Position.t list -> type_env -> Env.t -> a -> typ
-val refine : backward:bool -> type_env -> Env.t -> e -> typ -> (typ * Env.t) list
-val refine_a : Position.t list -> backward:bool -> type_env -> Env.t -> a -> typ -> (typ * Env.t) list
+type typ_tree =
+  | TNode of Env.t * (Env.t list * typ_tree) list
+  | TLeaf of Env.t * typ
+
+val leaves : typ_tree -> (Env.t * typ) list
+
+type context
+
+val empty_context : context
+
+val typeof : type_env -> Env.t -> Env.t -> context -> e -> typ_tree
+val typeof_a : Position.t list -> type_env -> Env.t -> Env.t -> context -> a -> typ_tree
+val refine : backward:bool -> type_env -> Env.t -> e -> typ -> Env.t list
+val refine_a : Position.t list -> backward:bool -> type_env -> Env.t -> a -> typ -> Env.t list
+
+val typeof_simple : type_env -> Env.t -> e -> typ

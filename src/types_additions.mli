@@ -45,9 +45,9 @@ val simplify_dnf : (typ * typ) list list -> (typ * typ) list list
 
 val split_arrow : typ -> typ list
 
-val square : typ -> typ -> (typ * typ) list
+val square_split : typ -> typ -> (typ * typ) list
 val square_approx : typ -> typ -> typ
 val square_exact : typ -> typ -> typ
 
-val triangle : typ -> typ -> (typ * typ) list
+val triangle_split : typ -> typ -> (typ * typ) list
 val triangle_exact : typ -> typ -> typ

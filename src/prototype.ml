@@ -28,7 +28,7 @@ let type_check_program
         let typ = Checker.typeof tenv env nf_expr in
         let time = (Unix.gettimeofday ()) -. time in
         let varm = StrMap.add name var varm in
-        let env = Checker.Env.add var typ env in
+        let env = Env.add var typ env in
         Format.ksprintf pr "%s (checked in %fs)\n" (Cduce.string_of_type typ) time;
         pr_logs () ; (varm, env)
       with Checker.Ill_typed (pos, str) ->
@@ -47,7 +47,7 @@ let type_check_program
         let tenv = define_types tenv lst in
         (tenv,varm,env)
     in
-    ignore (List.fold_left treat_elem (empty_tenv, Ast.empty_name_var_map, Checker.Env.empty) program)
+    ignore (List.fold_left treat_elem (empty_tenv, Ast.empty_name_var_map, Env.empty) program)
 
 let _ =
     let fn = ref "test.ml" in

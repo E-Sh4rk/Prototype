@@ -147,35 +147,23 @@ let square_exact f out =
             in
             let rec impossible_inputs current_set lst =
                 let t = List.map snd current_set in
-                if subtype out (neg (conj t)) then [conj (List.map fst current_set)]
-                else begin
-                    let aux (e,lst) = impossible_inputs (e::current_set) lst in
-                    List.flatten (List.map aux (take_one lst))
-                end
-            in
-            neg (disj (impossible_inputs [] (remove_included_branchs lst)))
-    end in
-    cap (domain f) (disj res)
-
-let square f out =
-    dnf f |>
-    List.map begin
-        fun lst ->
-            let remove_included_branchs lst =
-                let is_not_included (_, o) = subtype o out |> not in
-                List.filter is_not_included lst
-            in
-            let rec impossible_inputs current_set lst =
-                let t = List.map snd current_set in
                 if disjoint (conj t) out then [conj (List.map fst current_set)]
                 else begin
                     let aux (e,lst) = impossible_inputs (e::current_set) lst in
                     List.flatten (List.map aux (take_one lst))
                 end
             in
-            neg (disj (impossible_inputs [] (remove_included_branchs lst)))
-            |> cap (domain f)
-            |> (fun t -> (branch_type lst, t))
+            conj (List.map neg (impossible_inputs [] (remove_included_branchs lst)))
+    end in
+    cap (domain f) (disj res)
+
+let square_split f out =
+    dnf f |>
+    List.map begin
+        fun lst ->
+            let t = branch_type lst in
+            let res = square_exact t out in
+            (t, res)
     end
 
 let triangle_exact f out =
@@ -197,4 +185,11 @@ let triangle_exact f out =
     end in
     conj res
 
-let triangle f out = [f, triangle_exact f out]
+let triangle_split f out =
+    dnf f |>
+    List.map begin
+        fun lst ->
+            let t = branch_type lst in
+            let res = triangle_exact t out in
+            (t, res)
+    end

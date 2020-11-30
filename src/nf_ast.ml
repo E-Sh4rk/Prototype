@@ -16,6 +16,7 @@ type a =
 and e =
   | Let of Variable.t * a * e
   | EVar of Variable.t
+  | Hole
   [@@deriving show]
 
 let convert_to_normal_form ast =

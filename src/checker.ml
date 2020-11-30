@@ -15,9 +15,9 @@ let rec leaves tree = match tree with
     |> List.flatten
 
 
-type context = TODO
+type context = e
 
-let empty_context = TODO
+let empty_context = Hole
 
 
 let rec typeof_a (*pos tenv env env' ctx a*) _ _ _ _ _ _ =
@@ -74,10 +74,28 @@ and refine_a pos ~backward tenv env a t =
   end
   |> List.filter (fun env -> Env.is_bottom env |> not)
 
-and refine (*~backward tenv env e t*) ~backward _ _ _ _ =
-  ignore backward ;
-  failwith "Not implemented"
-
+and refine ~backward tenv env e t =
+  if Env.is_bottom env then []
+  else begin
+    match e with
+    | Hole -> assert false
+    | EVar v -> refine_a [] ~backward tenv env (Var v) t
+    | Let (v, a, e) ->
+      let rm_v = if backward then (fun env -> env) else (fun env -> Env.rm v env) in
+      refine ~backward tenv env e t
+      |> List.map (fun env' ->
+        if Env.mem v env'
+        then
+          refine_a [] ~backward tenv (Env.cap env env' |> rm_v) a (Env.find v env')
+          |> List.map (Env.cap (env' |> rm_v))
+        else [env']
+      )
+      |> List.flatten
+      |> (fun envs -> (if backward then [] else 
+        refine_a [] ~backward tenv (env |> rm_v) a empty
+        )@envs)
+  end
+  |> List.filter (fun env -> Env.is_bottom env |> not)
 
 let typeof_simple tenv env e =
   leaves (typeof tenv env Env.empty empty_context e)

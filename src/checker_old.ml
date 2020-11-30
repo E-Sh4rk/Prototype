@@ -124,6 +124,7 @@ and typeof tenv env e =
     |> List.map (fun (_, env) -> typeof tenv env e)
     |> disj
     |> normalize_typ
+  | Hole -> assert false
   end
   |> (fun x -> Format.printf "end typeof@." ; x)
 
@@ -277,6 +278,7 @@ and candidates tenv env e x =
         )
       |> List.flatten
     else r
+  | Hole -> assert false
   end
   (*|> normalize_candidates (Env.find x env)*) (* NOTE: Only needed in candidates_a. *)
   |> (fun x -> Format.printf "end candidates@." ; x)
@@ -375,6 +377,7 @@ and refine ~backward tenv env e t =
       |> List.flatten
     )
     |> List.flatten
+  | Hole -> assert false
   end
   (*|> filter_res*) (* NOTE: Only needed in refine_a. *)
   |> (fun x -> Format.printf "end refine@." ; x)

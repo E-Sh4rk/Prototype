@@ -85,3 +85,48 @@ let convert_to_normal_form ast =
     ) (EVar x)
 
   in aux ExprMap.empty ast
+
+let map ef af =
+  let rec aux_a a =
+    begin match a with
+    | Const c -> Const c
+    | Var v -> Var v
+    | Lambda (ta, v, e) -> Lambda (ta, v, aux_e e)
+    | Ite (v, t, e1, e2) -> Ite (v, t, aux_e e1, aux_e e2)
+    | App (v1, v2) -> App (v1, v2)
+    | Pair (v1, v2) -> Pair (v1, v2)
+    | Projection (p, v) -> Projection (p, v)
+    | RecordUpdate (v, str, vo) -> RecordUpdate (v, str, vo)
+    | Debug (str, v) -> Debug (str, v)
+    end
+    |> af
+  and aux_e e =
+    begin match e with
+    | Let (v, a, e) -> Let (v, aux_a a, aux_e e)
+    | EVar v -> EVar v
+    | Hole -> Hole
+    end
+    |> ef
+  in (aux_e, aux_a)
+
+let map_e ef af = map ef af |> fst
+let map_a ef af = map ef af |> snd
+
+let fold ef af =
+  let rec aux_a a =
+    begin match a with
+    | Const _ | Var _ | Debug _ | App _ | Pair _ | Projection _ | RecordUpdate _ -> []
+    | Lambda (_, _, e) -> [aux_e e]
+    | Ite (_, _, e1, e2) -> [aux_e e1 ; aux_e e2]
+    end
+    |> af a
+  and aux_e e =
+    begin match e with
+    | Let (_, a, e) -> [aux_a a ; aux_e e]
+    | EVar _ | Hole -> []
+    end
+    |> ef e
+  in (aux_e, aux_a)
+
+let fold_e ef af = fold ef af |> fst
+let fold_a ef af = fold ef af |> snd

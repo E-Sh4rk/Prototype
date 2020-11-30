@@ -10,9 +10,12 @@ type typ_tree =
 
 val leaves : typ_tree -> (Env.t * typ) list
 
-type context
+type context = e
 
 val empty_context : context
+val fill_context : context -> context -> context
+
+val bound_vars : e -> Variable.VarSet.t
 
 val typeof : type_env -> Env.t -> Env.t -> context -> e -> typ_tree
 val typeof_a : Position.t list -> type_env -> Env.t -> Env.t -> context -> a -> typ_tree

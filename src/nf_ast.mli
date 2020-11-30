@@ -18,6 +18,10 @@ and e =
   | Hole
 
 val convert_to_normal_form : Ast.annot_expr -> e
+val map_e : (e -> e) -> (a -> a) -> e -> e
+val map_a : (e -> e) -> (a -> a) -> a -> a
+val fold_e : (e -> 'a list -> 'a) -> (a -> 'a list -> 'a) -> e -> 'a
+val fold_a : (e -> 'a list -> 'a) -> (a -> 'a list -> 'a) -> a -> 'a
 
 val pp_a : Format.formatter -> a -> unit
 val pp_e : Format.formatter -> e -> unit

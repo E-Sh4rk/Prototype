@@ -1,6 +1,7 @@
 open Cduce
 open Nf_ast
 open Types_additions
+open Variable
 
 exception Ill_typed of Position.t list * string
 
@@ -18,6 +19,17 @@ let rec leaves tree = match tree with
 type context = e
 
 let empty_context = Hole
+
+let fill_context ctx e =
+  map_e (function Hole -> e | e -> e) (fun a -> a) ctx
+
+
+let bound_vars =
+  fold_e
+  (fun e acc -> let acc = List.fold_left VarSet.union VarSet.empty acc in
+    match e with Let (v, _, _) -> VarSet.add v acc | _ -> acc)
+  (fun a acc -> let acc = List.fold_left VarSet.union VarSet.empty acc in
+    match a with Lambda (_, v, _) -> VarSet.add v acc | _ -> acc)
 
 
 let rec typeof_a (*pos tenv env env' ctx a*) _ _ _ _ _ _ =

@@ -1,5 +1,7 @@
 open Variable
 
+exception EnvIsBottom
+
 type t =
 | EnvBottom
 | EnvOk of Cduce.typ VarMap.t
@@ -15,6 +17,11 @@ let add v t env =
   | EnvOk _ when Cduce.is_empty t -> EnvBottom
   | EnvOk env -> EnvOk (VarMap.add v t env)
 
+let domain t =
+  match t with
+  | EnvBottom -> raise EnvIsBottom
+  | EnvOk env -> VarMap.bindings env |> List.map fst
+
 let mem v env =
   match env with
   | EnvBottom -> true
@@ -22,7 +29,7 @@ let mem v env =
 
 let rm v env =
   match env with
-  | EnvBottom -> EnvBottom
+  | EnvBottom -> raise EnvIsBottom
   | EnvOk env -> EnvOk (VarMap.remove v env)
 
 let find v env =
@@ -30,14 +37,21 @@ let find v env =
   | EnvBottom -> Cduce.empty
   | EnvOk env -> VarMap.find v env
 
-let from_map map =
-  if List.exists (fun (_,t) -> Cduce.is_empty t) (VarMap.bindings map)
-  then EnvBottom else EnvOk map
+let strengthen v t env =
+  let t = if mem v env then Cduce.cap t (find v env) else t in
+  add v t env
 
 let cap env1 env2 = match env1, env2 with
   | EnvBottom, _ | _, EnvBottom -> EnvBottom
   | EnvOk env1, EnvOk env2 ->
-    from_map (VarMap.union (fun _ t1 t2 -> Some (Cduce.cap t1 t2)) env1 env2)
+    let bottom = ref false in
+    let map = VarMap.union (fun _ t1 t2 ->
+      let inter = Cduce.cap t1 t2 in
+      (if Cduce.is_empty inter then bottom := true) ;
+      Some inter
+      ) env1 env2
+    in
+    if !bottom then EnvBottom else EnvOk map
 
 let conj lst =
   List.fold_left cap empty lst

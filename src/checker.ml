@@ -32,11 +32,28 @@ let bound_vars =
     match a with Lambda (_, v, _) -> VarSet.add v acc | _ -> acc)
 
 
+let transfer_unbounded_vars e env env' =
+  let bv = bound_vars e in
+  let rec aux env env' vs =
+    match vs with
+    | [] -> (env, env')
+    | v::vs when VarSet.mem v bv -> aux env env' vs
+    | v::vs -> aux (Env.strengthen v (Env.find v env') env) (Env.rm v env') vs
+  in
+  try aux env env' (Env.domain env')
+  with Env.EnvIsBottom -> (Env.bottom, Env.bottom)
+
 let rec typeof_a (*pos tenv env env' ctx a*) _ _ _ _ _ _ =
   failwith "Not implemented"
 
-and typeof (*tenv env env' ctx e *) _ _ _ _ _ =
-  failwith "Not implemented"
+and typeof tenv env env' ctx e =
+  let (env, env') = transfer_unbounded_vars e env env' in
+  if Env.is_bottom env then
+    TLeaf (env, empty)
+  else begin
+    ignore env' ; ignore tenv ; ignore ctx ;
+    failwith "Not implemented"
+  end
 
 and refine_a pos ~backward tenv env a t =
   if Env.is_bottom env then []
@@ -94,17 +111,19 @@ and refine ~backward tenv env e t =
     | EVar v -> refine_a [] ~backward tenv env (Var v) t
     | Let (v, a, e) ->
       let rm_v = if backward then (fun env -> env) else (fun env -> Env.rm v env) in
+      let env_nov = rm_v env in (* Shouldn't raise Env.EnvIsBottom because emptiness is checked before *)
       refine ~backward tenv env e t
       |> List.map (fun env' ->
         if Env.mem v env'
         then
-          refine_a [] ~backward tenv (Env.cap env env' |> rm_v) a (Env.find v env')
-          |> List.map (Env.cap (env' |> rm_v))
+          let env_nov' = rm_v env' in (* Shouldn't raise Env.EnvIsBottom because refine only return non-empty envs *)
+          refine_a [] ~backward tenv (Env.cap env_nov env_nov') a (Env.find v env')
+          |> List.map (Env.cap env_nov')
         else [env']
       )
       |> List.flatten
       |> (fun envs -> (if backward then [] else 
-        refine_a [] ~backward tenv (env |> rm_v) a empty
+        refine_a [] ~backward tenv env_nov a empty
         )@envs)
   end
   |> List.filter (fun env -> Env.is_bottom env |> not)

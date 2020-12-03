@@ -86,6 +86,11 @@ let convert_to_normal_form ast =
 
   in aux ExprMap.empty ast
 
+let convert_a_to_e a pos =
+  let var = Variable.create None in
+  List.iter (fun pos -> Variable.attach_location var pos) pos ;
+  Let (var, a, EVar var)
+
 let map ef af =
   let rec aux_a a =
     begin match a with

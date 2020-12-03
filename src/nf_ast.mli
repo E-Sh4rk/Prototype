@@ -18,6 +18,7 @@ and e =
   | Hole
 
 val convert_to_normal_form : Ast.annot_expr -> e
+val convert_a_to_e : a -> Position.t list -> e
 val map_e : (e -> e) -> (a -> a) -> e -> e
 val map_a : (e -> e) -> (a -> a) -> a -> a
 val fold_e : (e -> 'a list -> 'a) -> (a -> 'a list -> 'a) -> e -> 'a

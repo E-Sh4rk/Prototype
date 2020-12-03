@@ -56,6 +56,18 @@ let cap env1 env2 = match env1, env2 with
 let conj lst =
   List.fold_left cap empty lst
 
+
+let leq env1 env2 =
+  match env1, env2 with
+  | EnvBottom, _ -> true
+  | _, EnvBottom -> false
+  | EnvOk env1, EnvOk env2 ->
+    VarMap.for_all (fun v t ->
+      VarMap.mem v env1 && Cduce.subtype (VarMap.find v env1) t
+    ) env2
+
+let equiv env1 env2 = leq env1 env2 && leq env2 env1
+
 let pp fmt env =
   match env with
   | EnvBottom -> Format.fprintf fmt "Bottom\n"

@@ -5,6 +5,23 @@ open Variable
 
 exception Ill_typed of Position.t list * string
 
+let all_possibilities lst =
+  let rec aux acc lst =
+    match lst with
+    | [] -> [List.rev acc]
+    | a::lst ->
+      List.map (fun x -> aux (x::acc) lst) a
+      |> List.flatten
+  in
+  aux [] lst
+
+let rec remove_duplicates equiv lst =
+  let remove elt lst = List.filter (equiv elt) lst in
+  match lst with
+  | [] -> []
+  | e::lst -> e::(remove e lst |> remove_duplicates equiv)
+
+
 type typ_tree =
   | TNode of Env.t * (Env.t list * typ_tree) list
   | TLeaf of Env.t * typ
@@ -23,6 +40,33 @@ let rec map_tree fn fl tree =
     in fn env children
   | TLeaf (env, t) -> fl env t
 
+let rec flatten_tree tree =
+  match tree with
+  | TLeaf (_, t) -> [(Env.empty, t)]
+  | TNode (_, children) ->
+    let children = children
+    |> List.map (fun (labels, tree) -> (labels, flatten_tree tree))
+    in
+    let specialized_res = children (* We take only one branch *)
+    |> List.map (fun (labels, ftree) ->
+      ftree
+      |> List.map (fun (env, t) ->
+        List.map (fun label -> (Env.cap env label, t)) labels
+        |> List.filter (fun (env, _) -> Env.is_bottom env |> not)
+      )
+      |> List.flatten
+    )
+    |> List.flatten
+    in
+    let common_res = children (* We take all branchs in parallel *)
+    |> List.map (fun (_, ftree) -> ftree)
+    |> all_possibilities
+    |> List.map (fun lst -> lst |>
+      List.fold_left (fun (aenv,at) (env, t) -> (Env.cap aenv env, cup at t)) (Env.empty, empty)
+    )
+    |> List.filter (fun (env, _) -> Env.is_bottom env |> not)
+    in
+    common_res@specialized_res
 
 type context = e
 
@@ -161,7 +205,19 @@ and typeof_a pos tenv env env' ctx a =
         let child2 = retype_a_with_assumption pos tenv env env' ctx a v t2 in
         TNode (env, [child1 ; child2])
       end
-    | Lambda _ -> failwith "TODO"
+    | Lambda (Ast.ADomain s, v, e) ->
+      let tree = typeof tenv (Env.add v s env) env' ctx e in
+      let res = flatten_tree tree in
+      let children = res
+      |> List.map (fun (env, _) -> Env.rm v env)
+      |> remove_duplicates Env.equiv
+      |> List.map (fun env ->
+        let t = failwith "TODO" in
+        let lenv = failwith "TODO" in
+        ([env], TLeaf (lenv, t) )
+      ) in
+      TNode (env, children)
+    | Lambda _ -> failwith "Not implemented"
   end
 
 and typeof tenv env env' ctx e =

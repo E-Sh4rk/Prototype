@@ -148,7 +148,20 @@ and typeof_a pos tenv env env' ctx a =
           TNode (env, [child1 ; child2])
         )
       end
-    | _ -> failwith "TODO"
+    | Ite (v, t, e1, e2) ->
+      let tv = Env.find v env in
+      let t1 = cap tv t in
+      let t2 = cap tv (neg t) in
+      if is_empty t2
+      then typeof tenv env env' ctx e1
+      else if is_empty t1
+      then typeof tenv env env' ctx e2
+      else begin
+        let child1 = retype_a_with_assumption pos tenv env env' ctx a v t1 in
+        let child2 = retype_a_with_assumption pos tenv env env' ctx a v t2 in
+        TNode (env, [child1 ; child2])
+      end
+    | Lambda _ -> failwith "TODO"
   end
 
 and typeof tenv env env' ctx e =

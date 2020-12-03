@@ -15,6 +15,14 @@ let rec leaves tree = match tree with
     List.map (fun (_, tree) -> leaves tree) lst
     |> List.flatten
 
+let rec map_tree fn fl tree =
+  match tree with
+  | TNode (env, children) ->
+    let children = children
+    |> List.map (fun (labels, child) -> (labels, map_tree fn fl child))
+    in fn env children
+  | TLeaf (env, t) -> fl env t
+
 
 type context = e
 
@@ -51,8 +59,62 @@ and typeof tenv env env' ctx e =
   if Env.is_bottom env then
     TLeaf (env, empty)
   else begin
-    ignore env' ; ignore tenv ; ignore ctx ;
-    failwith "Not implemented"
+    match e with
+    | Hole -> assert false
+    | EVar v -> typeof_a [] tenv env env' ctx (Var v)
+    | Let (v, a, e) when not (Env.mem v env) -> (* LetFirst *)
+      let pos = Variable.get_locations v in
+      typeof_a pos tenv env env' ctx a
+      |> map_tree
+      (fun env children ->
+        let env_nov = Env.rm v env in
+        (* Shouldn't raise Env.EnvIsBottom because nodes env shouldn't be empty
+        (otherwise it would be a leaf) *)
+        let children = children
+        |> List.map (fun (labels, child) ->
+          let labels = labels
+          |> List.map (fun label ->
+            let label_nov = Env.rm v label in
+            (* Shouldn't raise Env.EnvIsBottom because labels shouldn't be empty *)
+            begin
+              if Env.mem v label
+              then refine_a [] ~backward:false tenv
+                  (Env.cap env_nov label_nov) a (Env.find v label) 
+              else [Env.empty]
+            end
+            |> List.map (Env.cap label_nov)
+          )
+          |> List.flatten in
+          (labels, child)
+        ) in
+        TNode (env, children)
+      )
+      (fun env t ->
+        typeof tenv (Env.add v t env) env' ctx (Let (v, a, e))
+      )
+    | Let (v, a, e) ->
+      let pos = Variable.get_locations v in
+      begin match typeof_a pos tenv env env' ctx a with
+      | TNode _ -> assert false
+      | TLeaf (_, t) ->
+        let env = Env.strengthen v t env in
+        if not (Env.mem v env') || subtype (Env.find v env) (Env.find v env')
+        then (* LetNoRefine *)
+          let ctx = fill_context ctx (Let (v, a, Hole)) in
+          typeof tenv env (Env.rm v env') ctx e
+        else (* LetRefine *)
+          let t' = Env.find v env' in
+          let env_nov' = Env.rm v env' in
+          let trees =
+            let envs'' = refine_a [] ~backward:true tenv env a t' in
+            let env = Env.strengthen v t' env in
+            envs'' |> List.map (fun env'' ->
+              let env' = Env.cap env_nov' env'' in
+              typeof tenv env env' Hole (fill_context ctx (Let (v, a, e)))
+            )
+          in
+          TNode (env, List.map (fun tree -> ([], tree)) trees)
+      end
   end
 
 and refine_a pos ~backward tenv env a t =

@@ -95,12 +95,14 @@ let transfer_unbounded_vars e env env' =
   try aux env env' (Env.domain env')
   with Env.EnvIsBottom -> (Env.bottom, Env.bottom)
 
-let rec retype_a_with_assumption pos tenv env env' ctx a v t =
-  let assumption = Env.singleton v t in
-  let env' = Env.cap env' assumption in
+let rec retype_a_with_assumptions pos tenv env env' ctx a assumptions =
+  let env' = Env.cap env' assumptions in
   let expr = fill_context ctx (convert_a_to_e a pos) in
   let tree = typeof tenv env env' Hole expr in
-  ([assumption], tree)
+  ([assumptions], tree)
+
+and retype_a_with_assumption pos tenv env env' ctx a v t =
+  retype_a_with_assumptions pos tenv env env' ctx a (Env.singleton v t)
 
 and typeof_a pos tenv env env' ctx a =
   (* No need to apply NoDef here, applying it in typeof is enough. *)
@@ -205,18 +207,24 @@ and typeof_a pos tenv env env' ctx a =
         let child2 = retype_a_with_assumption pos tenv env env' ctx a v t2 in
         TNode (env, [child1 ; child2])
       end
-    | Lambda (Ast.ADomain s, v, e) ->
+    | Lambda (Ast.ADomain s, v, e) -> (* TODO: memoisation (only for the Lambda case, which is very costly) *)
       let tree = typeof tenv (Env.add v s env) env' ctx e in
       let res = flatten_tree tree in
-      let children = res
+      let envs = res
       |> List.map (fun (env, _) -> Env.rm v env)
-      |> remove_duplicates Env.equiv
-      |> List.map (fun env ->
-        let t = failwith "TODO" in
-        let lenv = failwith "TODO" in
-        ([env], TLeaf (lenv, t) )
-      ) in
-      TNode (env, children)
+      |> remove_duplicates Env.equiv in
+      begin match envs with
+      | [] -> assert false
+      | [env'] ->
+        assert (Env.leq env env') ;
+        TLeaf (env, conj (List.map (fun (env, t) ->
+          let tv = if Env.mem v env then Env.find v env else s in
+          mk_arrow (cons tv) (cons t)) res))
+      | envs ->
+        let children = envs
+        |> List.map (retype_a_with_assumptions pos tenv env env' ctx a) in
+        TNode (env, children)
+      end
     | Lambda _ -> failwith "Not implemented"
   end
 

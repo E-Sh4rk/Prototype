@@ -15,6 +15,9 @@ let print_logs () =
 let print_ill_typed (pos, str) =
   Format.printf "Ill typed\n" ; Utils.error pos str
 
+let print_result str =
+  Format.printf "%s@?" str
+
 let type_check_program
   (program:Ast.parser_program) (pr:string -> unit) pr_logs pr_ill_typed =
   let test_def (tenv,varm,env) (name,parsed_expr) =
@@ -52,4 +55,4 @@ let type_check_program
 let _ =
     let fn = ref "test.ml" in
     if Array.length Sys.argv > 1 then fn := Sys.argv.(1) ;
-    type_check_program (parse_program_file !fn) print_string print_logs print_ill_typed
+    type_check_program (parse_program_file !fn) print_result print_logs print_ill_typed

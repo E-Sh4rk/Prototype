@@ -229,6 +229,7 @@ and typeof_a pos tenv env env' ctx a =
   end
 
 and typeof tenv env env' ctx e =
+  (*Format.printf "typeof %a @." pp_e e ;*)
   let (env, env') = transfer_unbounded_vars e env env' in
   if Env.is_bottom env then
     TLeaf (env, empty)

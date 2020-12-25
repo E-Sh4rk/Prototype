@@ -1,4 +1,6 @@
 
+let test = if true is True then true else false
+
 let not = fun (a : Any) ->
   if a is True then false else true
 

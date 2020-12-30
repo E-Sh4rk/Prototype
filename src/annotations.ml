@@ -8,6 +8,7 @@ module VarAnnot = struct
     |> List.map (fun (_,snd) -> Cduce.cap snd initial)
     |> List.filter (fun t -> Cduce.is_empty t |> not)
   let add_split env typ va = (env, typ)::va
+  let cup va1 va2 = va2@va1
 end
 
 module Annotations = struct
@@ -19,6 +20,14 @@ module Annotations = struct
   let remove_var = VarMap.remove
   let get_var = VarMap.find
 
+  let restrict vs annots =
+    VarSet.fold (fun v acc ->
+      if mem_var v annots
+      then VarMap.add v (get_var v annots) acc
+      else acc
+    )
+    vs VarMap.empty
+
   let splits v env ?(initial=Cduce.any) annots =
     if mem_var v annots
     then get_var v annots |> VarAnnot.splits env ~initial
@@ -28,4 +37,10 @@ module Annotations = struct
     let va = if mem_var v annots then get_var v annots else VarAnnot.empty in
     let va = VarAnnot.add_split env typ va in
     add_var v va annots
+
+  let cup a1 a2 =
+    VarMap.union (fun _ va1 va2 -> Some (VarAnnot.cup va1 va2)) a1 a2
+
+  let union lst =
+    List.fold_left cup empty lst
 end

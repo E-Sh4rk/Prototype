@@ -6,24 +6,6 @@ open Variable
 
 exception Ill_typed of Position.t list * string
 
-(*let all_possibilities lst =
-  let rec aux acc lst =
-    match lst with
-    | [] -> [List.rev acc]
-    | a::lst ->
-      List.map (fun x -> aux (x::acc) lst) a
-      |> List.flatten
-  in
-  aux [] lst
-
-let rec remove_duplicates equiv lst =
-  let remove elt lst = List.filter (equiv elt) lst in
-  match lst with
-  | [] -> []
-  | e::lst -> e::(remove e lst |> remove_duplicates equiv)
-*)
-
-
 let rec typeof_a pos tenv env annots a =
   if Env.is_bottom env
   then raise (Ill_typed (pos, "Environment contains a divergent variable."))

@@ -7,7 +7,12 @@ module VarAnnot = struct
     List.filter (fun (env',_) -> Env.leq env env') va
     |> List.map (fun (_,snd) -> Cduce.cap snd initial)
     |> List.filter (fun t -> Cduce.is_empty t |> not)
-  let add_split env typ va = (env, typ)::va
+    |> Utils.remove_duplicates Cduce.equiv
+  let add_split env typ va =
+    let splits = splits env va in
+    if List.exists (fun t -> Cduce.equiv t typ) splits
+    then va
+    else (env, typ)::va
   let cup va1 va2 = va2@va1
 end
 

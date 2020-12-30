@@ -40,4 +40,9 @@ let do_not_memoize f =
   let rec aux input =
     f aux input
   in aux
-  
+
+let rec remove_duplicates equiv lst =
+  let remove elt lst = List.filter (fun e -> equiv elt e |> not) lst in
+  match lst with
+  | [] -> []
+  | e::lst -> e::(remove e lst |> remove_duplicates equiv)

@@ -53,6 +53,12 @@ let type_check_program
     ignore (List.fold_left treat_elem (empty_tenv, Ast.empty_name_var_map, Env.empty) program)
 
 let _ =
+    (* Printexc.record_backtrace true; *)
     let fn = ref "test.ml" in
     if Array.length Sys.argv > 1 then fn := Sys.argv.(1) ;
-    type_check_program (parse_program_file !fn) print_result print_logs print_ill_typed
+    try
+      type_check_program (parse_program_file !fn) print_result print_logs print_ill_typed
+    with e ->
+      let msg = Printexc.to_string e
+      and stack = Printexc.get_backtrace () in
+      Printf.eprintf "Uncatched exception: %s%s\n" msg stack

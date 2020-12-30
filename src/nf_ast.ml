@@ -108,8 +108,8 @@ let rec separate_defs bvs defs =
   match defs with
   | [] -> ([], [])
   | (v,d)::defs ->
-    let bvs' = bv_a d in
-    if VarSet.inter bvs bvs' |> VarSet.is_empty
+    let fvs = fv_a d in
+    if VarSet.inter bvs fvs |> VarSet.is_empty
     then
       let (defs, defs') = separate_defs bvs defs in
       ((v,d)::defs, defs')

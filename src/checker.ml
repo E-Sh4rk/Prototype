@@ -319,28 +319,32 @@ and infer_a' pos tenv env annots a =
       NeedSplit (Annotations.empty, [env1;env2], [env1;env2])
     end
   | Lambda (Ast.ADomain s, v, e) ->
-
-    let infer_with_split (*tenv env annots s x e*) _ _ _ _ _ _ =
-      (*let env' = Env.add x s env in
+    let infer_with_split tenv env annots s x e =
+      let env' = Env.add x s env in
       match infer' tenv env' annots e with
-      | Result annots' -> Result (Annotations.add_split x env s annots') (* LetSplitOk *)
+      | Result annots' -> Result (Annotations.add_split x env s annots') (* AbsSplitOk *)
       | NeedSplit (annots', gammas1, gammas2) ->
-        let gammas1' = backward env' x a gammas1 in
-        let gammas2' = forward env' x a gammas2 in
-        let x_annots = List.fold_left (fun acc env' ->
-          VarAnnot.add_split (Env.cap env (Env.rm x env')) (Env.find x env') acc
-        ) VarAnnot.empty gammas1'
+        let x_annots1 = List.fold_left (fun acc env' ->
+          let env'' = Env.cap env' (Env.singleton x s) in
+          VarAnnot.add_split (Env.cap env (Env.rm x env'')) (Env.find x env'') acc
+        ) VarAnnot.empty gammas1
         in
-        let annots'' = Annotations.add_var x x_annots annots' in
-        if List.for_all (fun gamma' -> domain_included_in_singleton gamma' x) (gammas1'@gammas2')
-        then (* LetSplitTop *)
-          infer' tenv env annots'' (Let (x, a, e))
-        else (* LetSplitUp *)
-          let gammas1'' = List.map (Env.rm x) gammas1' in
-          NeedSplit (annots'', gammas1'', gammas2')*)
-      failwith "TODO"
+        let x_annots2 =
+          List.filter (fun env' -> Env.mem x env') gammas2 |>
+          List.fold_left (fun acc env' ->
+            VarAnnot.add_split (Env.cap env (Env.rm x env')) (Env.find x env') acc
+          ) VarAnnot.empty 
+        in
+        let annots'' = Annotations.add_var x (VarAnnot.cup x_annots1 x_annots2) annots' in
+        if List.for_all (fun gamma' -> domain_included_in_singleton gamma' x) (gammas1@gammas2)
+        then (* AbsSplitTop *)
+          infer_a' pos tenv env annots'' (Lambda (Ast.ADomain s, v, e))
+        else (* AbsSplitUp *)
+          let gammas1' = List.map (Env.rm x) gammas1 in
+          let gammas2' = List.map (Env.rm x) gammas2 in
+          NeedSplit (annots'', gammas1', gammas2')
     in
-
+    (* Abs *)
     let splits = Annotations.splits v env ~initial:s annots in
     let annots' = Annotations.restrict (bv_e e) annots in
     let results = splits |>

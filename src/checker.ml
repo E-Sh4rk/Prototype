@@ -228,7 +228,99 @@ let rec infer' tenv env annots e =
       else NeedSplit (uannots, ugammas1, ugammas2)
     end
 
-and infer_a' _ _ _ _ _ = failwith "TODO"
+and infer_a' pos (*tenv*)_ env (*annots*)_ a =
+  match a with
+  | Const _ -> Result (Annotations.empty)
+  | Var _ -> Result (Annotations.empty)
+  | Debug _ -> Result (Annotations.empty)
+  | Pair _ -> Result (Annotations.empty)
+  | Projection (Field _, _) -> failwith "Not implemented"
+  | Projection (_, v) ->
+    let t = Env.find v env in
+    if subtype t pair_any then
+      begin match split_pair t with
+      | [] -> Result (Annotations.empty)
+      | [_] -> Result (Annotations.empty)
+      | lst ->
+        let gammas = lst |> List.map (fun (t1, t2) ->
+          Env.singleton v (mk_times (cons t1) (cons t2))
+        ) in
+        NeedSplit (Annotations.empty, gammas, gammas)
+      end
+    else begin
+      let t1 = cap t pair_any in
+      let t2 = diff t pair_any in
+      if is_empty t1 || is_empty t2
+      then raise (Ill_typed (pos, "Bad domain for the projection."))
+      else (
+        let env1 = Env.singleton v t1 in
+        let env2 = Env.singleton v t2 in
+        NeedSplit (Annotations.empty, [env1;env2], [env1;env2])
+      )
+    end
+  | RecordUpdate _ -> failwith "Not implemented"
+  | App (v1, v2) ->
+    let t1 = Env.find v1 env in
+    if subtype t1 arrow_any then
+      begin match split_arrow t1 with
+      | [] -> Result (Annotations.empty)
+      | [t1] ->
+        let t2 = Env.find v2 env in
+        begin match dnf t1 with
+        | [arrows] ->
+          if List.exists (fun (s,_) -> subtype t2 s) arrows
+          then Result (Annotations.empty)
+          else begin
+            let dom = domain t1 in
+            if subtype t2 dom
+            then begin
+              let gammas = arrows |> List.map (fun (s,_) -> cap s t2) |>
+                List.filter (fun t2 -> is_empty t2 |> not) |>
+                List.map (fun t2 -> Env.singleton v2 t2) in
+              NeedSplit (Annotations.empty, gammas, gammas)
+            end else begin
+              let t2 = cap t2 dom in
+              let t2' = diff t2 dom in
+              if is_empty t2 || is_empty t2'
+              then raise (Ill_typed (pos, "Bad domain for the application."))
+              else (
+                let env1 = Env.singleton v2 t2 in
+                let env2 = Env.singleton v2 t2' in
+                NeedSplit (Annotations.empty, [env1;env2], [env1;env2])
+              )
+            end
+          end
+        | _ -> assert false
+        end
+      | lst ->
+        let gammas = lst |> List.map (fun t1 -> Env.singleton v1 t1) in
+        NeedSplit (Annotations.empty, gammas, gammas)
+      end
+    else begin
+      let t1 = cap t1 arrow_any in
+      let t1' = diff t1 arrow_any in
+      if is_empty t1 || is_empty t1'
+      then raise (Ill_typed (pos, "Left-hand side of an application must have an arrow type."))
+      else (
+        let env1 = Env.singleton v1 t1 in
+        let env2 = Env.singleton v1 t1' in
+        NeedSplit (Annotations.empty, [env1;env2], [env1;env2])
+      )
+    end
+  | Ite (v, t, _, _) ->
+    let tv = Env.find v env in
+    let t1 = cap tv t in
+    let t2 = cap tv (neg t) in
+    if is_empty t1 || is_empty t2
+    then Result (Annotations.empty)
+    else begin
+      let env1 = Env.singleton v t1 in
+      let env2 = Env.singleton v t2 in
+      NeedSplit (Annotations.empty, [env1;env2], [env1;env2])
+    end
+  (*| Lambda (Ast.ADomain s, v, e) ->
+    failwith "TODO"*)
+  | Lambda _ -> failwith "Not implemented"
 
 (* TODO: in case of a NeedSplit below, just make the required split instead of failing. *)
 let infer tenv env annots e =

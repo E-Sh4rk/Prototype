@@ -124,6 +124,10 @@ let simplify_dnf dnf =
     in
     aux (fun t ts -> subtype t (disj ts)) [] splits
     |> List.map simplify_conjuncts
+
+let simplify_arrow t =
+    dnf t |> simplify_dnf
+    |> List.map branch_type |> disj
     
 let split_arrow t =
   dnf t

@@ -1,6 +1,7 @@
 open Cduce
 open Nf_ast
 open Types_additions
+open Annotations
 (*open Variable*)
 
 exception Ill_typed of Position.t list * string
@@ -23,23 +24,61 @@ let rec remove_duplicates equiv lst =
 *)
 
 
-let typeof_a (*pos tenv env env'*) _ _ _ _ a =
-  match a with
-  (*| Const (Atom str) -> failwith "TODO"
-  | Const c -> failwith "TODO"
-  | Var v -> failwith "TODO"
-  | Debug (_, v) -> failwith "TODO"
-  | Pair (v1, v2) -> failwith "TODO"
+let rec typeof_a pos tenv env annots a =
+  if Env.is_bottom env
+  then raise (Ill_typed (pos, "Environment contains a divergent variable."))
+  else begin match a with
+  | Const (Atom str) -> get_type_or_atom tenv str
+  | Const c -> Ast.const_to_typ c
+  | Var v -> Env.find v env
+  | Debug (_, v) -> Env.find v env
+  | Pair (v1, v2) ->
+    let t1 = Env.find v1 env in
+    let t2 = Env.find v2 env in
+    mk_times (cons t1) (cons t2)
   | Projection (Field _, _) -> failwith "Not implemented"
-  | Projection (p, v) -> failwith "TODO"
+  | Projection (p, v) ->
+    let t = Env.find v env in
+    if subtype t pair_any
+    then (if p = Fst then pi1 t else pi2 t)
+    else raise (Ill_typed (pos, "Projection can only be done on a pair."))
   | RecordUpdate _ -> failwith "Not implemented"
-  | App (v1, v2) -> failwith "TODO"
-  | Ite (v, t, x1, x2) -> failwith "TODO"
-  | Lambda (Ast.ADomain s, v, e) -> failwith "TODO"
-  | Lambda _ -> failwith "Not implemented"*)
-  | _ -> failwith "TODO"
+  | App (v1, v2) ->
+    let t1 = Env.find v1 env in
+    if subtype t1 arrow_any
+    then
+      let t2 = Env.find v2 env in
+      let dom = domain t1 in
+      if subtype t2 dom
+      then
+        let res = apply t1 t2 in
+        if is_empty res
+        then raise (Ill_typed (pos, "This application always diverges."))
+        else res
+      else raise (Ill_typed (pos, "Argument not in the domain of the function."))
+    else raise (Ill_typed (pos, "Application can only be done on a function."))
+  | Ite (v, t, x1, x2) ->
+    let tv = Env.find v env in
+    if subtype tv t
+    then Env.find x1 env
+    else if subtype tv (neg t)
+    then Env.find x2 env
+    else raise (Ill_typed (pos, "Cannot select a branch for the typecase."))
+  | Lambda (Ast.ADomain s, v, e) ->
+    let splits = Annotations.splits v env ~initial:s annots in
+    (* The splits are guaranteed not to contain the empty type *)
+    if disj splits |> subtype s
+    then
+      splits |> List.map (fun t ->
+        let env = Env.add v t env in
+        let res = typeof tenv env annots e in
+        mk_arrow (cons t) (cons res)
+      ) |> conj |> simplify_arrow
+    else raise (Ill_typed (pos, "Invalid split (does not cover the whole domain)."))
+  | Lambda _ -> failwith "Not implemented"
+  end
 
-and typeof (*tenv env env'*) _ _ _ e =
+and typeof (*tenv env annots*) _ _ _ e =
   match e with
   (*| EVar v -> failwith "TODO"
   | Let (v, a, e) -> failwith "TODO"*)

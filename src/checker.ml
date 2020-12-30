@@ -2,7 +2,7 @@ open Cduce
 open Nf_ast
 open Types_additions
 open Annotations
-(*open Variable*)
+open Variable
 
 exception Ill_typed of Position.t list * string
 
@@ -74,15 +74,30 @@ let rec typeof_a pos tenv env annots a =
         let res = typeof tenv env annots e in
         mk_arrow (cons t) (cons res)
       ) |> conj |> simplify_arrow
-    else raise (Ill_typed (pos, "Invalid split (does not cover the whole domain)."))
+      (* NOTE: the intersection of non-empty arrows cannot be empty,
+      thus no need to check the emptiness of the result *)
+    else raise (Ill_typed (pos, "Invalid splits (does not cover the whole domain)."))
   | Lambda _ -> failwith "Not implemented"
   end
 
-and typeof (*tenv env annots*) _ _ _ e =
-  match e with
-  (*| EVar v -> failwith "TODO"
-  | Let (v, a, e) -> failwith "TODO"*)
-  | _ -> failwith "TODO"
+and typeof tenv env annots e =
+  if Env.is_bottom env
+  then raise (Ill_typed ([], "Environment contains a divergent variable."))
+  else begin match e with
+  | EVar v -> Env.find v env
+  | Let (v, a, e) ->
+    let pos = Variable.get_locations v in
+    let s = typeof_a pos tenv env annots a in
+    let splits = Annotations.splits v env ~initial:s annots in
+    (* The splits are guaranteed not to contain the empty type *)
+    if disj splits |> subtype s
+    then
+      splits |> List.map (fun t ->
+        let env = Env.add v t env in
+        typeof tenv env annots e
+      ) |> disj
+    else raise (Ill_typed (pos, "Invalid splits (does not cover the whole domain)."))
+  end
 
 let refine_a _ ~backward _ env a t =
   begin match a with

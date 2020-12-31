@@ -27,6 +27,7 @@ let type_check_program
         let annot_expr = Ast.parser_expr_to_annot_expr tenv varm parsed_expr in
         let time = Unix.gettimeofday () in
         let nf_expr = convert_to_normal_form annot_expr in
+        assert (VarSet.subset (fv_e nf_expr) (Env.domain env |> VarSet.of_list)) ;
         (*Format.printf "%a\n" pp_e nf_expr ;*)
         let typ = Checker.typeof_simple tenv env nf_expr in
         let time = (Unix.gettimeofday ()) -. time in
@@ -53,7 +54,7 @@ let type_check_program
     ignore (List.fold_left treat_elem (empty_tenv, Ast.empty_name_var_map, Env.empty) program)
 
 let _ =
-    (* Printexc.record_backtrace true; *)
+    (*Printexc.record_backtrace true;*)
     let fn = ref "test.ml" in
     if Array.length Sys.argv > 1 then fn := Sys.argv.(1) ;
     try

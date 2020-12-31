@@ -130,7 +130,7 @@ type infer_res =
   | Result of Annotations.t
   | NeedSplit of Annotations.t * (Env.t list) * (Env.t list)
 
-let merge_annotations res =
+let merge_annotations additional_annots res =
   let aux = function
   | Result annots -> (annots, [], [])
   | NeedSplit (annots, gammas1, gammas2) -> (annots, gammas1, gammas2)
@@ -142,12 +142,14 @@ let merge_annotations res =
       let (ar,br,cr) = split3 lst in
       (a::ar, b::br, c::cr)
   in
-  List.map aux res |> split3 |>
-  (fun (a,b,c) -> (Annotations.union a, List.concat b, List.concat c))
-
-let is_result = function
+  let is_result = function
   | Result _ -> true
   | NeedSplit _ -> false
+  in
+  let (a,b,c) = List.map aux res |> split3 in
+  let (a,b,c) = (Annotations.union (additional_annots::a), List.concat b, List.concat c) in
+  if List.for_all is_result res
+  then Result a else NeedSplit (a,b,c)
 
 let backward env x a gammas =
   gammas |>
@@ -173,7 +175,7 @@ let domain_included_in_singleton env x =
 let actual_expected act exp =
   Format.asprintf "Actual: %a - Expected: %a" pp_typ act pp_typ exp
 
-(* TODO: update Lambda and Let (cf the fix in the paper) *)
+(* TODO: issue with LetSplitTop and AbsSplitTop (cf paper) *)
 let rec infer' tenv env annots e =
   let infer_with_split tenv env annots s x a e =
     let env' = Env.add x s env in
@@ -182,15 +184,22 @@ let rec infer' tenv env annots e =
     | NeedSplit (annots', gammas1, gammas2) ->
       let gammas1' = backward env' x a gammas1 in
       let gammas2' = forward env' x a gammas2 in
-      let x_annots = List.fold_left (fun acc env' ->
-        VarAnnot.add_split (Env.cap env (Env.rm x env')) (Env.find x env') acc
-      ) VarAnnot.empty gammas1'
-      in
-      let annots'' = Annotations.add_var x x_annots annots' in
       if List.for_all (fun gamma' -> domain_included_in_singleton gamma' x) (gammas1'@gammas2')
       then (* LetSplitTop *)
-        infer' tenv env annots'' (Let (x, a, e))
+        let splits = List.map (fun env'' -> Env.find x env'') gammas1'
+        |> Utils.remove_duplicates equiv in
+        let x_annots = List.fold_left (fun acc t ->
+          VarAnnot.add_split env t acc
+        ) VarAnnot.empty splits
+        in
+        List.map (fun s -> infer' tenv (Env.add x s env) annots' e) splits |>
+        merge_annotations (Annotations.add_var x x_annots Annotations.empty)
       else (* LetSplitUp *)
+        let x_annots = List.fold_left (fun acc env'' ->
+          VarAnnot.add_split (Env.cap env (Env.rm x env'')) (Env.find x env'') acc
+        ) VarAnnot.empty gammas1'
+        in
+        let annots'' = Annotations.add_var x x_annots annots' in
         let gammas1'' = List.map (Env.rm x) gammas1' in
         NeedSplit (annots'', gammas1'', gammas2')
   in
@@ -205,13 +214,9 @@ let rec infer' tenv env annots e =
       let t = typeof_a pos tenv env annots1' a in
       let splits = Annotations.splits v env ~initial:t annots in
       let annots2 = Annotations.restrict (bv_e e) annots in
-      let results = splits |>
-        List.map (fun s -> infer_with_split tenv env annots2 s v a e)
-      in
-      let (uannots, ugammas1, ugammas2) = merge_annotations results in
-      if List.for_all is_result results
-      then Result (Annotations.cup annots1' uannots)
-      else NeedSplit (Annotations.cup annots1' uannots, ugammas1, ugammas2)
+      splits |>
+      List.map (fun s -> infer_with_split tenv env annots2 s v a e) |>
+      merge_annotations annots1'
     end
 
 and infer_a' pos tenv env annots a =
@@ -313,36 +318,45 @@ and infer_a' pos tenv env annots a =
       match infer' tenv env' annots e with
       | Result annots' -> Result (Annotations.add_split x env s annots') (* AbsSplitOk *)
       | NeedSplit (annots', gammas1, gammas2) ->
-        let x_annots1 = List.fold_left (fun acc env' ->
-          let env'' = Env.cap env' (Env.singleton x s) in
-          VarAnnot.add_split (Env.cap env (Env.rm x env'')) (Env.find x env'') acc
-        ) VarAnnot.empty gammas1
-        in
-        let x_annots2 =
-          List.filter (fun env' -> Env.mem x env') gammas2 |>
-          List.fold_left (fun acc env' ->
-            VarAnnot.add_split (Env.cap env (Env.rm x env')) (Env.find x env') acc
-          ) VarAnnot.empty 
-        in
-        let annots'' = Annotations.add_var x (VarAnnot.cup x_annots1 x_annots2) annots' in
         if List.for_all (fun gamma' -> domain_included_in_singleton gamma' x) (gammas1@gammas2)
         then (* AbsSplitTop *)
-          infer_a' pos tenv env annots'' (Lambda (Ast.ADomain s, v, e))
+          let splits = (List.map
+            (fun env'' -> Env.find x (Env.cap env'' (Env.singleton x s))) gammas1
+            ) @ (
+              List.filter (fun env'' -> Env.mem x env'') gammas2 |>
+              List.map (fun env'' -> Env.find x env'')
+            )
+          |> Utils.remove_duplicates equiv in
+          let x_annots = List.fold_left (fun acc t ->
+            VarAnnot.add_split env t acc
+          ) VarAnnot.empty splits
+          in
+          List.map (fun s -> infer' tenv (Env.add x s env) annots' e) splits |>
+          merge_annotations (Annotations.add_var x x_annots Annotations.empty)
         else (* AbsSplitUp *)
+          let x_annots = VarAnnot.cup
+            (List.fold_left (fun acc env'' ->
+                let env'' = Env.cap env'' (Env.singleton x s) in
+                VarAnnot.add_split (Env.cap env (Env.rm x env'')) (Env.find x env'') acc
+              ) VarAnnot.empty gammas1
+            ) (
+              List.filter (fun env'' -> Env.mem x env'') gammas2 |>
+              List.fold_left (fun acc env'' ->
+                VarAnnot.add_split (Env.cap env (Env.rm x env'')) (Env.find x env'') acc
+              ) VarAnnot.empty 
+            )
+          in
+          let annots'' = Annotations.add_var x x_annots annots' in
           let gammas1' = List.map (Env.rm x) gammas1 in
           let gammas2' = List.map (Env.rm x) gammas2 in
-          NeedSplit (annots'', gammas1', gammas2')
+          NeedSplit (annots'', gammas1', gammas2')        
     in
     (* Abs *)
     let splits = Annotations.splits v env ~initial:s annots in
     let annots' = Annotations.restrict (bv_e e) annots in
-    let results = splits |>
-      List.map (fun s -> infer_with_split tenv env annots' s v e)
-    in
-    let (uannots, ugammas1, ugammas2) = merge_annotations results in
-    if List.for_all is_result results
-    then Result uannots
-    else NeedSplit (uannots, ugammas1, ugammas2)
+    splits |>
+    List.map (fun s -> infer_with_split tenv env annots' s v e) |>
+    merge_annotations Annotations.empty
   | Lambda _ -> failwith "Not implemented"
 
 let rec infer tenv env annots e =

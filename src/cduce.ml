@@ -31,7 +31,8 @@ let disjoint = CD.Types.disjoint
 let equiv = CD.Types.equiv
 
 
-(* TODO: Not very optimized... but temporary fix for the fact that arrows are not simplified *)
+(* NOTE: arrow types are not automatically simplified by Cduce,
+   thus we avoid useless cap\cup in order to keep simple types *)
 let cup t1 t2 = if subtype t1 t2 then t2
                 else if subtype t2 t1 then t1 else CD.Types.cup t1 t2
 let cap t1 t2 = if subtype t1 t2 then t1

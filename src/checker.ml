@@ -77,7 +77,7 @@ and typeof tenv env annots e =
       splits |> List.map (fun t ->
         let env = Env.add v t env in
         typeof tenv env annots e
-      ) |> disj
+      ) |> disj |> simplify_typ
     else raise (Ill_typed (pos, "Invalid splits (does not cover the whole domain)."))
   end
 
@@ -173,6 +173,7 @@ let domain_included_in_singleton env x =
 let actual_expected act exp =
   Format.asprintf "Actual: %a - Expected: %a" pp_typ act pp_typ exp
 
+(* TODO: update Lambda and Let (cf the fix in the paper) *)
 let rec infer' tenv env annots e =
   let infer_with_split tenv env annots s x a e =
     let env' = Env.add x s env in
@@ -364,4 +365,4 @@ let typeof_simple tenv env e =
   infer tenv env Annotations.empty e
   |> List.map (fun (env, annots) ->
     typeof tenv env annots e
-  ) |> disj
+  ) |> disj |> simplify_typ

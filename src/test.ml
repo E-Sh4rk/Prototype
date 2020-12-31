@@ -5,11 +5,14 @@ let bool = rand ()
 
 let test = if bool is True then true else false
 
-let not = fun (a : Any) ->
+let lnot = fun (a : Any) ->
   if a is True then false else true
 
-let or = fun (a : Any) -> fun (b : Any) ->
+let lor = fun (a : Any) -> fun (b : Any) ->
   if a is False then if b is False then false else true else true
 
-let test = fun (x:Any) ->
-  if or x (not x) is True then true else false
+let land = fun (a : Any) -> fun (b : Any) ->
+  if a is True then if b is False then false else true else false
+
+let test = fun (x:Any) -> fun (y:Any) ->
+  if land (lor x (lnot x)) (lor (lnot y) y) is True then true else false

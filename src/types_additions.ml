@@ -110,24 +110,49 @@ let rec take_one lst =
 let simplify_dnf dnf =
     let splits = List.map branch_type dnf in
     let splits = List.combine dnf splits in
-    let rec aux f kept lst = match lst with
+    let rec rm f kept lst = match lst with
     | [] -> kept
     | (dnf, t)::lst ->
         let (_, ts1) = List.split lst in
         let (_, ts2) = List.split kept in
-        if f t (ts1@ts2) then aux f kept lst else aux f ((dnf, t)::kept) lst
+        if f t (ts1@ts2) then rm f kept lst else rm f ((dnf, t)::kept) lst
+    in
+    let rec regroup conjuncts =
+        let rec aux (l,r) lst = match lst with
+        | [] -> ((l,r), [])
+        | (l',r')::lst ->
+            if equiv l l'
+            then aux (l, cap r r') lst
+            else if equiv r r'
+            then aux (cup l l', r) lst
+            else
+                let ((l,r),lst) = aux (l,r) lst in
+                ((l,r), (l',r')::lst)
+        in
+        match conjuncts with
+        | [] -> []
+        | (l, r)::lst ->
+            let ((l,r),lst) = aux (l,r) lst in
+            (l,r)::(regroup lst)
     in
     let simplify_conjuncts (conjuncts, _) =
-        let conjuncts = List.map (fun (a, b) -> ((a,b), mk_arrow (cons a) (cons b))) conjuncts in
-        aux (fun t ts -> subtype (conj ts) t) [] conjuncts
-        |> List.split |> fst (* TODO: regroup conjuncts when similar domain/codomain *)
+        let conjuncts = conjuncts |>
+            List.map (fun (a, b) -> ((a,b), mk_arrow (cons a) (cons b))) |>
+            rm (fun t ts -> subtype (conj ts) t) [] (* Remove redundant conjuncts *)
+        in
+        conjuncts |> List.split |> fst |> regroup (* Regroup conjuncts with similar domain/codomain *)
     in
-    aux (fun t ts -> subtype t (disj ts)) [] splits
+    rm (fun t ts -> subtype t (disj ts)) [] splits
     |> List.map simplify_conjuncts
 
 let simplify_arrow t =
     dnf t |> simplify_dnf
     |> List.map branch_type |> disj
+
+let simplify_typ t =
+    let arrow = cap t arrow_any |> simplify_arrow in
+    let non_arrow = diff t arrow_any |> normalize_typ in
+    cup arrow non_arrow
     
 let split_arrow t =
   dnf t

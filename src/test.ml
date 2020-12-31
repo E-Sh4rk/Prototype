@@ -1,5 +1,7 @@
 
-let test = if true is True then true else false
+let idb = fun (b : Bool) -> b
+let rand = fun (a : Unit) -> idb true
+let bool = rand ()
 
 let not = fun (a : Any) ->
   if a is True then false else true

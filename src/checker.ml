@@ -170,6 +170,9 @@ let forward env x a gammas =
 let domain_included_in_singleton env x =
   List.for_all (fun v -> Variable.equals v x) (Env.domain env)
 
+let actual_expected act exp =
+  Format.asprintf "Actual: %a - Expected: %a" pp_typ act pp_typ exp
+
 let rec infer' tenv env annots e =
   let infer_with_split tenv env annots s x a e =
     let env' = Env.add x s env in
@@ -233,7 +236,8 @@ and infer_a' pos tenv env annots a =
       let t1 = cap t pair_any in
       let t2 = diff t pair_any in
       if is_empty t1 || is_empty t2
-      then raise (Ill_typed (pos, "Bad domain for the projection."))
+      then raise (Ill_typed (pos,
+        "Bad domain for the projection. "^(actual_expected t pair_any)))
       else (
         let env1 = Env.singleton v t1 in
         let env2 = Env.singleton v t2 in
@@ -261,13 +265,14 @@ and infer_a' pos tenv env annots a =
                 List.map (fun t2 -> Env.singleton v2 t2) in
               NeedSplit (Annotations.empty, gammas, gammas)
             end else begin
-              let t2 = cap t2 dom in
-              let t2' = diff t2 dom in
-              if is_empty t2 || is_empty t2'
-              then raise (Ill_typed (pos, "Bad domain for the application."))
+              let t2' = cap t2 dom in
+              let t2'' = diff t2 dom in
+              if is_empty t2' || is_empty t2''
+              then raise (Ill_typed (pos,
+                "Bad domain for the application. "^(actual_expected t2 dom)))
               else (
-                let env1 = Env.singleton v2 t2 in
-                let env2 = Env.singleton v2 t2' in
+                let env1 = Env.singleton v2 t2' in
+                let env2 = Env.singleton v2 t2'' in
                 NeedSplit (Annotations.empty, [env1;env2], [env1;env2])
               )
             end
@@ -279,13 +284,14 @@ and infer_a' pos tenv env annots a =
         NeedSplit (Annotations.empty, gammas, gammas)
       end
     else begin
-      let t1 = cap t1 arrow_any in
-      let t1' = diff t1 arrow_any in
-      if is_empty t1 || is_empty t1'
-      then raise (Ill_typed (pos, "Left-hand side of an application must have an arrow type."))
+      let t1' = cap t1 arrow_any in
+      let t1'' = diff t1 arrow_any in
+      if is_empty t1' || is_empty t1''
+      then raise (Ill_typed (pos,
+        "Cannot apply a non-arrow type. "^(actual_expected t1 arrow_any)))
       else (
-        let env1 = Env.singleton v1 t1 in
-        let env2 = Env.singleton v1 t1' in
+        let env1 = Env.singleton v1 t1' in
+        let env2 = Env.singleton v1 t1'' in
         NeedSplit (Annotations.empty, [env1;env2], [env1;env2])
       )
     end

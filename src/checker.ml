@@ -344,17 +344,24 @@ and infer_a' pos tenv env annots a =
     else NeedSplit (uannots, ugammas1, ugammas2)
   | Lambda _ -> failwith "Not implemented"
 
-(* TODO: in case of a NeedSplit below, just make the required split instead of failing. *)
-let infer tenv env annots e =
+let rec infer tenv env annots e =
   match infer' tenv env annots e with
-  | Result annots -> annots
-  | _ -> raise (Ill_typed ([], "Expression need a split for a free variable."))
+  | Result annots -> [(env, annots)]
+  | NeedSplit (annots, envs, _) ->
+    envs |>
+    List.map (fun env -> infer tenv env annots e) |>
+    List.flatten
 
-let infer_a pos tenv env annots e =
+let rec infer_a pos tenv env annots e =
   match infer_a' pos tenv env annots e with
-  | Result annots -> annots
-  | _ -> raise (Ill_typed (pos, "Expression need a split for a free variable."))
+  | Result annots -> [(env, annots)]
+  | NeedSplit (annots, envs, _) ->
+    envs |>
+    List.map (fun env -> infer_a pos tenv env annots e) |>
+    List.flatten
 
 let typeof_simple tenv env e =
-  let annots = infer tenv env Annotations.empty e in
-  typeof tenv env annots e
+  infer tenv env Annotations.empty e
+  |> List.map (fun (env, annots) ->
+    typeof tenv env annots e
+  ) |> disj

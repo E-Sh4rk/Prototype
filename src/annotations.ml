@@ -13,7 +13,8 @@ module VarAnnot = struct
     if List.exists (fun t -> Cduce.equiv t typ) splits
     then va
     else (env, typ)::va
-  let cup va1 va2 = va2@va1
+  let cup va1 va2 =
+    List.fold_left (fun acc (env, typ) -> add_split env typ acc) va1 va2
 end
 
 module Annotations = struct

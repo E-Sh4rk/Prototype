@@ -15,8 +15,10 @@ let land = fun (a : Any) -> fun (b : Any) ->
   if a is True then if b is False then false else true else false
 
 let test = fun (x:Any) -> fun (y:Any) ->
-  if land (lor x (lnot x)) (lor (lnot y) y) is True then true else false
+  if land (lor x (lnot x)) (lor (lnot y) y) then true else false
 
 let test =
   let a = rand () in
   fun (b:Bool) -> lor b a
+
+

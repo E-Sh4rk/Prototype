@@ -6,6 +6,10 @@ open Variable
 
 exception Ill_typed of Position.t list * string
 
+let splits_domain splits domain =
+  Format.asprintf "Splits: %a - Domain: %a"
+    (Utils.pp_list Cduce.pp_typ) splits Cduce.pp_typ domain
+
 let rec typeof_a pos tenv env annots a =
   if Env.is_bottom env
   then raise (Ill_typed (pos, "Environment contains a divergent variable."))
@@ -58,7 +62,8 @@ let rec typeof_a pos tenv env annots a =
       ) |> conj |> simplify_arrow
       (* NOTE: the intersection of non-empty arrows cannot be empty,
       thus no need to check the emptiness of the result *)
-    else raise (Ill_typed (pos, "Invalid splits (does not cover the whole domain)."))
+    else raise (Ill_typed (pos,
+      "Invalid splits (does not cover the whole domain). "^(splits_domain splits s)))
   | Lambda _ -> failwith "Not implemented"
   end
 
@@ -78,7 +83,8 @@ and typeof tenv env annots e =
         let env = Env.add v t env in
         typeof tenv env annots e
       ) |> disj |> simplify_typ
-    else raise (Ill_typed (pos, "Invalid splits (does not cover the whole domain)."))
+    else raise (Ill_typed (pos,
+      "Invalid splits (does not cover the whole domain). "^(splits_domain splits s)))
   end
 
 let refine_a ~backward env a t =
@@ -355,7 +361,7 @@ let rec infer tenv env annots e =
   | Result annots -> [(env, annots)]
   | NeedSplit (annots, envs, _) ->
     envs |>
-    List.map (fun env -> infer tenv env annots e) |>
+    List.map (fun env' -> infer tenv (Env.cap env env') annots e) |>
     List.flatten
 
 let rec infer_a pos tenv env annots e =
@@ -363,7 +369,7 @@ let rec infer_a pos tenv env annots e =
   | Result annots -> [(env, annots)]
   | NeedSplit (annots, envs, _) ->
     envs |>
-    List.map (fun env -> infer_a pos tenv env annots e) |>
+    List.map (fun env' -> infer_a pos tenv (Env.cap env env') annots e) |>
     List.flatten
 
 let typeof_simple tenv env e =

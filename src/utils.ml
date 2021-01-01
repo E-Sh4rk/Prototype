@@ -46,3 +46,8 @@ let rec remove_duplicates equiv lst =
   match lst with
   | [] -> []
   | e::lst -> e::(remove e lst |> remove_duplicates equiv)
+
+let pp_list pp_elt fmt lst =
+  Format.fprintf fmt "[" ;
+  List.iter (fun elt -> Format.fprintf fmt " %a ;" pp_elt elt) lst ;
+  Format.fprintf fmt " ]"

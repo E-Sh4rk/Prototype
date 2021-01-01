@@ -16,3 +16,7 @@ let land = fun (a : Any) -> fun (b : Any) ->
 
 let test = fun (x:Any) -> fun (y:Any) ->
   if land (lor x (lnot x)) (lor (lnot y) y) is True then true else false
+
+let test =
+  let a = rand () in
+  fun (b:Bool) -> lor b a

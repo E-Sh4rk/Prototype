@@ -193,6 +193,7 @@ let rec infer' tenv env annots e =
       then (* LetSplitTop *)
         let splits = List.map (fun env'' -> Env.find x env'') gammas1'
         |> Utils.remove_duplicates equiv in
+        assert (disj splits |> subtype s) ;
         List.map (fun s -> infer_with_split tenv env annots' s x a e) splits |>
         merge_annotations Annotations.empty
       else (* LetSplitUp *)
@@ -200,6 +201,7 @@ let rec infer' tenv env annots e =
           VarAnnot.add_split (Env.cap env (Env.rm x env'')) (Env.find x env'') acc
         ) VarAnnot.empty gammas1'
         in
+        assert (VarAnnot.is_empty x_annots |> not) ;
         let annots'' = Annotations.add_var x x_annots annots' in
         let gammas1'' = List.map (Env.rm x) gammas1' in
         NeedSplit (annots'', gammas1'', gammas2')
@@ -214,6 +216,7 @@ let rec infer' tenv env annots e =
     | Result annots1' -> (* Let *)
       let t = typeof_a pos tenv env annots1' a in
       let splits = Annotations.splits v env ~initial:t annots in
+      assert (disj splits |> subtype t) ;
       let annots2 = Annotations.restrict (bv_e e) annots in
       splits |>
       List.map (fun s -> infer_with_split tenv env annots2 s v a e) |>
@@ -328,6 +331,7 @@ and infer_a' pos tenv env annots a =
               List.map (fun env'' -> Env.find x env'')
             )
           |> Utils.remove_duplicates equiv in
+          assert (disj splits |> subtype s) ;
           List.map (fun s -> infer_with_split tenv env annots' s x e) splits |>
           merge_annotations Annotations.empty
         else (* AbsSplitUp *)
@@ -343,6 +347,7 @@ and infer_a' pos tenv env annots a =
               ) VarAnnot.empty 
             )
           in
+          assert (VarAnnot.is_empty x_annots |> not) ;
           let annots'' = Annotations.add_var x x_annots annots' in
           let gammas1' = List.map (Env.rm x) gammas1 in
           let gammas2' = List.map (Env.rm x) gammas2 in
@@ -350,6 +355,7 @@ and infer_a' pos tenv env annots a =
     in
     (* Abs *)
     let splits = Annotations.splits v env ~initial:s annots in
+    assert (disj splits |> subtype s) ;
     let annots' = Annotations.restrict (bv_e e) annots in
     splits |>
     List.map (fun s -> infer_with_split tenv env annots' s v e) |>

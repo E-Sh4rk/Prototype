@@ -3,11 +3,17 @@ open Variable
 module VarAnnot = struct
   type t = (Env.t * Cduce.typ) list
   let empty = []
+  let is_empty va = va = []
   let splits env ?(initial=Cduce.any) va =
-    List.filter (fun (env',_) -> Env.leq env env') va
-    |> List.map (fun (_,snd) -> Cduce.cap snd initial)
+    let ts =
+      List.filter (fun (env',_) -> Env.leq env env') va
+      |> List.map (fun (_,snd) -> Cduce.cap snd initial)
+    in
+    if ts = []
+    then [initial]
+    else (ts
     |> List.filter (fun t -> Cduce.is_empty t |> not)
-    |> Utils.remove_duplicates Cduce.equiv
+    |> Utils.remove_duplicates Cduce.equiv)
   let add_split env typ va =
     let splits = splits env va in
     if List.exists (fun t -> Cduce.equiv t typ) splits

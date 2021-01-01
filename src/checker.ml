@@ -14,8 +14,10 @@ let actual_expected act exp =
   Format.asprintf "Actual: %a - Expected: %a" pp_typ act pp_typ exp
 
 let rec typeof_a pos tenv env annots a =
-  let type_lambda_with_splits env annots v e splits =
-    splits |> List.map (fun t ->
+  let type_lambda env annots v e =
+    Annotations.splits_strict v env annots |>
+    (* The splits are guaranteed not to contain the empty type *)
+    List.map (fun t ->
       let env = Env.add v t env in
       let res = typeof tenv env annots e in
       mk_arrow (cons t) (cons res)
@@ -63,24 +65,19 @@ let rec typeof_a pos tenv env annots a =
     then Env.find x2 env
     else raise (Ill_typed (pos, "Cannot select a branch for the typecase."))
   | Lambda (Ast.ADomain s, v, e) ->
-    let splits = Annotations.splits v env ~initial:s annots in
-    (* The splits are guaranteed not to contain the empty type *)
-    if disj splits |> subtype s
-    then type_lambda_with_splits env annots v e splits
+    let inferred_t = type_lambda env annots v e in
+    let dom = domain inferred_t in
+    if subtype s dom
+    then inferred_t
     else raise (Ill_typed (pos,
-      "Invalid splits (does not cover the whole domain). "^(splits_domain splits s)))
+      "The inferred domain for the abstraction is too weak. "^(actual_expected dom s)))
   | Lambda (Ast.AArrow t, v, e) ->
-    let splits = Annotations.splits v env ~initial:(domain t) annots in
-    (* The splits are guaranteed not to contain the empty type *)
-    let inferred_t = type_lambda_with_splits env annots v e splits in
+    let inferred_t = type_lambda env annots v e in
     if subtype inferred_t t
     then t
     else raise (Ill_typed (pos,
       "The inferred type for the abstraction is too weak. "^(actual_expected inferred_t t)))
-  | Lambda (Unnanoted, v, e) ->
-    let splits = Annotations.splits v env annots in
-    (* The splits are guaranteed not to contain the empty type *)
-    type_lambda_with_splits env annots v e splits
+  | Lambda (Unnanoted, v, e) -> type_lambda env annots v e
   end
 
 and typeof tenv env annots e =
@@ -91,7 +88,7 @@ and typeof tenv env annots e =
   | Let (v, a, e) ->
     let pos = Variable.get_locations v in
     let s = typeof_a pos tenv env annots a in
-    let splits = Annotations.splits v env ~initial:s annots in
+    let splits = Annotations.splits_strict v env annots in
     (* The splits are guaranteed not to contain the empty type *)
     if disj splits |> subtype s
     then

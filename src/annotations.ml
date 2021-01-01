@@ -9,11 +9,10 @@ module VarAnnot = struct
       List.filter (fun (env',_) -> Env.leq env env') va
       |> List.map (fun (_,snd) -> Cduce.cap snd initial)
     in
-    if ts = []
-    then [initial]
-    else (ts
+    let ts = if ts = [] then [initial] else ts in
+    ts
     |> List.filter (fun t -> Cduce.is_empty t |> not)
-    |> Utils.remove_duplicates Cduce.equiv)
+    |> Utils.remove_duplicates Cduce.equiv
   let add_split env typ va =
     let splits = splits env va in
     if List.exists (fun t -> Cduce.equiv t typ) splits
@@ -43,6 +42,8 @@ module Annotations = struct
   let splits v env ?(initial=Cduce.any) annots =
     if mem_var v annots
     then get_var v annots |> VarAnnot.splits env ~initial
+    else if Cduce.is_empty initial
+    then []
     else [initial]
   
   let add_split v env typ annots =

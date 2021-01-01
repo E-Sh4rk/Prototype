@@ -10,7 +10,19 @@ let splits_domain splits domain =
   Format.asprintf "Splits: %a - Domain: %a"
     (Utils.pp_list Cduce.pp_typ) splits Cduce.pp_typ domain
 
+let actual_expected act exp =
+  Format.asprintf "Actual: %a - Expected: %a" pp_typ act pp_typ exp
+
 let rec typeof_a pos tenv env annots a =
+  let type_lambda_with_splits env annots v e splits =
+    splits |> List.map (fun t ->
+      let env = Env.add v t env in
+      let res = typeof tenv env annots e in
+      mk_arrow (cons t) (cons res)
+    ) |> conj |> simplify_arrow
+    (* NOTE: the intersection of non-empty arrows cannot be empty,
+    thus no need to check the emptiness of the result *)
+  in
   if Env.is_bottom env
   then raise (Ill_typed (pos, "Environment contains a divergent variable."))
   else begin match a with
@@ -54,17 +66,21 @@ let rec typeof_a pos tenv env annots a =
     let splits = Annotations.splits v env ~initial:s annots in
     (* The splits are guaranteed not to contain the empty type *)
     if disj splits |> subtype s
-    then
-      splits |> List.map (fun t ->
-        let env = Env.add v t env in
-        let res = typeof tenv env annots e in
-        mk_arrow (cons t) (cons res)
-      ) |> conj |> simplify_arrow
-      (* NOTE: the intersection of non-empty arrows cannot be empty,
-      thus no need to check the emptiness of the result *)
+    then type_lambda_with_splits env annots v e splits
     else raise (Ill_typed (pos,
       "Invalid splits (does not cover the whole domain). "^(splits_domain splits s)))
-  | Lambda _ -> failwith "Not implemented"
+  | Lambda (Ast.AArrow t, v, e) ->
+    let splits = Annotations.splits v env ~initial:(domain t) annots in
+    (* The splits are guaranteed not to contain the empty type *)
+    let inferred_t = type_lambda_with_splits env annots v e splits in
+    if subtype inferred_t t
+    then t
+    else raise (Ill_typed (pos,
+      "The inferred type for the abstraction is too weak. "^(actual_expected inferred_t t)))
+  | Lambda (Unnanoted, v, e) ->
+    let splits = Annotations.splits v env annots in
+    (* The splits are guaranteed not to contain the empty type *)
+    type_lambda_with_splits env annots v e splits
   end
 
 and typeof tenv env annots e =
@@ -177,9 +193,6 @@ let forward env x a gammas =
 
 let domain_included_in_singleton env x =
   List.for_all (fun v -> Variable.equals v x) (Env.domain env)
-
-let actual_expected act exp =
-  Format.asprintf "Actual: %a - Expected: %a" pp_typ act pp_typ exp
 
 let rec infer' tenv env annots e =
   let rec infer_with_split tenv env annots s x a e =

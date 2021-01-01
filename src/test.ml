@@ -14,11 +14,16 @@ let lor = fun (a : Any) -> fun (b : Any) ->
 let land = fun (a : Any) -> fun (b : Any) ->
   if a is True then if b is False then false else true else false
 
-let test = fun (x:Any) -> fun (y:Any) ->
+let test_1 = fun (x:Any) -> fun (y:Any) ->
   if land (lor x (lnot x)) (lor (lnot y) y) then true else false
 
-let test =
+let is_int = fun (x:Any) -> if x is Int then true else false
+let is_bool = fun (x:Any) -> if x is Bool then true else false
+
+let test_2 = fun (x:Any) ->
+  lor (is_int x) (is_bool x)
+
+let test_3 =
   let a = rand () in
   fun (b:Bool) -> lor b a
-
 

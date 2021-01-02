@@ -32,4 +32,4 @@ let succ = fun (x:Int) -> x
 
 let test_4 = fun x -> if x is Bool then x else x
 
-let test_5 = fun x -> if x is Bool then bool_id x else succ x
+let test_5 = fun (x:Bool|Int) -> if x is Bool then bool_id x else succ x

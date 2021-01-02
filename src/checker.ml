@@ -192,7 +192,7 @@ let forward env x a gammas =
 let domain_included_in_singleton env x =
   List.for_all (fun v -> Variable.equals v x) (Env.domain env)
 
-(* TODO: Fix unnanoted lambdas (see example 5) *)
+(* TODO: Fix issue with test_5 *)
 
 let rec infer' tenv env annots e =
   let rec infer_with_split tenv env annots s x a e =

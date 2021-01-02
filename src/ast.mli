@@ -1,7 +1,7 @@
 open Types_additions
 open Variable
 
-(* TODO: check the restrictions on types (test types, normal types) *)
+(* TODO: check the restrictions on the test types (how is it done in Cduce?) *)
 
 type varname = string
 type exprid = int

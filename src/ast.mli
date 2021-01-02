@@ -1,6 +1,8 @@
 open Types_additions
 open Variable
 
+(* TODO: check the restrictions on types (test types, normal types) *)
+
 type varname = string
 type exprid = int
 

@@ -16,6 +16,7 @@ val find : Variable.t -> t -> typ
 val rm : Variable.t -> t -> t
 val cap : t -> t -> t
 val conj : t list -> t
+val filter : (Variable.t -> typ -> bool) -> t -> t
 
 val equiv : t -> t -> bool
 val leq : t -> t -> bool

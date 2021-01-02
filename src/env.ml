@@ -56,6 +56,11 @@ let cap env1 env2 = match env1, env2 with
 let conj lst =
   List.fold_left cap empty lst
 
+let filter f env =
+  match env with
+  | EnvBottom -> raise EnvIsBottom
+  | EnvOk env -> 
+    EnvOk (VarMap.filter f env)
 
 let leq env1 env2 =
   match env1, env2 with

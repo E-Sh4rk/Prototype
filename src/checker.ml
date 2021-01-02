@@ -140,10 +140,13 @@ let refine_a ~backward env a t =
   | Lambda (Ast.ADomain _, _, _) -> []
   | Lambda _ -> failwith "Not implemented"
   end
-  |> List.map (fun env' -> List.fold_left (fun acc v ->
-    if Env.mem v env then Env.strengthen v (Env.find v env) acc else acc)
+  |> List.map (fun env' -> List.fold_left
+    (fun acc v -> Env.strengthen v (Env.find v env) acc)
     env' (Env.domain env')) (* Inter *)
-  |> List.filter (fun env -> Env.is_bottom env |> not) (* Normalize *)
+  |> List.filter (fun env -> Env.is_bottom env |> not) (* RemoveBottomEnv *)
+  |> List.map (fun env' ->
+    Env.filter (fun v t -> subtype (Env.find v env) t |> not) env'
+    ) (* RemoveUselessVar *)
 
 type infer_res =
   | Result of Annotations.t

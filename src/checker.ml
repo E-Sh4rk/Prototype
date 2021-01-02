@@ -135,10 +135,8 @@ let refine_a ~backward env a t =
     let env1' = Env.singleton x1 t in
     let env2' = Env.singleton x2 t in
     [Env.cap env1 env1' ; Env.cap env2 env2']
-  | Lambda (Ast.ADomain s, _, _) when backward ->
-    if subtype (domain t) s then [Env.empty] else []
-  | Lambda (Ast.ADomain _, _, _) -> []
-  | Lambda _ -> failwith "Not implemented"
+  | Lambda _ when backward -> [Env.empty]
+  | Lambda _ -> []
   end
   |> List.map (fun env' -> List.fold_left
     (fun acc v -> Env.strengthen v (Env.find v env) acc)

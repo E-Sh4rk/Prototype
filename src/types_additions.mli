@@ -42,7 +42,6 @@ val conj : typ list -> typ
 val disj : typ list -> typ
 
 val simplify_dnf : (typ * typ) list list -> (typ * typ) list list
-val simplify_arrow : typ -> typ
 val simplify_typ : typ -> typ
 
 val split_arrow : typ -> typ list

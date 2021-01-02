@@ -27,3 +27,9 @@ let test_3 =
   let a = rand () in
   fun (b:Bool) -> lor b a
 
+let bool_id = fun ((True -> True) & (False -> False)) x -> x
+let succ = fun (x:Int) -> x
+
+let test_4 = fun x -> if x is Bool then x else x
+
+let test_5 = fun x -> if x is Bool then bool_id x else succ x

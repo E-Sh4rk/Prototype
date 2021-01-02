@@ -97,9 +97,12 @@ let conj ts = List.fold_left cap any ts
 let disj ts = List.fold_left cup empty ts
 
 let branch_type lst =
-    lst
-    |> List.map (fun (a, b) -> mk_arrow (cons a) (cons b))
-    |> conj
+    if lst = [] then arrow_any
+    else begin
+        lst
+        |> List.map (fun (a, b) -> mk_arrow (cons a) (cons b))
+        |> conj
+    end
 
 let rec take_one lst =
     match lst with
@@ -146,8 +149,8 @@ let simplify_dnf dnf =
     |> List.map simplify_conjuncts
 
 let simplify_arrow t =
-    dnf t |> simplify_dnf
-    |> List.map branch_type |> disj
+    let res = dnf t |> simplify_dnf |> List.map branch_type |> disj in
+    assert (equiv res t) ; res
 
 let simplify_typ t =
     let arrow = cap t arrow_any |> simplify_arrow in

@@ -15,13 +15,17 @@ let actual_expected act exp =
 
 let rec typeof_a pos tenv env annots a =
   let type_lambda env annots v e =
-    Annotations.splits_strict v env annots |>
+    let splits = Annotations.splits_strict v env annots in
     (* The splits are guaranteed not to contain the empty type *)
-    List.map (fun t ->
-      let env = Env.add v t env in
-      let res = typeof tenv env annots e in
-      mk_arrow (cons t) (cons res)
-    ) |> conj |> simplify_typ
+    if splits = []
+    then raise (Ill_typed (pos, "The inferred domain for this abstraction is empty."))
+    else begin
+      splits |> List.map (fun t ->
+        let env = Env.add v t env in
+        let res = typeof tenv env annots e in
+        mk_arrow (cons t) (cons res)
+      ) |> conj |> simplify_typ
+    end
     (* NOTE: the intersection of non-empty arrows cannot be empty,
     thus no need to check the emptiness of the result *)
   in

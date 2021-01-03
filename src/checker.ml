@@ -59,7 +59,8 @@ let rec typeof_a pos tenv env annots a =
         if is_empty res
         then raise (Ill_typed (pos, "This application always diverges."))
         else res
-      else raise (Ill_typed (pos, "Argument not in the domain of the function."))
+      else raise (Ill_typed (pos,
+        "Argument not in the domain of the function. "^(actual_expected t2 dom)))
     else raise (Ill_typed (pos, "Application can only be done on a function."))
   | Ite (v, t, x1, x2) ->
     let tv = Env.find v env in
@@ -90,13 +91,13 @@ and typeof tenv env annots e =
   else begin match e with
   | EVar v -> Env.find v env
   | Let (v, a, e) ->
-    let pos = Variable.get_locations v in
-    let s = typeof_a pos tenv env annots a in
     let splits = Annotations.splits_strict v env annots in
     (* The splits are guaranteed not to contain the empty type *)
     if splits = []
     then typeof tenv env annots e
     else begin
+      let pos = Variable.get_locations v in
+      let s = typeof_a pos tenv env annots a in
       if disj splits |> subtype s
       then
         splits |> List.map (fun t ->
@@ -201,6 +202,7 @@ let domain_included_in_singleton env x =
   List.for_all (fun v -> Variable.equals v x) (Env.domain env)
 
 (* TODO: Fix issue with test_5 *)
+exception Return of infer_res
 
 let rec infer' tenv env annots e =
   let rec infer_with_split tenv env annots s x a e =
@@ -230,25 +232,39 @@ let rec infer' tenv env annots e =
   match e with
   | EVar _ -> Result (Annotations.empty)
   | Let (v, a, e) ->
-    let pos = Variable.get_locations v in
-    let annots1 = Annotations.restrict (bv_a a) annots in
-    begin match infer_a' pos tenv env annots1 a with
-    | NeedSplit (a,b,c) -> NeedSplit (a,b,c) (* LetANeedSplit *)
-    | Result annots1' -> (* Let *)
-      let t = typeof_a pos tenv env annots1' a in
-      let splits = Annotations.splits v env ~initial:t annots in
-      assert (disj splits |> subtype t) ;
+    try
+      let pos = Variable.get_locations v in
+      let annots1 = Annotations.restrict (bv_a a) annots in
       let annots2 = Annotations.restrict (bv_e e) annots in
-      splits |>
-      List.map (fun s -> infer_with_split tenv env annots2 s v a e) |>
-      merge_annotations annots1'
-    end
+      let res =
+        try infer_a' pos tenv env annots1 a
+        with Ill_typed _ -> (* LetAUntypeable *)
+          raise (Return (infer' tenv env annots2 e))
+      in
+      begin match res with
+      | NeedSplit (a,b,c) -> NeedSplit (a,b,c) (* LetANeedSplit *)
+      | Result annots1' -> (* Let *)
+        let t = typeof_a pos tenv env annots1' a in
+        let splits = Annotations.splits v env ~initial:t annots in
+        assert (disj splits |> subtype t) ;
+        splits |>
+        List.map (fun s -> infer_with_split tenv env annots2 s v a e) |>
+        merge_annotations annots1'
+      end
+    with Return r -> r
 
 and infer_a' pos tenv env annots a =
   let rec infer_with_split ~enforce_domain tenv env annots s x e =
-    let env' = Env.add x s env in
     try
-      match infer' tenv env' annots e with
+      let env' = Env.add x s env in
+      let res =
+        try infer' tenv env' annots e
+        with (Ill_typed _) as err -> begin
+          if enforce_domain then raise err
+          else raise (Return (* AbsSplitBad *) (Result Annotations.empty))
+        end
+      in
+      match res with
       | Result annots' -> Result (Annotations.add_split x env s annots') (* AbsSplitOk *)
       | NeedSplit (annots', gammas1, gammas2) ->
         if List.for_all (fun gamma' -> domain_included_in_singleton gamma' x) (gammas1@gammas2)
@@ -281,9 +297,7 @@ and infer_a' pos tenv env annots a =
           let gammas1' = List.map (Env.rm x) gammas1 in
           let gammas2' = List.map (Env.rm x) gammas2 in
           NeedSplit (annots'', gammas1', gammas2')
-    with (Ill_typed _) as err ->
-      if enforce_domain then raise err
-      else (* AbsSplitBad *) Result(Annotations.empty)
+    with Return r -> r
   in
   let type_lambda_with_splits ~enforce_domain tenv env annots splits x e =
     (* Abs *)

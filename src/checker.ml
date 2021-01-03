@@ -94,14 +94,18 @@ and typeof tenv env annots e =
     let s = typeof_a pos tenv env annots a in
     let splits = Annotations.splits_strict v env annots in
     (* The splits are guaranteed not to contain the empty type *)
-    if disj splits |> subtype s
-    then
-      splits |> List.map (fun t ->
-        let env = Env.add v t env in
-        typeof tenv env annots e
-      ) |> disj |> simplify_typ
-    else raise (Ill_typed (pos,
-      "Invalid splits (does not cover the whole domain). "^(splits_domain splits s)))
+    if splits = []
+    then typeof tenv env annots e
+    else begin
+      if disj splits |> subtype s
+      then
+        splits |> List.map (fun t ->
+          let env = Env.add v t env in
+          typeof tenv env annots e
+        ) |> disj |> simplify_typ
+      else raise (Ill_typed (pos,
+        "Invalid splits (does not cover the whole domain). "^(splits_domain splits s)))
+    end
   end
 
 let refine_a ~backward env a t =

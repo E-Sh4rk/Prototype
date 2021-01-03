@@ -57,7 +57,7 @@ module Annotations = struct
 
   let splits_strict v env annots =
     if mem_var v annots
-    then get_var v annots |> VarAnnot.splits env
+    then get_var v annots |> VarAnnot.splits_strict env
     else []
   
   let add_split v env typ annots =

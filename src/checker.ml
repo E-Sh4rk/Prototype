@@ -201,7 +201,7 @@ let forward env x a gammas =
 let domain_included_in_singleton env x =
   List.for_all (fun v -> Variable.equals v x) (Env.domain env)
 
-(* TODO: Fix issue with test_5 *)
+(* TODO: Raise Ill_typed exception instead of Not_found when a variable is not in the env. *)
 exception Return of infer_res
 
 let rec infer' tenv env annots e =

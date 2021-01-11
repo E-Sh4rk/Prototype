@@ -146,6 +146,7 @@ let refine_a ~backward env a t =
     [Env.cap env1 env1' ; Env.cap env2 env2']
   | Lambda _ when backward -> [Env.empty]
   | Lambda _ -> []
+  | Let (_, a) -> refine_a ~backward env a t
   end
   |> List.map (fun env' -> List.fold_left
     (fun acc v -> Env.strengthen v (Env.find v env) acc)

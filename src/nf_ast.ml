@@ -189,7 +189,7 @@ let convert_to_normal_form ast =
       let ((_, pos), _) = ast in
       let (defs, expr_var_map, a) = to_defs_and_a expr_var_map ast in
       match a with
-      | Var v -> (defs, expr_var_map, v)
+      | Var v -> Variable.attach_location v pos ; (defs, expr_var_map, v)
       | a ->
         let var = Variable.create name in
         Variable.attach_location var pos ;

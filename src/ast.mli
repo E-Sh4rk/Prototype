@@ -59,7 +59,8 @@ val copy_annot : annotation -> annotation
 val parser_expr_to_annot_expr : type_env -> name_var_map -> parser_expr -> annot_expr
 
 val unannot : annot_expr -> expr
-val fv : annot_expr -> VarSet.t
+(*val fv : annot_expr -> VarSet.t*)
+val substitute : annot_expr -> Variable.t -> (annotation, Cduce.typ, Variable.t) ast -> annot_expr
 
 val const_to_typ : const -> Cduce.typ
 

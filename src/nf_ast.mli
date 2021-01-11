@@ -9,10 +9,11 @@ type a =
   | Pair of Variable.t * Variable.t
   | Projection of Ast.projection * Variable.t
   | RecordUpdate of Variable.t * string * Variable.t option
+  | Let of Variable.t * a
   | Debug of string * Variable.t
 
 and e =
-  | Let of Variable.t * a * e
+  | Bind of Variable.t * a * e
   | EVar of Variable.t (* We restrict to variables instead of atomics,
                           in order for every atomic to be localized by a variable *)
 

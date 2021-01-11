@@ -123,7 +123,7 @@ let rec unannot (_,e) =
     in
     ( (), e )
 
-let rec fv (_, expr) =
+(*let rec fv (_, expr) =
   match expr with
   | Const _ -> VarSet.empty
   | Var v -> VarSet.singleton v
@@ -138,7 +138,35 @@ let rec fv (_, expr) =
     | Some e2 -> VarSet.union (fv e1) (fv e2)
     | None -> fv e1
     end
-  | Debug (_, e) -> fv e
+  | Debug (_, e) -> fv e*)
+
+let rec substitute (annot, expr) v expr' =
+  let expr = match expr with
+  | Const c -> Const c
+  | Var v' when Variable.equals v v' -> expr'
+  | Var v' -> Var v'
+  | Lambda (ta, v', e) when Variable.equals v v' -> Lambda (ta, v', e)
+  | Lambda (ta, v', e) -> Lambda (ta, v', substitute e v expr')
+  | Ite (e, t, e1, e2) ->
+    Ite (substitute e v expr', t, substitute e1 v expr', substitute e2 v expr')
+  | App (e1, e2) ->
+    App (substitute e1 v expr', substitute e2 v expr')
+  | Let (v', e1, e2) when Variable.equals v v' ->
+    Let (v', substitute e1 v expr', e2)
+  | Let (v', e1, e2) ->
+    Let (v', substitute e1 v expr', substitute e2 v expr')
+  | Pair (e1, e2) ->
+    Pair (substitute e1 v expr', substitute e2 v expr')
+  | Projection (p, e) ->
+    Projection (p, substitute e v expr')
+  | RecordUpdate (e1, f, e2) ->
+    let e2 = match e2 with
+    | Some e2 -> Some (substitute e2 v expr')
+    | None -> None
+    in RecordUpdate (substitute e1 v expr', f, e2)
+  | Debug (str, e) -> Debug (str, substitute e v expr')
+  in
+  (annot, expr)
 
 let const_to_typ c =
     match c with

@@ -4,8 +4,6 @@ module VarAnnot : sig
   type t
   val empty : t
   val is_empty : t -> bool
-  (** The empty splits are removed,
-  but there is no guarantee that the splits cover the initial type. *)
   val splits : Env.t -> ?initial:Cduce.typ -> t -> Cduce.typ list
   val splits_strict : Env.t -> t -> Cduce.typ list
   val add_split : Env.t -> Cduce.typ -> t -> t
@@ -15,8 +13,7 @@ end
 module Annotations : sig
   type t
   val empty : t
-  (** The empty splits are removed,
-  but there is no guarantee that the splits cover the initial type. *)
+  val is_empty : Variable.t -> t -> bool
   val splits : Variable.t -> Env.t -> ?initial:Cduce.typ -> t -> Cduce.typ list
   val splits_strict : Variable.t -> Env.t -> t -> Cduce.typ list
   val add_split : Variable.t -> Env.t -> Cduce.typ -> t -> t

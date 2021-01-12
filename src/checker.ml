@@ -195,6 +195,7 @@ let domain_included_in_singleton env x =
   List.for_all (fun v -> Variable.equals v x) (Env.domain env)
 
 (* TODO: Raise Ill_typed exception instead of Not_found when a variable is not in the env. *)
+(* TODO: Add guardians about domains of the env *)
 exception Return of infer_res
 
 let rec infer' tenv env annots e =
@@ -295,9 +296,18 @@ and infer_a' pos tenv env annots a =
   let type_lambda_with_splits ~enforce_domain tenv env annots splits x e =
     (* Abs *)
     let annots' = Annotations.restrict (bv_e e) annots in
-    splits |>
-    List.map (fun s -> infer_with_split ~enforce_domain tenv env annots' s x e) |>
-    merge_annotations Annotations.empty
+    let res =
+      splits |>
+      List.map (fun s -> infer_with_split ~enforce_domain tenv env annots' s x e) |>
+      merge_annotations Annotations.empty
+    in
+    let empty_dom = match res with
+    | Result annots'' -> Annotations.is_empty x annots''
+    | NeedSplit (annots'',_,_) -> Annotations.is_empty x annots''
+    in
+    if empty_dom
+    then raise (Ill_typed (pos, "Cannot infer the domain of this abstraction."))
+    else res
   in
   match a with
   | Const _ -> Result (Annotations.empty)

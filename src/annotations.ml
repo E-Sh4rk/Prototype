@@ -38,6 +38,11 @@ module Annotations = struct
   let remove_var = VarMap.remove
   let get_var = VarMap.find
 
+  let is_empty v t =
+    if mem_var v t
+    then (get_var v t |> VarAnnot.is_empty)
+    else true
+
   let restrict vs annots =
     VarSet.fold (fun v acc ->
       if mem_var v annots
@@ -49,8 +54,6 @@ module Annotations = struct
   let splits v env ?(initial=Cduce.any) annots =
     if mem_var v annots
     then get_var v annots |> VarAnnot.splits env ~initial
-    else if Cduce.is_empty initial
-    then []
     else [initial]
 
   let splits_strict v env annots =

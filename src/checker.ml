@@ -13,8 +13,6 @@ let splits_domain splits domain =
 let actual_expected act exp =
   Format.asprintf "Actual: %a - Expected: %a" pp_typ act pp_typ exp
 
-(* TODO: Change implementation of the splits (can contain the empty type, etc) *)
-
 let rec typeof_a pos tenv env annots a =
   let type_lambda env annots v e =
     let splits = Annotations.splits_strict v env annots in
@@ -76,11 +74,15 @@ let rec typeof_a pos tenv env annots a =
     else raise (Ill_typed (pos,
       "The inferred type for the abstraction is too weak. "^(actual_expected inferred_t t)))
   | Lambda (Unnanoted, v, e) -> type_lambda env annots v e
+  | Let (v, a) ->
+    if Env.mem v env
+    then typeof_a pos tenv env annots a
+    else raise (Ill_typed (pos, "Unable to type the definition."))
 
 and typeof tenv env annots e =
   match e with
   | EVar v -> Env.find v env
-  | Let (v, a, e) ->
+  | Bind (v, a, e) ->
     let splits = Annotations.splits_strict v env annots in
     if splits = []
     then typeof tenv env annots e
@@ -97,7 +99,7 @@ and typeof tenv env annots e =
         "Invalid splits (does not cover the whole domain). "^(splits_domain splits s)))
     end
 
-let refine_a ~backward env a t =
+let rec refine_a ~backward env a t =
   begin match a with
   | Const c when backward ->
     if disjoint (Ast.const_to_typ c) t then [] else [Env.empty]
@@ -134,7 +136,7 @@ let refine_a ~backward env a t =
     [Env.cap env1 env1' ; Env.cap env2 env2']
   | Lambda _ when backward -> [Env.empty]
   | Lambda _ -> []
-  | Let (v, a) -> Env.cap (refine_a ~backward env a t) (Env.singleton v any)
+  | Let (v, a) -> List.map (Env.cap (Env.singleton v any)) (refine_a ~backward env a t)
   end
   |> List.map (fun env' -> List.fold_left
     (fun acc v -> Env.strengthen v (Env.find v env) acc)

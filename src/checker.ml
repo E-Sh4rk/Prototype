@@ -16,6 +16,12 @@ let actual_expected act exp =
 let unbound_variable pos v =
   raise (Ill_typed (pos, "Unbound variable "^(Variable.show v)^"."))
 
+let var_type pos v env =
+  if Env.mem v env then Env.find v env else unbound_variable pos v
+
+let check_var_dom pos v env =
+  if Env.mem v env |> not then unbound_variable pos v
+
 let rec typeof_a pos tenv env annots a =
   let type_lambda env annots v e =
     let splits = Annotations.splits_strict v env annots in
@@ -32,24 +38,24 @@ let rec typeof_a pos tenv env annots a =
   match a with
   | Const (Atom str) -> get_type_or_atom tenv str
   | Const c -> Ast.const_to_typ c
-  | Var v -> Env.find v env
-  | Debug (_, v) -> Env.find v env
+  | Var v -> var_type pos v env
+  | Debug (_, v) -> var_type pos v env
   | Pair (v1, v2) ->
-    let t1 = Env.find v1 env in
-    let t2 = Env.find v2 env in
+    let t1 = var_type pos v1 env in
+    let t2 = var_type pos v2 env in
     mk_times (cons t1) (cons t2)
   | Projection (Field _, _) -> failwith "Not implemented"
   | Projection (p, v) ->
-    let t = Env.find v env in
+    let t = var_type pos v env in
     if subtype t pair_any
     then (if p = Fst then pi1 t else pi2 t)
     else raise (Ill_typed (pos, "Projection can only be done on a pair."))
   | RecordUpdate _ -> failwith "Not implemented"
   | App (v1, v2) ->
-    let t1 = Env.find v1 env in
+    let t1 = var_type pos v1 env in
     if subtype t1 arrow_any
     then
-      let t2 = Env.find v2 env in
+      let t2 = var_type pos v2 env in
       let dom = domain t1 in
       if subtype t2 dom
       then apply t1 t2
@@ -57,11 +63,11 @@ let rec typeof_a pos tenv env annots a =
         "Argument not in the domain of the function. "^(actual_expected t2 dom)))
     else raise (Ill_typed (pos, "Application can only be done on a function."))
   | Ite (v, t, x1, x2) ->
-    let tv = Env.find v env in
+    let tv = var_type pos v env in
     if subtype tv t
-    then Env.find x1 env
+    then var_type pos x1 env
     else if subtype tv (neg t)
-    then Env.find x2 env
+    then var_type pos x2 env
     else raise (Ill_typed (pos, "Cannot select a branch for the typecase."))
   | Lambda (Ast.ADomain s, v, e) ->
     let inferred_t = type_lambda env annots v e in
@@ -84,7 +90,7 @@ let rec typeof_a pos tenv env annots a =
 
 and typeof tenv env annots e =
   match e with
-  | EVar v -> Env.find v env
+  | EVar v -> var_type (Variable.get_locations v) v env
   | Bind (v, a, e) ->
     let splits = Annotations.splits_strict v env annots in
     if splits = []
@@ -149,8 +155,6 @@ let rec refine_a ~backward env a t =
     Env.filter (fun v t -> subtype (Env.find v env) t |> not) env'
     ) (* RemoveUselessVar *)
 
-(* TODO: Update infer to match the new CBV system *)
-
 type infer_res =
   | Result of Annotations.t
   | NeedSplit of Annotations.t * (Env.t list) * (Env.t list)
@@ -197,8 +201,6 @@ let forward env x a gammas =
 let domain_included_in_singleton env x =
   List.for_all (fun v -> Variable.equals v x) (Env.domain env)
 
-(* TODO: Raise Ill_typed exception instead of Not_found when a variable is not in the env. *)
-(* TODO: Add guardians about domains of the env *)
 exception Return of infer_res
 
 let rec infer' tenv env annots e =
@@ -227,7 +229,9 @@ let rec infer' tenv env annots e =
         NeedSplit (annots'', gammas1'', gammas2')
   in
   match e with
-  | EVar _ -> Result (Annotations.empty)
+  | EVar v ->
+    check_var_dom (Variable.get_locations v) v env ;
+    Result (Annotations.empty)
   | Bind (v, a, e) ->
     try
       let pos = Variable.get_locations v in
@@ -314,12 +318,12 @@ and infer_a' pos tenv env annots a =
   in
   match a with
   | Const _ -> Result (Annotations.empty)
-  | Var _ -> Result (Annotations.empty)
-  | Debug _ -> Result (Annotations.empty)
-  | Pair _ -> Result (Annotations.empty)
+  | Var v -> check_var_dom pos v env ; Result (Annotations.empty)
+  | Debug (_, v) -> check_var_dom pos v env ; Result (Annotations.empty)
+  | Pair (v1, v2) -> check_var_dom pos v1 env ; check_var_dom pos v2 env ; Result (Annotations.empty)
   | Projection (Field _, _) -> failwith "Not implemented"
   | Projection (_, v) ->
-    let t = Env.find v env in
+    let t = var_type pos v env in
     if subtype t pair_any then
       begin match split_pair t with
       | [] -> Result (Annotations.empty)
@@ -344,12 +348,12 @@ and infer_a' pos tenv env annots a =
     end
   | RecordUpdate _ -> failwith "Not implemented"
   | App (v1, v2) ->
-    let t1 = Env.find v1 env in
+    let t1 = var_type pos v1 env in
+    let t2 = var_type pos v2 env in
     if subtype t1 arrow_any then
       begin match split_arrow t1 with
       | [] -> Result (Annotations.empty)
       | [t1] ->
-        let t2 = Env.find v2 env in
         begin match dnf t1 with
         | [arrows] ->
           if List.exists (fun (s,_) -> subtype t2 s) arrows
@@ -393,13 +397,18 @@ and infer_a' pos tenv env annots a =
         NeedSplit (Annotations.empty, [env1;env2], [env1;env2])
       )
     end
-  | Ite (v, t, _, _) ->
-    let tv = Env.find v env in
+  | Ite (v, t, v1, v2) ->
+    let tv = var_type pos v env in
     let t1 = cap tv t in
     let t2 = cap tv (neg t) in
-    if is_empty t1 || is_empty t2
-    then Result (Annotations.empty)
-    else begin
+    if is_empty t2
+    then begin
+      check_var_dom pos v1 env ;
+      Result (Annotations.empty)
+    end else if is_empty t1 then begin
+      check_var_dom pos v2 env ;
+      Result (Annotations.empty)
+    end else begin
       let env1 = Env.singleton v t1 in
       let env2 = Env.singleton v t2 in
       NeedSplit (Annotations.empty, [env1;env2], [env1;env2])

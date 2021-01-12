@@ -5,7 +5,8 @@ exception EnvIsBottom
 
 type t
 val empty : t
-val contains_bottom : t -> bool
+val bottom : t
+val is_bottom : t -> bool
 val singleton : Variable.t -> typ -> t
 val add : Variable.t -> typ -> t -> t
 val strengthen : Variable.t -> typ -> t -> t

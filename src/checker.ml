@@ -13,12 +13,13 @@ let splits_domain splits domain =
 let actual_expected act exp =
   Format.asprintf "Actual: %a - Expected: %a" pp_typ act pp_typ exp
 
+(* TODO: Change implementation of the splits (can contain the empty type, etc) *)
+
 let rec typeof_a pos tenv env annots a =
   let type_lambda env annots v e =
     let splits = Annotations.splits_strict v env annots in
-    (* The splits are guaranteed not to contain the empty type *)
     if splits = []
-    then raise (Ill_typed (pos, "The inferred domain for this abstraction is empty."))
+    then raise (Ill_typed (pos, "Cannot infer domain of this abstraction."))
     else begin
       splits |> List.map (fun t ->
         let env = Env.add v t env in
@@ -26,12 +27,8 @@ let rec typeof_a pos tenv env annots a =
         mk_arrow (cons t) (cons res)
       ) |> conj |> simplify_typ
     end
-    (* NOTE: the intersection of non-empty arrows cannot be empty,
-    thus no need to check the emptiness of the result *)
   in
-  if Env.is_bottom env
-  then raise (Ill_typed (pos, "Environment contains a divergent variable."))
-  else begin match a with
+  match a with
   | Const (Atom str) -> get_type_or_atom tenv str
   | Const c -> Ast.const_to_typ c
   | Var v -> Env.find v env
@@ -54,11 +51,7 @@ let rec typeof_a pos tenv env annots a =
       let t2 = Env.find v2 env in
       let dom = domain t1 in
       if subtype t2 dom
-      then
-        let res = apply t1 t2 in
-        if is_empty res
-        then raise (Ill_typed (pos, "This application always diverges."))
-        else res
+      then apply t1 t2
       else raise (Ill_typed (pos,
         "Argument not in the domain of the function. "^(actual_expected t2 dom)))
     else raise (Ill_typed (pos, "Application can only be done on a function."))
@@ -83,16 +76,12 @@ let rec typeof_a pos tenv env annots a =
     else raise (Ill_typed (pos,
       "The inferred type for the abstraction is too weak. "^(actual_expected inferred_t t)))
   | Lambda (Unnanoted, v, e) -> type_lambda env annots v e
-  end
 
 and typeof tenv env annots e =
-  if Env.is_bottom env
-  then raise (Ill_typed ([], "Environment contains a divergent variable."))
-  else begin match e with
+  match e with
   | EVar v -> Env.find v env
   | Let (v, a, e) ->
     let splits = Annotations.splits_strict v env annots in
-    (* The splits are guaranteed not to contain the empty type *)
     if splits = []
     then typeof tenv env annots e
     else begin
@@ -107,7 +96,6 @@ and typeof tenv env annots e =
       else raise (Ill_typed (pos,
         "Invalid splits (does not cover the whole domain). "^(splits_domain splits s)))
     end
-  end
 
 let refine_a ~backward env a t =
   begin match a with
@@ -146,15 +134,17 @@ let refine_a ~backward env a t =
     [Env.cap env1 env1' ; Env.cap env2 env2']
   | Lambda _ when backward -> [Env.empty]
   | Lambda _ -> []
-  | Let (_, a) -> refine_a ~backward env a t
+  | Let (v, a) -> Env.cap (refine_a ~backward env a t) (Env.singleton v any)
   end
   |> List.map (fun env' -> List.fold_left
     (fun acc v -> Env.strengthen v (Env.find v env) acc)
     env' (Env.domain env')) (* Inter *)
-  |> List.filter (fun env -> Env.is_bottom env |> not) (* RemoveBottomEnv *)
+  |> List.filter (fun env -> Env.contains_bottom env |> not) (* RemoveBottomEnv *)
   |> List.map (fun env' ->
     Env.filter (fun v t -> subtype (Env.find v env) t |> not) env'
     ) (* RemoveUselessVar *)
+
+(* TODO: Update infer to match the new CBV system *)
 
 type infer_res =
   | Result of Annotations.t

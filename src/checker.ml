@@ -13,6 +13,9 @@ let splits_domain splits domain =
 let actual_expected act exp =
   Format.asprintf "Actual: %a - Expected: %a" pp_typ act pp_typ exp
 
+let unbound_variable pos v =
+  raise (Ill_typed (pos, "Unbound variable "^(Variable.show v)^"."))
+
 let rec typeof_a pos tenv env annots a =
   let type_lambda env annots v e =
     let splits = Annotations.splits_strict v env annots in
@@ -207,13 +210,13 @@ let rec infer' tenv env annots e =
       let gammas1' = backward env' x a gammas1 in
       let gammas2' = forward env' x a gammas2 in
       if List.for_all (fun gamma' -> domain_included_in_singleton gamma' x) (gammas1'@gammas2')
-      then (* LetSplitTop *)
+      then (* BindSplitTop *)
         let splits = List.map (fun env'' -> Env.find x env'') gammas1'
         |> Utils.remove_duplicates equiv in
         assert (disj splits |> subtype s) ;
         List.map (fun s -> infer_with_split tenv env annots' s x a e) splits |>
         merge_annotations Annotations.empty
-      else (* LetSplitUp *)
+      else (* BindSplitUp *)
         let x_annots = List.fold_left (fun acc env'' ->
           VarAnnot.add_split (Env.cap env (Env.rm x env'')) (Env.find x env'') acc
         ) VarAnnot.empty gammas1'
@@ -225,19 +228,19 @@ let rec infer' tenv env annots e =
   in
   match e with
   | EVar _ -> Result (Annotations.empty)
-  | Let (v, a, e) ->
+  | Bind (v, a, e) ->
     try
       let pos = Variable.get_locations v in
       let annots1 = Annotations.restrict (bv_a a) annots in
       let annots2 = Annotations.restrict (bv_e e) annots in
       let res =
         try infer_a' pos tenv env annots1 a
-        with Ill_typed _ -> (* LetAUntypeable *)
+        with Ill_typed _ -> (* BindAUntypeable *)
           raise (Return (infer' tenv env annots2 e))
       in
       begin match res with
-      | NeedSplit (a,b,c) -> NeedSplit (a,b,c) (* LetANeedSplit *)
-      | Result annots1' -> (* Let *)
+      | NeedSplit (a,b,c) -> NeedSplit (a,b,c) (* BindANeedSplit *)
+      | Result annots1' -> (* Bind *)
         let t = typeof_a pos tenv env annots1' a in
         let splits = Annotations.splits v env ~initial:t annots in
         assert (disj splits |> subtype t) ;
@@ -417,6 +420,10 @@ and infer_a' pos tenv env annots a =
     in
     assert (disj splits |> subtype (domain t)) ;
     type_lambda_with_splits ~enforce_domain:true tenv env annots splits v e
+  | Let (v, a) ->
+    if Env.mem v env
+    then infer_a' pos tenv env annots a
+    else unbound_variable pos v
 
 let rec infer tenv env annots e =
   match infer' tenv env annots e with

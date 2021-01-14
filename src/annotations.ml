@@ -5,12 +5,26 @@ module VarAnnot = struct
   let empty = []
   let is_empty va = va = []
 
+  let rec partition lst =
+    let inter t1 t2 =
+      if Cduce.disjoint t1 t2 then t1 else Cduce.cap t1 t2
+    in
+    match lst with
+    | [] -> []
+    | t::lst ->
+      let s = List.fold_left inter t lst in
+      let lst = (t::lst)
+      |> List.map (fun t -> Cduce.diff t s)
+      |> List.filter (fun t -> Cduce.is_empty t |> not)
+      in
+      s::(partition lst)
+
   let splits env ?(initial=Cduce.any) va =
     let res =
       List.filter (fun (env',_) -> Env.leq env env') va
       |> List.map (fun (_,snd) -> Cduce.cap snd initial)
       |> List.filter (fun t -> Cduce.is_empty t |> not)
-      |> Utils.remove_duplicates Cduce.equiv
+      |> partition
     in
     if res = [] then [initial] else res
 

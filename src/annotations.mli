@@ -8,6 +8,7 @@ module VarAnnot : sig
   val splits_strict : Env.t -> t -> Cduce.typ list
   val add_split : Env.t -> Cduce.typ -> t -> t
   val cup : t -> t -> t
+  val partition : Cduce.typ list -> Cduce.typ list
   val pp_filtered : string list -> Format.formatter -> t -> unit
 end
 

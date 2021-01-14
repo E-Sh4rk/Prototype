@@ -214,7 +214,7 @@ let rec infer' tenv env annots e =
       if List.for_all (fun gamma' -> domain_included_in_singleton gamma' x) (gammas1'@gammas2')
       then (* BindSplitTop *)
         let splits = List.map (fun env'' -> Env.find x env'') gammas1'
-        |> Utils.remove_duplicates equiv in
+        |> VarAnnot.partition in
         assert (disj splits |> subtype s) ;
         List.map (fun s -> infer_with_split tenv env annots' s x a e) splits |>
         merge_annotations Annotations.empty
@@ -276,7 +276,7 @@ and infer_a' pos tenv env annots a =
               List.filter (fun env'' -> Env.mem x env'') gammas2 |>
               List.map (fun env'' -> Env.find x env'')
             )
-          |> Utils.remove_duplicates equiv in
+          |> VarAnnot.partition in
           assert (disj splits |> subtype s) ;
           List.map (fun s -> infer_with_split ~enforce_domain tenv env annots' s x e) splits |>
           merge_annotations Annotations.empty
@@ -423,9 +423,9 @@ and infer_a' pos tenv env annots a =
   | Lambda (Ast.AArrow t, v, e) ->
     let splits =
       dnf t |> List.map (fun lst -> List.map fst lst) |>
-      List.flatten |> Utils.remove_duplicates equiv |>
+      List.flatten |> VarAnnot.partition |>
       List.map (fun s -> Annotations.splits v env ~initial:s annots) |>
-      List.flatten |> Utils.remove_duplicates equiv
+      List.flatten |> VarAnnot.partition
     in
     assert (disj splits |> subtype (domain t)) ;
     type_lambda_with_splits ~enforce_domain:true tenv env annots splits v e

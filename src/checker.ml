@@ -150,7 +150,7 @@ let rec refine_a ~backward env a t =
   |> List.map (fun env' -> List.fold_left
     (fun acc v -> Env.strengthen v (Env.find v env) acc)
     env' (Env.domain env')) (* Inter *)
-  |> List.filter (fun env -> Env.contains_bottom env |> not) (* RemoveBottomEnv *)
+  |> List.filter (fun env -> Env.contains_empty env |> not) (* RemoveBottomEnv *)
   |> List.map (fun env' ->
     Env.filter (fun v t -> subtype (Env.find v env) t |> not) env'
     ) (* RemoveUselessVar *)
@@ -438,7 +438,7 @@ let rec infer tenv env annots e =
   match infer' tenv env annots e with
   | Result annots -> [(env, annots)]
   | NeedSplit (annots, envs, _) ->
-    envs |>
+    envs |> (* TODO: 'partition' the envs *)
     List.map (fun env' -> infer tenv (Env.cap env env') annots e) |>
     List.flatten
 
@@ -446,7 +446,7 @@ let rec infer_a pos tenv env annots e =
   match infer_a' pos tenv env annots e with
   | Result annots -> [(env, annots)]
   | NeedSplit (annots, envs, _) ->
-    envs |>
+    envs |> (* TODO: 'partition' the envs *)
     List.map (fun env' -> infer_a pos tenv (Env.cap env env') annots e) |>
     List.flatten
 

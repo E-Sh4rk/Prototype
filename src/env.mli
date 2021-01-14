@@ -5,7 +5,7 @@ exception EnvIsBottom
 
 type t
 val empty : t
-val contains_bottom : t -> bool
+val contains_empty : t -> bool
 val singleton : Variable.t -> typ -> t
 val add : Variable.t -> typ -> t -> t
 val strengthen : Variable.t -> typ -> t -> t
@@ -19,6 +19,7 @@ val filter : (Variable.t -> typ -> bool) -> t -> t
 
 val equiv : t -> t -> bool
 val leq : t -> t -> bool
+val disjoint : t -> t -> bool
 
 val show : t -> string
 val pp : Format.formatter -> t -> unit

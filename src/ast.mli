@@ -2,6 +2,7 @@ open Types_additions
 open Variable
 
 (* TODO: check the restrictions on the test types (how is it done in Cduce?) *)
+(* TODO: move Magic into a new type of expression, and allow to specify an associated type *)
 
 type varname = string
 type exprid = int

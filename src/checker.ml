@@ -36,6 +36,7 @@ let rec typeof_a pos tenv env annots a =
     end
   in
   match a with
+  | Abstract t -> t
   | Const (Atom str) -> get_type_or_atom tenv str
   | Const c -> Ast.const_to_typ c
   | Var v -> var_type pos v env
@@ -110,6 +111,8 @@ and typeof tenv env annots e =
 
 let rec refine_a ~backward env a t =
   begin match a with
+  | Abstract s when backward -> if disjoint s t then [] else [Env.empty]
+  | Abstract s -> if subtype s t then [Env.empty] else []
   | Const c when backward ->
     if disjoint (Ast.const_to_typ c) t then [] else [Env.empty]
   | Const c ->
@@ -317,6 +320,7 @@ and infer_a' pos tenv env annots a =
     else res
   in
   match a with
+  | Abstract _ -> Result (Annotations.empty)
   | Const _ -> Result (Annotations.empty)
   | Var v -> check_var_dom pos v env ; Result (Annotations.empty)
   | Debug (_, v) -> check_var_dom pos v env ; Result (Annotations.empty)
@@ -434,24 +438,15 @@ and infer_a' pos tenv env annots a =
     then infer_a' pos tenv env annots a
     else unbound_variable pos v
 
-let rec infer tenv env annots e =
-  match infer' tenv env annots e with
-  | Result annots -> [(env, annots)]
-  | NeedSplit (annots, envs, _) ->
-    envs |> (* TODO: 'partition' the envs *)
-    List.map (fun env' -> infer tenv (Env.cap env env') annots e) |>
-    List.flatten
-
-let rec infer_a pos tenv env annots e =
-  match infer_a' pos tenv env annots e with
-  | Result annots -> [(env, annots)]
-  | NeedSplit (annots, envs, _) ->
-    envs |> (* TODO: 'partition' the envs *)
-    List.map (fun env' -> infer_a pos tenv (Env.cap env env') annots e) |>
-    List.flatten
+let infer tenv env annots e =
+  let fv = fv_e e in
+  let e = VarSet.fold (fun v acc ->
+    Bind (v, Abstract (Env.find v env), acc)
+  ) fv e in
+  match infer' tenv Env.empty annots e with
+  | Result annots -> (e, annots)
+  | NeedSplit _ -> assert false
 
 let typeof_simple tenv env e =
-  infer tenv env Annotations.empty e
-  |> List.map (fun (env, annots) ->
-    typeof tenv env annots e
-  ) |> disj |> simplify_typ
+  let (e, annots) = infer tenv env Annotations.empty e in
+  typeof tenv Env.empty annots e |> simplify_typ

@@ -2,6 +2,7 @@ open Variable
 module ExprMap = Ast.ExprMap
 
 type a =
+  | Abstract of Cduce.typ
   | Const of Ast.const
   | Var of Variable.t
   | Lambda of (Cduce.typ Ast.type_annot) * Variable.t * e
@@ -23,6 +24,7 @@ and e =
 let map ef af =
   let rec aux_a a =
     begin match a with
+    | Abstract t -> Abstract t
     | Const c -> Const c
     | Var v -> Var v
     | Lambda (ta, v, e) -> Lambda (ta, v, aux_e e)
@@ -49,8 +51,8 @@ let map_a ef af = map ef af |> snd
 let fold ef af =
   let rec aux_a a =
     begin match a with
-    | Const _ | Var _ | Debug _ | App _ | Pair _ | Projection _
-    | RecordUpdate _ | Ite _ -> []
+    | Abstract _ | Const _ | Var _ | Debug _ | App _ | Pair _
+    | Projection _ | RecordUpdate _ | Ite _ -> []
     | Lambda (_, _, e) -> [aux_e e]
     | Let (_, a) -> [aux_a a]
     end
@@ -86,7 +88,7 @@ let free_vars =
       | None -> VarSet.add v acc
       | Some vo -> VarSet.add v acc |> VarSet.add vo
       end
-    | Const _ -> acc
+    | Const _ | Abstract _ -> acc
   in
   (fold_a f1 f2, fold_e f1 f2)
 

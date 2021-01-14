@@ -1,6 +1,7 @@
 open Variable
 
 type a =
+  | Abstract of Cduce.typ
   | Const of Ast.const
   | Var of Variable.t
   | Lambda of (Cduce.typ Ast.type_annot) * Variable.t * e

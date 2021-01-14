@@ -75,6 +75,8 @@ rule token = parse
 (*| "-"     { MINUS }
 | "+"     { PLUS  }*)
 | "magic" { MAGIC }
+| "<"     { LT }
+| ">"     { GT }
 | int as i { LINT (int_of_string i) }
 (*| fn as f { LFLOAT (float_of_string f) }*)
 | "true"  { LBOOL true }

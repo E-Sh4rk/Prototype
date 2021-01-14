@@ -2,7 +2,7 @@ open Types_additions
 open Variable
 
 (* TODO: check the restrictions on the test types (how is it done in Cduce?) *)
-(* TODO: move Magic into a new type of expression, and allow to specify an associated type *)
+(* TODO: built-in lists and strings *)
 
 type varname = string
 type exprid = int
@@ -10,7 +10,6 @@ type exprid = int
 type annotation = exprid Position.located
 
 type const =
-| Magic
 | Unit
 | EmptyRecord
 | Bool of bool
@@ -23,6 +22,7 @@ type projection = Fst | Snd | Field of string
 type 'typ type_annot = Unnanoted | ADomain of 'typ | AArrow of 'typ
 
 type ('a, 'typ, 'v) ast =
+| Abstract of 'typ
 | Const of const
 | Var of 'v
 | Lambda of ('typ type_annot) * 'v * ('a, 'typ, 'v) t

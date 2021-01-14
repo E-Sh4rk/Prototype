@@ -139,6 +139,7 @@ let convert_to_normal_form ast =
       if ExprMap.mem uast expr_var_map
       then ([], expr_var_map, Var (ExprMap.find uast expr_var_map))
       else match e with
+      | Ast.Abstract t -> ([], expr_var_map, Abstract t)
       | Ast.Const c -> ([], expr_var_map, Const c)
       | Ast.Var v -> ([], expr_var_map, Var v)
       | Ast.Lambda (t, v, e) ->

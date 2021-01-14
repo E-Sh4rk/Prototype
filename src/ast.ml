@@ -7,7 +7,6 @@ type exprid = int
 type annotation = exprid Position.located
 
 type const =
-| Magic
 | Unit
 | EmptyRecord
 | Bool of bool
@@ -23,6 +22,7 @@ type 'typ type_annot = Unnanoted | ADomain of 'typ | AArrow of 'typ
 [@@deriving show]
 
 type ('a, 'typ, 'v) ast =
+| Abstract of 'typ
 | Const of const
 | Var of 'v
 | Lambda of ('typ type_annot) * 'v * ('a, 'typ, 'v) t
@@ -69,6 +69,7 @@ let copy_annot a =
 let parser_expr_to_annot_expr tenv name_var_map e =
     let rec aux env ((exprid,pos),e) =
         let e = match e with
+        | Abstract t -> Abstract (type_expr_to_typ tenv t)
         | Const c -> Const c
         | Var str ->
             if has_type_or_atom tenv str
@@ -109,6 +110,7 @@ let parser_expr_to_annot_expr tenv name_var_map e =
 
 let rec unannot (_,e) =
     let e = match e with
+    | Abstract t -> Abstract t
     | Const c -> Const c
     | Var v  -> Var v
     | Lambda (t, v, e) -> Lambda (t, v, unannot e)
@@ -125,7 +127,7 @@ let rec unannot (_,e) =
 
 (*let rec fv (_, expr) =
   match expr with
-  | Const _ -> VarSet.empty
+  | Abstract _ | Const _ -> VarSet.empty
   | Var v -> VarSet.singleton v
   | Lambda (_, v, e) -> VarSet.remove v (fv e)
   | Ite (e, _, e1, e2) -> VarSet.union (VarSet.union (fv e) (fv e1)) (fv e2)
@@ -142,6 +144,7 @@ let rec unannot (_,e) =
 
 let rec substitute (annot, expr) v expr' =
   let expr = match expr with
+  | Abstract t -> Abstract t
   | Const c -> Const c
   | Var v' when Variable.equals v v' -> expr'
   | Var v' -> Var v'
@@ -170,7 +173,6 @@ let rec substitute (annot, expr) v expr' =
 
 let const_to_typ c =
     match c with
-    | Magic -> Cduce.empty
     | Unit -> Cduce.unit_typ
     | EmptyRecord -> Cduce.empty_closed_record
     | Bool true -> Cduce.true_typ

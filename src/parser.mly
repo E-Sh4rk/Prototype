@@ -38,7 +38,7 @@
 %token ARROW AND OR NEG DIFF
 %token ANY EMPTY BOOL CHAR (*FLOAT*) INT TRUE FALSE UNIT
 %token DOUBLEDASH TIMES (*PLUS MINUS*)
-%token LBRACE RBRACE DOUBLEPOINT WITH EQUAL_OPT POINT
+%token LBRACE RBRACE DOUBLEPOINT WITH EQUAL_OPT POINT LT GT
 %token ATOMS TYPE TYPE_AND
 (*%token LBRACKET RBRACKET SEMICOLON*)
 %token<string> ID
@@ -118,6 +118,8 @@ field_term:
 atomic_term:
   x=identifier { annot $startpos $endpos (var_or_primitive x) }
 | l=literal { annot $startpos $endpos (Const l) }
+| MAGIC { annot $startpos $endpos (Abstract (TBase TEmpty)) }
+| MAGIC LT t=typ GT { annot $startpos $endpos (Abstract t) }
 | LBRACE fs=separated_list(COMMA, field_term) RBRACE
   { record_update (annot $startpos $endpos (Const EmptyRecord)) fs }
 | LPAREN ts=separated_nonempty_list(COMMA, term) RPAREN { tuple ts }
@@ -128,7 +130,6 @@ literal:
 | c=LCHAR  { Char c }
 | b=LBOOL  { Bool b }
 | LUNIT    { Unit }
-| MAGIC    { Magic }
 
 %inline abstraction:
   FUN LPAREN ty=typ RPAREN vs=identifier+ ARROW t=term

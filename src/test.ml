@@ -1,7 +1,5 @@
 
-let idb = fun (b : Bool) -> b
-let rand = fun (a : Unit) -> idb true
-let bool = rand ()
+let bool = magic<Bool>
 
 let test = if bool is True then true else false
 
@@ -23,9 +21,7 @@ let is_bool = fun (x:Any) -> if x is Bool then true else false
 let test_2 = fun (x:Any) ->
   lor (is_int x) (is_bool x)
 
-let test_3 =
-  let a = rand () in
-  fun (b:Bool) -> lor b a
+let test_3 = fun (b:Bool) -> lor b bool
 
 let bool_id = fun ((True -> True) & (False -> False)) x -> x
 let succ = fun (x:Int) -> x

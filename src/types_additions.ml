@@ -5,7 +5,7 @@ module StrMap = Map.Make(String)
 (* Construction of types *)
 
 type type_base =
-    TInt of int option * int option
+    | TInt of int option * int option | TSChar of char
     | TBool | TTrue | TFalse | TUnit | TChar | TAny | TEmpty
 
 type type_expr =
@@ -26,6 +26,7 @@ let empty_tenv = StrMap.empty
 let type_base_to_typ t =
     match t with
     | TInt (lb,ub) -> Cduce.interval lb ub
+    | TSChar c -> Cduce.single_char c
     | TBool -> Cduce.bool_typ
     | TTrue -> Cduce.true_typ | TFalse -> Cduce.false_typ
     | TUnit -> Cduce.unit_typ | TChar -> Cduce.char_typ

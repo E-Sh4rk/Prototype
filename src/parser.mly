@@ -119,7 +119,7 @@ atomic_term:
   x=identifier { annot $startpos $endpos (var_or_primitive x) }
 | l=literal { annot $startpos $endpos (Const l) }
 | MAGIC { annot $startpos $endpos (Abstract (TBase TEmpty)) }
-| MAGIC LT t=typ GT { annot $startpos $endpos (Abstract t) }
+| LT t=typ GT { annot $startpos $endpos (Abstract t) }
 | LBRACE fs=separated_list(COMMA, field_term) RBRACE
   { record_update (annot $startpos $endpos (Const EmptyRecord)) fs }
 | LPAREN ts=separated_nonempty_list(COMMA, term) RPAREN { tuple ts }
@@ -180,6 +180,7 @@ type_constant:
 | i=LINT { TInt (Some i, Some i) }
 | i=type_interval { i }
 | CHAR { TChar }
+| c=LCHAR { TSChar c }
 | BOOL { TBool }
 | TRUE { TTrue }
 | FALSE { TFalse }

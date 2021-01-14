@@ -1,5 +1,5 @@
 
-let bool = magic<Bool>
+let bool = <Bool>
 
 let test = if bool is True then true else false
 

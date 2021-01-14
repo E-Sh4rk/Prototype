@@ -22,3 +22,4 @@ val leq : t -> t -> bool
 
 val show : t -> string
 val pp : Format.formatter -> t -> unit
+val pp_filtered : string list -> Format.formatter -> t -> unit

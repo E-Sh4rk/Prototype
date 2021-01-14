@@ -27,6 +27,13 @@ module VarAnnot = struct
 
   let cup va1 va2 =
     List.fold_left (fun acc (env, typ) -> add_split env typ acc) va1 va2
+
+  let pp_filtered names fmt t =
+    List.iter (
+      fun (env, t) ->
+        Format.fprintf fmt "---------------@.Type: %a@.Env: %a@.---------------@."
+        Cduce.pp_typ t (Env.pp_filtered names) env
+    ) t
 end
 
 module Annotations = struct

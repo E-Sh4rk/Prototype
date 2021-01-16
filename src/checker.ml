@@ -84,9 +84,9 @@ let rec typeof_a pos tenv env annots a =
     else raise (Ill_typed (pos,
       "The inferred type for the abstraction is too weak. "^(actual_expected inferred_t t)))
   | Lambda (Unnanoted, v, e) -> type_lambda env annots v e
-  | Let (v, a) ->
-    if Env.mem v env
-    then typeof_a pos tenv env annots a
+  | Let (v1, v2) ->
+    if Env.mem v1 env
+    then var_type pos v2 env
     else raise (Ill_typed (pos, "Unable to type the definition."))
 
 and typeof tenv env annots e =
@@ -109,7 +109,7 @@ and typeof tenv env annots e =
         "Invalid splits (does not cover the whole domain). "^(splits_domain splits s)))
     end
 
-let rec refine_a ~backward env a t =
+let refine_a ~backward env a t =
   begin match a with
   | Abstract s when backward -> if disjoint s t then [] else [Env.empty]
   | Abstract s -> if subtype s t then [Env.empty] else []
@@ -148,7 +148,7 @@ let rec refine_a ~backward env a t =
     [Env.cap env1 env1' ; Env.cap env2 env2']
   | Lambda _ when backward -> [Env.empty]
   | Lambda _ -> []
-  | Let (v, a) -> List.map (Env.cap (Env.singleton v any)) (refine_a ~backward env a t)
+  | Let (v1, v2) -> [Env.cap (Env.singleton v1 any) (Env.singleton v2 t)]
   end
   |> List.map (fun env' -> List.fold_left
     (fun acc v -> Env.strengthen v (Env.find v env) acc)
@@ -324,7 +324,8 @@ and infer_a' pos tenv env annots a =
   | Const _ -> Result (Annotations.empty)
   | Var v -> check_var_dom pos v env ; Result (Annotations.empty)
   | Debug (_, v) -> check_var_dom pos v env ; Result (Annotations.empty)
-  | Pair (v1, v2) -> check_var_dom pos v1 env ; check_var_dom pos v2 env ; Result (Annotations.empty)
+  | Pair (v1, v2) ->
+    check_var_dom pos v1 env ; check_var_dom pos v2 env ; Result (Annotations.empty)
   | Projection (Field _, _) -> failwith "Not implemented"
   | Projection (_, v) ->
     let t = var_type pos v env in
@@ -433,10 +434,8 @@ and infer_a' pos tenv env annots a =
     in
     assert (disj splits |> subtype (domain t)) ;
     type_lambda_with_splits ~enforce_domain:true tenv env annots splits v e
-  | Let (v, a) ->
-    if Env.mem v env
-    then infer_a' pos tenv env annots a
-    else unbound_variable pos v
+  | Let (v1, v2) ->
+    check_var_dom pos v1 env ; check_var_dom pos v2 env ; Result (Annotations.empty)
 
 let infer tenv env annots e =
   let fv = fv_e e in

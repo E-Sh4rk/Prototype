@@ -10,7 +10,7 @@ type a =
   | Pair of Variable.t * Variable.t
   | Projection of Ast.projection * Variable.t
   | RecordUpdate of Variable.t * string * Variable.t option
-  | Let of Variable.t * a
+  | Let of Variable.t * Variable.t
   | Debug of string * Variable.t
 
 and e =

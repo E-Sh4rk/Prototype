@@ -1,7 +1,6 @@
 open Types_additions
 open Variable
 
-(* TODO: check the restrictions on the test types (how is it done in Cduce?) *)
 (* TODO: built-in lists and strings *)
 
 type varname = string

@@ -89,7 +89,10 @@ let parser_expr_to_annot_expr tenv name_var_map e =
             let env = StrMap.add str var env in
             Lambda (t, var, aux env e)
         | Ite (e, t, e1, e2) ->
-            Ite (aux env e, type_expr_to_typ tenv t, aux env e1, aux env e2)
+            let t = type_expr_to_typ tenv t in
+            if is_test_type t
+            then Ite (aux env e, t, aux env e1, aux env e2)
+            else failwith "Cannot make a typecase with a non-trvial arrow type."
         | App (e1, e2) ->
             App (aux env e1, aux env e2)
         | Let (str, e1, e2) ->

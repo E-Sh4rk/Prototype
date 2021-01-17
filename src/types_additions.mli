@@ -46,6 +46,8 @@ val simplify_typ : typ -> typ
 
 val split_arrow : typ -> typ list
 
+val is_test_type : typ -> bool
+
 val square_split : typ -> typ -> (typ * typ) list
 val square_approx : typ -> typ -> typ
 val square_exact : typ -> typ -> typ

@@ -79,14 +79,11 @@ let free_vars =
     let acc = List.fold_left VarSet.union VarSet.empty acc in
     match a with
     | Lambda (_, v, _) -> VarSet.remove v acc
-    | Var v | Projection (_, v) | Debug (_, v) -> VarSet.add v acc
+    | Var v | Projection (_, v) | Debug (_, v) | RecordUpdate (v, _, None) ->
+      VarSet.add v acc
     | Ite (v, _, x1, x2) -> VarSet.add v acc |> VarSet.add x1 |> VarSet.add x2
-    | App (v1, v2) | Pair (v1, v2) | Let (v1, v2) -> VarSet.add v1 acc |> VarSet.add v2
-    | RecordUpdate (v, _, vo) ->
-      begin match vo with
-      | None -> VarSet.add v acc
-      | Some vo -> VarSet.add v acc |> VarSet.add vo
-      end
+    | App (v1, v2) | Pair (v1, v2) | Let (v1, v2) | RecordUpdate (v1, _, Some v2) ->
+      VarSet.add v1 acc |> VarSet.add v2
     | Const _ | Abstract _ -> acc
   in
   (fold_a f1 f2, fold_e f1 f2)

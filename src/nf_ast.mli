@@ -3,7 +3,6 @@ open Variable
 type a =
   | Abstract of Cduce.typ
   | Const of Ast.const
-  | Var of Variable.t
   | Lambda of (Cduce.typ Ast.type_annot) * Variable.t * e
   | Ite of Variable.t * Cduce.typ * Variable.t * Variable.t
   | App of Variable.t * Variable.t
@@ -15,8 +14,7 @@ type a =
 
 and e =
   | Bind of Variable.t * a * e
-  | EVar of Variable.t (* We restrict to variables instead of atomics,
-                          in order for every atomic to be localized by a variable *)
+  | Var of Variable.t
 
 val convert_to_normal_form : Ast.annot_expr -> e
 val convert_a_to_e : a -> Position.t list -> e

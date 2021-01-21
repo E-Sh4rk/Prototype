@@ -4,7 +4,6 @@ module ExprMap = Ast.ExprMap
 type a =
   | Abstract of Cduce.typ
   | Const of Ast.const
-  | Var of Variable.t
   | Lambda of (Cduce.typ Ast.type_annot) * Variable.t * e
   | Ite of Variable.t * Cduce.typ * Variable.t * Variable.t
   | App of Variable.t * Variable.t
@@ -17,7 +16,7 @@ type a =
 
 and e =
   | Bind of Variable.t * a * e
-  | EVar of Variable.t
+  | Var of Variable.t
   [@@deriving show]
 
 
@@ -26,7 +25,6 @@ let map ef af =
     begin match a with
     | Abstract t -> Abstract t
     | Const c -> Const c
-    | Var v -> Var v
     | Lambda (ta, v, e) -> Lambda (ta, v, aux_e e)
     | Ite (v, t, x1, x2) -> Ite (v, t, x1, x2)
     | App (v1, v2) -> App (v1, v2)
@@ -40,7 +38,7 @@ let map ef af =
   and aux_e e =
     begin match e with
     | Bind (v, a, e) -> Bind (v, aux_a a, aux_e e)
-    | EVar v -> EVar v
+    | Var v -> Var v
     end
     |> ef
   in (aux_e, aux_a)
@@ -51,7 +49,7 @@ let map_a ef af = map ef af |> snd
 let fold ef af =
   let rec aux_a a =
     begin match a with
-    | Abstract _ | Const _ | Var _ | Debug _ | App _ | Pair _
+    | Abstract _ | Const _ | Debug _ | App _ | Pair _
     | Projection _ | RecordUpdate _ | Ite _ | Let _ -> []
     | Lambda (_, _, e) -> [aux_e e]
     end
@@ -59,7 +57,7 @@ let fold ef af =
   and aux_e e =
     begin match e with
     | Bind (_, a, e) -> [aux_a a ; aux_e e]
-    | EVar _ -> []
+    | Var _ -> []
     end
     |> ef e
   in (aux_e, aux_a)
@@ -73,13 +71,13 @@ let free_vars =
     let acc = List.fold_left VarSet.union VarSet.empty acc in
     match e with
     | Bind (v, _, _) -> VarSet.remove v acc
-    | EVar v -> VarSet.add v acc
+    | Var v -> VarSet.add v acc
   in
   let f2 a acc =
     let acc = List.fold_left VarSet.union VarSet.empty acc in
     match a with
     | Lambda (_, v, _) -> VarSet.remove v acc
-    | Var v | Projection (_, v) | Debug (_, v) | RecordUpdate (v, _, None) ->
+    | Projection (_, v) | Debug (_, v) | RecordUpdate (v, _, None) ->
       VarSet.add v acc
     | Ite (v, _, x1, x2) -> VarSet.add v acc |> VarSet.add x1 |> VarSet.add x2
     | App (v1, v2) | Pair (v1, v2) | Let (v1, v2) | RecordUpdate (v1, _, Some v2) ->
@@ -94,7 +92,7 @@ let fv_e = free_vars |> snd
 let bound_vars =
   let f1 e acc =
     let acc = List.fold_left VarSet.union VarSet.empty acc in
-    match e with Bind (v, _, _) -> VarSet.add v acc | EVar _ -> acc
+    match e with Bind (v, _, _) -> VarSet.add v acc | Var _ -> acc
   in
   let f2 a acc =
     let acc = List.fold_left VarSet.union VarSet.empty acc in
@@ -203,7 +201,7 @@ let convert_to_normal_form ast =
       List.fold_left (
         fun nf (v, d) ->
         Bind (v, d, nf)
-      ) (EVar x)
+      ) (Var x)
     in
     
     let (defs, _, x) = to_defs_and_x expr_var_map ast in
@@ -214,4 +212,4 @@ let convert_to_normal_form ast =
 let convert_a_to_e a pos =
   let var = Variable.create None in
   List.iter (fun pos -> Variable.attach_location var pos) pos ;
-  Bind (var, a, EVar var)
+  Bind (var, a, Var var)

@@ -39,7 +39,6 @@ let rec typeof_a pos tenv env annots a =
   | Abstract t -> t
   | Const (Atom str) -> get_type_or_atom tenv str
   | Const c -> Ast.const_to_typ c
-  | Var v -> var_type pos v env
   | Debug (_, v) -> var_type pos v env
   | Pair (v1, v2) ->
     let t1 = var_type pos v1 env in
@@ -91,7 +90,7 @@ let rec typeof_a pos tenv env annots a =
 
 and typeof tenv env annots e =
   match e with
-  | EVar v -> var_type (Variable.get_locations v) v env
+  | Var v -> var_type (Variable.get_locations v) v env
   | Bind (v, a, e) ->
     let splits = Annotations.splits_strict v env annots in
     if splits = []
@@ -117,7 +116,6 @@ let refine_a ~backward env a t =
     if disjoint (Ast.const_to_typ c) t then [] else [Env.empty]
   | Const c ->
     if subtype (Ast.const_to_typ c) t then [Env.empty] else []
-  | Var v -> [Env.singleton v t]
   | Debug (_, v) -> [Env.singleton v t]
   | Pair (v1, v2) ->
     split_pair t
@@ -232,7 +230,7 @@ let rec infer' tenv env annots e =
         NeedSplit (annots'', gammas1'', gammas2')
   in
   match e with
-  | EVar v ->
+  | Var v ->
     check_var_dom (Variable.get_locations v) v env ;
     Result (Annotations.empty)
   | Bind (v, a, e) ->
@@ -322,7 +320,6 @@ and infer_a' pos tenv env annots a =
   match a with
   | Abstract _ -> Result (Annotations.empty)
   | Const _ -> Result (Annotations.empty)
-  | Var v -> check_var_dom pos v env ; Result (Annotations.empty)
   | Debug (_, v) -> check_var_dom pos v env ; Result (Annotations.empty)
   | Pair (v1, v2) ->
     check_var_dom pos v1 env ; check_var_dom pos v2 env ; Result (Annotations.empty)

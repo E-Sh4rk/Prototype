@@ -145,34 +145,30 @@ let rec unannot (_,e) =
     end
   | Debug (_, e) -> fv e*)
 
-let rec substitute (annot, expr) v expr' =
-  let expr = match expr with
-  | Abstract t -> Abstract t
-  | Const c -> Const c
-  | Var v' when Variable.equals v v' -> expr'
-  | Var v' -> Var v'
-  | Lambda (ta, v', e) when Variable.equals v v' -> Lambda (ta, v', e)
-  | Lambda (ta, v', e) -> Lambda (ta, v', substitute e v expr')
-  | Ite (e, t, e1, e2) ->
-    Ite (substitute e v expr', t, substitute e1 v expr', substitute e2 v expr')
-  | App (e1, e2) ->
-    App (substitute e1 v expr', substitute e2 v expr')
-  | Let (v', e1, e2) when Variable.equals v v' ->
-    Let (v', substitute e1 v expr', e2)
-  | Let (v', e1, e2) ->
-    Let (v', substitute e1 v expr', substitute e2 v expr')
-  | Pair (e1, e2) ->
-    Pair (substitute e1 v expr', substitute e2 v expr')
-  | Projection (p, e) ->
-    Projection (p, substitute e v expr')
-  | RecordUpdate (e1, f, e2) ->
-    let e2 = match e2 with
-    | Some e2 -> Some (substitute e2 v expr')
-    | None -> None
-    in RecordUpdate (substitute e1 v expr', f, e2)
-  | Debug (str, e) -> Debug (str, substitute e v expr')
-  in
-  (annot, expr)
+let substitute aexpr v (annot', expr') =
+  let rec aux (_, expr) =
+    let expr = match expr with
+    | Abstract t -> Abstract t
+    | Const c -> Const c
+    | Var v' when Variable.equals v v' -> expr'
+    | Var v' -> Var v'
+    | Lambda (ta, v', e) when Variable.equals v v' -> Lambda (ta, v', e)
+    | Lambda (ta, v', e) -> Lambda (ta, v', aux e)
+    | Ite (e, t, e1, e2) -> Ite (aux e, t, aux e1, aux e2)
+    | App (e1, e2) -> App (aux e1, aux e2)
+    | Let (v', e1, e2) when Variable.equals v v' -> Let (v', aux e1, e2)
+    | Let (v', e1, e2) -> Let (v', aux e1, aux e2)
+    | Pair (e1, e2) -> Pair (aux e1, aux e2)
+    | Projection (p, e) -> Projection (p, aux e)
+    | RecordUpdate (e1, f, e2) ->
+      let e2 = match e2 with
+      | Some e2 -> Some (aux e2)
+      | None -> None
+      in RecordUpdate (aux e1, f, e2)
+    | Debug (str, e) -> Debug (str, aux e)
+    in
+    (annot', expr)
+  in aux aexpr
 
 let const_to_typ c =
     match c with

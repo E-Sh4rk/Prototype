@@ -127,17 +127,19 @@ let extract_from_expr_map vals em =
   )
   (ExprMap.empty, em)
 
+exception IsVar of Variable.t
+
 let convert_to_normal_form ast =
   let aux expr_var_map ast =
     let rec to_defs_and_a expr_var_map ast =
       let (_, e) = ast in
       let uast = Ast.unannot ast in
       if ExprMap.mem uast expr_var_map
-      then ([], expr_var_map, Var (ExprMap.find uast expr_var_map))
+      then raise (IsVar (ExprMap.find uast expr_var_map))
       else match e with
       | Ast.Abstract t -> ([], expr_var_map, Abstract t)
       | Ast.Const c -> ([], expr_var_map, Const c)
-      | Ast.Var v -> ([], expr_var_map, Var v)
+      | Ast.Var v -> raise (IsVar v)
       | Ast.Lambda (t, v, e) ->
         (*let e = aux expr_var_map e in
         ([], expr_var_map, Lambda (t, v, e))*)
@@ -159,7 +161,7 @@ let convert_to_normal_form ast =
       | Ast.Let (v, e1, e2) ->
         let name = Variable.get_name v in
         let (defs1, expr_var_map, x) = to_defs_and_x ~name expr_var_map e1 in
-        let e2 = Ast.substitute e2 v (Ast.Var x) in (* Substitute v by x in e2 *)
+        let e2 = Ast.substitute e2 v e1 in (* Substitute v by e1 in e2 *)
         let (defs2, expr_var_map, y) = to_defs_and_x expr_var_map e2 in
         (defs2@defs1, expr_var_map, Let (x, y))
       | Ast.App (e1, e2) ->
@@ -186,15 +188,15 @@ let convert_to_normal_form ast =
 
     and to_defs_and_x ?(name=None) expr_var_map ast =
       let ((_, pos), _) = ast in
-      let (defs, expr_var_map, a) = to_defs_and_a expr_var_map ast in
-      match a with
-      | Var v -> Variable.attach_location v pos ; (defs, expr_var_map, v)
-      | a ->
+      try
+        let (defs, expr_var_map, a) = to_defs_and_a expr_var_map ast in
         let var = Variable.create name in
         Variable.attach_location var pos ;
         let expr_var_map = ExprMap.add (Ast.unannot ast) var expr_var_map in
         let defs = (var, a)::defs in
         (defs, expr_var_map, var)
+      with IsVar v ->
+        (Variable.attach_location v pos ; ([], expr_var_map, v))
     
     and defs_and_x_to_e defs x =
       defs |>

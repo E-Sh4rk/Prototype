@@ -13,7 +13,7 @@ eval `opam config env`
 ## Installing Cduce
 
 ```
-git clone -b cduce-next git@gitlab.math.univ-paris-diderot.fr:cduce/cduce.git
+git clone -b cduce-next https://gitlab.math.univ-paris-diderot.fr/cduce/cduce.git
 cd cduce
 sudo apt install m4
 opam install num ulex

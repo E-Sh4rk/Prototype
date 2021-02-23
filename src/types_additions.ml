@@ -41,8 +41,8 @@ let type_expr_to_typ env t =
         | TPair (t1,t2) -> cons (mk_times (aux t1) (aux t2))
         | TRecord (is_open, fields) ->
             let aux' (label,t,opt) =
-                let t = descr (aux t) in
-                (label, cons (if opt then or_absent t else t))
+                let n = aux t in
+                (label, if opt then or_absent (descr n) |> cons else n)
             in
             let fields = List.map aux' fields in
             cons (mk_record is_open fields)

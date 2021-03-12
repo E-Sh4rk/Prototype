@@ -64,7 +64,9 @@ let rec typeof_a pos tenv env annots a =
     else raise (Ill_typed (pos, "Application can only be done on a function."))
   | Ite (v, t, x1, x2) ->
     let tv = var_type pos v env in
-    if subtype tv t
+    if subtype tv empty
+    then empty
+    else if subtype tv t
     then var_type pos x1 env
     else if subtype tv (neg t)
     then var_type pos x2 env
@@ -144,8 +146,10 @@ let refine_a ~backward env a t =
     let env1' = Env.singleton x1 t in
     let env2' = Env.singleton x2 t in
     [Env.cap env1 env1' ; Env.cap env2 env2']
-  | Lambda _ when backward -> [Env.empty]
-  | Lambda _ -> []
+  | Lambda _ when backward ->
+    if disjoint arrow_any t then [] else [Env.empty]
+  | Lambda _ ->
+    if subtype arrow_any t then [Env.empty] else []
   | Let (v1, v2) -> [Env.cap (Env.singleton v1 any) (Env.singleton v2 t)]
   end
   |> List.map (fun env' -> List.fold_left

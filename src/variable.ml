@@ -41,5 +41,15 @@ module Variable = struct
 
 end
 
+let predefined_vars = Hashtbl.create 10
+
+let get_predefined_var i =
+  if Hashtbl.mem predefined_vars i
+  then Hashtbl.find predefined_vars i
+  else
+    let v = Variable.create None in
+    Hashtbl.add predefined_vars i v ;
+    v
+
 module VarMap = Map.Make(Variable)
 module VarSet = Set.Make(Variable)

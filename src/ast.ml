@@ -115,7 +115,7 @@ let rec unannot (_,e) =
     let e = match e with
     | Abstract t -> Abstract t
     | Const c -> Const c
-    | Var v  -> Var v
+    | Var v -> Var v
     | Lambda (t, v, e) -> Lambda (t, v, unannot e)
     | Ite (e, t, e1, e2) -> Ite (unannot e, t, unannot e1, unannot e2)
     | App (e1, e2) -> App (unannot e1, unannot e2)
@@ -127,6 +127,36 @@ let rec unannot (_,e) =
     | Debug (str, e) -> Debug (str, unannot e)
     in
     ( (), e )
+
+let normalize_bvs e =
+    let rec aux depth map (a, e) =
+        let e = match e with
+        | Abstract t -> Abstract t
+        | Const c -> Const c
+        | Var v when VarMap.mem v map -> Var (VarMap.find v map)
+        | Var v -> Var v
+        | Lambda (t, v, e) ->
+            let v' = get_predefined_var depth in
+            let map = VarMap.add v v' map in
+            Lambda (t, v', aux (depth+1) map e)
+        | Ite (e, t, e1, e2) ->
+            Ite (aux depth map e, t, aux depth map e1, aux depth map e2)
+        | App (e1, e2) ->
+            App (aux depth map e1, aux depth map e2)
+        | Let (v, e1, e2) ->
+            let v' = get_predefined_var depth in
+            let map = VarMap.add v v' map in
+            Let (v', aux (depth+1) map e1, aux (depth+1) map e2)
+        | Pair (e1, e2) ->
+            Pair (aux depth map e1, aux depth map e2)
+        | Projection (p, e) -> Projection (p, aux depth map e)
+        | RecordUpdate (e1, l, e2) ->
+            RecordUpdate (aux depth map e1, l, Utils.option_map (aux depth map) e2)
+        | Debug (str, e) -> Debug (str, aux depth map e)
+        in (a, e)
+    in aux 0 VarMap.empty e
+
+let unannot_and_normalize e = e |> unannot |> normalize_bvs
 
 (*let rec fv (_, expr) =
   match expr with

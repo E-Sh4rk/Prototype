@@ -131,7 +131,7 @@ let convert_to_normal_form ast =
   let aux expr_var_map ast =
     let rec to_defs_and_a expr_var_map ast =
       let (_, e) = ast in
-      let uast = Ast.unannot ast in
+      let uast = Ast.unannot_and_normalize ast in
       if ExprMap.mem uast expr_var_map
       then raise (IsVar (ExprMap.find uast expr_var_map))
       else match e with
@@ -190,7 +190,8 @@ let convert_to_normal_form ast =
         let (defs, expr_var_map, a) = to_defs_and_a expr_var_map ast in
         let var = Variable.create name in
         Variable.attach_location var pos ;
-        let expr_var_map = ExprMap.add (Ast.unannot ast) var expr_var_map in
+        let expr_var_map =
+          ExprMap.add (Ast.unannot_and_normalize ast) var expr_var_map in
         let defs = (var, a)::defs in
         (defs, expr_var_map, var)
       with IsVar v ->

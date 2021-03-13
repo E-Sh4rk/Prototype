@@ -1,23 +1,23 @@
 open Variable
 
+val partition : Cduce.typ -> Cduce.typ list -> Cduce.typ list
+
 module VarAnnot : sig
   type t
   val empty : t
   val is_empty : t -> bool
-  val splits : Env.t -> ?initial:Cduce.typ -> t -> Cduce.typ list
-  val splits_strict : Env.t -> t -> Cduce.typ list
+  val splits : Env.t -> t -> Cduce.typ list
   val add_split : Env.t -> Cduce.typ -> t -> t
   val cup : t -> t -> t
-  val partition : Cduce.typ list -> Cduce.typ list
   val pp_filtered : string list -> Format.formatter -> t -> unit
 end
 
 module Annotations : sig
   type t
   val empty : t
+  val is_undefined : Variable.t -> t -> bool
   val is_empty : Variable.t -> t -> bool
-  val splits : Variable.t -> Env.t -> ?initial:Cduce.typ -> t -> Cduce.typ list
-  val splits_strict : Variable.t -> Env.t -> t -> Cduce.typ list
+  val splits : Variable.t -> Env.t -> t -> Cduce.typ list
   val add_split : Variable.t -> Env.t -> Cduce.typ -> t -> t
   val cup : t -> t -> t
   val union : t list -> t

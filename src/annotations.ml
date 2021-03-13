@@ -1,43 +1,37 @@
 open Variable
 
+let partition_aux lst is_empty disjoint cap diff =
+  let rec aux lst =
+    let rm_empty = List.filter (fun t -> is_empty t |> not) in
+    let inter t1 t2 =
+      if disjoint t1 t2 then t1 else cap t1 t2
+    in
+    match rm_empty lst with
+    | [] -> []
+    | t::lst ->
+      let s = List.fold_left inter t lst in
+      let lst = (t::lst)
+      |> List.map (fun t -> diff t s)
+      |> aux
+      in
+      s::lst
+  in aux lst
+
+let partition t lst =
+  if Cduce.is_empty t then [CDuce.empty]
+  else
+    let lst = List.map (Cduce.cap t) lst in
+    partition_aux (t::lst) Cduce.is_empty Cduce.disjoint Cduce.cap Cduce.diff
+
 module VarAnnot = struct
   type t = (Env.t * Cduce.typ) list
   let empty = []
   let is_empty va = va = []
 
-  let partition_aux lst is_empty disjoint cap diff =
-    let rec aux lst =
-      let rm_empty = List.filter (fun t -> is_empty t |> not) in
-      let inter t1 t2 =
-        if disjoint t1 t2 then t1 else cap t1 t2
-      in
-      match rm_empty lst with
-      | [] -> []
-      | t::lst ->
-        let s = List.fold_left inter t lst in
-        let lst = (t::lst)
-        |> List.map (fun t -> diff t s)
-        |> aux
-        in
-        s::lst
-    in aux lst
-
-  let partition lst =
-    partition_aux lst Cduce.is_empty Cduce.disjoint Cduce.cap Cduce.diff
-
-  let splits env ?(initial=Cduce.any) va =
-    let res =
-      List.filter (fun (env',_) -> Env.leq env env') va
-      |> List.map (fun (_,snd) -> Cduce.cap snd initial)
-      |> List.filter (fun t -> Cduce.is_empty t |> not)
-      |> partition
-    in
-    if res = [] then [initial] else res
-
-  let splits_strict env va =
+  let splits env va =
     List.filter (fun (env',_) -> Env.leq env env') va
     |> List.map snd
-    |> Utils.remove_duplicates Cduce.equiv
+    (*|> Utils.remove_duplicates Cduce.equiv*)
 
   let add_split env typ va =
     let splits = splits env va in
@@ -65,6 +59,9 @@ module Annotations = struct
   let remove_var = VarMap.remove
   let get_var = VarMap.find
 
+  let is_undefined v t =
+    mem_var v t |> not
+
   let is_empty v t =
     if mem_var v t
     then (get_var v t |> VarAnnot.is_empty)
@@ -78,14 +75,9 @@ module Annotations = struct
     )
     vs VarMap.empty
 
-  let splits v env ?(initial=Cduce.any) annots =
+  let splits v env annots =
     if mem_var v annots
-    then get_var v annots |> VarAnnot.splits env ~initial
-    else [initial]
-
-  let splits_strict v env annots =
-    if mem_var v annots
-    then get_var v annots |> VarAnnot.splits_strict env
+    then get_var v annots |> VarAnnot.splits env
     else []
   
   let add_split v env typ annots =

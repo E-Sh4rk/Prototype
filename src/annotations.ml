@@ -23,6 +23,11 @@ let partition t lst =
     let lst = List.map (Cduce.cap t) lst in
     partition_aux (t::lst) Cduce.is_empty Cduce.disjoint Cduce.cap Cduce.diff
 
+let partition_for_full_domain lst =
+  match partition_aux lst Cduce.is_empty Cduce.disjoint Cduce.cap Cduce.diff with
+  | [] -> [Cduce.empty]
+  | lst -> lst
+
 module VarAnnot = struct
   type t = (Env.t * Cduce.typ) list
   let empty = []

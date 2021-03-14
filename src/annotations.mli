@@ -1,6 +1,7 @@
 (*open Variable*)
 
 val partition : Cduce.typ -> Cduce.typ list -> Cduce.typ list
+val partition_for_full_domain : Cduce.typ list -> Cduce.typ list
 
 module VarAnnot : sig
   type t

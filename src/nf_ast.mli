@@ -1,9 +1,10 @@
 open Variable
+open Annotations
 
 type a =
   | Abstract of Cduce.typ
   | Const of Ast.const
-  | Lambda of (Cduce.typ Ast.type_annot) * Variable.t * e
+  | Lambda of VarAnnot.t * (Cduce.typ Ast.type_annot) * Variable.t * e
   | Ite of Variable.t * Cduce.typ * Variable.t * Variable.t
   | App of Variable.t * Variable.t
   | Pair of Variable.t * Variable.t
@@ -13,7 +14,7 @@ type a =
   | Debug of string * Variable.t
 
 and e =
-  | Bind of Variable.t * a * e
+  | Bind of VarAnnot.t * Variable.t * a * e
   | Var of Variable.t
 
 val convert_to_normal_form : Ast.annot_expr -> e

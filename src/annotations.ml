@@ -1,4 +1,4 @@
-open Variable
+(*open Variable*)
 
 let partition_aux lst is_empty disjoint cap diff =
   let rec aux lst =
@@ -18,7 +18,7 @@ let partition_aux lst is_empty disjoint cap diff =
   in aux lst
 
 let partition t lst =
-  if Cduce.is_empty t then [CDuce.empty]
+  if Cduce.is_empty t then [Cduce.empty]
   else
     let lst = List.map (Cduce.cap t) lst in
     partition_aux (t::lst) Cduce.is_empty Cduce.disjoint Cduce.cap Cduce.diff
@@ -26,6 +26,7 @@ let partition t lst =
 module VarAnnot = struct
   type t = (Env.t * Cduce.typ) list
   let empty = []
+  let any = [Env.empty, Cduce.any]
   let is_empty va = va = []
 
   let splits env va =
@@ -48,9 +49,12 @@ module VarAnnot = struct
         Format.fprintf fmt "---------------@.Type: %a@.Env: %a@.---------------@."
         Cduce.pp_typ t (Env.pp_filtered names) env
     ) t
+
+  let pp fmt t =
+    Format.fprintf fmt "[%i]" (List.length t)
 end
 
-module Annotations = struct
+(*module Annotations = struct
   type t = VarAnnot.t VarMap.t
   let empty = VarMap.empty
 
@@ -90,4 +94,4 @@ module Annotations = struct
 
   let union lst =
     List.fold_left cup empty lst
-end
+end*)

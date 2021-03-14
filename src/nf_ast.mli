@@ -29,6 +29,8 @@ val bv_e : e -> VarSet.t
 val fv_a : a -> VarSet.t
 val fv_e : e -> VarSet.t
 
+val merge_annots : e list -> e
+
 val pp_a : Format.formatter -> a -> unit
 val pp_e : Format.formatter -> e -> unit
 val show_a : a -> string

@@ -104,6 +104,36 @@ let bound_vars =
 let bv_a = bound_vars |> fst
 let bv_e = bound_vars |> snd
 
+let merge_annots' e1 e2 =
+  let rec aux_a a1 a2 =
+    match a1, a2 with
+    | Abstract t, _ -> Abstract t
+    | Const c, _ -> Const c
+    | Lambda (va1, t, v, e1), Lambda (va2, _, _, e2) ->
+      Lambda (VarAnnot.cup va1 va2, t, v, aux_e e1 e2)
+    | Lambda _, _ -> assert false
+    | Ite (v, t, x1, x2), _ -> Ite (v, t, x1, x2)
+    | App (v1, v2), _ -> App (v1, v2)
+    | Pair (v1, v2), _ -> Pair (v1, v2)
+    | Projection (p, v), _ -> Projection (p, v)
+    | RecordUpdate (v, str, vo), _ -> RecordUpdate (v, str, vo)
+    | Let (v1, v2), _ -> Let (v1, v2)
+    | Debug (str, v), _ -> Debug (str, v)
+  and aux_e e1 e2 =
+    match e1, e2 with
+    | Var v, _ -> Var v
+    | Bind (va1, v, a1, e1), Bind (va2, _, a2, e2) ->
+      Bind (VarAnnot.cup va1 va2, v, aux_a a1 a2, aux_e e1 e2)
+    | Bind _, _ -> assert false
+  in
+  aux_e e1 e2
+
+let merge_annots es =
+  match es with
+  | [] -> assert false
+  | e::es -> List.fold_left merge_annots' e es
+
+
 let rec separate_defs bvs defs =
   match defs with
   | [] -> ([], [])

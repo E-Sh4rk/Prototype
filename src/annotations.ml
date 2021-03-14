@@ -29,6 +29,8 @@ module VarAnnot = struct
   let any = [Env.empty, Cduce.any]
   let is_empty va = va = []
 
+  let singleton env t = [(env, t)]
+
   let splits env va =
     List.filter (fun (env',_) -> Env.leq env env') va
     |> List.map snd
@@ -42,6 +44,9 @@ module VarAnnot = struct
 
   let cup va1 va2 =
     List.fold_left (fun acc (env, typ) -> add_split env typ acc) va1 va2
+
+  let union lst =
+    List.fold_left cup [] lst
 
   let pp_filtered names fmt t =
     List.iter (

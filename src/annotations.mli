@@ -7,9 +7,11 @@ module VarAnnot : sig
   val empty : t
   val any : t
   val is_empty : t -> bool
+  val singleton : Env.t -> Cduce.typ -> t
   val splits : Env.t -> t -> Cduce.typ list
   val add_split : Env.t -> Cduce.typ -> t -> t
   val cup : t -> t -> t
+  val union : t list -> t
   val pp_filtered : string list -> Format.formatter -> t -> unit
   val pp : Format.formatter -> t -> unit
 end

@@ -4,6 +4,9 @@ open Types_additions
 open Annotations
 open Variable
 
+(* TODO: Init annotations with VarAnnot.empty, and for Lambdas,
+   if the splits are empty, then consider that the initial type is Any *)
+
 exception Ill_typed of Position.t list * string
 
 let splits_domain splits domain =
@@ -19,8 +22,8 @@ let unbound_variable pos v =
 let var_type pos v env =
   if Env.mem v env then Env.find v env else unbound_variable pos v
 
-(*let check_var_dom pos v env =
-  if Env.mem v env |> not then unbound_variable pos v*)
+let check_var_dom pos v env =
+  if Env.mem v env |> not then unbound_variable pos v
 
 let rec typeof_a pos tenv env a =
   let type_lambda env va v e =
@@ -160,10 +163,6 @@ let refine_a ~backward env a t =
     Env.filter (fun v t -> subtype (Env.find v env) t |> not) env'
     ) (* RemoveUselessVar *)
 
-(*let merge_annotations additional_annots res =
-  let (a,b) = List.split res in
-  (Annotations.union (additional_annots::a), List.concat b)
-
 let backward env x a gammas =
   gammas |>
   List.map (fun gamma' ->
@@ -171,7 +170,7 @@ let backward env x a gammas =
     then (refine_a ~backward:true (Env.cap env gamma') a (Env.find x gamma')
       |> List.map (Env.cap gamma'))
     else [Env.add x (Env.find x env) gamma']
-  ) |> List.flatten*)
+  ) |> List.flatten
 
 (*let forward env x a gammas =
   gammas |>
@@ -182,67 +181,79 @@ let backward env x a gammas =
     else [gamma']
   ) |> List.flatten*)
 
-(*let domain_included_in_singleton env x =
+let domain_included_in_singleton env x =
   List.for_all (fun v -> Variable.equals v x) (Env.domain env)
 
-type infer_res = Annotations.t * (Env.t list)
+let empty_annots =
+  map_a
+  (function Bind (_, v, a, e) -> Bind (VarAnnot.empty, v, a, e) | e -> e)
+  (function Lambda (_, t, v, e) -> Lambda (VarAnnot.empty, t, v, e) | a -> a)
+
+type infer_res = e * (Env.t list)
 exception Return of infer_res
 
-let rec infer' tenv env annots e =
-  let rec infer_with_split tenv env annots s x a e =
+let merge_res res =
+  let (es, gammas) = List.split res in
+  (merge_annots es, List.concat gammas)
+
+let rec infer' tenv env e =
+  let rec infer_with_split tenv env s x a e = (* TODO: from here *)
     let env' = Env.add x s env in
-    match infer' tenv env' annots e with
-    | Result annots' -> Result (Annotations.add_split x env s annots') (* LetSplitOk *)
-    | NeedSplit (annots', gammas1, gammas2) ->
-      let gammas1' = backward env' x a gammas1 in
-      let gammas2' = forward env' x a gammas2 in
-      if List.for_all (fun gamma' -> domain_included_in_singleton gamma' x) (gammas1'@gammas2')
+    match infer' tenv env' e with
+    | (e, []) -> (VarAnnot.singleton env s, (e, [])) (* BindSplitOk *)
+    | (e, gammas) ->
+      let gammas = backward env' x a gammas in
+      if List.for_all (fun gamma -> domain_included_in_singleton gamma x) gammas
       then (* BindSplitTop *)
-        let splits = List.map (fun env'' -> Env.find x env'') gammas1'
-        |> VarAnnot.partition in
+        let splits = List.map (fun gamma -> Env.find x gamma) gammas
+        |> partition s in
         assert (disj splits |> subtype s) ;
-        List.map (fun s -> infer_with_split tenv env annots' s x a e) splits |>
-        merge_annotations Annotations.empty
-      else (* BindSplitUp *)
-        let x_annots = List.fold_left (fun acc env'' ->
-          VarAnnot.add_split (Env.cap env (Env.rm x env'')) (Env.find x env'') acc
-        ) VarAnnot.empty gammas1'
+        let (vas, res) =
+          List.map (fun s -> infer_with_split tenv env s x a e) splits |>
+          List.split
         in
-        assert (VarAnnot.is_empty x_annots |> not) ;
-        let annots'' = Annotations.add_var x x_annots annots' in
-        let gammas1'' = List.map (Env.rm x) gammas1' in
-        NeedSplit (annots'', gammas1'', gammas2')
+        (VarAnnot.union vas, merge_res res)
+      else (* BindSplitUp *)
+        let va = List.fold_left (fun acc gamma ->
+          VarAnnot.add_split (Env.cap env (Env.rm x gamma)) (Env.find x gamma) acc
+        ) VarAnnot.empty gammas
+        in
+        assert (VarAnnot.is_empty va |> not) ;
+        let gammas = List.map (Env.rm x) gammas in
+        (va, (e, gammas))
   in
   match e with
   | Var v ->
     check_var_dom (Variable.get_locations v) v env ;
-    (Annotations.empty, [])
-  | Bind (v, a, e) ->
+    (e, [])
+  | Bind (va, v, a, e) ->
     try
       let pos = Variable.get_locations v in
-      let annots1 = Annotations.restrict (bv_a a) annots in
-      let annots2 = Annotations.restrict (bv_e e) annots in
       let res =
-        try infer_a' pos tenv env annots1 a
+        try infer_a' pos tenv env a
         with Ill_typed _ -> (* BindDefUntypeable *)
-          let (annots', gammas) = infer' tenv env annots2 e in
-          raise (Return (Annotations.add_var v VarAnnot.empty annots', gammas))
+          let a = empty_annots a in
+          let (e, gammas) = infer' tenv env e in
+          raise (Return (Bind (VarAnnot.empty, v, a, e), gammas))
       in
       begin match res with
-      | NeedSplit (annots', gammas) -> (* BindDefNeedSplit *)
-        NeedSplit (Annotations.add_var v ((* TODO: Update from there *)) annots', gammas)
-      | Result annots1' -> (* Bind *) 
-        let t = typeof_a pos tenv env annots1' a in
-        let splits = Annotations.splits v env ~initial:t annots in
+      | (a, (_::_ as gammas)) -> (* BindDefNeedSplit *)
+        (Bind (va, v, a, e), gammas)
+      | (a, []) -> (* Bind *)
+        let t = typeof_a pos tenv env a in
+        let splits = VarAnnot.splits env va |> partition t in
         assert (disj splits |> subtype t) ;
-        splits |>
-        List.map (fun s -> infer_with_split tenv env annots2 s v a e) |>
-        merge_annotations annots1'
+        let (vas, res) = splits |>
+          List.map (fun s -> infer_with_split tenv env s v a e) |>
+          List.split
+        in
+        let (e, gammas) = merge_res res in
+        (Bind (VarAnnot.union vas, v, a, e), gammas)
       end
     with Return r -> r
 
-and infer_a' pos tenv env annots a =
-  let rec infer_with_split ~enforce_domain tenv env annots s x e =
+and infer_a' (*pos tenv env a*) _ _ _ _ =
+  (*let rec infer_with_split ~enforce_domain tenv env annots s x e =
     try
       let env' = Env.add x s env in
       let res =
@@ -418,18 +429,17 @@ and infer_a' pos tenv env annots a =
     assert (disj splits |> subtype (domain t)) ;
     type_lambda_with_splits ~enforce_domain:true tenv env annots splits v e
   | Let (v1, v2) ->
-    check_var_dom pos v1 env ; check_var_dom pos v2 env ; Result (Annotations.empty)
+    check_var_dom pos v1 env ; check_var_dom pos v2 env ; Result (Annotations.empty)*)
+  failwith "TODO"
 
-let infer tenv env annots e =
+let infer tenv env e =
   let fv = fv_e e in
   let e = VarSet.fold (fun v acc ->
-    Bind (v, Abstract (Env.find v env), acc)
+    Bind (VarAnnot.any, v, Abstract (var_type [] v env), acc)
   ) fv e in
-  match infer' tenv Env.empty annots e with
-  | Result annots -> (e, annots)
-  | NeedSplit _ -> assert false*)
-
-let infer _ _ _ = failwith "TODO"
+  match infer' tenv Env.empty e with
+  | (e, []) -> e
+  | _ -> assert false
 
 let typeof_simple tenv env e =
   let e = infer tenv env e in

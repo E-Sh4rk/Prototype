@@ -4,6 +4,6 @@
 
 (executable
  (name prototype)
- (libraries dynlink camlp4.lib ulex unix num str cduce)
+ (libraries num str threads cduce)
  (preprocess (pps ppx_deriving.show ppx_deriving.ord))
  (modules (:standard \ test)))

@@ -8,10 +8,8 @@ val pp_typ : Format.formatter -> typ -> unit
 val show_typ : typ -> string
 
 val pp : Format.formatter -> typ -> unit
-val printf : typ -> unit
-val dump : Format.formatter -> typ -> unit
 val string_of_type : typ -> string
-val string_of_node : node -> string
+val pp_node : Format.formatter -> node -> unit
 val descr : node -> typ
 val cons : typ -> node
 
@@ -34,7 +32,7 @@ val cap : typ -> typ -> typ
 val diff : typ -> typ -> typ
 val neg : typ -> typ
 
-val mk_var : bool -> string -> typ
+(*val mk_var : bool -> string -> typ*)
 val mk_atom : string -> typ
 val mk_new_typ: unit -> node
 val define_typ: node -> typ -> unit

@@ -6,14 +6,12 @@ module LabelMap = CD.Ident.LabelMap
 type typ = CD.Types.t
 type node = CD.Types.Node.t
 
-let pp_typ = CD.Types.Print.pp_type
-let show_typ = CD.Types.Print.string_of_type
+let pp_typ = CD.Types.Print.print
+let show_typ = CD.Types.Print.to_string
 
-let pp = CD.Types.Print.pp_type
-let printf = CD.Types.Print.printf
-let dump = CD.Types.Print.dump
-let string_of_type = CD.Types.Print.string_of_type
-let string_of_node = CD.Types.Print.string_of_node
+let pp = CD.Types.Print.print
+let string_of_type = CD.Types.Print.to_string
+let pp_node = CD.Types.Print.print_node
 let descr = CD.Types.descr
 let cons = CD.Types.cons
 
@@ -47,9 +45,9 @@ let from_label lbl = CD.Ident.Label.get_ascii lbl
 
 (* ----- *)
 
-let mk_var internal name =
+(*let mk_var internal name =
     let var = CD.Var.mk ~internal:internal name in
-    CD.Types.var var
+    CD.Types.var var*)
 
 let mk_atom ascii_name =
     ascii_name |> CD.Atoms.V.mk_ascii |> CD.Atoms.atom |> CD.Types.atom

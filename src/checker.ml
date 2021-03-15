@@ -4,8 +4,8 @@ open Types_additions
 open Annotations
 open Variable
 
-(* TODO: Init annotations with VarAnnot.empty, and for Lambdas,
-   if the splits are empty, then consider that the initial type is Any *)
+(* TODO: Improve error messages
+   (when failing due to all branches having failed, print errors of the branches) *)
 
 exception Ill_typed of Position.t list * string
 
@@ -423,7 +423,7 @@ and infer_a' pos tenv env a =
 let infer tenv env e =
   let fv = fv_e e in
   let e = VarSet.fold (fun v acc ->
-    Bind (VarAnnot.any, v, Abstract (var_type [] v env), acc)
+    Bind (VarAnnot.initial, v, Abstract (var_type [] v env), acc)
   ) fv e in
   match infer' tenv Env.empty e with
   | (e, []) -> e

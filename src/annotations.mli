@@ -7,6 +7,7 @@ module VarAnnot : sig
   type t
   val empty : t
   val any : t
+  val initial : t
   val is_empty : t -> bool
   val singleton : Env.t -> Cduce.typ -> t
   val splits : Env.t -> t -> Cduce.typ list

@@ -32,6 +32,7 @@ module VarAnnot = struct
   type t = (Env.t * Cduce.typ) list
   let empty = []
   let any = [Env.empty, Cduce.any]
+  let initial = empty (* NOTE: 'any' in the paper (more optimized with 'empty') *)
   let is_empty va = va = []
 
   let singleton env t = [(env, t)]

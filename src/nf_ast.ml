@@ -181,7 +181,7 @@ let convert_to_normal_form ast =
           extract_from_expr_map (defs |> List.map fst |> VarSet.of_list) in
         let (defs, defs') = (List.rev defs, List.rev defs') in
         let e = defs_and_x_to_e defs' x in
-        (defs, expr_var_map, Lambda (VarAnnot.any, t, v, e))
+        (defs, expr_var_map, Lambda (VarAnnot.initial, t, v, e))
       | Ast.Ite (e, t, e1, e2) ->
         let (defs, expr_var_map, x) = to_defs_and_x expr_var_map e in
         let (defs1, expr_var_map, x1) = to_defs_and_x expr_var_map e1 in
@@ -232,7 +232,7 @@ let convert_to_normal_form ast =
       defs |>
       List.fold_left (
         fun nf (v, d) ->
-        Bind (VarAnnot.any, v, d, nf)
+        Bind (VarAnnot.initial, v, d, nf)
       ) (Var x)
     in
     
@@ -240,8 +240,3 @@ let convert_to_normal_form ast =
     defs_and_x_to_e defs x
 
   in aux ExprMap.empty ast
-
-let convert_a_to_e a pos =
-  let var = Variable.create None in
-  List.iter (fun pos -> Variable.attach_location var pos) pos ;
-  Bind (VarAnnot.any, var, a, Var var)

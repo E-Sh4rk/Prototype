@@ -35,3 +35,36 @@ let custom_id = fun ((0--1 -> 0--1) & (1--2 -> 1--2)) x -> x
 let test_6 = fun x ->
   let y = custom_id x in
   if y is 1 then true else false
+
+(* Examples from the previous paper *)
+let two_steps =
+  let f = fun (( Any\Int -> (Any, Any)\(Int,Int) ) & ( Int -> (Int,Int) )) x -> magic
+  in
+  fun x ->
+    if snd (f x) is Int
+    then
+      if fst (f x) is Int then x
+      else 0
+    else 0
+
+let plus = <Int->Int->Int>
+let bti = <Bool->Int>
+let incr = <Int->Int>
+
+let appl1_fail =
+  fun ( ((Int -> Int) | (Bool -> Bool)) -> (Int | Bool) -> (Int | Bool)) x1 ->
+    fun ( (Int | Bool) -> (Int | Bool) ) x2 ->
+      if (x1 x2) is Int then plus x2 (x1 x2) else land x2 (x1 x2)
+
+let appl1_ok =
+  fun ( ((Int -> Int) & (Bool -> Bool)) -> (Int | Bool) -> (Int | Bool)) x1 ->
+    fun ( (Int | Bool) -> (Int | Bool) ) x2 ->
+      if (x1 x2) is Int then plus x2 (x1 x2) else land x2 (x1 x2)
+
+let appl2 =
+  let bti =
+    fun (Bool -> Int) b -> magic
+  in
+  fun ( ( (Int|Char -> Int) | (Bool|Char -> Bool) ) -> Char -> Int) x1 ->
+    fun (Char -> Int) x2 ->
+      if (x1 x2) is Int then incr (x1 (x1 x2)) else bti (x1 (x1 x2))

@@ -197,7 +197,7 @@ let merge_res res =
   (merge_annots es, List.concat gammas)
 
 let rec infer' tenv env e =
-  let rec infer_with_split tenv env s x a e = (* TODO: from here *)
+  let rec infer_with_split tenv env s x a e =
     let env' = Env.add x s env in
     match infer' tenv env' e with
     | (e, []) -> (VarAnnot.singleton env s, (e, [])) (* BindSplitOk *)

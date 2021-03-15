@@ -22,13 +22,13 @@ let type_check_program
   (program:Ast.parser_program) (pr:string -> unit) pr_logs pr_ill_typed =
   let test_def (tenv,varm,env) (name,parsed_expr) =
     Format.ksprintf pr "%s: " name;
-    begin try
-        let var = Variable.create (Some name) in
-        let annot_expr = Ast.parser_expr_to_annot_expr tenv varm parsed_expr in
-        let time = Unix.gettimeofday () in
-        let nf_expr = convert_to_normal_form annot_expr in
-        assert (VarSet.subset (fv_e nf_expr) (Env.domain env |> VarSet.of_list)) ;
-        (*Format.printf "%a\n" pp_e nf_expr ;*)
+    begin
+      let var = Variable.create (Some name) in
+      let annot_expr = Ast.parser_expr_to_annot_expr tenv varm parsed_expr in
+      let time = Unix.gettimeofday () in
+      let nf_expr = convert_to_normal_form annot_expr in
+      assert (VarSet.subset (fv_e nf_expr) (Env.domain env |> VarSet.of_list)) ;
+      try
         let typ = Checker.typeof_simple tenv env nf_expr in
         let time = (Unix.gettimeofday ()) -. time in
         let varm = StrMap.add name var varm in
@@ -36,6 +36,7 @@ let type_check_program
         Format.ksprintf pr "%s (checked in %fs)\n" (Cduce.string_of_type typ) time;
         pr_logs () ; (varm, env)
       with Checker.Ill_typed (pos, str) ->
+        (*Format.printf "%a\n" pp_e nf_expr ;*)
         pr_ill_typed (pos, str); (varm,env)
       end
     in

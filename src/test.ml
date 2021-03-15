@@ -28,7 +28,6 @@ let succ = fun (x:Int) -> x
 
 let test_4 = fun x -> if x is Bool then x else x
 
-(* TODO: Fix issue with test_5 *)
 let test_5 = fun x -> if x is Bool then bool_id x else succ x
 
 let custom_id = fun ((0--1 -> 0--1) & (1--2 -> 1--2)) x -> x

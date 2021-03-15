@@ -240,7 +240,10 @@ let rec infer' tenv env e =
       | (a, (_::_ as gammas)) -> (* BindDefNeedSplit *)
         (Bind (va, v, a, e), gammas)
       | (a, []) -> (* Bind *)
-        let t = typeof_a pos tenv env a in
+        let t =
+          try typeof_a pos tenv env a
+          with Ill_typed _ -> assert false
+        in
         let splits = VarAnnot.splits env va |> partition t in
         assert (disj splits |> subtype t) ;
         let (vas, res) = splits |>
@@ -345,28 +348,28 @@ and infer_a' pos tenv env a =
       | [t1] ->
         begin match dnf t1 with
         | [arrows] ->
-          if List.for_all (fun (s,_) -> subtype t2 s || disjoint t2 s) arrows
-          then (a, [])
-          else begin
-            let dom = domain t1 in
-            if subtype t2 dom
-            then begin
+          let dom = domain t1 in
+          if subtype t2 dom
+          then begin
+            if List.for_all (fun (s,_) -> subtype t2 s || disjoint t2 s) arrows
+            then (a, [])
+            else begin
               let gammas = arrows |> List.map (fun (s,_) -> cap s t2) |>
                 List.filter (fun t2 -> is_empty t2 |> not) |>
                 List.map (fun t2 -> Env.singleton v2 t2) in
               (a, gammas)
-            end else begin
-              let t2' = cap t2 dom in
-              let t2'' = diff t2 dom in
-              if is_empty t2' || is_empty t2''
-              then raise (Ill_typed (pos,
-                "Bad domain for the application. "^(actual_expected t2 dom)))
-              else (
-                let env1 = Env.singleton v2 t2' in
-                let env2 = Env.singleton v2 t2'' in
-                (a, [env1;env2])
-              )
             end
+          end else begin
+            let t2' = cap t2 dom in
+            let t2'' = diff t2 dom in
+            if is_empty t2' || is_empty t2''
+            then raise (Ill_typed (pos,
+              "Bad domain for the application. "^(actual_expected t2 dom)))
+            else (
+              let env1 = Env.singleton v2 t2' in
+              let env2 = Env.singleton v2 t2'' in
+              (a, [env1;env2])
+            )
           end
         | _ -> assert false
         end

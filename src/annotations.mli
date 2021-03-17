@@ -12,6 +12,7 @@ module VarAnnot : sig
   val singleton : Env.t -> Cduce.typ -> t
   val splits : Env.t -> t -> Cduce.typ list
   val add_split : Env.t -> Cduce.typ -> t -> t
+  val restrict : Env.t -> t -> t
   val cup : t -> t -> t
   val union : t list -> t
   val pp_filtered : string list -> Format.formatter -> t -> unit

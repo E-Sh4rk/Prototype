@@ -48,6 +48,9 @@ module VarAnnot = struct
     then va
     else (env, typ)::va
 
+  let restrict env =
+    List.map (fun (gamma, t) -> (Env.cap env gamma, t))
+
   let cup va1 va2 =
     List.fold_left (fun acc (env, typ) -> add_split env typ acc) va1 va2
 

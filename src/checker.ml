@@ -189,6 +189,11 @@ let empty_annots =
   (function Bind (_, v, a, e) -> Bind (VarAnnot.empty, v, a, e) | e -> e)
   (function Lambda (_, t, v, e) -> Lambda (VarAnnot.empty, t, v, e) | a -> a)
 
+let restrict_annots gamma =
+  map_e
+  (function Bind (va, v, a, e) -> Bind (VarAnnot.restrict gamma va, v, a, e) | e -> e)
+  (function Lambda (va, t, v, e) -> Lambda (VarAnnot.restrict gamma va, t, v, e) | a -> a)
+
 type infer_res = e * (Env.t list)
 exception Return of infer_res
 
@@ -238,6 +243,7 @@ let rec infer' tenv env e =
       in
       begin match res with
       | (a, (_::_ as gammas)) -> (* BindDefNeedSplit *)
+        let e = restrict_annots env e in
         (Bind (va, v, a, e), gammas)
       | (a, []) -> (* Bind *)
         let t =

@@ -47,7 +47,14 @@ let rec typeof_a pos tenv env a =
     let t1 = var_type pos v1 env in
     let t2 = var_type pos v2 env in
     mk_times (cons t1) (cons t2)
-  | Projection (Field _, _) -> failwith "Not implemented"
+  | Projection (Field label, recVar) -> 
+    let t = var_type pos recVar env in
+    if subtype t record_any then
+      try 
+        get_field t label
+      with Not_found -> raise (Ill_typed (pos, "Label " ^ label ^ " not present."))
+    else
+      raise (Ill_typed (pos, "Field projection can only be done on a record."))
   | Projection (p, v) ->
     let t = var_type pos v env in
     if subtype t pair_any
@@ -132,7 +139,9 @@ let refine_a ~backward env a t =
     )
   | Projection (Fst, v) -> [mk_times (cons t) any_node |> Env.singleton v]
   | Projection (Snd, v) -> [mk_times any_node (cons t) |> Env.singleton v]
-  | Projection _ -> failwith "Not implemented"
+  | Projection (Field label, recVar) ->
+    let open' = true in
+    [mk_record open' [label, cons t] |> Env.singleton recVar]
   | RecordUpdate _ -> failwith "Not implemented"
   | App (v1, v2) ->
     let t1 = Env.find v1 env in

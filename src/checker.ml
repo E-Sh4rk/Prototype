@@ -47,8 +47,8 @@ let rec typeof_a pos tenv env a =
     let t1 = var_type pos v1 env in
     let t2 = var_type pos v2 env in
     mk_times (cons t1) (cons t2)
-  | Projection (Field label, recVar) -> 
-    let t = var_type pos recVar env in
+  | Projection (Field label, v) -> 
+    let t = var_type pos v env in
     if subtype t record_any then
       try 
         get_field t label
@@ -139,9 +139,9 @@ let refine_a ~backward env a t =
     )
   | Projection (Fst, v) -> [mk_times (cons t) any_node |> Env.singleton v]
   | Projection (Snd, v) -> [mk_times any_node (cons t) |> Env.singleton v]
-  | Projection (Field label, recVar) ->
+  | Projection (Field label, v) ->
     let open' = true in
-    [mk_record open' [label, cons t] |> Env.singleton recVar]
+    [mk_record open' [label, cons t] |> Env.singleton v]
   | RecordUpdate _ -> failwith "Not implemented"
   | App (v1, v2) ->
     let t1 = Env.find v1 env in
@@ -329,17 +329,17 @@ and infer_a' pos tenv env a =
   | Debug (_, v) -> check_var_dom pos v env ; (a, [])
   | Pair (v1, v2) ->
     check_var_dom pos v1 env ; check_var_dom pos v2 env ; (a, [])
-  | Projection (Field label, recVar) -> (* MATT use snake case *)
-    let t = var_type pos recVar env in
+  | Projection (Field label, v) ->
+    let t = var_type pos v env in
     let split_record (_: typ) = (failwith "Not implemented." : typ list) in (* MATT actually implement *)
     let record_any_with (_: string) = (failwith "Notimplemented." : typ) in (* MATT actually implement *)
-    if subtype t (record_any_with label) then begin (* MATT record with label, not record_any *)
+    if subtype t (record_any_with label) then begin
       match split_record t with
       | [] -> (a, [])
       | [_] -> (a, [])
       | lst ->
         let gammas = lst |> List.map (fun t' ->
-          Env.singleton recVar t')
+          Env.singleton v t')
         in 
         (a, gammas)
     end
@@ -350,8 +350,8 @@ and infer_a' pos tenv env a =
         raise (Ill_typed (pos, 
         "Bad domain for the projection. " ^ (actual_expected t (record_any_with label))))
       else (
-        let env1 = Env.singleton recVar t1 in
-        let env2 = Env.singleton recVar t2 in
+        let env1 = Env.singleton v t1 in
+        let env2 = Env.singleton v t2 in
         (a, [env1;env2])
       )
   | Projection (_, v) ->

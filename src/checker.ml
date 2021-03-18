@@ -329,7 +329,31 @@ and infer_a' pos tenv env a =
   | Debug (_, v) -> check_var_dom pos v env ; (a, [])
   | Pair (v1, v2) ->
     check_var_dom pos v1 env ; check_var_dom pos v2 env ; (a, [])
-  | Projection (Field _, _) -> failwith "Not implemented"
+  | Projection (Field label, recVar) -> (* MATT use snake case *)
+    let t = var_type pos recVar env in
+    let split_record (_: typ) = (failwith "Not implemented." : typ list) in (* MATT actually implement *)
+    let record_any_with (_: string) = (failwith "Notimplemented." : typ) in (* MATT actually implement *)
+    if subtype t (record_any_with label) then begin (* MATT record with label, not record_any *)
+      match split_record t with
+      | [] -> (a, [])
+      | [_] -> (a, [])
+      | lst ->
+        let gammas = lst |> List.map (fun t' ->
+          Env.singleton recVar t')
+        in 
+        (a, gammas)
+    end
+    else
+      let t1 = cap t (record_any_with label) in
+      let t2 = diff t (record_any_with label) in
+      if is_empty t1 || is_empty t2 then
+        raise (Ill_typed (pos, 
+        "Bad domain for the projection. " ^ (actual_expected t (record_any_with label))))
+      else (
+        let env1 = Env.singleton recVar t1 in
+        let env2 = Env.singleton recVar t2 in
+        (a, [env1;env2])
+      )
   | Projection (_, v) ->
     let t = var_type pos v env in
     if subtype t pair_any then begin

@@ -63,4 +63,4 @@ let _ =
     with e ->
       let msg = Printexc.to_string e
       and stack = Printexc.get_backtrace () in
-      Printf.eprintf "Uncatched exception: %s%s\n" msg stack
+      Printf.eprintf "Uncaught exception: %s%s\n" msg stack

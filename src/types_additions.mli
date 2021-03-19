@@ -54,3 +54,12 @@ val square_exact : typ -> typ -> typ
 
 val triangle_split : typ -> typ -> (typ * typ) list
 val triangle_exact : typ -> typ -> typ
+
+(* Record manipulation *)
+
+val record_any_with : string -> typ
+(** [record_any_with l] creates the record type {l = Any ..} *)
+
+val split_record : typ -> typ list
+(** [split_record t] splits a union of record types 
+    into a list of individual record types *)

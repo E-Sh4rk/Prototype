@@ -1,6 +1,7 @@
 open Cduce
 
 module StrMap = Map.Make(String)
+module LabelMap = CD.Ident.LabelMap
 
 (* Construction of types *)
 
@@ -246,3 +247,19 @@ let triangle_split f out =
             let res = triangle_exact t out in
             (t, res)
     end
+
+(* Record manipulation *)
+let record_any_with l = mk_record true [l, cons any]
+
+let split_record t =
+  let to_node (is_absent, t) =
+    if is_absent then
+      cons (CD.Types.Record.or_absent t)
+    else
+      cons t
+  in
+  let to_record (labels, is_open, _) =
+    let labels' = LabelMap.map to_node labels in
+    CD.Types.record_fields (is_open, labels')
+  in
+  CD.Types.Record.get t |> List.map to_record

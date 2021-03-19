@@ -60,7 +60,20 @@ let rec typeof_a pos tenv env a =
     if subtype t pair_any
     then (if p = Fst then pi1 t else pi2 t)
     else raise (Ill_typed (pos, "Projection can only be done on a pair."))
-  | RecordUpdate _ -> failwith "Not implemented"
+  | RecordUpdate (r, label, None) -> 
+    let t = var_type pos r env in
+    if subtype t record_any then
+      remove_field t label
+    else
+      raise (Ill_typed (pos, "Field removal can only be done on a record."))
+  | RecordUpdate (r, label, Some v) ->
+    let t = var_type pos r env in
+    let t' = var_type pos v env in
+    if subtype t record_any then
+      let right_record = mk_record false [label, cons t'] in
+      merge_records t right_record
+    else
+      raise (Ill_typed (pos, "Field update can only be done on a record."))
   | App (v1, v2) ->
     let t1 = var_type pos v1 env in
     if subtype t1 arrow_any
@@ -140,9 +153,9 @@ let refine_a ~backward env a t =
   | Projection (Fst, v) -> [mk_times (cons t) any_node |> Env.singleton v]
   | Projection (Snd, v) -> [mk_times any_node (cons t) |> Env.singleton v]
   | Projection (Field label, v) ->
-    let open' = true in
-    [mk_record open' [label, cons t] |> Env.singleton v]
-  | RecordUpdate _ -> failwith "Not implemented"
+    [mk_record true [label, cons t] |> Env.singleton v]
+  | RecordUpdate (v, _, _) ->
+    [Env.singleton v record_any]
   | App (v1, v2) ->
     let t1 = Env.find v1 env in
     (if backward then square_split t1 t else triangle_split t1 t)
@@ -375,7 +388,13 @@ and infer_a' pos tenv env a =
         (a, [env1;env2])
       )
     end
-  | RecordUpdate _ -> failwith "Not implemented"
+  | RecordUpdate (v, _, None) ->
+    check_var_dom pos v env;
+    (a, [])
+  | RecordUpdate (v, _, Some f) ->
+    check_var_dom pos v env;
+    check_var_dom pos f env;
+    (a, [])
   | App (v1, v2) ->
     let t1 = var_type pos v1 env in
     let t2 = var_type pos v2 env in

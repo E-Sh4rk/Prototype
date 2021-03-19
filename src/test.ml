@@ -68,3 +68,21 @@ let appl2 =
   fun ( ( (Int|Char -> Int) | (Bool|Char -> Bool) ) -> Char -> Int) x1 ->
     fun (Char -> Int) x2 ->
       if (x1 x2) is Int then incr (x1 (x1 x2)) else bti (x1 (x1 x2))
+
+let records_fail =
+  let destruct = fun ({id=Int} -> Int) x -> x.id in
+  let record = { id=0, name='a' } in
+  destruct record
+
+let records_ok =
+  let destruct = fun ({id=Int ..} -> Int) x -> x.id in
+  let record = {id=0, name='a'} in
+  destruct record
+
+let records_fail2 =
+  fun ({..} -> Any) x ->
+    if {x with a=0} is {a=Int ..} then x.a else 0
+
+let paper_example =
+  fun ({..} -> Bool) x ->
+    if {x with a=0} is {a=Int, b=Bool ..} | {a=Bool, b=Int ..} then x.b else false

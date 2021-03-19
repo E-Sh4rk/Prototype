@@ -331,8 +331,6 @@ and infer_a' pos tenv env a =
     check_var_dom pos v1 env ; check_var_dom pos v2 env ; (a, [])
   | Projection (Field label, v) ->
     let t = var_type pos v env in
-    let split_record (_: typ) = (failwith "Not implemented." : typ list) in (* MATT actually implement *)
-    let record_any_with (_: string) = (failwith "Notimplemented." : typ) in (* MATT actually implement *)
     if subtype t (record_any_with label) then begin
       match split_record t with
       | [] -> (a, [])

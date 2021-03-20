@@ -124,6 +124,8 @@ and typeof tenv env e =
       let pos = Variable.get_locations v in
       let s = typeof_a pos tenv env a in
       if disj splits |> subtype s
+      (* NOTE: in the paper, equivalence is required
+      (but it is still sound if we test only this inclusion) *)
       then
         splits |> List.map (fun t ->
           let env = Env.add v t env in

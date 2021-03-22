@@ -344,6 +344,29 @@ and infer_a' pos tenv env a =
   | Debug (_, v) -> check_var_dom pos v env ; (a, [])
   | Pair (v1, v2) ->
     check_var_dom pos v1 env ; check_var_dom pos v2 env ; (a, [])
+  | Projection ((Fst | Snd), v) ->
+    let t = var_type pos v env in
+    if subtype t pair_any then begin
+      match split_pair t with
+      | [] -> (a, [])
+      | [_] -> (a, [])
+      | lst ->
+        let gammas = lst |> List.map (fun (t1, t2) ->
+          Env.singleton v (mk_times (cons t1) (cons t2))
+        ) in
+        (a, gammas)
+    end else begin
+      let t1 = cap t pair_any in
+      let t2 = diff t pair_any in
+      if is_empty t1 || is_empty t2
+      then raise (Ill_typed (pos,
+        "Bad domain for the projection. "^(actual_expected t pair_any)))
+      else (
+        let env1 = Env.singleton v t1 in
+        let env2 = Env.singleton v t2 in
+        (a, [env1;env2])
+      )
+    end
   | Projection (Field label, v) ->
     let t = var_type pos v env in
     if subtype t (record_any_with label) then begin
@@ -367,36 +390,37 @@ and infer_a' pos tenv env a =
         let env2 = Env.singleton v t2 in
         (a, [env1;env2])
       )
-  | Projection (_, v) ->
+  | RecordUpdate (v, _, None) ->
     let t = var_type pos v env in
-    if subtype t pair_any then begin
-      match split_pair t with
-      | [] -> (a, [])
-      | [_] -> (a, [])
-      | lst ->
-        let gammas = lst |> List.map (fun (t1, t2) ->
-          Env.singleton v (mk_times (cons t1) (cons t2))
-        ) in
-        (a, gammas)
-    end else begin
-      let t1 = cap t pair_any in
-      let t2 = diff t pair_any in
-      if is_empty t1 || is_empty t2
-      then raise (Ill_typed (pos,
-        "Bad domain for the projection. "^(actual_expected t pair_any)))
+    if subtype t record_any then
+      (a, [])
+    else
+      let t1 = cap t record_any in
+      let t2 = diff t record_any in
+      if is_empty t1 || is_empty t2 then
+        raise (Ill_typed (pos, 
+        "Bad domain for the projection. " ^ (actual_expected t record_any)))
       else (
         let env1 = Env.singleton v t1 in
         let env2 = Env.singleton v t2 in
         (a, [env1;env2])
       )
-    end
-  | RecordUpdate (v, _, None) ->
-    check_var_dom pos v env;
-    (a, [])
   | RecordUpdate (v, _, Some f) ->
-    check_var_dom pos v env;
     check_var_dom pos f env;
-    (a, [])
+    let t = var_type pos v env in
+    if subtype t record_any then
+      (a, [])
+    else
+      let t1 = cap t record_any in
+      let t2 = diff t record_any in
+      if is_empty t1 || is_empty t2 then
+        raise (Ill_typed (pos, 
+        "Bad domain for the projection. " ^ (actual_expected t record_any)))
+      else (
+        let env1 = Env.singleton v t1 in
+        let env2 = Env.singleton v t2 in
+        (a, [env1;env2])
+      )
   | App (v1, v2) ->
     let t1 = var_type pos v1 env in
     let t2 = var_type pos v2 env in

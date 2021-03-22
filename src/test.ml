@@ -83,6 +83,31 @@ let records_fail2 =
   fun ({..} -> Any) x ->
     if {x with a=0} is {a=Int ..} then x.a else 0
 
+let records_ok2 =
+  let x = { flag=true } in
+  {x with id=10}
+
+let records_ok3 =
+  let x = { flag=true, id=10 } in
+  x\flag
+(* Model doesn't currently account for "known empty" labels *)
+
+
+let paper_example1 =
+  fun x ->
+    if {x with a=0} is {a=Int, b=Bool ..} | {a=Bool, b=Int ..} then true else false
+
+let paper_example2 =
+  fun x ->
+    if x is {a=Int, b=Bool ..} | {a=Bool, b=Int ..} then true else false
+
+let paper_example3 =
+  fun x ->
+    if x is {a=Int, b=Bool ..} | {a=Bool, b=Int ..} then x.b else false
+
+let paper_example4 =
+  fun x ->
+    if {x with a=0} is {a=Int, b=Bool ..} | {a=Bool, b=Int ..} then x.b else false
 let paper_example =
   fun ({..} -> Bool) x ->
     if {x with a=0} is {a=Int, b=Bool ..} | {a=Bool, b=Int ..} then x.b else false

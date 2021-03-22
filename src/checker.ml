@@ -225,6 +225,14 @@ let merge_res res =
   let (es, gammas) = List.split res in
   (merge_annots es, List.concat gammas)
 
+let typeof_nofail tenv env e =
+  try typeof tenv env e
+  with Ill_typed _ -> assert false
+
+let typeof_a_nofail pos tenv env a =
+  try typeof_a pos tenv env a
+  with Ill_typed _ -> assert false
+
 let rec infer' tenv env e =
   let rec infer_with_split tenv env s x a e =
     let env' = Env.add x s env in
@@ -270,10 +278,7 @@ let rec infer' tenv env e =
         let e = restrict_annots env e in
         (Bind (va, v, a, e), gammas)
       | (a, []) -> (* Bind *)
-        let t =
-          try typeof_a pos tenv env a
-          with Ill_typed _ -> assert false
-        in
+        let t = typeof_a_nofail pos tenv env a in
         let splits = VarAnnot.splits env va |> partition t in
         assert (disj splits |> subtype t) ;
         let (vas, res) = splits |>
@@ -307,7 +312,7 @@ and infer_a' pos tenv env a =
       begin match enforce_arrow with
       | None -> ()
       | Some lst -> if lst |> List.exists (fun (left, right) ->
-        subtype s left && (subtype (typeof tenv env' e) right |> not)
+        subtype s left && (subtype (typeof_nofail tenv env' e) right |> not)
       ) then
         raise (Ill_typed (pos, "Cannot get the codomain specified for this abstraction."))
       end ;

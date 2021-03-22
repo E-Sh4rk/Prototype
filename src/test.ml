@@ -108,6 +108,7 @@ let paper_example3 =
 let paper_example4 =
   fun x ->
     if {x with a=0} is {a=Int, b=Bool ..} | {a=Bool, b=Int ..} then x.b else false
+
 let paper_example =
   fun ({..} -> Bool) x ->
     if {x with a=0} is {a=Int, b=Bool ..} | {a=Bool, b=Int ..} then x.b else false

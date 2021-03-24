@@ -156,9 +156,10 @@ let refine_a ~backward env a t =
   | Projection (Snd, v) -> [mk_times any_node (cons t) |> Env.singleton v]
   | Projection (Field label, v) ->
     [mk_record true [label, cons t] |> Env.singleton v]
-  | RecordUpdate (v, _, _) when backward ->
-    (* TODO: improve it *)
-    [Env.singleton v record_any]
+  | RecordUpdate (v, label, None) when backward ->
+    let singletonLabel = mk_record false [label, cons t] in
+    let t_extended = merge_records t singletonLabel in
+    [Env.singleton v t; Env.singleton v t_extended]
   | RecordUpdate _ -> failwith "Not implemented" (* Not used anyway... *)
   | App (v1, v2) ->
     let t1 = Env.find v1 env in

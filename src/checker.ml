@@ -259,6 +259,7 @@ let rec infer' tenv env e =
       if List.for_all (fun gamma -> domain_included_in_singleton gamma x) gammas
       then (* BindSplitTop *)
         let splits = List.map (fun gamma -> Env.find x gamma) gammas
+        |> (fun lst -> assert (disj lst |> subtype s) ; lst)
         |> partition s in
         assert (disj splits |> subtype s) ;
         let (vas, res) =

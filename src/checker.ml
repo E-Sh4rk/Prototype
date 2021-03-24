@@ -157,9 +157,22 @@ let refine_a ~backward env a t =
   | Projection (Field label, v) ->
     [mk_record true [label, cons t] |> Env.singleton v]
   | RecordUpdate (v, label, None) when backward ->
-    let singletonLabel = mk_record false [label, cons t] in
-    let t_extended = merge_records t singletonLabel in
-    [Env.singleton v t; Env.singleton v t_extended]
+    split_record t
+    |> List.concat_map (
+      fun t' ->
+        let singletonLabel = mk_record false [label, cons t'] in
+        let t'_extended = merge_records t' singletonLabel in
+      [Env.singleton v t; Env.singleton v t'_extended]
+    )
+  | RecordUpdate(v, label, Some _) when backward ->
+    split_record t
+    |> List.concat_map (
+      fun t' ->
+        let singletonLabel = mk_record false [label, cons t'] in
+        let t'_extended = merge_records t' singletonLabel in
+        let t'_reduced = remove_field t' label in
+        [Env.singleton v t'_reduced; Env.singleton v t'_extended]
+    )
   | RecordUpdate _ -> failwith "Not implemented" (* Not used anyway... *)
   | App (v1, v2) ->
     let t1 = Env.find v1 env in

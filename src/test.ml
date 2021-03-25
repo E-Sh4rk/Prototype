@@ -92,6 +92,13 @@ let records_ok3 =
   x\flag
 (* Model doesn't currently account for "known empty" labels *)
 
+let records_ok4 =
+  fun x ->
+    if {x with a=0} is {a=Int ..} then true else false
+
+let records_ok5 =
+  fun x ->
+    if {x with a=0} is {a=Int, b=Bool ..} then true else false
 
 let paper_example1 =
   fun x ->

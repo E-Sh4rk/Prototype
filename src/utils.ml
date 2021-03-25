@@ -48,3 +48,6 @@ let pp_list pp_elt fmt lst =
   Format.fprintf fmt "[" ;
   List.iter (fun elt -> Format.fprintf fmt " %a ;" pp_elt elt) lst ;
   Format.fprintf fmt " ]"
+
+  let assert_with b msg =
+    if not b then failwith msg

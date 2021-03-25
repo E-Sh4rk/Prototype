@@ -3,7 +3,7 @@ open Nf_ast
 open Types_additions
 open Annotations
 open Variable
-
+open Utils
 (* TODO: Improve error messages
    (when failing due to all branches having failed, print errors of the branches) *)
 
@@ -158,21 +158,24 @@ let refine_a ~backward env a t =
     [mk_record true [label, cons t] |> Env.singleton v]
   | RecordUpdate (v, label, None) when backward ->
     split_record t
-    |> List.concat_map (
-      fun t' ->
-        let singletonLabel = mk_record false [label, cons t'] in
-        let t'_extended = merge_records t' singletonLabel in
-      [Env.singleton v t; Env.singleton v t'_extended]
+    |> List.map (
+      fun ti ->
+        if subtype ti (remove_field ti label) then
+          Env.singleton v ti
+        else
+          let singleton_label = mk_record false [label, any_node] in
+          let ti_extended = merge_records ti singleton_label in
+          Env.singleton v ti_extended
     )
-  | RecordUpdate(v, label, Some _) when backward ->
+  | RecordUpdate(v, label, Some field) when backward ->
     split_record t
-    |> List.concat_map (
-      fun t' ->
-        let singletonLabel = mk_record false [label, cons t'] in
-        let t'_extended = merge_records t' singletonLabel in
-        let t'_reduced = remove_field t' label in
-        [Env.singleton v t'_reduced; Env.singleton v t'_extended]
-    )
+    |> List.map (
+      fun ti ->
+        let singleton_label = mk_record false [label, any_or_absent_node] in
+        let ti_extended = merge_records ti singleton_label in
+        let field_type = get_field ti label in
+        Env.cap (Env.singleton v ti_extended) (Env.singleton field field_type)
+      )
   | RecordUpdate _ -> failwith "Not implemented" (* Not used anyway... *)
   | App (v1, v2) ->
     let t1 = Env.find v1 env in
@@ -259,7 +262,7 @@ let rec infer' tenv env e =
       if List.for_all (fun gamma -> domain_included_in_singleton gamma x) gammas
       then (* BindSplitTop *)
         let splits = List.map (fun gamma -> Env.find x gamma) gammas
-        |> (fun lst -> assert (disj lst |> subtype s) ; lst)
+        |> (fun lst -> assert_with (disj lst |> subtype s) (show_typ s ^ " is not a subtype of " ^ show_typ (disj lst)); lst)
         |> partition s in
         assert (disj splits |> subtype s) ;
         let (vas, res) =

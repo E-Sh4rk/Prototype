@@ -15,10 +15,7 @@ eval `opam config env`
 ```
 sudo apt install m4
 opam pin add --kind git cduce https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#monomorphic-stable
-nano ~/.opam/4.11.2/lib/cduce/META
 ```
-
-Remove occurences of `+camlp4/camlp4lib.cma` and `+camlp4/camlp4lib.cmxa`, and save.
 
 ## Building the prototype
 

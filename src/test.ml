@@ -79,22 +79,43 @@ let records_ok =
   let record = {id=0, name='a'} in
   destruct record
 
+(* must fail because we do not know whether x has a field a *) 
 let records_fail2 =
   fun ({..} -> Any) x ->
     if {x with a=0} is {a=Int ..} then x.a else 0
 
+(* This gives an uncaught exception
+
+This should work because x\a is not of type  {b=Int ..} since 
+it is of type {b=Int, a=?Empty, ..} 
+let records_ok1 =
+  fun ({b = Int ..} -> Int) x ->
+    if x\a is {b=Int ..} then x.c else 0
+ *)
+  
+(* This instead should fail but the syntax of types is not recognized
+let records_ok1_fail =
+  fun ({b = Int ..} -> Int) x ->
+    if x\a is {b=Int a=?Empty ..} then x.c else 0
+*)
+  
 let records_ok2 =
   let x = { flag=true } in
   {x with id=10}
+
 
 let records_ok3 =
   let x = { flag=true, id=10 } in
   x\flag
 (* Model doesn't currently account for "known empty" labels *)
 
+
+  
 let records_ok4 =
   fun x ->
     if {x with a=0} is {a=Int ..} then true else false
+
+let x = {b = 3}\l 
 
 let records_ok5 =
   fun x ->

@@ -87,12 +87,29 @@ let records_fail2 =
 (* This gives an uncaught exception
 
 This should work because x\a is not of type  {b=Int ..} since 
-it is of type {b=Int, a=?Empty, ..} 
+it is of type {a=?Empty, ..} 
+ *)
+
+let records_ok1 =
+  fun ({a = Int ..} -> Int) x ->
+    if x\a is {b=Int ..} then x.c else 0
+
+
+
+(*
+but it returns
+records_ok1: Uncaught exception: Failure("{ a=?Empty c=Any .. } is not a subtype of Empty") 
+ *)
+  
+  
+(* This should fail since  x\a is of type  {b=Int a=?Empty ..} which is a subtype of 
+ {b=Int ..} = {b=Int a=?Any ..}  and it does *)
+
 let records_ok1 =
   fun ({b = Int ..} -> Int) x ->
     if x\a is {b=Int ..} then x.c else 0
- *)
-  
+
+
 (* This instead should fail but the syntax of types is not recognized
 let records_ok1_fail =
   fun ({b = Int ..} -> Int) x ->
@@ -115,7 +132,7 @@ let records_ok4 =
   fun x ->
     if {x with a=0} is {a=Int ..} then true else false
 
-let x = {b = 3}\l 
+let x = {b = 3, c=4}\l 
 
 let records_ok5 =
   fun x ->

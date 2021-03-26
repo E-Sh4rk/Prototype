@@ -99,6 +99,16 @@ let records_ok1 =
 (*
 but it returns
 records_ok1: Uncaught exception: Failure("{ a=?Empty c=Any .. } is not a subtype of Empty") 
+
+Γ = x : {a = Int ..}                        x: { a =Int, c = Any, ..}
+bind y = x\a in y : {a =? Empty ..}         y: {a =? Empty c = Any  ..}
+bind z = x.c in  x: { c = Any ..}
+bind w = if y is  {b=Int ..} then z else 0 in
+w
+
+x :{..}
+
+x\l : { a=?Empty, ..} = {a = Undef, ..} 
  *)
   
   

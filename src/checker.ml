@@ -158,14 +158,14 @@ let refine_a ~backward env a t =
     [mk_record true [label, cons t] |> Env.singleton v]
   | RecordUpdate (v, label, None) when backward ->
     split_record t
-    |> List.map (
+    |> List.filter_map (
       fun ti ->
         if subtype ti (remove_field ti label) then
-          Env.singleton v ti
-        else
-          let singleton_label = mk_record false [label, any_node] in
+          let singleton_label = mk_record false [label, any_or_absent_node] in
           let ti_extended = merge_records ti singleton_label in
-          Env.singleton v ti_extended
+          Some (Env.singleton v ti_extended)
+        else
+          None
     )
   | RecordUpdate(v, label, Some field) when backward ->
     split_record t

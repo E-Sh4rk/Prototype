@@ -84,38 +84,24 @@ let records_fail2 =
   fun ({..} -> Any) x ->
     if {x with a=0} is {a=Int ..} then x.a else 0
 
-(* This gives an uncaught exception
-
-This should work because x\a is not of type  {b=Int ..} since 
-it is of type {a=?Empty, ..} 
- *)
-
-let records_ok1 =
-  fun ({a = Int ..} -> Int) x ->
-    if x\a is {b=Int ..} then x.c else 0
-
-
-
-(*
-but it returns
-records_ok1: Uncaught exception: Failure("{ a=?Empty c=Any .. } is not a subtype of Empty") 
-
-Γ = x : {a = Int ..}                        x: { a =Int, c = Any, ..}
-bind y = x\a in y : {a =? Empty ..}         y: {a =? Empty c = Any  ..}
-bind z = x.c in  x: { c = Any ..}
-bind w = if y is  {b=Int ..} then z else 0 in
-w
-
-x :{..}
-
-x\l : { a=?Empty, ..} = {a = Undef, ..} 
- *)
-  
-  
-(* This should fail since  x\a is of type  {b=Int a=?Empty ..} which is a subtype of 
- {b=Int ..} = {b=Int a=?Any ..}  and it does *)
+(* 
+  This should work because x\a is of type  {b=Int ..} since 
+  it is of type {b=Int a=?Empty, ..} which is a subtype of
+  {b=Int ..}
+*)
 
 let records_ok1 =
+  fun ({b = Int ..} -> Int) x ->
+    if x\a is {b=Int ..} then x.b else x.c
+
+  
+  
+(* 
+   This should fail since  x\a is of type  {b=Int a=?Empty ..} 
+   which is a subtype of {b=Int ..} = {b=Int a=?Any ..}  
+*)
+
+let records_fail1 =
   fun ({b = Int ..} -> Int) x ->
     if x\a is {b=Int ..} then x.c else 0
 

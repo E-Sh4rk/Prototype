@@ -106,11 +106,14 @@ let records_fail1 =
     if x\a is {b=Int ..} then x.c else 0
 
 
-(* This instead should fail but the syntax of types is not recognized
-let records_ok1_fail =
+(* 
+   This should also fail for the same reasons as above 
+ *)
+
+let records_fail1bis =
   fun ({b = Int ..} -> Int) x ->
-    if x\a is {b=Int a=?Empty ..} then x.c else 0
-*)
+    if x\a is {b=Int, a=?Empty ..} then x.c else 0
+
   
 let records_ok2 =
   let x = { flag=true } in
@@ -120,20 +123,37 @@ let records_ok2 =
 let records_ok3 =
   let x = { flag=true, id=10 } in
   x\flag
-(* Model doesn't currently account for "known empty" labels *)
 
+
+(* Memento: we should improve the printing of types. When the 
+   type is closed we should not print the fields of type =?Empty
+ *)
 
   
 let records_ok4 =
   fun x ->
     if {x with a=0} is {a=Int ..} then true else false
 
-let x = {b = 3, c=4}\l 
+let w = {b = 3, c=4}\l 
+
+(* Memento: we should improve the printing of types. When the 
+   type is closed we should not print the fields of type =?Empty
+ *)
+
+
+let x = <{..}>
+let y = {x with a = 0}         
+let u = if {x with a=0} is {..} then 0 else 1
+let v = if {x with a=0} is {b=?Any ..} then 0 else 1
+let s = if {x with a=0} is {a=?Bool ..} then 0 else 1      
+let t = if {x with a=0} is {a=Int ..} then 0 else 1      
+let z = if {x with a=0} is {b=?Empty ..} then 0 else 1
 
 let records_ok5 =
   fun x ->
     if {x with a=0} is {a=Int, b=Bool ..} then true else false
 
+          
 let paper_example1 =
   fun x ->
     if {x with a=0} is {a=Int, b=Bool ..} | {a=Bool, b=Int ..} then true else false

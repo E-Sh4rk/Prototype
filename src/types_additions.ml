@@ -249,7 +249,7 @@ let triangle_split f out =
     end
 
 (* Record manipulation *)
-let record_any_with l = mk_record true [l, cons any]
+let record_any_with l = mk_record true [l, any_node]
 
 let split_record t =
   let to_node (is_absent, t) =
@@ -259,7 +259,22 @@ let split_record t =
       cons t
   in
   let to_record (labels, is_open, _) =
-    let labels' = LabelMap.map to_node labels in
-    CD.Types.record_fields (is_open, labels')
+    let labels = LabelMap.map to_node labels in
+    CD.Types.record_fields (is_open, labels)
   in
   CD.Types.Record.get t |> List.map to_record
+
+let remove_field_info t label =
+    let label = CD.Ident.Label.mk_ascii label in
+    let to_filtered_node l (is_absent, t) =
+        if CD.Ident.Label.equal label l
+        then any_or_absent_node
+        else if is_absent
+        then cons (CD.Types.Record.or_absent t)
+        else cons t
+    in
+    let to_filtered_record (labels, is_open, _) =
+        let labels = LabelMap.mapi to_filtered_node labels in
+        CD.Types.record_fields (is_open, labels)
+    in
+    CD.Types.Record.get t |> List.map to_filtered_record |> disj

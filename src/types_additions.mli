@@ -63,3 +63,7 @@ val record_any_with : string -> typ
 val split_record : typ -> typ list
 (** [split_record t] splits a union of record types 
     into a list of individual record types *)
+
+val remove_field_info : typ -> string -> typ
+(** [remove_field_info t label] removes all the information
+    about the field label in the record t. *)

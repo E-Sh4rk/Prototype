@@ -109,6 +109,9 @@ let empty_open_record = CD.Types.empty_open_record
 let get_field record field =
   CD.Types.Record.project record (to_label field)
 
+let get_field_assuming_not_absent record field =
+  CD.Types.Record.project_opt record (to_label field)
+
 let all_fields record =
   let lbls = CD.Types.Record.all_labels record in
   List.map from_label (LabelSet.get lbls)

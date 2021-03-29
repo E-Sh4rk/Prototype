@@ -167,15 +167,14 @@ let refine_a ~backward env a t =
           let ti_extended = merge_records ti singleton_label in
           Some (Env.singleton v ti_extended)
     )
-  | RecordUpdate (v, label, Some field) when backward ->
-    (* TODO: Does not seem correct... should look more like the case above. *)
+  | RecordUpdate (v, label, Some x) when backward ->
     split_record t
     |> List.map (
       fun ti ->
         let singleton_label = mk_record false [label, any_or_absent_node] in
         let ti_extended = merge_records ti singleton_label in
-        let field_type = get_field ti label in
-        Env.cap (Env.singleton v ti_extended) (Env.singleton field field_type)
+        let field_type = get_field_assuming_not_absent ti label in
+        Env.cap (Env.singleton v ti_extended) (Env.singleton x field_type)
       )
   | RecordUpdate _ -> failwith "Not implemented" (* Not used anyway... *)
   | App (v1, v2) ->

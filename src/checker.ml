@@ -50,8 +50,7 @@ let rec typeof_a pos tenv env a =
   | Projection (Field label, v) -> 
     let t = var_type pos v env in
     if subtype t record_any then
-      try 
-        get_field t label
+      try get_field t label
       with Not_found -> raise (Ill_typed (pos, "Label " ^ label ^ " not present."))
     else
       raise (Ill_typed (pos, "Field projection can only be done on a record."))
@@ -160,14 +159,16 @@ let refine_a ~backward env a t =
     split_record t
     |> List.filter_map (
       fun ti ->
-        if subtype ti (remove_field ti label) then
+        try begin (* If the field 'label' is required (i.e. it cannot be absent) *)
+          get_field ti label |> ignore ;
+          None
+        end with Not_found -> (* If the field 'label' can be absent *)
           let singleton_label = mk_record false [label, any_or_absent_node] in
           let ti_extended = merge_records ti singleton_label in
           Some (Env.singleton v ti_extended)
-        else
-          None
     )
-  | RecordUpdate(v, label, Some field) when backward ->
+  | RecordUpdate (v, label, Some field) when backward ->
+    (* TODO: Does not seem correct... should look more like the case above. *)
     split_record t
     |> List.map (
       fun ti ->

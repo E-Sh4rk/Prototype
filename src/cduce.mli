@@ -1,5 +1,5 @@
 
-module CD = Cduce_lib
+module CD = Cduce_types
 
 type typ = CD.Types.t
 type node = CD.Types.Node.t

@@ -1,5 +1,5 @@
 
-module CD = Cduce_lib
+module CD = Cduce_types
 module LabelSet = CD.Ident.LabelSet
 module LabelMap = CD.Ident.LabelMap
 

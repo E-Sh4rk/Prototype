@@ -265,7 +265,7 @@ let split_record t =
   CD.Types.Record.get t |> List.map to_record
 
 let remove_field_info t label =
-    let label = CD.Ident.Label.mk_ascii label in
+    (*let label = CD.Ident.Label.mk_ascii label in
     let to_filtered_node l (is_absent, t) =
         if CD.Ident.Label.equal label l
         then any_or_absent_node
@@ -277,4 +277,7 @@ let remove_field_info t label =
         let labels = LabelMap.mapi to_filtered_node labels in
         CD.Types.record_fields (is_open, labels)
     in
-    CD.Types.Record.get t |> List.map to_filtered_record |> disj
+    CD.Types.Record.get t |> List.map to_filtered_record |> disj*)
+    let t = remove_field t label in
+    let singleton = mk_record false [label, any_or_absent_node] in
+    merge_records t singleton

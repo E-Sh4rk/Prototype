@@ -1,17 +1,20 @@
 type Input = Any
 and Output = Empty
 
-type X = X -> Input -> Output
+(*type X = X -> Input -> Output*)
+
+type LoopRec = Bool | { y =? LoopRec }
+let f = fun (LoopRec -> LoopRec) y -> y
 
 (* Fix-point combinator *)
-let z = fun (((Input -> Output) -> Input -> Output ) -> (Input -> Output)) f ->
+(*let z = fun (((Input -> Output) -> Input -> Output ) -> (Input -> Output)) f ->
       let delta = fun ( X -> (Input -> Output) ) x ->
          f ( fun (Input -> Output) v -> ( x x v ))
        in delta delta
+*)
+(*let id = fun ((Input -> Output) -> (Input -> Output)) x -> x *)
 
-let id = fun ((Input -> Output) -> (Input -> Output)) x -> x
-
-let diverge = z id
+(*let diverge = z id*)
 
 
 let bool = <Bool>

@@ -47,6 +47,7 @@ val split_pair : typ -> (typ * typ) list
 val mk_record : bool -> (string * node) list -> typ
 val record_any : typ
 val absent : typ
+val has_absent : typ -> bool
 val any_or_absent : typ
 val absent_node : node
 val any_or_absent_node : node

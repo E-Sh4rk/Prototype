@@ -94,6 +94,8 @@ let record_any = CD.Types.Record.any
 
 let absent = CD.Types.Record.absent
 
+let has_absent = CD.Types.Record.has_absent
+
 let any_or_absent = CD.Types.Record.any_or_absent
 
 let absent_node = CD.Types.Record.absent_node

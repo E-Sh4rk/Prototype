@@ -1,6 +1,48 @@
+type Input = Any
+and Output = Empty
+
+
+type X = X -> Input -> Output
+
+(* Fix-point combinator *)
+let z = fun (((Input -> Output) -> Input -> Output ) -> (Input -> Output)) f ->
+      let delta = fun ( X -> (Input -> Output) ) x ->
+         f ( fun (Input -> Output) v -> ( x x v ))
+       in delta delta
+
+let id = fun ((Input -> Output) -> (Input -> Output)) x -> x
+
+let diverge = z id
+
+
+
+
+
+
+(*
+atom nil
+type Document = { nodeType=9 ..}
+and NodeList = Nil | (Node, NodeList)
+and Element = { nodeType=1,
+                   childNodes = NodeList
+                  .. }
+and Text = { nodeType=3,
+             isElementContentWhiteSpace=Bool
+            .. }
+and Node = Document | Element | Text
+
+let is_empty_node = fun (x : Node) ->
+  if x.nodeType is 9 then false
+  else if x.nodeType is 3 then
+    x.isElementContentWhiteSpace
+  else
+  if x.childNodes is Nil then true else false
+ *)
 
 let bool = <Bool>
 
+
+	     
 let test = if bool is True then true else false
 
 let lnot = fun (a : Any) ->
@@ -147,7 +189,8 @@ let u = if {x with a=0} is {..} then 0 else 1
 let v = if {x with a=0} is {b=?Any ..} then 0 else 1
 let s = if {x with a=0} is {a=?Bool ..} then 0 else 1      
 let t = if {x with a=0} is {a=Int ..} then 0 else 1      
-let z = if {x with a=0} is {b=?Empty ..} then 0 else 1
+let z = if {x with a=0} is {b=?Empty ..} then 0 else x.b
+
 
 let records_ok5 =
   fun x ->
@@ -158,6 +201,7 @@ let paper_example1 =
   fun x ->
     if {x with a=0} is {a=Int, b=Bool ..} | {a=Bool, b=Int ..} then true else false
 
+      
 let paper_example2 =
   fun x ->
     if x is {a=Int, b=Bool ..} | {a=Bool, b=Int ..} then true else false
@@ -173,3 +217,24 @@ let paper_example4 =
 let paper_example =
   fun ({..} -> Bool) x ->
     if {x with a=0} is {a=Int, b=Bool ..} | {a=Bool, b=Int ..} then x.b else false
+
+
+
+(*
+atom nil
+
+type IntList = Nil | (Int,IntList)
+ and AnyList = Nil | (Any, AnyList)                   
+ and IntTree = (Any \IntList) | Nil | (IntList,IntTree)
+
+      
+let concat = fun (x : AnyList) ->
+              fun (y : AnyList) ->
+                  if x is Nil then y else (fst x , (concat (snd x) y)) 
+                                  
+                                  
+let flatten = fun x ->
+  if x is Nil then true
+  else if x is (Any,Any) then concat (flatten(fst x)) (flatten(snd x))
+  else (x,nil)
+ *)

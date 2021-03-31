@@ -24,7 +24,7 @@ git clone git@github.com:E-Sh4rk/Prototype.git
 cd Prototype/src
 opam install dune
 eval $(opam env)
-opam install ppx_deriving menhir
+opam install ppx_deriving menhir pomap
 make
 ```
 

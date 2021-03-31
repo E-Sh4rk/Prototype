@@ -173,3 +173,20 @@ let paper_example4 =
 let paper_example =
   fun ({..} -> Bool) x ->
     if {x with a=0} is {a=Int, b=Bool ..} | {a=Bool, b=Int ..} then x.b else false
+
+(* Example on record from previous paper *)
+(* TODO: fix issue (the domain does not seem good). *)
+
+atom nil
+type Document = { nodeType=9 ..}
+and NodeList = Nil | (Node, NodeList)
+and Element = { nodeType=1, childNodes = NodeList ..}
+and Text = { nodeType=3, isElementContentWhiteSpace=Bool ..}
+and Node = Document | Element | Text
+
+let is_empty_node = fun (x : Element(*Node*)) ->
+  if x.nodeType is 9 then false
+  else if x.nodeType is 3 then x.isElementContentWhiteSpace
+  else if x.childNodes is Nil then true else false
+
+

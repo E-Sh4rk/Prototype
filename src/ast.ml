@@ -1,5 +1,6 @@
 open Types_additions
 open Variable
+open Pomap
 
 type varname = string
 type exprid = int
@@ -13,13 +14,13 @@ type const =
 | Int of int
 | Char of char
 | Atom of string
-[@@deriving show]
+[@@deriving show, ord]
 
 type projection = Fst | Snd | Field of string
-[@@deriving show]
+[@@deriving show, ord]
 
 type 'typ type_annot = Unnanoted | ADomain of 'typ | AArrow of 'typ
-[@@deriving show]
+[@@deriving show, ord]
 
 type ('a, 'typ, 'v) ast =
 | Abstract of 'typ
@@ -33,6 +34,7 @@ type ('a, 'typ, 'v) ast =
 | Projection of projection * ('a, 'typ, 'v) t
 | RecordUpdate of ('a, 'typ, 'v) t * string * ('a, 'typ, 'v) t option
 | Debug of string * ('a, 'typ, 'v) t
+[@@deriving ord]
 
 and ('a, 'typ, 'v) t = 'a * ('a, 'typ, 'v) ast
 
@@ -41,11 +43,23 @@ type expr = (unit, Cduce.typ, Variable.t) t
 type parser_expr = (annotation, type_expr, varname) t
 
 module Expr = struct
-    type t = expr
-    let compare = compare
-    let equiv t1 t2 = (compare t1 t2) = 0
+    type el = expr
+    type ord = Unknown | Lower | Equal | Greater
+    let compare t1 t2 =
+        try (
+            let i = compare
+                (fun () () -> 0)
+                Types_compare.compare_typ
+                Variable.compare t1 t2 in
+            match i with
+            | 0 -> Equal
+            | -1 -> Lower
+            | 1 -> Greater
+            | _ -> assert false
+        )
+        with Types_compare.Uncomparable -> Unknown 
 end
-module ExprMap = Map.Make(Expr)
+module ExprMap = Pomap_impl.Make(Expr)
 
 type name_var_map = Variable.t StrMap.t
 

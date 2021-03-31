@@ -148,13 +148,11 @@ let rec separate_defs bvs defs =
       let (defs, defs') = separate_defs bvs defs in
       (defs, (v,d)::defs')
 
-let extract_from_expr_map vals em =
-  ExprMap.bindings em |>
-  List.filter (fun (_, v) -> VarSet.mem v vals) |>
-  List.fold_left (fun (acc1,acc2) (e,v) ->
-    (ExprMap.add e v acc1, ExprMap.remove e acc2)
-  )
-  (ExprMap.empty, em)
+let filter_expr_map vals em =
+  ExprMap.filter (fun _ node ->
+    let v = ExprMap.get_el node in
+    VarSet.mem v vals
+  ) em
 
 exception IsVar of Variable.t
 
@@ -164,7 +162,9 @@ let convert_to_normal_form ast =
       let (_, e) = ast in
       let uast = Ast.unannot_and_normalize ast in
       if ExprMap.mem uast expr_var_map
-      then raise (IsVar (ExprMap.find uast expr_var_map))
+      then
+        let (_,node) = ExprMap.find uast expr_var_map in
+        raise (IsVar (ExprMap.get_el node))
       else match e with
       | Ast.Abstract t -> ([], expr_var_map, Abstract t)
       | Ast.Const c -> ([], expr_var_map, Const c)
@@ -177,8 +177,8 @@ let convert_to_normal_form ast =
         let (defs, defs') =
           List.rev defs' |>
           separate_defs (VarSet.singleton v) in
-        let (expr_var_map, _) = expr_var_map' |>
-          extract_from_expr_map (defs |> List.map fst |> VarSet.of_list) in
+        let expr_var_map = expr_var_map' |>
+          filter_expr_map (defs |> List.map fst |> VarSet.of_list) in
         let (defs, defs') = (List.rev defs, List.rev defs') in
         let e = defs_and_x_to_e defs' x in
         (defs, expr_var_map, Lambda (VarAnnot.initial, t, v, e))

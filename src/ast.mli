@@ -1,5 +1,6 @@
 open Types_additions
 open Variable
+open Pomap
 
 (* TODO: built-in lists and strings *)
 
@@ -39,12 +40,8 @@ type annot_expr = (annotation, Cduce.typ, Variable.t) t
 type expr = (unit, Cduce.typ, Variable.t) t
 type parser_expr = (annotation, type_expr, varname) t
 
-module Expr : sig
-    type t = expr
-    val compare : t -> t -> int
-    val equiv : t -> t -> bool
-end
-module ExprMap : Map.S with type key = expr
+module Expr : Pomap_intf.PARTIAL_ORDER with type el = expr
+module ExprMap : Pomap_intf.POMAP with type key = expr
 
 type name_var_map = Variable.t StrMap.t
 val empty_name_var_map : name_var_map

@@ -142,7 +142,7 @@ atomic_term:
 | MAGIC { annot $startpos $endpos (Abstract (TBase TEmpty)) }
 | LBRACE fs=separated_list(COMMA, field_term) RBRACE
 { record_update (annot $startpos $endpos (Const EmptyRecord)) fs }
-| LPAREN ts=separated_nonempty_list(COMMA, term) RPAREN
+| LPAREN ts=separated_list(COMMA, term) RPAREN
 { tuple (Position.lex_join $startpos $endpos) ts }
 | LBRACE a=atomic_term WITH fs=separated_nonempty_list(COMMA, field_term) RBRACE
 { record_update a fs }

@@ -8,18 +8,20 @@ module LabelMap = CD.Ident.LabelMap
 
 type type_base =
     | TInt of int option * int option | TSChar of char | TSString of string
-    | TBool | TTrue | TFalse | TUnit | TChar | TAny | TEmpty | TNil | TString
+    | TBool | TTrue | TFalse | TUnit | TChar | TAny | TEmpty | TNil
+    | TString | TList
 
 type type_expr =
-| TBase of type_base
-| TCustom of string
-| TPair of type_expr * type_expr
-| TRecord of bool * (string * type_expr * bool) list
-| TArrow of type_expr * type_expr
-| TCup of type_expr * type_expr
-| TCap of type_expr * type_expr
-| TDiff of type_expr * type_expr
-| TNeg of type_expr
+    | TBase of type_base
+    | TCustom of string
+    | TPair of type_expr * type_expr
+    | TRecord of bool * (string * type_expr * bool) list
+    | TSList of type_expr list
+    | TArrow of type_expr * type_expr
+    | TCup of type_expr * type_expr
+    | TCap of type_expr * type_expr
+    | TDiff of type_expr * type_expr
+    | TNeg of type_expr
 
 type type_env = node StrMap.t * StrSet.t (* Atoms *)
 
@@ -30,11 +32,11 @@ let type_base_to_typ t =
     | TInt (lb,ub) -> Cduce.interval lb ub
     | TSChar c -> Cduce.single_char c
     | TSString str -> Cduce.single_string str
-    | TBool -> Cduce.bool_typ
+    | TBool -> Cduce.bool_typ | TNil -> Cduce.nil_typ
     | TTrue -> Cduce.true_typ | TFalse -> Cduce.false_typ
     | TUnit -> Cduce.unit_typ | TChar -> Cduce.char_typ
     | TAny -> Cduce.any | TEmpty -> Cduce.empty
-    | TNil -> Cduce.nil_typ | TString -> Cduce.string_typ
+    | TString -> Cduce.string_typ | TList -> Cduce.list_typ
 
 let derecurse_types env defs =
     let henv = Hashtbl.create 16 in
@@ -73,6 +75,7 @@ let derecurse_types env defs =
             in
             let fields = List.map aux' fields in
             mk_record is_open fields
+        | TSList lst -> List.map aux lst |> Cduce.single_list
         | TArrow (t1,t2) -> mk_arrow (aux_node t1) (aux_node t2)
         | TCup (t1,t2) ->
             let t1 = aux t1 in

@@ -19,6 +19,14 @@
     let pos_right = Ast.position_of_expr right in
     (Ast.new_annot (Position.join pos_left pos_right), Pair (left,right))
 
+  let rec list_of_elts pos = function
+    | [] -> (Ast.new_annot pos, Const Nil)
+    | x::xs ->
+    let left = x in let right = list_of_elts pos xs in
+    let pos_left = Ast.position_of_expr left in
+    let pos_right = Ast.position_of_expr right in
+    (Ast.new_annot (Position.join pos_left pos_right), Pair (left,right))
+
   let rec record_update base = function
     | [] -> base
     | (label,e)::fields ->
@@ -36,11 +44,11 @@
 %token IF IS THEN ELSE
 %token LPAREN RPAREN EQUAL COMMA COLON
 %token ARROW AND OR NEG DIFF
-%token ANY EMPTY BOOL CHAR (*FLOAT*) INT TRUE FALSE UNIT NIL STRING
+%token ANY EMPTY BOOL CHAR (*FLOAT*) INT TRUE FALSE UNIT NIL STRING LIST
 %token DOUBLEDASH TIMES PLUS MINUS DIV
 %token LBRACE RBRACE DOUBLEPOINT WITH EQUAL_OPT POINT LT GT
 %token ATOMS TYPE TYPE_AND
-(*%token LBRACKET RBRACKET SEMICOLON*)
+%token LBRACKET RBRACKET SEMICOLON
 %token<string> ID
 %token<string> TID
 (*%token<float> LFLOAT*)
@@ -114,7 +122,6 @@ simple_term:
 | p=prefix_term a=atomic_term { annot $startpos $endpos (App (p, a)) }
 | a=atomic_term POINT id=identifier { annot $startpos $endpos (Projection (Field id, a)) }
 | a=atomic_term DIFF id=identifier { annot $startpos $endpos (RecordUpdate (a,id,None)) }
-| LBRACE a=atomic_term WITH fs=separated_nonempty_list(COMMA, field_term) RBRACE { record_update a fs }
 | DEBUG str=LSTRING a=atomic_term { annot $startpos $endpos (Debug (str, a)) }
 | LT t=typ GT { annot $startpos $endpos (Abstract t) }
 (*| m=MINUS t=atomic_term { App (Primitive Neg, t) }*)
@@ -134,8 +141,12 @@ atomic_term:
 | l=literal { annot $startpos $endpos (Const l) }
 | MAGIC { annot $startpos $endpos (Abstract (TBase TEmpty)) }
 | LBRACE fs=separated_list(COMMA, field_term) RBRACE
-  { record_update (annot $startpos $endpos (Const EmptyRecord)) fs }
+{ record_update (annot $startpos $endpos (Const EmptyRecord)) fs }
 | LPAREN ts=separated_nonempty_list(COMMA, term) RPAREN { tuple ts }
+| LBRACE a=atomic_term WITH fs=separated_nonempty_list(COMMA, field_term) RBRACE
+{ record_update a fs }
+| LBRACKET lst=separated_list(SEMICOLON, term) RBRACKET
+{ list_of_elts (Position.lex_join $startpos $endpos) lst }
 
 literal:
 (*f=LFLOAT { Float f }*)
@@ -203,6 +214,7 @@ typ:
 | LBRACE fs=separated_list(COMMA, typ_field) RBRACE { TRecord (false, fs) }
 | LBRACE fs=separated_list(COMMA, typ_field) DOUBLEPOINT RBRACE { TRecord (true, fs) }
 | LPAREN t=typ RPAREN { t }
+| LBRACKET fs=separated_list(SEMICOLON, typ) RBRACKET { TSList fs }
 
 typ_field:
   id=identifier EQUAL t=typ { (id, t, false) }
@@ -223,6 +235,7 @@ type_constant:
 | ANY { TAny }
 | NIL { TNil }
 | STRING { TString }
+| LIST { TList }
 | str=LSTRING { TSString str }
 
 type_interval:

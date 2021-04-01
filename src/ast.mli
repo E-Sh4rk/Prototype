@@ -2,7 +2,6 @@ open Types_additions
 open Variable
 open Pomap
 
-(* TODO: built-in lists *)
 (* TODO: allow the definition of functions with multiple parameters (without nesting fun) *)
 
 type varname = string

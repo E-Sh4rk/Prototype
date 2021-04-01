@@ -72,13 +72,14 @@ rule token = parse
 | "False" { FALSE }
 | "Nil"   { NIL }
 | "String"{ STRING }
+| "List"  { LIST }
 | "("     { LPAREN }
 | ")"     { RPAREN }
 | "{"     { LBRACE }
 | "}"     { RBRACE }
-(*| "["     { LBRACKET }
+| "["     { LBRACKET }
 | "]"     { RBRACKET }
-| ";"     { SEMICOLON }*)
+| ";"     { SEMICOLON }
 | "*"     { TIMES }
 | "--"    { DOUBLEDASH }
 | ".."    { DOUBLEPOINT }

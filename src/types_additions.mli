@@ -7,18 +7,20 @@ module StrMap : Map.S with type key = String.t
 
 type type_base =
     | TInt of int option * int option | TSChar of char | TSString of string
-    | TBool | TTrue | TFalse | TUnit | TChar | TAny | TEmpty | TNil | TString
+    | TBool | TTrue | TFalse | TUnit | TChar | TAny | TEmpty | TNil
+    | TString | TList
 
 type type_expr =
-| TBase of type_base
-| TCustom of string
-| TPair of type_expr * type_expr
-| TRecord of bool * (string * type_expr * bool) list
-| TArrow of type_expr * type_expr
-| TCup of type_expr * type_expr
-| TCap of type_expr * type_expr
-| TDiff of type_expr * type_expr
-| TNeg of type_expr
+    | TBase of type_base
+    | TCustom of string
+    | TPair of type_expr * type_expr
+    | TRecord of bool * (string * type_expr * bool) list
+    | TSList of type_expr list
+    | TArrow of type_expr * type_expr
+    | TCup of type_expr * type_expr
+    | TCap of type_expr * type_expr
+    | TDiff of type_expr * type_expr
+    | TNeg of type_expr
 
 type type_env
 

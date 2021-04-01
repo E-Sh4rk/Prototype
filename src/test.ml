@@ -199,6 +199,21 @@ let typeof = fun x ->
 let test_typeof = fun y ->
   if typeof y is "Boolean" then lnot y else false
 
+(* Test with lists *)
+
+let hd = fun (x:(Any, List)) -> fst x
+let is_empty = fun (x:List) ->
+  if x is [] then true else false
+
+let test_hd = fun y ->
+  if y is List
+  then if lnot (is_empty y) then hd y
+  else nil else 0
+
+let various = [0; "ML"; nil]
+let various_fun = fun (x:[Int ; String ; List]) -> fst (snd x)
+let various_test = various_fun various
+
 (* Test prefix/infix operators *)
 
 let (+) = <Int -> Int -> Int>

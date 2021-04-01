@@ -67,10 +67,17 @@ let nil_typ = mk_atom "nil"
 
 let string_typ =
   let str = CD.Types.make () in
-  let cons = CD.Types.times (cons char_typ) str in
-  let union = CD.Types.cup nil_typ cons in
+  let times = CD.Types.times (cons char_typ) str in
+  let union = CD.Types.cup nil_typ times in
   CD.Types.define str union ;
   descr str
+
+let list_typ =
+  let lst = CD.Types.make () in
+  let times = CD.Types.times any_node lst in
+  let union = CD.Types.cup nil_typ times in
+  CD.Types.define lst union ;
+  descr lst
 
 let interval i1 i2 =
   match i1, i2 with
@@ -109,13 +116,20 @@ let single_string str =
   ) nil_typ rev_str
 
 (*
-let mk_list alpha =
+let list_of alpha =
     let alpha_list = CD.Types.make () in
-    let cons = CD.Types.times alpha alpha_list in
+    let cons = CD.Types.times (cons alpha) alpha_list in
     let union = CD.Types.cup nil_typ cons in
     CD.Types.define alpha_list union ;
     descr alpha_list
 *)
+
+let single_list lst =
+  List.rev lst |>
+  List.fold_left (
+    fun acc t ->
+      CD.Types.times (cons t) (cons acc)
+  ) nil_typ
 
 let mk_new_typ = CD.Types.make
 

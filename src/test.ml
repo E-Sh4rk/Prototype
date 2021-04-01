@@ -212,3 +212,14 @@ let z = fun (((Input -> Output) -> Input -> Output ) -> (Input -> Output)) f ->
 let id = fun ((Input -> Output) -> (Input -> Output)) x -> x
 
 let diverge = z id
+
+(* Test prefix/infix operators *)
+
+let (+) = <Int -> Int -> Int>
+let (-) = <Int -> Int -> Int>
+let ( * ) = <Int -> Int -> Int>
+let (/) = <Int -> Int -> Int>
+let (=) = <Int -> Int -> Bool>
+let (!) = <Bool -> Bool> (* Operators starting with ? or ! are prefix *)
+
+let infix_test = ! (((1*2) + 3) = 6)

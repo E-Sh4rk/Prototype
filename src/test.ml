@@ -224,38 +224,7 @@ let id = fun ((Input -> Output) -> (Input -> Output)) x -> x
 
 let diverge = fixpoint id
 
-
-(* Test prefix/infix operators *)
-
-let (+) = <Int -> Int -> Int>
-let (-) = <Int -> Int -> Int>
-let ( * ) = <Int -> Int -> Int>
-let (/) = <Int -> Int -> Int>
-let (=) = <Int -> Int -> Bool>
-let (!) = <Bool -> Bool> (* Operators starting with ? or ! are prefix *)
-
-let infix_test = ! (((1*2) + 3) = 6)
-
-let fac1 =  fun ((Int -> Int) -> (Int -> Int)) f ->
+let fac =  fun ((Int -> Int) -> (Int -> Int)) f ->
   fun (Int -> Int) x -> if x is (0--1) then 1 else x * (f(x-1))
-               
-let fac2 =  fun (f : Int -> Int) ->
-  fun (x : Int) -> if x is 0 then x else x * f(x-1)
-
-let fac3 =  fun (f : Int -> Int) ->
-  fun x -> if x is 0 then 1 else x * f(x-1)
-
-let fac4 =  fun (f : Int -> Int) ->
-  fun x -> if x is 0 then x+1 else x * f(x-1)
-
-let fac4 =  fun (f : Int -> Int) ->
-  fun x -> if x is -100--1  then x+1 else x * f(x-1)
-
-let factorial = fixpoint fac4                                       
-
-(* TODO: Does not type... Investigate. Works with x instead of x-1 *)
-let fac =  fun (f : (Int -> Int)) ->
-  fun (x : Int) -> if x is 0 then 1 else x * (f (x-1))
 
 let factorial = fixpoint fac
-

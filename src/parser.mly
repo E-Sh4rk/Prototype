@@ -139,10 +139,15 @@ atomic_term:
 
 literal:
 (*f=LFLOAT { Float f }*)
-  i=LINT   { Int i }
+  i=lint   { Int i }
 | c=LCHAR  { Char c }
 | b=LBOOL  { Bool b }
 | LUNIT    { Unit }
+
+lint:
+| i=LINT { i }
+| LPAREN PLUS i=LINT RPAREN { i }
+| LPAREN MINUS i=LINT RPAREN { -i }
 
 %inline abstraction:
   FUN LPAREN ty=typ RPAREN vs=identifier+ ARROW t=term
@@ -204,7 +209,7 @@ typ_field:
 type_constant:
 (*  FLOAT { TyFloat }*)
   INT { TInt (None, None) }
-| i=LINT { TInt (Some i, Some i) }
+| i=lint { TInt (Some i, Some i) }
 | i=type_interval { i }
 | CHAR { TChar }
 | c=LCHAR { TSChar c }
@@ -216,13 +221,13 @@ type_constant:
 | ANY { TAny }
 
 type_interval:
-(*  LBRACKET lb=LINT SEMICOLON ub=LINT RBRACKET { TInt (Some lb, Some ub) }
-| LBRACKET SEMICOLON ub=LINT RBRACKET { TInt (None, Some ub) }
-| LBRACKET lb=LINT SEMICOLON RBRACKET { TInt (Some lb, None) }
+(*  LBRACKET lb=lint SEMICOLON ub=lint RBRACKET { TInt (Some lb, Some ub) }
+| LBRACKET SEMICOLON ub=lint RBRACKET { TInt (None, Some ub) }
+| LBRACKET lb=lint SEMICOLON RBRACKET { TInt (Some lb, None) }
 | LBRACKET SEMICOLON RBRACKET { TInt (None, None) }*)
-  lb=LINT DOUBLEDASH ub=LINT { TInt (Some lb, Some ub) }
-| TIMES DOUBLEDASH ub=LINT { TInt (None, Some ub) }
-| lb=LINT DOUBLEDASH TIMES { TInt (Some lb, None) }
+  lb=lint DOUBLEDASH ub=lint { TInt (Some lb, Some ub) }
+| TIMES DOUBLEDASH ub=lint { TInt (None, Some ub) }
+| lb=lint DOUBLEDASH TIMES { TInt (Some lb, None) }
 | TIMES DOUBLEDASH TIMES { TInt (None, None) }
 
 (*%inline annoted(X): x=X {

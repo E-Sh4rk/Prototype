@@ -16,9 +16,9 @@ let type_id = ['A'-'Z']['a'-'z''A'-'Z''0'-'9''_']*
 
 let decimal = ['0'-'9']+
 
-let int = '-'? decimal
+let int = decimal
 
-let fn = (int "." decimal?) | (int? "." decimal)
+(*let fn = (int "." decimal?) | (int? "." decimal)*)
 
 let char = '\'' ['a'-'z''A'-'Z''0'-'9''_'' ''-'] '\''
 

@@ -32,9 +32,11 @@ val define_atom : type_env -> string -> type_env
 
 val define_types : type_env -> (string * type_expr) list -> type_env
 
-val get_type_or_atom : type_env -> string -> typ
+val get_type : type_env -> string -> typ
 
-val has_type_or_atom : type_env -> string -> bool
+val has_type : type_env -> string -> bool
+
+val has_atom : type_env -> string -> bool
 
 (* Operations on types *)
 

@@ -1,6 +1,7 @@
 open Cduce
 
 module StrMap = Map.Make(String)
+module StrSet = Set.Make(String)
 module LabelMap = CD.Ident.LabelMap
 
 (* Construction of types *)
@@ -20,9 +21,9 @@ type type_expr =
 | TDiff of type_expr * type_expr
 | TNeg of type_expr
 
-type type_env = node StrMap.t
+type type_env = node StrMap.t * StrSet.t (* Atoms *)
 
-let empty_tenv = StrMap.empty
+let empty_tenv = (StrMap.empty, StrSet.empty)
 
 let type_base_to_typ t =
     match t with
@@ -33,7 +34,7 @@ let type_base_to_typ t =
     | TUnit -> Cduce.unit_typ | TChar -> Cduce.char_typ
     | TAny -> Cduce.any | TEmpty -> Cduce.empty
 
-let type_expr_to_typ env t =
+let type_expr_to_typ (env, _) t =
     let rec aux t =
         match t with
         | TBase tb -> cons (type_base_to_typ tb)
@@ -47,6 +48,7 @@ let type_expr_to_typ env t =
                 if opt then (
                     let ndef = or_absent (descr n) in
                     define_typ n ndef ) ;
+                (* TODO: Is it correct when this function is not called by define_types??? *)
                 (label, n)
             in
             let fields = List.map aux' fields in
@@ -67,13 +69,14 @@ let type_expr_to_typ env t =
         | TNeg t -> cons (neg (descr (aux t)))
     in descr (aux t)
 
-let define_atom env atom =
-    let atom = String.capitalize_ascii atom in
-    if StrMap.mem atom env
-    then failwith (Printf.sprintf "Atom %s already defined!" atom)
-    else StrMap.add atom (cons (mk_atom atom)) env
+let define_atom (env, atoms) name =
+    let atom = String.uncapitalize_ascii name in
+    let typ = String.capitalize_ascii name in
+    if StrMap.mem typ env
+    then failwith (Printf.sprintf "Type %s already defined!" typ)
+    else (StrMap.add typ (cons (mk_atom typ)) env, StrSet.add atom atoms)
 
-let define_types env defs =
+let define_types (env, atoms) defs =
     let declare_type env (name,_) =
         let name = String.capitalize_ascii name in
         if StrMap.mem name env
@@ -83,28 +86,35 @@ let define_types env defs =
     let env = List.fold_left declare_type env defs in
     let define_type (name,decl) =
         let name = String.capitalize_ascii name in
-        let t = type_expr_to_typ env decl in
+        let t = type_expr_to_typ (env, atoms) decl in
         let () = Cduce.register name t in
         let x = StrMap.find name env in
         let t = if has_absent (descr x) then or_absent t else t in
         define_typ x t;
     in
     List.iter define_type defs ;
-    (* fix top-level optional types *)
-    StrMap.map (
+    (* Fix top-level optional types *)
+    let env =
+        StrMap.map (
         fun node ->
             let t = descr node in
             if has_absent t then cons (diff t absent) else node
         ) env
+    in
+    (env, atoms)
 
-let get_type_or_atom env name =
+let get_type (env, _) name =
     let name = String.capitalize_ascii name in
     try descr (StrMap.find name env)
     with Not_found -> failwith (Printf.sprintf "Type %s undefined!" name)
 
-let has_type_or_atom env name =
+let has_type (env, _) name =
     let name = String.capitalize_ascii name in
     StrMap.mem name env
+
+let has_atom (_, atoms) name =
+    let name = String.uncapitalize_ascii name in
+    StrSet.mem name atoms
 
 (* Operations on types *)
 

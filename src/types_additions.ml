@@ -38,16 +38,16 @@ let type_expr_to_typ env t =
         match t with
         | TBase tb -> cons (type_base_to_typ tb)
         | TCustom k ->
-            (try StrMap.find k env with Not_found -> failwith (Printf.sprintf "Type %s undefined!" k))
+            (try StrMap.find k env with Not_found ->
+                failwith (Printf.sprintf "Type %s undefined!" k))
         | TPair (t1,t2) -> cons (mk_times (aux t1) (aux t2))
         | TRecord (is_open, fields) ->
             let aux' (label,t,opt) =
                 let n = aux t in
-                let () = if opt then
-                       let ndef = or_absent (descr n) in
-                       define_typ n ndef
-                       in
-                (label,  n)
+                if opt then (
+                    let ndef = or_absent (descr n) in
+                    define_typ n ndef ) ;
+                (label, n)
             in
             let fields = List.map aux' fields in
             cons (mk_record is_open fields)
@@ -55,11 +55,11 @@ let type_expr_to_typ env t =
         | TCup (t1,t2) ->
             let t1 = descr (aux t1) in
             let t2 = descr (aux t2) in
-            cons (cup_r t1 t2)
+            cons (cup t1 t2)
         | TCap (t1,t2) ->
             let t1 = descr (aux t1) in
             let t2 = descr (aux t2) in
-            cons (cap_r t1 t2)
+            cons (cap t1 t2)
         | TDiff (t1,t2) ->
             let t1 = descr (aux t1) in
             let t2 = descr (aux t2) in
@@ -91,12 +91,11 @@ let define_types env defs =
     in
     List.iter define_type defs ;
     (* fix top-level optional types *)
-    StrMap.fold (fun name node acc ->
-                let t = descr node in
-                let nnode =
-                    if has_absent t then cons (diff t absent) else node
-                in
-                StrMap.add name nnode acc) env StrMap.empty
+    StrMap.map (
+        fun node ->
+            let t = descr node in
+            if has_absent t then cons (diff t absent) else node
+        ) env
 
 let get_type_or_atom env name =
     let name = String.capitalize_ascii name in
@@ -109,8 +108,8 @@ let has_type_or_atom env name =
 
 (* Operations on types *)
 
-let conj ts = List.fold_left cap any ts
-let disj ts = List.fold_left cup empty ts
+let conj ts = List.fold_left cap_o any ts
+let disj ts = List.fold_left cup_o empty ts
 
 let branch_type lst =
     if lst = [] then arrow_any
@@ -141,9 +140,9 @@ let simplify_dnf dnf =
         | [] -> ((l,r), [])
         | (l',r')::lst ->
             if equiv l l'
-            then aux (l, cap r r') lst
+            then aux (l, cap_o r r') lst
             else if equiv r r'
-            then aux (cup l l', r) lst
+            then aux (cup_o l l', r) lst
             else
                 let ((l,r),lst) = aux (l,r) lst in
                 ((l,r), (l',r')::lst)
@@ -169,9 +168,9 @@ let simplify_arrow t =
     assert (equiv res t) ; res
 
 let simplify_typ t =
-    let arrow = cap t arrow_any |> simplify_arrow in
+    let arrow = cap_o t arrow_any |> simplify_arrow in
     let non_arrow = diff t arrow_any |> normalize_typ in
-    cup arrow non_arrow
+    cup_o arrow non_arrow
     
 let split_arrow t =
   dnf t
@@ -179,7 +178,7 @@ let split_arrow t =
 
 let is_test_type t =
     let is_non_trivial_arrow t =
-        let arrow_part = cap t arrow_any in
+        let arrow_part = cap_o t arrow_any in
         (is_empty arrow_part || subtype arrow_any arrow_part) |> not
     in
     let memo = Hashtbl.create 10 in
@@ -200,11 +199,11 @@ let is_test_type t =
 let square_approx f out =
     let res = dnf f |> List.map begin
         fun lst ->
-            let is_impossible (_,t) = is_empty (cap out t) in
+            let is_impossible (_,t) = is_empty (cap_o out t) in
             let impossibles = List.filter is_impossible lst |> List.map fst in
             neg (disj impossibles)
     end in
-    cap (domain f) (disj res)
+    cap_o (domain f) (disj res)
 
 let square_exact f out =
     let res = dnf f |> List.map begin
@@ -223,7 +222,7 @@ let square_exact f out =
             in
             conj (List.map neg (impossible_inputs [] (remove_included_branchs lst)))
     end in
-    cap (domain f) (disj res)
+    cap_o (domain f) (disj res)
 
 let square_split f out =
     dnf f |>

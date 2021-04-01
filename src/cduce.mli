@@ -28,12 +28,11 @@ val unit_typ : typ
 val interval : int option -> int option -> typ
 val single_char : char -> typ
 
-val cup_r : typ -> typ -> typ
-val cap_r : typ -> typ -> typ
-
-
 val cup : typ -> typ -> typ
 val cap : typ -> typ -> typ
+val cup_o : typ -> typ -> typ
+val cap_o : typ -> typ -> typ
+
 val diff : typ -> typ -> typ
 val neg : typ -> typ
 

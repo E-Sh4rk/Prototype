@@ -6,10 +6,13 @@ module LabelMap = CD.Ident.LabelMap
 type typ = CD.Types.t
 type node = CD.Types.Node.t
 
-let pp_typ = CD.Types.Print.print
-let show_typ = CD.Types.Print.to_string
+let register s = 
+  let module U = Encodings.Utf8 in
+  CD.Types.Print.register_global "" (Ns.Uri.mk (U.mk ""), U.mk s)
+let pp_typ = CD.Types.Print.print_noname
+let show_typ t = Format.asprintf "%a" pp_typ t
 
-let pp = CD.Types.Print.print
+let pp = pp_typ
 let string_of_type = CD.Types.Print.to_string
 let pp_node = CD.Types.Print.print_node
 let descr = CD.Types.descr

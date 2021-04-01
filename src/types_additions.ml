@@ -84,6 +84,7 @@ let define_types env defs =
     let define_type (name,decl) =
         let name = String.capitalize_ascii name in
         let t = type_expr_to_typ env decl in
+        let () = Cduce.register name t in
         let x = StrMap.find name env in
         let t = if has_absent (descr x) then or_absent t else t in
         define_typ x t;

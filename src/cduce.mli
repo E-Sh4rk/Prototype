@@ -7,6 +7,7 @@ type node = CD.Types.Node.t
 val pp_typ : Format.formatter -> typ -> unit
 val show_typ : typ -> string
 
+val register : string -> typ -> unit
 val pp : Format.formatter -> typ -> unit
 val string_of_type : typ -> string
 val pp_node : Format.formatter -> node -> unit
@@ -75,3 +76,6 @@ val non_empty: typ -> bool
 val subtype  : typ -> typ -> bool
 val disjoint : typ -> typ -> bool
 val equiv : typ -> typ -> bool
+
+
+

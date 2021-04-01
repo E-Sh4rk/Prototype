@@ -68,6 +68,8 @@ let appl2 =
     fun (Char -> Int) x2 ->
       if (x1 x2) is Int then incr (x1 (x1 x2)) else bti (x1 (x1 x2))
 
+(* Examples on records *)
+
 let records_fail =
   let destruct = fun ({id=Int} -> Int) x -> x.id in
   let record = { id=0, name='a' } in
@@ -78,7 +80,7 @@ let records_ok =
   let record = {id=0, name='a'} in
   destruct record
 
-(* must fail because we do not know whether x has a field a *) 
+(* Must fail because we do not know whether x has a field a *) 
 let records_fail2 =
   fun ({..} -> Any) x ->
     if {x with a=0} is {a=Int ..} then x.a else 0
@@ -88,36 +90,27 @@ let records_fail2 =
   it is of type {b=Int a=?Empty, ..} which is a subtype of
   {b=Int ..}
 *)
-
 let records_ok1 =
   fun ({b = Int ..} -> Int) x ->
     if x\a is {b=Int ..} then x.b else x.c
 
-  
-  
 (* 
    This should fail since  x\a is of type  {b=Int a=?Empty ..} 
    which is a subtype of {b=Int ..} = {b=Int a=?Any ..}  
 *)
-
 let records_fail1 =
   fun ({b = Int ..} -> Int) x ->
     if x\a is {b=Int ..} then x.c else 0
 
 
-(* 
-   This should also fail for the same reasons as above 
- *)
-
+(*  This should also fail for the same reasons as above *)
 let records_fail1bis =
   fun ({b = Int ..} -> Int) x ->
     if x\a is {b=Int, a=?Empty ..} then x.c else 0
 
-  
 let records_ok2 =
   let x = { flag=true } in
   {x with id=10}
-
 
 let records_ok3 =
   let x = { flag=true, id=10 } in
@@ -179,23 +172,19 @@ let is_empty_node = fun (x : Node) ->
 (* Examples with recursive functions *)
 
 (*
-
 type IntList = Nil | (Int,IntList)
  and AnyList = Nil | (Any, AnyList)                   
  and IntTree = (Any \IntList) | Nil | (IntList,IntTree)
-
       
 let concat = fun (x : AnyList) ->
               fun (y : AnyList) ->
                   if x is Nil then y else (fst x , (concat (snd x) y)) 
                                   
-                                  
 let flatten = fun x ->
   if x is Nil then true
   else if x is (Any,Any) then concat (flatten(fst x)) (flatten(snd x))
   else (x,nil)
- *)
-
+*)
 
 (* Test with strings *)
 
@@ -221,7 +210,6 @@ let (!) = <Bool -> Bool> (* Operators starting with ? or ! are prefix *)
 
 let infix_test = ! (((1*2) - 3) = 6)
 
-
 (* Fix-point combinator *)
 
 type Input = Int (* Any   *)
@@ -238,32 +226,12 @@ let id = fun ((Input -> Output) -> (Input -> Output)) x -> x
 
 let diverge = fixpoint id
 
-
-
-               
 let fac1 =  fun ((Int -> Int) -> (Int -> Int)) f ->
   fun (Int -> Int) x -> if x is (0--1) then 1 else x * (f(x-1))
                
 let fac2 =  fun (f : Int -> Int) ->
-  fun (x : Int) -> if x is 0 then x else x * f(x-1)
+  fun (x : Int) -> if x is 0 then 1 else x * (f(x-1))
 
 let fac3 =  fun (f : Int -> Int) ->
-  fun x -> if x is 0 then 1 else x * f(x-1)
-
-let fac4 =  fun (f : Int -> Int) ->
-  fun x -> if x is 0 then x+1 else x * f(x)
-
-let fac5 =  fun (f : Int -> Int) ->
-  fun x -> if x is (-100)--1  then x+1 else x * f(x-1)
-
-let fac6 =  fun (f : Int -> Int) ->
-  fun (x: Int) -> if x is 0--1  then 1 else x+1  
-         
-let factorial = fixpoint fac6                                      
-
-(* TODO: Does not type... Investigate. Works with x instead of x-1 *)
-let fac =  fun (f : (Int -> Int)) ->
-  fun (x : Int) -> if x is 0 then 1 else x * (f (x-1))
-
-let factorial = fixpoint fac
-
+  fun x -> if x is 0 then 1 else x * (f(x-1))
+let factorial = fixpoint fac3

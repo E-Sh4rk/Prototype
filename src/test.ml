@@ -1,29 +1,3 @@
-type Input = Int (* Empty *)
-and Output = Int (* Any   *)
-
-
-type Fix = Fix -> Input -> Output
-
-
-(* Fix-point combinator *)
-let fixpoint = fun (((Input -> Output) -> Input -> Output ) -> (Input -> Output)) f ->
-      let delta = fun ( Fix -> (Input -> Output) ) x ->
-         f ( fun (Input -> Output) v -> ( x x v ))
-       in delta delta
-
-let id = fun ((Input -> Output) -> (Input -> Output)) x -> x 
-
-let diverge = fixpoint id
-
-
-let fac =  fun f ->
-             fun x -> if x is 0 then 1 else x * f(x-1) 
-
-type LoopRec = Bool | { y =? LoopRec }
-let f = fun (LoopRec -> LoopRec) y -> y
-
-            
-
 let bool = <Bool>
 
 let test = if bool is True then true else false
@@ -148,12 +122,6 @@ let records_ok2 =
 let records_ok3 =
   let x = { flag=true, id=10 } in
   x\flag
-
-
-(* Memento: we should improve the printing of types. When the 
-   type is closed we should not print the fields of type =?Empty
- *)
-
   
 let records_ok4 =
   fun x ->
@@ -165,7 +133,6 @@ let w = {b = 3, c=4}\l
    type is closed we should not print the fields of type =?Empty
  *)
 
-
 let x = <{..}>
 let y = {x with a = 0}         
 let u = if {x with a=0} is {..} then 0 else 1
@@ -174,17 +141,14 @@ let s = if {x with a=0} is {a=?Bool ..} then 0 else 1
 let t = if {x with a=0} is {a=Int ..} then 0 else 1      
 let z = if {x with a=0} is {b=?Empty ..} then 0 else x.b
 
-
 let records_ok5 =
   fun x ->
     if {x with a=0} is {a=Int, b=Bool ..} then true else false
 
-          
 let paper_example1 =
   fun x ->
     if {x with a=0} is {a=Int, b=Bool ..} | {a=Bool, b=Int ..} then true else false
 
-      
 let paper_example2 =
   fun x ->
     if x is {a=Int, b=Bool ..} | {a=Bool, b=Int ..} then true else false
@@ -201,9 +165,6 @@ let paper_example =
   fun ({..} -> Bool) x ->
     if {x with a=0} is {a=Int, b=Bool ..} | {a=Bool, b=Int ..} then x.b else false
 
-(* Example on record from previous paper *)
-(* TODO: fix issue (the domain does not seem good). *)
-
 atom nil
 type Document = { nodeType=9 ..}
 and NodeList = Nil | (Node, NodeList)
@@ -211,11 +172,12 @@ and Element = { nodeType=1, childNodes = NodeList ..}
 and Text = { nodeType=3, isElementContentWhiteSpace=Bool ..}
 and Node = Document | Element | Text
 
-let is_empty_node = fun (x : Element(*Node*)) ->
+let is_empty_node = fun (x : Node) ->
   if x.nodeType is 9 then false
   else if x.nodeType is 3 then x.isElementContentWhiteSpace
   else if x.childNodes is Nil then true else false
 
+(* Examples with recursive functions *)
 (*
 atom nil
 
@@ -236,3 +198,35 @@ let flatten = fun x ->
  *)
 
 
+(* Fix-point combinator *)
+
+type Input = Int (* Any   *)
+and Output = Int (* Empty *)
+
+type X = X -> Input -> Output
+
+let fixpoint = fun (((Input -> Output) -> Input -> Output ) -> (Input -> Output)) f ->
+      let delta = fun ( X -> (Input -> Output) ) x ->
+         f ( fun (Input -> Output) v -> ( x x v ))
+       in delta delta
+
+let id = fun ((Input -> Output) -> (Input -> Output)) x -> x
+
+let diverge = fixpoint id
+
+(* Test prefix/infix operators *)
+
+let (+) = <Int -> Int -> Int>
+let (-) = <Int -> Int -> Int>
+let ( * ) = <Int -> Int -> Int>
+let (/) = <Int -> Int -> Int>
+let (=) = <Int -> Int -> Bool>
+let (!) = <Bool -> Bool> (* Operators starting with ? or ! are prefix *)
+
+let infix_test = ! (((1*2) + 3) = 6)
+
+               
+let fac =  fun (f : Int -> Int) ->
+  fun (x : Int) -> if x is 0 then x else x * f(x-1)
+
+let factorial = fix fac                                       

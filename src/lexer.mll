@@ -24,6 +24,14 @@ let char = '\'' ['a'-'z''A'-'Z''0'-'9''_'' ''-'] '\''
 
 let string = '"' ['a'-'z''A'-'Z''0'-'9''_'' ''-']* '"'
 
+let op_char =  '!' | '$' | '%' | '&' | '*' | '+' | '-' |
+               '.' | '/' | ':' | ';' | '<' | '=' | '>' |
+               '?' | '@' | '^' | '|' | '~'
+
+let prefix_op = ('!' | '?') op_char*
+let infix_op = ('=' | '<' | '>' | '@' | '^' | '|' | '&' |
+                 '~' | '+' | '-' | '*' | '/' | '$' | '%') op_char*
+
 rule token = parse
 | newline { enter_newline lexbuf |> token }
 | blank   { token lexbuf }
@@ -72,8 +80,9 @@ rule token = parse
 | "*"     { TIMES }
 | "--"    { DOUBLEDASH }
 | ".."    { DOUBLEPOINT }
-(*| "-"     { MINUS }
-| "+"     { PLUS  }*)
+| "-"     { MINUS }
+| "+"     { PLUS  }
+| "/"     { DIV   }
 | "magic" { MAGIC }
 | "<"     { LT }
 | ">"     { GT }
@@ -82,6 +91,8 @@ rule token = parse
 | "true"  { LBOOL true }
 | "false" { LBOOL false }
 | "()"    { LUNIT }
+| infix_op as s  { INFIX s }
+| prefix_op as s { PREFIX s }
 | string as s { LSTRING (String.sub s 1 ((String.length s) - 2)) }
 | char as c { LCHAR (c.[1]) }
 | id as s { ID s }

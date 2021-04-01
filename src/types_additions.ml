@@ -1,6 +1,7 @@
 open Cduce
 
 module StrMap = Map.Make(String)
+module StrSet = Set.Make(String)
 module LabelMap = CD.Ident.LabelMap
 
 (* Construction of types *)
@@ -20,9 +21,9 @@ type type_expr =
 | TDiff of type_expr * type_expr
 | TNeg of type_expr
 
-type type_env = node StrMap.t
+type type_env = node StrMap.t * StrSet.t (* Atoms *)
 
-let empty_tenv = StrMap.empty
+let empty_tenv = (StrMap.empty, StrSet.empty)
 
 let type_base_to_typ t =
     match t with
@@ -33,78 +34,97 @@ let type_base_to_typ t =
     | TUnit -> Cduce.unit_typ | TChar -> Cduce.char_typ
     | TAny -> Cduce.any | TEmpty -> Cduce.empty
 
-let type_expr_to_typ env t =
-    let rec aux t =
+let derecurse_types env defs =
+    let henv = Hashtbl.create 16 in
+    let () =
+        List.iter (fun (name, def) ->
+                if StrMap.mem name env then 
+                    failwith (Printf.sprintf "Type %s already defined!" name)
+                else
+                    Hashtbl.add henv name (def, None)) defs
+    in
+    let rec get_name name =
+        match Hashtbl.find henv name with
+        | _, Some v -> v
+        | def, None -> 
+            let v = mk_new_typ () in
+            Hashtbl.replace henv name (def, Some v);
+            let t = aux def in
+            define_typ v t;
+            v
+        | exception Not_found -> 
+            try 
+                StrMap.find name env
+            with
+                Not_found -> 
+                    failwith (Printf.sprintf "Type %s undefined!" name)
+    and aux t =
         match t with
-        | TBase tb -> cons (type_base_to_typ tb)
-        | TCustom k ->
-            (try StrMap.find k env with Not_found ->
-                failwith (Printf.sprintf "Type %s undefined!" k))
-        | TPair (t1,t2) -> cons (mk_times (aux t1) (aux t2))
+        | TBase tb -> type_base_to_typ tb
+        | TCustom n -> descr (get_name n)
+        | TPair (t1,t2) -> mk_times (aux_node t1) (aux_node t2)
         | TRecord (is_open, fields) ->
             let aux' (label,t,opt) =
-                let n = aux t in
-                if opt then (
-                    let ndef = or_absent (descr n) in
-                    define_typ n ndef ) ;
+                let n = aux_node t in
+                let () = 
+                    if opt then define_typ n (or_absent (descr n)) 
+                in
                 (label, n)
             in
             let fields = List.map aux' fields in
-            cons (mk_record is_open fields)
-        | TArrow (t1,t2) -> cons (mk_arrow (aux t1) (aux t2))
+            mk_record is_open fields
+        | TArrow (t1,t2) -> mk_arrow (aux_node t1) (aux_node t2)
         | TCup (t1,t2) ->
-            let t1 = descr (aux t1) in
-            let t2 = descr (aux t2) in
-            cons (cup t1 t2)
+            let t1 = aux t1 in
+            let t2 = aux t2 in
+            cup t1 t2
         | TCap (t1,t2) ->
-            let t1 = descr (aux t1) in
-            let t2 = descr (aux t2) in
-            cons (cap t1 t2)
+            let t1 = aux t1 in
+            let t2 = aux t2 in
+            cap t1 t2
         | TDiff (t1,t2) ->
-            let t1 = descr (aux t1) in
-            let t2 = descr (aux t2) in
-            cons (diff t1 t2)
-        | TNeg t -> cons (neg (descr (aux t)))
-    in descr (aux t)
-
-let define_atom env atom =
-    let atom = String.capitalize_ascii atom in
-    if StrMap.mem atom env
-    then failwith (Printf.sprintf "Atom %s already defined!" atom)
-    else StrMap.add atom (cons (mk_atom atom)) env
-
-let define_types env defs =
-    let declare_type env (name,_) =
-        let name = String.capitalize_ascii name in
-        if StrMap.mem name env
-        then failwith (Printf.sprintf "Type %s already defined!" name)
-        else StrMap.add name (mk_new_typ ()) env
+            let t1 = aux t1 in
+            let t2 = aux t2 in
+            diff t1 t2
+        | TNeg t -> neg (aux t)
+    and aux_node t =
+        match t with
+          TCustom n -> get_name n
+        | _ -> cons (aux t)
     in
-    let env = List.fold_left declare_type env defs in
-    let define_type (name,decl) =
-        let name = String.capitalize_ascii name in
-        let t = type_expr_to_typ env decl in
-        let () = Cduce.register name t in
-        let x = StrMap.find name env in
-        let t = if has_absent (descr x) then or_absent t else t in
-        define_typ x t;
-    in
-    List.iter define_type defs ;
-    (* fix top-level optional types *)
-    StrMap.map (
-        fun node ->
-            let t = descr node in
-            if has_absent t then cons (diff t absent) else node
-        ) env
+    List.map (fun (name, def) -> name, aux_node def) defs
+    
+let type_expr_to_typ env t = 
+    match derecurse_types (fst env) [ ("", t ) ] with
+        [ _, n ] -> descr n
+        | _ -> assert false
 
-let get_type_or_atom env name =
+let define_types (tenv, aenv) defs =
+    List.fold_left 
+       (fun acc (name, node) -> StrMap.add name node acc)
+    tenv
+    (derecurse_types tenv defs), aenv
+
+let define_atom (env, atoms) name =
+    let atom = String.uncapitalize_ascii name in
+    let typ = String.capitalize_ascii name in
+    if StrMap.mem typ env
+    then failwith (Printf.sprintf "Type %s already defined!" typ)
+    else (StrMap.add typ (cons (mk_atom typ)) env, StrSet.add atom atoms)
+
+
+let get_type (env, _) name =
     let name = String.capitalize_ascii name in
     try descr (StrMap.find name env)
     with Not_found -> failwith (Printf.sprintf "Type %s undefined!" name)
 
-let has_type_or_atom env name =
+let has_type (env, _) name =
     let name = String.capitalize_ascii name in
     StrMap.mem name env
+
+let has_atom (_, atoms) name =
+    let name = String.uncapitalize_ascii name in
+    StrSet.mem name atoms
 
 (* Operations on types *)
 

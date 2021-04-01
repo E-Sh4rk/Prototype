@@ -37,7 +37,7 @@
 %token LPAREN RPAREN EQUAL COMMA COLON
 %token ARROW AND OR NEG DIFF
 %token ANY EMPTY BOOL CHAR (*FLOAT*) INT TRUE FALSE UNIT
-%token DOUBLEDASH TIMES (*PLUS MINUS*)
+%token DOUBLEDASH TIMES PLUS MINUS DIV
 %token LBRACE RBRACE DOUBLEPOINT WITH EQUAL_OPT POINT LT GT
 %token ATOMS TYPE TYPE_AND
 (*%token LBRACKET RBRACKET SEMICOLON*)
@@ -50,6 +50,7 @@
 %token<string> LSTRING
 %token LUNIT
 %token MAGIC
+%token<string> INFIX PREFIX
 
 %type<Ast.parser_expr> term
 %start<Ast.parser_expr> unique_term
@@ -59,8 +60,10 @@
 %right ARROW (*IN*)
 %left OR
 %left AND
-(*%left PLUS*)
-(*%left TIMES*)
+(*%nonassoc INFIX PREFIX*)
+(*%left ID*)
+(*%left PLUS MINUS
+%left TIMES DIV*)
 %nonassoc DIFF
 %nonassoc NEG
 
@@ -105,21 +108,31 @@ simple_term:
   a=simple_term b=atomic_term { annot $startpos $endpos (App (a, b)) }
 | FST a=atomic_term { annot $startpos $endpos (Projection (Fst, a)) }
 | SND a=atomic_term { annot $startpos $endpos (Projection (Snd, a)) }
+| a=atomic_term s=infix_term b=atomic_term
+{ let app1 = annot $startpos $endpos (App (s, a)) in
+  annot $startpos $endpos (App (app1, b)) }
+| p=prefix_term a=atomic_term { annot $startpos $endpos (App (p, a)) }
 | a=atomic_term POINT id=identifier { annot $startpos $endpos (Projection (Field id, a)) }
 | a=atomic_term DIFF id=identifier { annot $startpos $endpos (RecordUpdate (a,id,None)) }
-| LBRACE a=simple_term WITH fs=separated_nonempty_list(COMMA, field_term) RBRACE { record_update a fs }
+| LBRACE a=atomic_term WITH fs=separated_nonempty_list(COMMA, field_term) RBRACE { record_update a fs }
 | DEBUG str=LSTRING a=atomic_term { annot $startpos $endpos (Debug (str, a)) }
+| LT t=typ GT { annot $startpos $endpos (Abstract t) }
 (*| m=MINUS t=atomic_term { App (Primitive Neg, t) }*)
 | a=atomic_term { a }
 
 field_term:
   id=identifier EQUAL t=simple_term { (id, t) }
 
+infix_term:
+  x=infix { annot $startpos $endpos (var_or_primitive x) }
+
+prefix_term:
+  x=prefix { annot $startpos $endpos (var_or_primitive x) }
+
 atomic_term:
   x=identifier { annot $startpos $endpos (var_or_primitive x) }
 | l=literal { annot $startpos $endpos (Const l) }
 | MAGIC { annot $startpos $endpos (Abstract (TBase TEmpty)) }
-| LT t=typ GT { annot $startpos $endpos (Abstract t) }
 | LBRACE fs=separated_list(COMMA, field_term) RBRACE
   { record_update (annot $startpos $endpos (Const EmptyRecord)) fs }
 | LPAREN ts=separated_nonempty_list(COMMA, term) RPAREN { tuple ts }
@@ -155,7 +168,21 @@ literal:
 | PLUS  { Add }
 | TIMES { Mul }*)
 
-identifier: x=ID { x }
+identifier:
+  | x=ID | LPAREN x=prefix RPAREN | LPAREN x=infix RPAREN { x }
+
+infix:
+  | x=INFIX {x}
+  | DIV   {"/"}
+  | TIMES {"*"}
+  | PLUS  {"+"}
+  | MINUS {"-"}
+  | EQUAL {"="}
+  | LT    {"<"}
+  | GT    {">"}
+
+prefix:
+  | x=PREFIX {x}
 
 typ:
   x=type_constant { TBase x }

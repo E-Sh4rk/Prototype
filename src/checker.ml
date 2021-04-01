@@ -40,7 +40,7 @@ let rec typeof_a pos tenv env a =
   in
   match a with
   | Abstract t -> t
-  | Const (Atom str) -> get_type_or_atom tenv str
+  | Const (Atom str) -> get_type tenv str
   | Const c -> Ast.const_to_typ c
   | Debug (_, v) -> var_type pos v env
   | Pair (v1, v2) ->

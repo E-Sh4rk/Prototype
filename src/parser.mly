@@ -36,7 +36,7 @@
 %token IF IS THEN ELSE
 %token LPAREN RPAREN EQUAL COMMA COLON
 %token ARROW AND OR NEG DIFF
-%token ANY EMPTY BOOL CHAR (*FLOAT*) INT TRUE FALSE UNIT
+%token ANY EMPTY BOOL CHAR (*FLOAT*) INT TRUE FALSE UNIT NIL STRING
 %token DOUBLEDASH TIMES PLUS MINUS DIV
 %token LBRACE RBRACE DOUBLEPOINT WITH EQUAL_OPT POINT LT GT
 %token ATOMS TYPE TYPE_AND
@@ -48,7 +48,7 @@
 %token<bool> LBOOL
 %token<char> LCHAR
 %token<string> LSTRING
-%token LUNIT
+%token LUNIT LNIL
 %token MAGIC
 %token<string> INFIX PREFIX
 
@@ -142,7 +142,9 @@ literal:
   i=lint   { Int i }
 | c=LCHAR  { Char c }
 | b=LBOOL  { Bool b }
+| s=LSTRING{ String s }
 | LUNIT    { Unit }
+| LNIL     { Nil }
 
 lint:
 | i=LINT { i }
@@ -219,6 +221,9 @@ type_constant:
 | UNIT { TUnit }
 | EMPTY { TEmpty }
 | ANY { TAny }
+| NIL { TNil }
+| STRING { TString }
+| str=LSTRING { TSString str }
 
 type_interval:
 (*  LBRACKET lb=lint SEMICOLON ub=lint RBRACKET { TInt (Some lb, Some ub) }

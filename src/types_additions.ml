@@ -7,8 +7,8 @@ module LabelMap = CD.Ident.LabelMap
 (* Construction of types *)
 
 type type_base =
-    | TInt of int option * int option | TSChar of char
-    | TBool | TTrue | TFalse | TUnit | TChar | TAny | TEmpty
+    | TInt of int option * int option | TSChar of char | TSString of string
+    | TBool | TTrue | TFalse | TUnit | TChar | TAny | TEmpty | TNil | TString
 
 type type_expr =
 | TBase of type_base
@@ -29,10 +29,12 @@ let type_base_to_typ t =
     match t with
     | TInt (lb,ub) -> Cduce.interval lb ub
     | TSChar c -> Cduce.single_char c
+    | TSString str -> Cduce.single_string str
     | TBool -> Cduce.bool_typ
     | TTrue -> Cduce.true_typ | TFalse -> Cduce.false_typ
     | TUnit -> Cduce.unit_typ | TChar -> Cduce.char_typ
     | TAny -> Cduce.any | TEmpty -> Cduce.empty
+    | TNil -> Cduce.nil_typ | TString -> Cduce.string_typ
 
 let derecurse_types env defs =
     let henv = Hashtbl.create 16 in

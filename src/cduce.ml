@@ -24,6 +24,7 @@ let empty = CD.Types.empty
 let any_node = CD.Types.any_node
 let empty_node = CD.Types.empty_node
 
+(* ----- *)
 
 let is_empty = CD.Types.is_empty
 let non_empty = CD.Types.non_empty
@@ -56,17 +57,64 @@ let from_label lbl = CD.Ident.Label.get_ascii lbl
 
 let mk_atom ascii_name =
     ascii_name |> CD.Atoms.V.mk_ascii |> CD.Atoms.atom |> CD.Types.atom
+let true_typ = mk_atom "true"
+let false_typ = mk_atom "false"
+let bool_typ = cup true_typ false_typ
+let int_typ = CD.Types.Int.any
+let char_typ = CD.Types.Char.any
+let unit_typ = mk_atom "unit"
+let nil_typ = mk_atom "nil"
+
+let string_typ =
+  let str = CD.Types.make () in
+  let cons = CD.Types.times (cons char_typ) str in
+  let union = CD.Types.cup nil_typ cons in
+  CD.Types.define str union ;
+  descr str
+
+let interval i1 i2 =
+  match i1, i2 with
+  | Some i1, Some i2 -> 
+    let i1 = CD.Intervals.V.from_int i1 in
+    let i2 = CD.Intervals.V.from_int i2 in
+    let i = CD.Intervals.bounded i1 i2 in
+    CD.Types.interval i
+  | Some i1, None ->
+    let i1 = CD.Intervals.V.from_int i1 in
+    let i = CD.Intervals.right i1 in
+    CD.Types.interval i
+  | None, Some i2 ->
+    let i2 = CD.Intervals.V.from_int i2 in
+    let i = CD.Intervals.left i2 in
+    CD.Types.interval i
+  | None, None ->
+    CD.Types.Int.any
+    
+let single_char c =
+  let c = CD.Chars.V.mk_char c in
+  let c = CD.Chars.atom c in
+  CD.Types.char c
+
+let single_string str =
+  let rev_str =
+    String.to_seq str |>
+    Seq.fold_left (
+      fun acc c ->
+        c::acc
+    ) []
+  in
+  List.fold_left (
+    fun acc c ->
+      CD.Types.times (single_char c |> cons) (cons acc)
+  ) nil_typ rev_str
 
 (*
 let mk_list alpha =
     let alpha_list = CD.Types.make () in
-
-    let nil_atom = mk_atom "nil" in
     let cons = CD.Types.times alpha alpha_list in
-
-    let descr = CD.Types.cup nil_atom cons in
-    CD.Types.define alpha_list descr ;
-    alpha_list
+    let union = CD.Types.cup nil_typ cons in
+    CD.Types.define alpha_list union ;
+    descr alpha_list
 *)
 
 let mk_new_typ = CD.Types.make
@@ -147,33 +195,3 @@ let apply t args =
 let dnf t =
   snd (CD.Types.Arrow.get t)
 
-
-let true_typ = mk_atom "true"
-let false_typ = mk_atom "false"
-let bool_typ = cup true_typ false_typ
-let int_typ = CD.Types.Int.any
-let char_typ = CD.Types.Char.any
-let unit_typ = mk_atom "unit"
-
-let interval i1 i2 =
-  match i1, i2 with
-  | Some i1, Some i2 -> 
-    let i1 = CD.Intervals.V.from_int i1 in
-    let i2 = CD.Intervals.V.from_int i2 in
-    let i = CD.Intervals.bounded i1 i2 in
-    CD.Types.interval i
-  | Some i1, None ->
-    let i1 = CD.Intervals.V.from_int i1 in
-    let i = CD.Intervals.right i1 in
-    CD.Types.interval i
-  | None, Some i2 ->
-    let i2 = CD.Intervals.V.from_int i2 in
-    let i = CD.Intervals.left i2 in
-    CD.Types.interval i
-  | None, None ->
-    CD.Types.Int.any
-    
-let single_char c =
-  let c = CD.Chars.V.mk_char c in
-  let c = CD.Chars.atom c in
-  CD.Types.char c

@@ -6,8 +6,8 @@ module StrMap : Map.S with type key = String.t
 (* Construction of types *)
 
 type type_base =
-    | TInt of int option * int option | TSChar of char
-    | TBool | TTrue | TFalse | TUnit | TChar | TAny | TEmpty
+    | TInt of int option * int option | TSChar of char | TSString of string
+    | TBool | TTrue | TFalse | TUnit | TChar | TAny | TEmpty | TNil | TString
 
 type type_expr =
 | TBase of type_base

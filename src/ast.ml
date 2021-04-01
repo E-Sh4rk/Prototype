@@ -8,11 +8,12 @@ type exprid = int
 type annotation = exprid Position.located
 
 type const =
-| Unit
+| Unit | Nil
 | EmptyRecord
 | Bool of bool
 | Int of int
 | Char of char
+| String of string
 | Atom of string
 [@@deriving show, ord]
 
@@ -216,11 +217,13 @@ let substitute aexpr v (annot', expr') =
 let const_to_typ c =
     match c with
     | Unit -> Cduce.unit_typ
+    | Nil -> Cduce.nil_typ
     | EmptyRecord -> Cduce.empty_closed_record
     | Bool true -> Cduce.true_typ
     | Bool false -> Cduce.false_typ
     | Int i -> Cduce.interval (Some i) (Some i)
     | Char c -> Cduce.single_char c
+    | String str -> Cduce.single_string str
     | Atom t ->
         failwith (Printf.sprintf "Can't retrieve the type of the atom %s." t)
 

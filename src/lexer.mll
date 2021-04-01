@@ -70,6 +70,8 @@ rule token = parse
 | "Unit"  { UNIT }
 | "True"  { TRUE }
 | "False" { FALSE }
+| "Nil"   { NIL }
+| "String"{ STRING }
 | "("     { LPAREN }
 | ")"     { RPAREN }
 | "{"     { LBRACE }
@@ -90,6 +92,7 @@ rule token = parse
 (*| fn as f { LFLOAT (float_of_string f) }*)
 | "true"  { LBOOL true }
 | "false" { LBOOL false }
+| "nil"   { LNIL }
 | "()"    { LUNIT }
 | infix_op as s  { INFIX s }
 | prefix_op as s { PREFIX s }
@@ -105,6 +108,7 @@ rule token = parse
 }
 
 and comment depth = parse
+| newline { enter_newline lexbuf |> comment depth }
 | "*)" {
   if depth = 0 then token lexbuf else comment (depth - 1) lexbuf
 }

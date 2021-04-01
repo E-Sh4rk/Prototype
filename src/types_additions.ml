@@ -55,11 +55,11 @@ let type_expr_to_typ env t =
         | TCup (t1,t2) ->
             let t1 = descr (aux t1) in
             let t2 = descr (aux t2) in
-            cons (cup t1 t2)
+            cons (cup_r t1 t2)
         | TCap (t1,t2) ->
             let t1 = descr (aux t1) in
             let t2 = descr (aux t2) in
-            cons (cap t1 t2)
+            cons (cap_r t1 t2)
         | TDiff (t1,t2) ->
             let t1 = descr (aux t1) in
             let t2 = descr (aux t2) in

@@ -240,17 +240,6 @@ let diverge = fixpoint id
 
 
 
-(* Test prefix/infix operators *)
-
-let (+) = <Int -> Int -> Int>
-let (-) = <Int -> Int -> Int>
-let ( * ) = <Int -> Int -> Int>
-let (/) = <Int -> Int -> Int>
-let (=) = <Int -> Int -> Bool>
-let (!) = <Bool -> Bool> (* Operators starting with ? or ! are prefix *)
-
-let infix_test = ! (((1*2) + 3) = 6)
-
                
 let fac1 =  fun ((Int -> Int) -> (Int -> Int)) f ->
   fun (Int -> Int) x -> if x is (0--1) then 1 else x * (f(x-1))

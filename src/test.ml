@@ -156,7 +156,7 @@ let paper_example2 =
 let paper_example3 =
   fun x ->
     if x is {a=Int, b=Bool ..} | {a=Bool, b=Int ..} then x.b else false
-
+  
 let paper_example4 =
   fun x ->
     if {x with a=0} is {a=Int, b=Bool ..} | {a=Bool, b=Int ..} then x.b else false
@@ -165,7 +165,6 @@ let paper_example =
   fun ({..} -> Bool) x ->
     if {x with a=0} is {a=Int, b=Bool ..} | {a=Bool, b=Int ..} then x.b else false
 
-atom nil
 type Document = { nodeType=9 ..}
 and NodeList = Nil | (Node, NodeList)
 and Element = { nodeType=1, childNodes = NodeList ..}
@@ -180,7 +179,6 @@ let is_empty_node = fun (x : Node) ->
 (* Examples with recursive functions *)
 
 (*
-atom nil
 
 type IntList = Nil | (Int,IntList)
  and AnyList = Nil | (Any, AnyList)                   
@@ -197,6 +195,31 @@ let flatten = fun x ->
   else if x is (Any,Any) then concat (flatten(fst x)) (flatten(snd x))
   else (x,nil)
  *)
+
+
+(* Test with strings *)
+
+let typeof = fun x ->
+  if x is String then "String"
+  else if x is Char then "Char"
+  else if x is Int then "Number"
+  else if x is Bool then "Boolean"
+  else if x is Unit|Nil then "Nil"
+  else "Object"
+
+let test_typeof = fun y ->
+  if typeof y is "Boolean" then lnot y else false
+
+(* Test prefix/infix operators *)
+
+let (+) = <Int -> Int -> Int>
+let (-) = <Int -> Int -> Int>
+let ( * ) = <Int -> Int -> Int>
+let (/) = <Int -> Int -> Int>
+let (=) = <Int -> Int -> Bool>
+let (!) = <Bool -> Bool> (* Operators starting with ? or ! are prefix *)
+
+let infix_test = ! (((1*2) - 3) = 6)
 
 
 (* Fix-point combinator *)

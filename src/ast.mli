@@ -2,7 +2,8 @@ open Types_additions
 open Variable
 open Pomap
 
-(* TODO: built-in lists and strings *)
+(* TODO: built-in lists *)
+(* TODO: allow the definition of functions with multiple parameters (without nesting fun) *)
 
 type varname = string
 type exprid = int
@@ -10,11 +11,12 @@ type exprid = int
 type annotation = exprid Position.located
 
 type const =
-| Unit
+| Unit | Nil
 | EmptyRecord
 | Bool of bool
 | Int of int
 | Char of char
+| String of string
 | Atom of string
 
 type projection = Fst | Snd | Field of string

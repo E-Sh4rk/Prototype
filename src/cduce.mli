@@ -25,8 +25,11 @@ val bool_typ : typ
 val int_typ : typ
 val char_typ : typ
 val unit_typ : typ
+val nil_typ : typ
+val string_typ : typ
 val interval : int option -> int option -> typ
 val single_char : char -> typ
+val single_string : string -> typ
 
 val cup : typ -> typ -> typ
 val cap : typ -> typ -> typ
@@ -75,6 +78,3 @@ val non_empty: typ -> bool
 val subtype  : typ -> typ -> bool
 val disjoint : typ -> typ -> bool
 val equiv : typ -> typ -> bool
-
-
-

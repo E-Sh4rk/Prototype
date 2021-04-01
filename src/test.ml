@@ -1,24 +1,28 @@
-type Input = Empty
-and Output = Any
+type Input = Int (* Empty *)
+and Output = Int (* Any   *)
 
 
-(*type X = X -> Input -> Output*)
+type Fix = Fix -> Input -> Output
+
+
+(* Fix-point combinator *)
+let fixpoint = fun (((Input -> Output) -> Input -> Output ) -> (Input -> Output)) f ->
+      let delta = fun ( Fix -> (Input -> Output) ) x ->
+         f ( fun (Input -> Output) v -> ( x x v ))
+       in delta delta
+
+let id = fun ((Input -> Output) -> (Input -> Output)) x -> x 
+
+let diverge = fixpoint id
+
+
+let fac =  fun f ->
+             fun x -> if x is 0 then 1 else x * f(x-1) 
 
 type LoopRec = Bool | { y =? LoopRec }
 let f = fun (LoopRec -> LoopRec) y -> y
 
-
-(* Fix-point combinator *)
-(*let z = fun (((Input -> Output) -> Input -> Output ) -> (Input -> Output)) f ->
-      let delta = fun ( X -> (Input -> Output) ) x ->
-         f ( fun (Input -> Output) v -> ( x x v ))
-       in delta delta
-*)
-(*let id = fun ((Input -> Output) -> (Input -> Output)) x -> x *)
-
-(*let diverge = z id*)
-
-
+            
 
 let bool = <Bool>
 

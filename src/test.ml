@@ -197,21 +197,22 @@ let flatten = fun x ->
   else (x,nil)
  *)
 
+
 (* Fix-point combinator *)
 
-type Input = Any
-and Output = Empty
+type Input = Int (* Any   *)
+and Output = Int (* Empty *)
 
 type X = X -> Input -> Output
 
-let z = fun (((Input -> Output) -> Input -> Output ) -> (Input -> Output)) f ->
+let fixpoint = fun (((Input -> Output) -> Input -> Output ) -> (Input -> Output)) f ->
       let delta = fun ( X -> (Input -> Output) ) x ->
          f ( fun (Input -> Output) v -> ( x x v ))
        in delta delta
 
 let id = fun ((Input -> Output) -> (Input -> Output)) x -> x
 
-let diverge = z id
+let diverge = fixpoint id
 
 (* Test prefix/infix operators *)
 
@@ -223,3 +224,9 @@ let (=) = <Int -> Int -> Bool>
 let (!) = <Bool -> Bool> (* Operators starting with ? or ! are prefix *)
 
 let infix_test = ! (((1*2) + 3) = 6)
+
+               
+let fac =  fun (f : Int -> Int) ->
+  fun (x : Int) -> if x is 0 then x else x * f(x-1)
+
+let factorial = fix fac                                       

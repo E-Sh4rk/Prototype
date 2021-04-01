@@ -94,7 +94,7 @@ rule token = parse
 | "true"  { LBOOL true }
 | "false" { LBOOL false }
 | "nil"   { LNIL }
-| "()"    { LUNIT }
+| "unit"  { LUNIT }
 | infix_op as s  { INFIX s }
 | prefix_op as s { PREFIX s }
 | string as s { LSTRING (String.sub s 1 ((String.length s) - 2)) }

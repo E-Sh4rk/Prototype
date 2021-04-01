@@ -10,11 +10,11 @@
   let var_or_primitive = function
     | x -> Var x
 
-  let rec tuple = function
-    | [] -> assert false
+  let rec tuple pos = function
+    | [] -> (Ast.new_annot pos, Const Unit)
     | [x] -> x
     | x::xs ->
-    let left = x in let right = tuple xs in
+    let left = x in let right = tuple pos xs in
     let pos_left = Ast.position_of_expr left in
     let pos_right = Ast.position_of_expr right in
     (Ast.new_annot (Position.join pos_left pos_right), Pair (left,right))
@@ -142,7 +142,8 @@ atomic_term:
 | MAGIC { annot $startpos $endpos (Abstract (TBase TEmpty)) }
 | LBRACE fs=separated_list(COMMA, field_term) RBRACE
 { record_update (annot $startpos $endpos (Const EmptyRecord)) fs }
-| LPAREN ts=separated_nonempty_list(COMMA, term) RPAREN { tuple ts }
+| LPAREN ts=separated_nonempty_list(COMMA, term) RPAREN
+{ tuple (Position.lex_join $startpos $endpos) ts }
 | LBRACE a=atomic_term WITH fs=separated_nonempty_list(COMMA, field_term) RBRACE
 { record_update a fs }
 | LBRACKET lst=separated_list(SEMICOLON, term) RBRACKET

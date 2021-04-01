@@ -7,6 +7,7 @@ type node = CD.Types.Node.t
 val pp_typ : Format.formatter -> typ -> unit
 val show_typ : typ -> string
 
+val register : string -> typ -> unit
 val pp : Format.formatter -> typ -> unit
 val string_of_type : typ -> string
 val pp_node : Format.formatter -> node -> unit
@@ -26,6 +27,10 @@ val char_typ : typ
 val unit_typ : typ
 val interval : int option -> int option -> typ
 val single_char : char -> typ
+
+val cup_r : typ -> typ -> typ
+val cap_r : typ -> typ -> typ
+
 
 val cup : typ -> typ -> typ
 val cap : typ -> typ -> typ
@@ -47,6 +52,7 @@ val split_pair : typ -> (typ * typ) list
 val mk_record : bool -> (string * node) list -> typ
 val record_any : typ
 val absent : typ
+val has_absent : typ -> bool
 val any_or_absent : typ
 val absent_node : node
 val any_or_absent_node : node
@@ -70,3 +76,6 @@ val non_empty: typ -> bool
 val subtype  : typ -> typ -> bool
 val disjoint : typ -> typ -> bool
 val equiv : typ -> typ -> bool
+
+
+

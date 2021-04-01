@@ -43,7 +43,11 @@ let type_expr_to_typ env t =
         | TRecord (is_open, fields) ->
             let aux' (label,t,opt) =
                 let n = aux t in
-                (label, if opt then or_absent (descr n) |> cons else n)
+                let () = if opt then
+                       let ndef = or_absent (descr n) in
+                       define_typ n ndef
+                       in
+                (label,  n)
             in
             let fields = List.map aux' fields in
             cons (mk_record is_open fields)
@@ -51,11 +55,11 @@ let type_expr_to_typ env t =
         | TCup (t1,t2) ->
             let t1 = descr (aux t1) in
             let t2 = descr (aux t2) in
-            cons (cup t1 t2)
+            cons (cup_r t1 t2)
         | TCap (t1,t2) ->
             let t1 = descr (aux t1) in
             let t2 = descr (aux t2) in
-            cons (cap t1 t2)
+            cons (cap_r t1 t2)
         | TDiff (t1,t2) ->
             let t1 = descr (aux t1) in
             let t2 = descr (aux t2) in
@@ -80,9 +84,19 @@ let define_types env defs =
     let define_type (name,decl) =
         let name = String.capitalize_ascii name in
         let t = type_expr_to_typ env decl in
-        define_typ (StrMap.find name env) t
+        let () = Cduce.register name t in
+        let x = StrMap.find name env in
+        let t = if has_absent (descr x) then or_absent t else t in
+        define_typ x t;
     in
-    List.iter define_type defs ; env
+    List.iter define_type defs ;
+    (* fix top-level optional types *)
+    StrMap.fold (fun name node acc ->
+                let t = descr node in
+                let nnode =
+                    if has_absent t then cons (diff t absent) else node
+                in
+                StrMap.add name nnode acc) env StrMap.empty
 
 let get_type_or_atom env name =
     let name = String.capitalize_ascii name in

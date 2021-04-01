@@ -6,10 +6,13 @@ module LabelMap = CD.Ident.LabelMap
 type typ = CD.Types.t
 type node = CD.Types.Node.t
 
-let pp_typ = CD.Types.Print.print
-let show_typ = CD.Types.Print.to_string
+let register s = 
+  let module U = Encodings.Utf8 in
+  CD.Types.Print.register_global "" (Ns.Uri.mk (U.mk ""), U.mk s)
+let pp_typ = CD.Types.Print.print_noname
+let show_typ t = Format.asprintf "%a" pp_typ t
 
-let pp = CD.Types.Print.print
+let pp = pp_typ
 let string_of_type = CD.Types.Print.to_string
 let pp_node = CD.Types.Print.print_node
 let descr = CD.Types.descr
@@ -28,7 +31,8 @@ let subtype = CD.Types.subtype
 let disjoint = CD.Types.disjoint
 let equiv = CD.Types.equiv
 
-
+let cup_r t1 t2 = CD.Types.cup t1 t2
+let cap_r t1 t2 = CD.Types.cap t1 t2
 (* NOTE: arrow types are not automatically simplified by Cduce,
    thus we avoid useless cap\cup in order to keep simple types *)
 let cup t1 t2 = if subtype t1 t2 then t2
@@ -93,6 +97,8 @@ let mk_record is_open fields =
 let record_any = CD.Types.Record.any
 
 let absent = CD.Types.Record.absent
+
+let has_absent = CD.Types.Record.has_absent
 
 let any_or_absent = CD.Types.Record.any_or_absent
 

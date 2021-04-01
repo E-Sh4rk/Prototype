@@ -197,6 +197,16 @@ let flatten = fun x ->
   else (x,nil)
  *)
 
+(* Test prefix/infix operators *)
+
+let (+) = <Int -> Int -> Int>
+let (-) = <Int -> Int -> Int>
+let ( * ) = <Int -> Int -> Int>
+let (/) = <Int -> Int -> Int>
+let (=) = <Int -> Int -> Bool>
+let (!) = <Bool -> Bool> (* Operators starting with ? or ! are prefix *)
+
+let infix_test = ! (((1*2) - 3) = 6)
 
 (* Fix-point combinator *)
 
@@ -214,19 +224,8 @@ let id = fun ((Input -> Output) -> (Input -> Output)) x -> x
 
 let diverge = fixpoint id
 
-(* Test prefix/infix operators *)
+(* TODO: Does not type... Investigate. Works with x instead of x-1 *)
+let fac =  fun (f : (Int -> Int)) ->
+  fun (x : Int) -> if x is 0 then 1 else x * (f (x-1))
 
-let (+) = <Int -> Int -> Int>
-let (-) = <Int -> Int -> Int>
-let ( * ) = <Int -> Int -> Int>
-let (/) = <Int -> Int -> Int>
-let (=) = <Int -> Int -> Bool>
-let (!) = <Bool -> Bool> (* Operators starting with ? or ! are prefix *)
-
-let infix_test = ! (((1*2) + 3) = 6)
-
-               
-let fac =  fun (f : Int -> Int) ->
-  fun (x : Int) -> if x is 0 then x else x * f(x-1)
-
-let factorial = fix fac                                       
+let factorial = fixpoint fac

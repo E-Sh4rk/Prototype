@@ -36,7 +36,6 @@ let cap t1 t2 = CD.Types.cap t1 t2
 let diff = CD.Types.diff
 let neg = CD.Types.neg
 
-
 (* NOTE: arrow types are not automatically simplified by Cduce,
    thus we avoid useless cap\cup in order to keep simple types *)
 let cup_o t1 t2 = if subtype t1 t2 then t2

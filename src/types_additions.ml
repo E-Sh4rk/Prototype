@@ -53,11 +53,9 @@ let derecurse_types env defs =
             define_typ v t;
             v
         | exception Not_found -> 
-            try 
-                StrMap.find name env
-            with
-                Not_found -> 
-                    failwith (Printf.sprintf "Type %s undefined!" name)
+            try StrMap.find name env
+            with Not_found -> 
+                failwith (Printf.sprintf "Type %s undefined!" name)
     and aux t =
         match t with
         | TBase tb -> type_base_to_typ tb
@@ -93,17 +91,22 @@ let derecurse_types env defs =
         | _ -> cons (aux t)
     in
     List.map (fun (name, def) -> name, aux_node def) defs
-    
-let type_expr_to_typ env t = 
-    match derecurse_types (fst env) [ ("", t ) ] with
-        [ _, n ] -> descr n
-        | _ -> assert false
+
+let type_expr_to_typ (tenv, _) t = 
+    match derecurse_types tenv [ ("", t) ] with
+    | [ _, n ] -> descr n
+    | _ -> assert false
 
 let define_types (tenv, aenv) defs =
-    List.fold_left 
-       (fun acc (name, node) -> StrMap.add name node acc)
-    tenv
-    (derecurse_types tenv defs), aenv
+    let defs = List.map
+        (fun (name, decl) -> (String.capitalize_ascii name, decl))
+        defs
+    in
+    let tenv = List.fold_left
+        (fun acc (name, node) -> StrMap.add name node acc)
+        tenv
+        (derecurse_types tenv defs)
+    in (tenv, aenv)
 
 let define_atom (env, atoms) name =
     let atom = String.uncapitalize_ascii name in

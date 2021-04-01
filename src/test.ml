@@ -1,7 +1,9 @@
-type Input = Any
-and Output = Empty
+type Input = Empty
+and Output = Any
+
 
 type X = X -> Input -> Output
+
 
 (* Fix-point combinator *)
 let z = fun (((Input -> Output) -> Input -> Output ) -> (Input -> Output)) f ->
@@ -9,9 +11,12 @@ let z = fun (((Input -> Output) -> Input -> Output ) -> (Input -> Output)) f ->
          f ( fun (Input -> Output) v -> ( x x v ))
        in delta delta
 
+
 let id = fun ((Input -> Output) -> (Input -> Output)) x -> x
 
+
 let diverge = z id
+ 
 
 
 let bool = <Bool>
@@ -224,3 +229,5 @@ let flatten = fun x ->
   else if x is (Any,Any) then concat (flatten(fst x)) (flatten(snd x))
   else (x,nil)
  *)
+
+

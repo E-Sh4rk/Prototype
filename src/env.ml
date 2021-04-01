@@ -19,12 +19,12 @@ let rm = VarMap.remove
 let find = VarMap.find
 
 let strengthen v t env =
-  let t = if mem v env then Cduce.cap t (find v env) else t in
+  let t = if mem v env then Cduce.cap_o t (find v env) else t in
   add v t env
 
 let cap =
   VarMap.union (fun _ t1 t2 ->
-    Some (Cduce.cap t1 t2)
+    Some (Cduce.cap_o t1 t2)
     )
 
 let conj lst =

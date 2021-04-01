@@ -387,7 +387,7 @@ and infer_a' pos tenv env a =
         ) in
         (a, gammas)
     end else begin
-      let t1 = cap t pair_any in
+      let t1 = cap_o t pair_any in
       let t2 = diff t pair_any in
       if is_empty t1 || is_empty t2
       then raise (Ill_typed (pos,
@@ -411,7 +411,7 @@ and infer_a' pos tenv env a =
         (a, gammas)
     end
     else
-      let t1 = cap t (record_any_with label) in
+      let t1 = cap_o t (record_any_with label) in
       let t2 = diff t (record_any_with label) in
       if is_empty t1 || is_empty t2 then
         raise (Ill_typed (pos, 
@@ -426,7 +426,7 @@ and infer_a' pos tenv env a =
     if subtype t record_any then
       (a, [])
     else
-      let t1 = cap t record_any in
+      let t1 = cap_o t record_any in
       let t2 = diff t record_any in
       if is_empty t1 || is_empty t2 then
         raise (Ill_typed (pos, 
@@ -442,7 +442,7 @@ and infer_a' pos tenv env a =
     if subtype t record_any then
       (a, [])
     else
-      let t1 = cap t record_any in
+      let t1 = cap_o t record_any in
       let t2 = diff t record_any in
       if is_empty t1 || is_empty t2 then
         raise (Ill_typed (pos, 
@@ -467,13 +467,13 @@ and infer_a' pos tenv env a =
             if List.for_all (fun (s,_) -> subtype t2 s || disjoint t2 s) arrows
             then (a, [])
             else begin
-              let gammas = arrows |> List.map (fun (s,_) -> cap s t2) |>
+              let gammas = arrows |> List.map (fun (s,_) -> cap_o s t2) |>
                 List.filter (fun t2 -> is_empty t2 |> not) |>
                 List.map (fun t2 -> Env.singleton v2 t2) in
               (a, gammas)
             end
           end else begin
-            let t2' = cap t2 dom in
+            let t2' = cap_o t2 dom in
             let t2'' = diff t2 dom in
             if is_empty t2' || is_empty t2''
             then raise (Ill_typed (pos,
@@ -491,7 +491,7 @@ and infer_a' pos tenv env a =
         (a, gammas)
       end
     else begin
-      let t1' = cap t1 arrow_any in
+      let t1' = cap_o t1 arrow_any in
       let t1'' = diff t1 arrow_any in
       if is_empty t1' || is_empty t1''
       then raise (Ill_typed (pos,
@@ -507,8 +507,8 @@ and infer_a' pos tenv env a =
     if is_empty tv
     then (a, [])
     else
-      let t1 = cap tv t in
-      let t2 = cap tv (neg t) in
+      let t1 = cap_o tv t in
+      let t2 = diff tv t in
       if is_empty t2
       then (check_var_dom pos v1 env ; (a, []))
       else if is_empty t1

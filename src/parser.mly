@@ -184,10 +184,12 @@ lint:
   arg = identifier { (Unnanoted, arg) }
 | LPAREN arg = identifier COLON ty = typ RPAREN { (ADomain ty, arg) }
 
-%inline definition: LET i=identifier EQUAL t=term
-{
-  (i, t)
-}
+%inline definition:
+  LET i=identifier ais=annoted_identifier* EQUAL t=term
+  {
+    let t = multi_param_abstraction $startpos $endpos ais t in
+    (i, t)
+  }
 
 (*%inline binop :
 | PLUS  { Add }

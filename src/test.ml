@@ -188,7 +188,7 @@ let flatten = fun x ->
 
 (* Test with strings *)
 
-let typeof = fun x ->
+let typeof x =
   if x is String then "String"
   else if x is Char then "Char"
   else if x is Int then "Number"
@@ -196,22 +196,22 @@ let typeof = fun x ->
   else if x is Unit|Nil then "Nil"
   else "Object"
 
-let test_typeof = fun y ->
+let test_typeof y =
   if typeof y is "Boolean" then lnot y else false
 
 (* Test with lists *)
 
-let hd = fun (x:(Any, List)) -> fst x
-let is_empty = fun (x:List) ->
+let hd (x:(Any, List)) = fst x
+let is_empty (x:List) =
   if x is [] then true else false
 
-let test_hd = fun y ->
+let test_hd y =
   if y is List
   then if lnot (is_empty y) then hd y
   else nil else 0
 
 let various = [0; "ML"; nil]
-let various_fun = fun (x:[Int ; String ; List]) -> fst (snd x)
+let various_fun (x:[Int ; String ; List]) = fst (snd x)
 let various_test = various_fun various
 
 (* Test prefix/infix operators *)
@@ -223,7 +223,7 @@ let (/) = <Int -> Int -> Int>
 let (=) = <Int -> Int -> Bool>
 let (!) = <Bool -> Bool> (* Operators starting with ? or ! are prefix *)
 
-let infix_test = ! (((1*2) - 3) = 6)
+let infix_test (x:Int) (y:Bool) = land (! (((1*x) - 3) = 6)) y
 
 (* Fix-point combinator *)
 

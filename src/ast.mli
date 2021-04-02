@@ -2,8 +2,6 @@ open Types_additions
 open Variable
 open Pomap
 
-(* TODO: allow the definition of functions with multiple parameters (without nesting fun) *)
-
 type varname = string
 type exprid = int
 

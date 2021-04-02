@@ -2,6 +2,8 @@ open Types_additions
 open Variable
 open Pomap
 
+(* TODO: Syntax for more advanced lists ([Int ; (Bool ; Any)* ; String]) *)
+
 type varname = string
 type exprid = int
 

@@ -136,7 +136,7 @@ let define_atom (env, atoms) name =
     let typ = String.capitalize_ascii name in
     if StrMap.mem typ env
     then failwith (Printf.sprintf "Type %s already defined!" typ)
-    else (StrMap.add typ (cons (mk_atom typ)) env, StrSet.add atom atoms)
+    else (StrMap.add typ (cons (mk_atom atom)) env, StrSet.add atom atoms)
 
 
 let get_type (env, _) name =

@@ -57,13 +57,13 @@ let from_label lbl = CD.Ident.Label.get_ascii lbl
 
 let mk_atom ascii_name =
     ascii_name |> CD.Atoms.V.mk_ascii |> CD.Atoms.atom |> CD.Types.atom
-let true_typ = mk_atom "true"
-let false_typ = mk_atom "false"
+let true_typ = CD.Builtin_defs.true_type
+let false_typ = CD.Builtin_defs.false_type
 let bool_typ = cup true_typ false_typ
 let int_typ = CD.Types.Int.any
 let char_typ = CD.Types.Char.any
 let unit_typ = mk_atom "unit"
-let nil_typ = mk_atom "nil"
+let nil_typ = CD.Sequence.nil_type
 
 let string_typ =
   let str = CD.Types.make () in

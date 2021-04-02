@@ -48,7 +48,7 @@
 %token EOF
 %token FUN LET IN FST SND DEBUG
 %token IF IS THEN ELSE
-%token LPAREN RPAREN EQUAL COMMA COLON
+%token LPAREN RPAREN EQUAL COMMA COLON INTERROGATION_MARK
 %token ARROW AND OR NEG DIFF
 %token ANY EMPTY BOOL CHAR (*FLOAT*) INT TRUE FALSE UNIT NIL STRING LIST
 %token DOUBLEDASH TIMES PLUS MINUS DIV
@@ -210,6 +210,7 @@ infix:
 
 prefix:
   | x=PREFIX {x}
+  | INTERROGATION_MARK {"?"}
 
 typ:
   x=type_constant { TBase x }
@@ -223,7 +224,9 @@ typ:
 | LBRACE fs=separated_list(COMMA, typ_field) RBRACE { TRecord (false, fs) }
 | LBRACE fs=separated_list(COMMA, typ_field) DOUBLEPOINT RBRACE { TRecord (true, fs) }
 | LPAREN t=typ RPAREN { t }
-| LBRACKET fs=separated_list(SEMICOLON, typ) RBRACKET { TSList fs }
+| LBRACKET ts=separated_list(SEMICOLON, typ) RBRACKET
+{ TSList (List.fold_left (fun acc t -> ReSeq (acc, ReType t)) ReEpsilon ts) }
+(* TODO: Parse regexp *)
 
 typ_field:
   id=identifier EQUAL t=typ { (id, t, false) }

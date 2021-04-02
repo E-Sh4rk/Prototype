@@ -50,6 +50,7 @@ rule token = parse
 | "."     { POINT }
 | "="     { EQUAL }
 | "=?"    { EQUAL_OPT }
+| "?"     { INTERROGATION_MARK }
 | "if"    { IF }
 | "is"    { IS }
 | "then"  { THEN }

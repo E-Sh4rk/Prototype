@@ -39,6 +39,7 @@ let type_base_to_typ t =
     | TString -> Cduce.string_typ | TList -> Cduce.list_typ
 
 let derecurse_types env defs =
+    let open Cduce_core in
     let henv = Hashtbl.create 16 in
     let () =
         List.iter (fun (name, def) ->
@@ -51,55 +52,70 @@ let derecurse_types env defs =
         match Hashtbl.find henv name with
         | _, Some v -> v
         | def, None -> 
-            let v = mk_new_typ () in
+            let v = Typepat.mk_delayed () in
             Hashtbl.replace henv name (def, Some v);
             let t = aux def in
-            define_typ v t;
+            Typepat.link v t;
             v
         | exception Not_found -> 
-            try StrMap.find name env
+            try Typepat.mk_type (descr (StrMap.find name env))
             with Not_found -> 
                 failwith (Printf.sprintf "Type %s undefined!" name)
     and aux t =
         match t with
-        | TBase tb -> type_base_to_typ tb
-        | TCustom n -> descr (get_name n)
-        | TPair (t1,t2) -> mk_times (aux_node t1) (aux_node t2)
+        | TBase tb -> Typepat.mk_type (type_base_to_typ tb)
+        | TCustom n -> get_name n
+        | TPair (t1,t2) -> Typepat.mk_prod (aux t1) (aux t2)
         | TRecord (is_open, fields) ->
             let aux' (label,t,opt) =
-                let n = aux_node t in
-                let () = 
-                    if opt then define_typ n (or_absent (descr n)) 
-                in
-                (label, n)
+                let n = aux t in
+                let n = if opt then Typepat.mk_optional n else n in
+                (Cduce.to_label label, (n, None))
             in
-            let fields = List.map aux' fields in
-            mk_record is_open fields
-        | TSList lst -> List.map aux lst |> Cduce.single_list
-        | TArrow (t1,t2) -> mk_arrow (aux_node t1) (aux_node t2)
+            let lmap = 
+                Cduce_types.Ident.LabelMap.from_list_disj (List.map aux' fields)
+            in
+            Typepat.mk_record is_open lmap
+
+        | TSList lst -> Typepat.rexp (aux_re lst)
+        | TArrow (t1,t2) -> Typepat.mk_arrow (aux t1) (aux t2)
         | TCup (t1,t2) ->
             let t1 = aux t1 in
             let t2 = aux t2 in
-            cup t1 t2
+            Typepat.mk_or t1 t2
         | TCap (t1,t2) ->
             let t1 = aux t1 in
             let t2 = aux t2 in
-            cap t1 t2
+            Typepat.mk_and t1 t2
         | TDiff (t1,t2) ->
             let t1 = aux t1 in
             let t2 = aux t2 in
-            diff t1 t2
-        | TNeg t -> neg (aux t)
-    and aux_node t =
-        match t with
-          TCustom n -> get_name n
-        | _ -> cons (aux t)
-    in
-    List.map (fun (name, def) -> name, aux_node def) defs
+            Typepat.mk_diff t1 t2
+        | TNeg t -> Typepat.mk_diff (Typepat.mk_type Cduce.any) (aux t)
+   
+    and aux_re l =
+    (* TODO replace with an AST for regexp :
+        | ReSeq(re1, re2) -> Typepat.mk_set (aux_re re1) (aux_re re2)
+        | ReStar(re) -> Typepat.mk_star (aux_re re)
+        | ReType(te) -> Typepat.mk_elem (aux re)
+        ...
+    *)
+        let node = 
+            List.fold_right 
+            (fun te acc -> 
+                Typepat.mk_seq 
+                        (Typepat.mk_elem (aux te)) acc) l Typepat.mk_epsilon
+        in
+        node
+in
+    let nodes = List.map (fun (name, def) -> name, aux def) defs in
+    List.map (fun (name, node) -> (name, 
+                        (Typepat.internalize node; Typepat.typ node))) nodes
+
 
 let type_expr_to_typ (tenv, _) t = 
     match derecurse_types tenv [ ("", t) ] with
-    | [ _, n ] -> descr n
+    | [ _, n ] -> n
     | _ -> assert false
 
 let define_types (tenv, aenv) defs =
@@ -108,7 +124,9 @@ let define_types (tenv, aenv) defs =
         defs
     in
     let tenv = List.fold_left
-        (fun acc (name, node) -> StrMap.add name node acc)
+        (fun acc (name, typ) ->
+            Cduce.register name typ; 
+            StrMap.add name (cons typ) acc)
         tenv
         (derecurse_types tenv defs)
     in (tenv, aenv)

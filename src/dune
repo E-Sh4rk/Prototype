@@ -4,6 +4,6 @@
 
 (executable
  (name prototype)
- (libraries num str threads cduce-types pomap)
+ (libraries num str threads cduce-types cduce.lib pomap)
  (preprocess (pps ppx_deriving.show ppx_deriving.ord ppx_deriving.eq))
  (modules (:standard \ test)))

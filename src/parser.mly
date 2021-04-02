@@ -37,6 +37,12 @@
   let annot sp ep e =
     (Ast.new_annot (Position.lex_join sp ep), e)
 
+  let multi_param_abstraction startpos endpos lst t =
+    List.rev lst |> List.fold_left (
+      fun acc (annotation, v) ->
+        annot startpos endpos (Lambda (annotation, v, acc))
+    ) t
+
 %}
 
 %token EOF
@@ -164,19 +170,19 @@ lint:
 | LPAREN MINUS i=LINT RPAREN { -i }
 
 %inline abstraction:
-  FUN LPAREN ty=typ RPAREN vs=identifier+ ARROW t=term
+  FUN LPAREN ty=typ RPAREN hd=identifier tl=annoted_identifier* ARROW t=term
 {
-  if List.length vs > 1 then failwith "Fun with multiple arguments not supported yet!"
-  else annot $startpos $endpos (Lambda (AArrow ty, List.hd vs, t))
+  let t = multi_param_abstraction $startpos $endpos tl t in
+  annot $startpos $endpos (Lambda (AArrow ty, hd, t))
 }
-| FUN LPAREN arg = identifier COLON ty = typ RPAREN ARROW t = term
+| FUN ais=annoted_identifier+ ARROW t = term
 {
-  annot $startpos $endpos (Lambda (ADomain ty, arg, t))
+  multi_param_abstraction $startpos $endpos ais t
 }
-| FUN arg = identifier ARROW t = term
-{
-  annot $startpos $endpos (Lambda (Unnanoted, arg, t))
-}
+
+%inline annoted_identifier:
+  arg = identifier { (Unnanoted, arg) }
+| LPAREN arg = identifier COLON ty = typ RPAREN { (ADomain ty, arg) }
 
 %inline definition: LET i=identifier EQUAL t=term
 {

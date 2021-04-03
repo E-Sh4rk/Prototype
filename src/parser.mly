@@ -53,7 +53,7 @@
 %token ANY EMPTY BOOL CHAR (*FLOAT*) INT TRUE FALSE UNIT NIL STRING LIST
 %token DOUBLEDASH TIMES PLUS MINUS DIV
 %token LBRACE RBRACE DOUBLEPOINT WITH EQUAL_OPT POINT LT GT
-%token ATOMS TYPE TYPE_AND
+%token ATOMS TYPE TYPE_AND REGEX_OR
 %token LBRACKET RBRACKET SEMICOLON
 %token<string> ID
 %token<string> TID
@@ -71,11 +71,9 @@
 %start<(Ast.varname * Ast.parser_expr) list> definitions
 %start<Ast.parser_program> program
 
-%right ARROW (*IN*)
+%right ARROW
 %left OR
 %left AND
-(*%nonassoc INFIX PREFIX*)
-(*%left ID*)
 (*%left PLUS MINUS
 %left TIMES DIV*)
 %nonassoc DIFF
@@ -213,20 +211,21 @@ prefix:
   | INTERROGATION_MARK {"?"}
 
 typ:
+  t=atomic_typ { t }
+| lhs=typ ARROW rhs=typ { TArrow (lhs, rhs) }
+| NEG t=typ { TNeg t }
+| lhs=typ OR rhs=typ  { TCup (lhs, rhs) }
+| lhs=typ AND rhs=typ { TCap (lhs, rhs) }
+| lhs=typ DIFF rhs=typ  { TDiff (lhs, rhs) }
+
+atomic_typ:
   x=type_constant { TBase x }
 | s=TID { TCustom s }
-| lhs=typ ARROW rhs=typ { TArrow (lhs, rhs) }
 | LPAREN lhs=typ COMMA rhs=typ RPAREN { TPair (lhs, rhs) }
-| NEG t=typ { TNeg t }
-| lhs=typ AND rhs=typ { TCap (lhs, rhs) }
-| lhs=typ OR rhs=typ  { TCup (lhs, rhs) }
-| lhs=typ DIFF rhs=typ  { TDiff (lhs, rhs) }
+| LPAREN t=typ RPAREN { t }
 | LBRACE fs=separated_list(COMMA, typ_field) RBRACE { TRecord (false, fs) }
 | LBRACE fs=separated_list(COMMA, typ_field) DOUBLEPOINT RBRACE { TRecord (true, fs) }
-| LPAREN t=typ RPAREN { t }
-| LBRACKET ts=separated_list(SEMICOLON, typ) RBRACKET
-{ TSList (List.fold_left (fun acc t -> ReSeq (acc, ReType t)) ReEpsilon ts) }
-(* TODO: Parse regexp *)
+| LBRACKET re=typ_re RBRACKET { TSList re }
 
 typ_field:
   id=identifier EQUAL t=typ { (id, t, false) }
@@ -263,3 +262,28 @@ type_interval:
 (*%inline annoted(X): x=X {
   (Position.with_poss $startpos $endpos (unique_exprid ()), x)
 }*)
+
+typ_re:
+  re=seq_re { re }
+| re=simple_re { re }
+| { ReEpsilon }
+(* rs=separated_list(SEMICOLON, simple_re)
+{ List.fold_left (fun acc r -> ReSeq (acc, r)) ReEpsilon rs }*)
+
+seq_re:
+  lhs=typ_re SEMICOLON rhs=simple_re { ReSeq (lhs, rhs) }
+
+simple_re:
+  re=atomic_re { re }
+| re=alt_re { re }
+
+alt_re:
+  lhs=simple_re REGEX_OR rhs=atomic_re { ReAlt (lhs, rhs) }
+
+atomic_re:
+  t=typ { ReType t }
+| LPAREN re=alt_re RPAREN { re }
+| LPAREN re=seq_re RPAREN { re }
+| re=atomic_re TIMES { ReStar re }
+| re=atomic_re PLUS { ReSeq (re, ReStar re) }
+| re=atomic_re INTERROGATION_MARK { ReAlt (re, ReEpsilon) }

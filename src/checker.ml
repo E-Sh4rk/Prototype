@@ -6,6 +6,10 @@ open Variable
 open Utils
 (* TODO: Improve error messages
    (when failing due to all branches having failed, print errors of the branches) *)
+(* TODO: Better inference of the domain of functionnal arguments
+   (and then, support for recursive functions) *)
+(* TODO: Cduce type printer should add some parentheses sometimes
+   (ambiguous for arrows and regex) *)
 
 exception Ill_typed of Position.t list * string
 

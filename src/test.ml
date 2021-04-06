@@ -228,13 +228,19 @@ let infix_test (x:Int) (y:Bool) = land (! (((1*x) - 3) = 6)) y
 (* Fix-point combinator *)
 
 type Input = Int (* Any   *)
-and Output = Int (* Empty *)
+and Output = Bool (* Empty *)
 
 type X = X -> Input -> Output
 
 let fixpoint = fun (((Input -> Output) -> Input -> Output ) -> (Input -> Output)) f ->
       let delta = fun ( X -> (Input -> Output) ) x ->
          f ( fun (Input -> Output) v -> ( x x v ))
+       in delta delta
+
+(* with less annotations *)
+let fixpoint2 = fun (f:((Input -> Output) -> Input -> Output )) ->
+      let delta = fun ( x: X )  ->
+         f ( fun  v -> ( x x v ))
        in delta delta
 
 let id = fun ((Input -> Output) -> (Input -> Output)) x -> x
@@ -250,3 +256,5 @@ let fac2 =  fun (f : Int -> Int) ->
 let fac3 =  fun (f : Int -> Int) ->
   fun x -> if x is 0 then 1 else x * (f(x-1))
 let factorial = fixpoint fac3
+
+

@@ -124,12 +124,14 @@ let list_of alpha =
     descr alpha_list
 *)
 
+(*
 let single_list lst =
   List.rev lst |>
   List.fold_left (
     fun acc t ->
       CD.Types.times (cons t) (cons acc)
   ) nil_typ
+*)
 
 let mk_new_typ = CD.Types.make
 

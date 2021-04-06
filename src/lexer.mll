@@ -39,10 +39,11 @@ rule token = parse
 | "atom"  { ATOMS }
 | "type"  { TYPE }
 | "and"   { TYPE_AND }
+| "or"    { REGEX_OR }
 | "(*"    { comment 0 lexbuf }
 | "->"    { ARROW }
-| "&"     { AND  }
-| "|"     { OR  }
+| "&"     { AND }
+| "|"     { OR }
 | "\\"    { DIFF }
 | "~"     { NEG  }
 | ":"     { COLON }
@@ -50,6 +51,7 @@ rule token = parse
 | "."     { POINT }
 | "="     { EQUAL }
 | "=?"    { EQUAL_OPT }
+| "?"     { INTERROGATION_MARK }
 | "if"    { IF }
 | "is"    { IS }
 | "then"  { THEN }

@@ -10,12 +10,19 @@ type type_base =
     | TBool | TTrue | TFalse | TUnit | TChar | TAny | TEmpty | TNil
     | TString | TList
 
-type type_expr =
+type type_regexp =
+    | ReEpsilon | ReEmpty
+    | ReType of type_expr
+    | ReSeq of type_regexp * type_regexp
+    | ReStar of type_regexp
+    | ReAlt of type_regexp * type_regexp
+
+and type_expr =
     | TBase of type_base
     | TCustom of string
     | TPair of type_expr * type_expr
     | TRecord of bool * (string * type_expr * bool) list
-    | TSList of type_expr list
+    | TSList of type_regexp
     | TArrow of type_expr * type_expr
     | TCup of type_expr * type_expr
     | TCap of type_expr * type_expr

@@ -11,12 +11,19 @@ type type_base =
     | TBool | TTrue | TFalse | TUnit | TChar | TAny | TEmpty | TNil
     | TString | TList
 
-type type_expr =
+type type_regexp =
+    | ReEpsilon | ReEmpty
+    | ReType of type_expr
+    | ReSeq of type_regexp * type_regexp
+    | ReStar of type_regexp
+    | ReAlt of type_regexp * type_regexp
+
+and type_expr =
     | TBase of type_base
     | TCustom of string
     | TPair of type_expr * type_expr
     | TRecord of bool * (string * type_expr * bool) list
-    | TSList of type_expr list
+    | TSList of type_regexp
     | TArrow of type_expr * type_expr
     | TCup of type_expr * type_expr
     | TCap of type_expr * type_expr
@@ -92,21 +99,14 @@ let derecurse_types env defs =
             let t2 = aux t2 in
             Typepat.mk_diff t1 t2
         | TNeg t -> Typepat.mk_diff (Typepat.mk_type Cduce.any) (aux t)
-   
-    and aux_re l =
-    (* TODO replace with an AST for regexp :
-        | ReSeq(re1, re2) -> Typepat.mk_set (aux_re re1) (aux_re re2)
-        | ReStar(re) -> Typepat.mk_star (aux_re re)
-        | ReType(te) -> Typepat.mk_elem (aux re)
-        ...
-    *)
-        let node = 
-            List.fold_right 
-            (fun te acc -> 
-                Typepat.mk_seq 
-                        (Typepat.mk_elem (aux te)) acc) l Typepat.mk_epsilon
-        in
-        node
+    and aux_re r =
+        match r with
+        | ReEmpty -> Typepat.mk_empty
+        | ReEpsilon -> Typepat.mk_epsilon
+        | ReType t -> Typepat.mk_elem (aux t)
+        | ReSeq (r1, r2) -> Typepat.mk_seq (aux_re r1) (aux_re r2)
+        | ReAlt (r1, r2) -> Typepat.mk_alt (aux_re r1) (aux_re r2)
+        | ReStar r -> Typepat.mk_star (aux_re r)
     in
     let nodes = List.map (fun (name, def) -> name, aux def) defs in
     List.map (fun (name, node) -> (name, 

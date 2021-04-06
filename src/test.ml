@@ -199,7 +199,7 @@ let typeof x =
 let test_typeof y =
   if typeof y is "Boolean" then lnot y else false
 
-(* Test with lists *)
+(* Test with lists and regex *)
 
 let hd (x:(Any, List)) = fst x
 let is_empty (x:List) =
@@ -213,6 +213,8 @@ let test_hd y =
 let various = [0; "ML"; nil]
 let various_fun (x:[Int ; String ; List]) = fst (snd x)
 let various_test = various_fun various
+
+let regex (x: [ Int -> Bool ; Bool* ; Int? ; String+ ]) = 0
 
 (* Test prefix/infix operators *)
 

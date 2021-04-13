@@ -151,7 +151,7 @@ let pi2 t =
   CD.Types.Product.pi2 (CD.Types.Product.get t)
 
 let split_pair t =
-  CD.Types.Product.get ~kind:`Normal t
+  CD.Types.Product.normal ~kind:`Normal t
 
 
 let mk_record is_open fields =

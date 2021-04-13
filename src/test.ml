@@ -260,3 +260,45 @@ let fac3 =  fun (f : Int -> Int) ->
 let factorial = fixpoint fac3
 
 
+let concat = < String -> String -> String>
+let to_string = <Any -> String>
+
+let add x y =
+    if x is Int then if y is Int then x + y
+                   else concat (to_string x) y
+                else if y is String then concat (to_string x) y
+                     else concat (to_string x) (to_string y)                                                               
+
+
+                                 (* Nouveaux examples *)
+atom a
+atom b
+atom c
+atom d
+atom e  
+
+  
+  
+type S2 = A | B
+type S1 = E | (C,(S2,S2)) |  (D,(S1,S1))
+
+let g = <((E -> A) & ((S1\E) -> B)) >
+
+         
+let f v =
+  if v is (C,(Any,Any)) then (c , ( fst(snd v) , fst(snd v) )) else
+  if v is (D,(Any,Any)) then (c , ( g(fst(snd v)) , g(fst(snd v)) )) else
+  if v is E then v else nil   
+
+
+(*
+
+let f (g : ((<e>[] -> <a>[]) & ((S1\<e>[]) -> <b>[]))) (v : S1) : (S1 \ (<c>[<a>[] <b>[]])) =
+  match v with
+  | <c>[ (x & <a>[] ) _ ] -> <c> [ x x ]
+  | <c>[ x _ ] -> <c>[ x x ]
+  | <d>[ (x & <e>[]) _ ] -> <c> [ (g x) (g x) ]
+  | <d>[ x _ ] ->  <c> [ (g x) (g x) ]
+  | <e>[] -> <e>[]
+  ;;
+ *)

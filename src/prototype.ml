@@ -42,8 +42,10 @@ let type_check_program
     in
     let treat_elem (tenv,varm,env) elem =
       match elem with
-      | Ast.Definition d ->
+      | Ast.Definition (log, d) ->
+        if log then Utils.log_enabled := true ;
         let (varm,env) = test_def (tenv,varm,env) d in
+        Utils.log_enabled := false ;
         (tenv,varm,env)
       | Ast.Atoms lst ->
         let tenv = List.fold_left define_atom tenv lst in

@@ -31,7 +31,6 @@ type ('a, 'typ, 'v) ast =
 | Pair of ('a, 'typ, 'v) t * ('a, 'typ, 'v) t
 | Projection of projection * ('a, 'typ, 'v) t
 | RecordUpdate of ('a, 'typ, 'v) t * string * ('a, 'typ, 'v) t option
-| Debug of string * ('a, 'typ, 'v) t
 
 and ('a, 'typ, 'v) t = 'a * ('a, 'typ, 'v) ast
 
@@ -62,7 +61,7 @@ val substitute : annot_expr -> Variable.t -> annot_expr -> annot_expr
 val const_to_typ : const -> Cduce.typ
 
 type parser_element =
-| Definition of (string * parser_expr)
+| Definition of (bool (* log? *) * (string * parser_expr))
 | Atoms of string list
 | Types of (string * type_expr) list
 

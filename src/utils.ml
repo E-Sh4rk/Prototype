@@ -17,6 +17,10 @@ let error pos msg =
   ) "" pos in
   Format.printf "Error:%s\t%s\n" pos msg
 
+let log_enabled = ref false
+let log_debug a =
+  if !log_enabled then Format.fprintf Format.std_formatter a
+  else Format.ifprintf Format.std_formatter a
 
 
 let option_map f = function None -> None | Some e -> Some (f e)

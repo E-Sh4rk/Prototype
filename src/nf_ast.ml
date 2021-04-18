@@ -12,7 +12,6 @@ type a =
   | Projection of Ast.projection * Variable.t
   | RecordUpdate of Variable.t * string * Variable.t option
   | Let of Variable.t * Variable.t
-  | Debug of string * Variable.t
   [@@deriving show]
 
 and e =
@@ -33,7 +32,6 @@ let map ef af =
     | Projection (p, v) -> Projection (p, v)
     | RecordUpdate (v, str, vo) -> RecordUpdate (v, str, vo)
     | Let (v1, v2) -> Let (v1, v2)
-    | Debug (str, v) -> Debug (str, v)
     end
     |> af
   and aux_e e =
@@ -50,7 +48,7 @@ let map_a ef af = map ef af |> snd
 let fold ef af =
   let rec aux_a a =
     begin match a with
-    | Abstract _ | Const _ | Debug _ | App _ | Pair _
+    | Abstract _ | Const _ | App _ | Pair _
     | Projection _ | RecordUpdate _ | Ite _ | Let _ -> []
     | Lambda (_, _, _, e) -> [aux_e e]
     end
@@ -78,7 +76,7 @@ let free_vars =
     let acc = List.fold_left VarSet.union VarSet.empty acc in
     match a with
     | Lambda (_, _, v, _) -> VarSet.remove v acc
-    | Projection (_, v) | Debug (_, v) | RecordUpdate (v, _, None) ->
+    | Projection (_, v) | RecordUpdate (v, _, None) ->
       VarSet.add v acc
     | Ite (v, _, x1, x2) -> VarSet.add v acc |> VarSet.add x1 |> VarSet.add x2
     | App (v1, v2) | Pair (v1, v2) | Let (v1, v2) | RecordUpdate (v1, _, Some v2) ->
@@ -118,7 +116,6 @@ let merge_annots' e1 e2 =
     | Projection (p, v), _ -> Projection (p, v)
     | RecordUpdate (v, str, vo), _ -> RecordUpdate (v, str, vo)
     | Let (v1, v2), _ -> Let (v1, v2)
-    | Debug (str, v), _ -> Debug (str, v)
   and aux_e e1 e2 =
     match e1, e2 with
     | Var v, _ -> Var v
@@ -211,9 +208,6 @@ let convert_to_normal_form ast =
         let (defs, expr_var_map, x) = to_defs_and_x expr_var_map e in
         let (defs', expr_var_map, x') = to_defs_and_x expr_var_map e' in
         (defs'@defs, expr_var_map, RecordUpdate (x, str, Some x'))
-      | Ast.Debug (str, e) ->
-        let (defs, expr_var_map, x) = to_defs_and_x expr_var_map e in
-        (defs, expr_var_map, Debug (str, x))
 
     and to_defs_and_x ?(name=None) expr_var_map ast =
       let ((_, pos), _) = ast in

@@ -11,7 +11,6 @@ type a =
   | Projection of Ast.projection * Variable.t
   | RecordUpdate of Variable.t * string * Variable.t option
   | Let of Variable.t * Variable.t
-  | Debug of string * Variable.t
 
 and e =
   | Bind of VarAnnot.t * Variable.t * a * e

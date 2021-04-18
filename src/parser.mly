@@ -98,7 +98,8 @@ unique_term: t=term EOF { t }
 
 
 element:
-  a=definition { Definition a }
+  a=definition { Definition (false, a) }
+| DEBUG a=definition { Definition (true, a) }
 | a=atoms      { Atoms a }
 | a=types_def  { Types a }
 
@@ -126,7 +127,6 @@ simple_term:
 | p=prefix_term a=atomic_term { annot $startpos $endpos (App (p, a)) }
 | a=atomic_term POINT id=identifier { annot $startpos $endpos (Projection (Field id, a)) }
 | a=atomic_term DIFF id=identifier { annot $startpos $endpos (RecordUpdate (a,id,None)) }
-| DEBUG str=LSTRING a=atomic_term { annot $startpos $endpos (Debug (str, a)) }
 | LT t=typ GT { annot $startpos $endpos (Abstract t) }
 (*| m=MINUS t=atomic_term { App (Primitive Neg, t) }*)
 | a=atomic_term { a }

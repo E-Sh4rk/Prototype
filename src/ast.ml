@@ -34,7 +34,6 @@ type ('a, 'typ, 'v) ast =
 | Pair of ('a, 'typ, 'v) t * ('a, 'typ, 'v) t
 | Projection of projection * ('a, 'typ, 'v) t
 | RecordUpdate of ('a, 'typ, 'v) t * string * ('a, 'typ, 'v) t option
-| Debug of string * ('a, 'typ, 'v) t
 [@@deriving ord]
 
 and ('a, 'typ, 'v) t = 'a * ('a, 'typ, 'v) ast
@@ -119,7 +118,6 @@ let parser_expr_to_annot_expr tenv name_var_map e =
         | Projection (p, e) -> Projection (p, aux env e)
         | RecordUpdate (e1, l, e2) ->
             RecordUpdate (aux env e1, l, Utils.option_map (aux env) e2)
-        | Debug (str, e) -> Debug (str, aux env e)
         in
         ((exprid,pos),e)
     in
@@ -138,7 +136,6 @@ let rec unannot (_,e) =
     | Projection (p, e) -> Projection (p, unannot e)
     | RecordUpdate (e1, l, e2) ->
         RecordUpdate (unannot e1, l, Utils.option_map unannot e2)
-    | Debug (str, e) -> Debug (str, unannot e)
     in
     ( (), e )
 
@@ -166,7 +163,6 @@ let normalize_bvs e =
         | Projection (p, e) -> Projection (p, aux depth map e)
         | RecordUpdate (e1, l, e2) ->
             RecordUpdate (aux depth map e1, l, Utils.option_map (aux depth map) e2)
-        | Debug (str, e) -> Debug (str, aux depth map e)
         in (a, e)
     in aux 0 VarMap.empty e
 
@@ -209,7 +205,6 @@ let substitute aexpr v (annot', expr') =
       | Some e2 -> Some (aux e2)
       | None -> None
       in RecordUpdate (aux e1, f, e2)
-    | Debug (str, e) -> Debug (str, aux e)
     in
     (annot', expr)
   in aux aexpr
@@ -228,7 +223,7 @@ let const_to_typ c =
         failwith (Printf.sprintf "Can't retrieve the type of the atom %s." t)
 
 type parser_element =
-| Definition of (string * parser_expr)
+| Definition of (bool * (string * parser_expr))
 | Atoms of string list
 | Types of (string * type_expr) list
 

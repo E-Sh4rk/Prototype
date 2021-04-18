@@ -46,7 +46,6 @@ let rec typeof_a pos tenv env a =
   | Abstract t -> t
   | Const (Atom str) -> get_type tenv str
   | Const c -> Ast.const_to_typ c
-  | Debug (_, v) -> var_type pos v env
   | Pair (v1, v2) ->
     let t1 = var_type pos v1 env in
     let t2 = var_type pos v2 env in
@@ -146,7 +145,6 @@ let refine_a ~backward env a t =
     if disjoint (Ast.const_to_typ c) t then [] else [Env.empty]
   | Const c ->
     if subtype (Ast.const_to_typ c) t then [Env.empty] else []
-  | Debug (_, v) -> [Env.singleton v t]
   | Pair (v1, v2) ->
     split_pair t
     |> List.map (
@@ -376,7 +374,6 @@ and infer_a' pos tenv env a =
   match a with
   | Abstract _ -> (a, [])
   | Const _ -> (a, [])
-  | Debug (_, v) -> check_var_dom pos v env ; (a, [])
   | Pair (v1, v2) ->
     check_var_dom pos v1 env ; check_var_dom pos v2 env ; (a, [])
   | Projection ((Fst | Snd), v) ->

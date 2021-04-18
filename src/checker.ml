@@ -256,7 +256,9 @@ let rec infer' tenv env e =
   let rec infer_with_split tenv env s x a e =
     let env' = Env.add x s env in
     match infer' tenv env' e with
-    | (e, []) -> (VarAnnot.singleton env s, (e, [])) (* BindSplitOk *)
+    | (e, []) -> (* BindSplitOk *)
+      (*log "@,The BIND has been annotated." ;*)
+      (VarAnnot.singleton env s, (e, []))
     | (e, gammas) ->
       let gammas = backward env' x a gammas in
       if List.for_all (fun gamma -> domain_included_in_singleton gamma x) gammas
@@ -269,6 +271,7 @@ let rec infer' tenv env e =
           List.map (fun s -> infer_with_split tenv env s x a e) splits |>
           List.split
         in
+        log "@,The split has been fully repercuted. Going down." ;
         (VarAnnot.union vas, merge_res res)
       else (* BindSplitUp *)
         let va = List.fold_left (fun acc gamma ->
@@ -277,6 +280,7 @@ let rec infer' tenv env e =
         in
         assert (VarAnnot.is_empty va |> not) ;
         let gammas = List.map (Env.rm x) gammas in
+        log "@,The split still has repercussions on earlier variables. Going up." ;
         (va, (e, gammas))
   in
   match e with
@@ -284,17 +288,21 @@ let rec infer' tenv env e =
     check_var_dom (Variable.get_locations v) v env ;
     (e, [])
   | Bind (va, v, a, e) ->
+    log "@,@[<v 1>BIND for variable %a" Variable.pp v ;
+    let res = 
     try
       let pos = Variable.get_locations v in
       let res =
         try infer_a' pos tenv env a
         with Ill_typed _ -> (* BindDefUntypeable *)
+          log "@,Definition is untypeable. Skipping." ;
           let a = empty_annots a in
           let (e, gammas) = infer' tenv env e in
           raise (Return (Bind (VarAnnot.empty, v, a, e), gammas))
       in
       begin match res with
       | (a, (_::_ as gammas)) -> (* BindDefNeedSplit *)
+        log "@,The definition need a split. Going up." ;
         let e = restrict_annots env e in
         (Bind (va, v, a, e), gammas)
       | (a, []) -> (* Bind *)
@@ -309,6 +317,8 @@ let rec infer' tenv env e =
         (Bind (VarAnnot.union vas, v, a, e), gammas)
       end
     with Return r -> r
+    in
+    log "@]@,END BIND for variable %a" Variable.pp v ; res
 
 and infer_a' pos tenv env a =
   let rec infer_with_splits ~enforce_domain ~enforce_arrow tenv env x e splits =
@@ -346,6 +356,7 @@ and infer_a' pos tenv env a =
         assert (disj splits |> subtype s) ;
         let res = infer_with_splits ~enforce_domain ~enforce_arrow tenv env x e splits in
         let (vas, res) = List.split res in
+        log "@,The split has been fully repercuted. Going down." ;
         (VarAnnot.union vas, merge_res res)
       else (* AbsSplitUp *)
         let va = List.fold_left (fun acc gamma ->
@@ -355,9 +366,11 @@ and infer_a' pos tenv env a =
         in
         assert (VarAnnot.is_empty va |> not) ;
         let gammas = List.map (Env.rm x) gammas in
+        log "@,The split still has repercussions on earlier variables. Going up." ;
         (va, (e, gammas))
   in
   let type_lambda_with_splits ~enforce_domain ?(enforce_arrow=None) lt tenv env splits x e =
+    log "@,@[<v 1>LAMBDA for variable %a" Variable.pp x ;
     let t = match enforce_domain with
     (* NOTE: if splits are empty, we assume it's because it hasn't been set yet. *)
     | None -> if splits = [] then any else disj splits
@@ -369,6 +382,7 @@ and infer_a' pos tenv env a =
     let res = infer_with_splits ~enforce_domain ~enforce_arrow tenv env x e splits in
     let (vas, res) = List.split res in
     let (e, gammas) = merge_res res in
+    log "@]@,END LAMBDA for variable %a" Variable.pp x ;
     (Lambda (VarAnnot.union vas, lt, x, e), gammas)
   in
   match a with
@@ -546,7 +560,7 @@ let infer tenv env e =
     Bind (VarAnnot.initial, v, Abstract (var_type [] v env), acc)
   ) fv e in
   match infer' tenv Env.empty e with
-  | (e, []) -> e
+  | (e, []) -> log "@." ; e
   | _ -> assert false
 
 let typeof_simple tenv env e =

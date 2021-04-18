@@ -2,7 +2,7 @@ let bool = <Bool>
 
 let test = if bool is True then true else false
 
-let lnot = fun (a : Any) ->
+debug let lnot = fun (a : Any) ->
   if a is True then false else true
 
 let lor = fun (a : Any) -> fun (b : Any) ->

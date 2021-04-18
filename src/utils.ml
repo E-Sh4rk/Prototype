@@ -18,7 +18,7 @@ let error pos msg =
   Format.printf "Error:%s\t%s\n" pos msg
 
 let log_enabled = ref false
-let log_debug a =
+let log a =
   if !log_enabled then Format.fprintf Format.std_formatter a
   else Format.ifprintf Format.std_formatter a
 

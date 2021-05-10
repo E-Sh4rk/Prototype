@@ -227,6 +227,141 @@ let (!) = <Bool -> Bool> (* Operators starting with ? or ! are prefix *)
 
 let infix_test (x:Int) (y:Bool) = land (! (((1*x) - 3) = 6)) y
 
+(* Nouveaux examples *)
+
+let concat = < String -> String -> String>
+let to_string = <Any -> String>
+
+let add x y =
+    if x is Int then
+        if y is Int then x + y
+        else concat (to_string x) y
+    else if y is String then concat (to_string x) y
+    else concat (to_string x) (to_string y)                                                               
+                         
+atom a
+atom b
+atom c
+atom d
+atom e  
+
+type S2 = A | B
+type S1 = E | (C,(S2,S2)) |  (D,(S1,S1))
+
+let g = <((E -> A) & ((S1\E) -> B)) >
+
+         
+let f v =
+  if v is (C,(Any,Any)) then (c , ( fst(snd v) , fst(snd v) )) else
+  if v is (D,(Any,Any)) then (c , ( g(fst(snd v)) , g(fst(snd v)) )) else
+  if v is E then v else nil   
+
+(*
+
+let f (g : ((<e>[] -> <a>[]) & ((S1\<e>[]) -> <b>[]))) (v : S1) : (S1 \ (<c>[<a>[] <b>[]])) =
+  match v with
+  | <c>[ (x & <a>[] ) _ ] -> <c> [ x x ]
+  | <c>[ x _ ] -> <c>[ x x ]
+  | <d>[ (x & <e>[]) _ ] -> <c> [ (g x) (g x) ]
+  | <d>[ x _ ] ->  <c> [ (g x) (g x) ]
+  | <e>[] -> <e>[]
+  ;;
+ *)
+
+(* Prelude *)
+atom no
+
+let and_ = fun (x : Any) ->
+           fun (y : Any) -> if x is True then if y is True then y else false else false
+
+let and2_ = fun (x : (Any,Any)) -> if fst x is True then if snd x is True then fst x else false else false
+
+let or_ = fun (x : Any) ->
+fun (y:Any) -> if x is True then true else if y is True then true else false
+
+let not_ = fun (x : Any) -> if x is True then true else false
+let add1 = fun (Int -> Int) x -> magic
+
+let is_string = fun (x : Any) ->
+  if x is String then true else false
+
+let is_int = fun (x : Any) ->
+  if x is Int then true else false
+
+let strlen = fun ((String) -> Int) x -> magic
+
+let add = fun (Int -> Int -> Int ) x -> magic
+
+let f = fun ((Int | String) -> Int) x -> magic
+
+let g = fun ((Int, Int) -> Int) x -> magic
+
+(* Examples Tobin & Felleisen *)
+
+let example1 = fun (x:Any) ->
+     if x is Int then add1 x else 0
+
+
+let example2 = fun (x:String|Int) ->
+  if x is Int then add1 x else strlen x
+
+
+let example3 = fun (x: Any) ->
+    if x is (Any \ False) then (x,x) else false
+
+
+let example4 = fun (x : Any) ->
+   if or_ (is_int x) (is_string x) is True then x else 'A'
+
+
+let example5 = fun (x : Any) -> fun (y : Any) ->
+   if and_ (is_int x) (is_string y) is True then
+    add x (strlen y) else 0
+
+
+let example6 = fun (x : Int|String) -> fun (y : Any) ->
+if and_ (is_int x) (is_string y) is True then
+  add  x (strlen y) else strlen x
+
+
+let example7 = fun (x : Any) -> fun (y : Any) ->
+if  (if (is_int x) is True then (is_string y) else false) is True then
+  add x (strlen y) else 0
+
+
+let example8 = fun (x : Any) -> if or_ (is_int x) (is_string x) is True then true else false
+
+
+let example9 = fun (x : Any) ->
+if
+  (if is_int x is True then is_int x else is_string x)
+  is True then  f x else 0
+
+
+let example10 = fun (p : (Any,Any)) ->
+   if is_int (fst p) is True then add1 (fst p) else 7
+
+
+let example11 = fun (p : (Any, Any)) ->
+   if and_ (is_int (fst p)) (is_int (snd p)) is True then g p else no
+
+
+let example12 = fun (p : (Any, Any)) -> if is_int (fst p) is True then true else false
+
+
+let example13 =
+    fun (x : Any) ->
+      fun (y : Any) ->
+       if and_ (is_int x) (is_string y) is True then 1
+       else if is_int x is True then 2
+       else 3
+
+let example14_alt = fun (input : Int | String) -> fun (extra : (Any, Any)) ->
+    if and2_ ((is_int input),(is_int (fst extra)))  is True then
+       add input (fst extra)
+    else if (is_int input,is_int (fst extra)) is (Any,True) then add (strlen input) (fst extra)
+    else 0
+
 (* Fix-point combinator *)
 
 type Input = Int (* Any   *)
@@ -257,48 +392,5 @@ let fac2 =  fun (f : Int -> Int) ->
 
 let fac3 =  fun (f : Int -> Int) ->
   fun x -> if x is 0 then 1 else x * (f(x-1))
-let factorial = fixpoint fac3
 
-
-let concat = < String -> String -> String>
-let to_string = <Any -> String>
-
-let add x y =
-    if x is Int then if y is Int then x + y
-                   else concat (to_string x) y
-                else if y is String then concat (to_string x) y
-                     else concat (to_string x) (to_string y)                                                               
-
-
-                                 (* Nouveaux examples *)
-atom a
-atom b
-atom c
-atom d
-atom e  
-
-  
-  
-type S2 = A | B
-type S1 = E | (C,(S2,S2)) |  (D,(S1,S1))
-
-let g = <((E -> A) & ((S1\E) -> B)) >
-
-         
-let f v =
-  if v is (C,(Any,Any)) then (c , ( fst(snd v) , fst(snd v) )) else
-  if v is (D,(Any,Any)) then (c , ( g(fst(snd v)) , g(fst(snd v)) )) else
-  if v is E then v else nil   
-
-
-(*
-
-let f (g : ((<e>[] -> <a>[]) & ((S1\<e>[]) -> <b>[]))) (v : S1) : (S1 \ (<c>[<a>[] <b>[]])) =
-  match v with
-  | <c>[ (x & <a>[] ) _ ] -> <c> [ x x ]
-  | <c>[ x _ ] -> <c>[ x x ]
-  | <d>[ (x & <e>[]) _ ] -> <c> [ (g x) (g x) ]
-  | <d>[ x _ ] ->  <c> [ (g x) (g x) ]
-  | <e>[] -> <e>[]
-  ;;
- *)
+(*let factorial = fixpoint fac3*)

@@ -362,6 +362,14 @@ let example14_alt = fun (input : Int | String) -> fun (extra : (Any, Any)) ->
     else if (is_int input,is_int (fst extra)) is (Any,True) then add (strlen input) (fst extra)
     else 0
 
+let example14 = fun (input : Int|String) ->
+  fun (extra : (Any, Any)) ->
+    if and2_(is_int input , is_int(fst extra)) is True then
+        add input (fst extra)
+    else if is_int(fst extra) is True then
+        add (strlen input) (fst extra)
+    else 0
+
 (* Fix-point combinator *)
 
 type Input = Int (* Any   *)

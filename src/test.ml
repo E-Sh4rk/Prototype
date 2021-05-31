@@ -410,3 +410,7 @@ let fac3 =  fun (f : Int -> Int) ->
   fun x -> if x is 0 then 1 else x * (f(x-1))
 
 (*let factorial = fixpoint fac3*)
+
+let typeable_in_racket =
+  let id = fun x -> x in
+  (id 42) + 3

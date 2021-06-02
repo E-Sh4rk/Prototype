@@ -414,3 +414,13 @@ let fac3 =  fun (f : Int -> Int) ->
 let typeable_in_racket =
   let id = fun x -> x in
   (id 42) + 3
+
+let how_to_type_that =
+  let snd_ = fun x -> (fun y -> y) in
+  (snd_ 0 42) + 1
+(* becomes
+bind snd = lambda x. lambda y. y in
+bind aux1 = snd 0 in
+bind aux2 = aux1 42 in
+bind aux3 = aux2 + 1
+*)

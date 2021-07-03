@@ -125,26 +125,22 @@ and typeof tenv env e =
     else begin
       let pos = Variable.get_locations v in
       let s = typeof_a pos tenv env a in
-      if disj splits |> subtype s
-      (* NOTE: in the paper, equivalence is required
-      (but it is still sound if we test only this inclusion) *)
+      if disj splits |> equiv s
+      (* NOTE: it is still sound if we only test 'subtype' instad of 'equiv',
+        but for now I prefer to match the paper. *)
       then
         splits |> List.map (fun t ->
           let env = Env.add v t env in
           typeof tenv env e
         ) |> disj |> simplify_typ
       else raise (Ill_typed (pos,
-        "Invalid splits (does not cover the whole domain). "^(splits_domain splits s)))
+        "Invalid splits (does not cover the initial domain). "^(splits_domain splits s)))
     end
 
-let refine_a ~backward env a t =
+let refine_a env a t =
   begin match a with
-  | Abstract s when backward -> if disjoint s t then [] else [Env.empty]
-  | Abstract s -> if subtype s t then [Env.empty] else []
-  | Const c when backward ->
-    if disjoint (Ast.const_to_typ c) t then [] else [Env.empty]
-  | Const c ->
-    if subtype (Ast.const_to_typ c) t then [Env.empty] else []
+  | Abstract s -> if disjoint s t then [] else [Env.empty]
+  | Const c -> if disjoint (Ast.const_to_typ c) t then [] else [Env.empty]
   | Pair (v1, v2) ->
     split_pair t
     |> List.map (
@@ -157,7 +153,7 @@ let refine_a ~backward env a t =
   | Projection (Snd, v) -> [mk_times any_node (cons t) |> Env.singleton v]
   | Projection (Field label, v) ->
     [mk_record true [label, cons t] |> Env.singleton v]
-  | RecordUpdate (v, label, None) when backward ->
+  | RecordUpdate (v, label, None) ->
     split_record t
     |> List.filter_map (
       fun ti ->
@@ -168,7 +164,7 @@ let refine_a ~backward env a t =
           let ti = remove_field_info ti label in
           Some (Env.singleton v ti)
     )
-  | RecordUpdate (v, label, Some x) when backward ->
+  | RecordUpdate (v, label, Some x) ->
     split_record t
     |> List.map (
       fun ti ->
@@ -176,10 +172,9 @@ let refine_a ~backward env a t =
         let ti = remove_field_info ti label in
         Env.cap (Env.singleton v ti) (Env.singleton x field_type)
       )
-  | RecordUpdate _ -> failwith "Not implemented" (* Not used anyway... *)
   | App (v1, v2) ->
     let t1 = Env.find v1 env in
-    (if backward then square_split t1 t else triangle_split t1 t)
+    square_split t1 t
     |> List.map (
       fun (t1, t2) ->
         let env1 = Env.singleton v1 t1 in
@@ -192,10 +187,8 @@ let refine_a ~backward env a t =
     let env1' = Env.singleton x1 t in
     let env2' = Env.singleton x2 t in
     [Env.cap env1 env1' ; Env.cap env2 env2']
-  | Lambda _ when backward ->
-    if disjoint arrow_any t then [] else [Env.empty]
   | Lambda _ ->
-    if subtype arrow_any t then [Env.empty] else []
+    if disjoint arrow_any t then [] else [Env.empty]
   | Let (v1, v2) -> [Env.cap (Env.singleton v1 any) (Env.singleton v2 t)]
   end
   |> List.map (fun env' -> List.fold_left
@@ -210,19 +203,10 @@ let backward env x a gammas =
   gammas |>
   List.map (fun gamma' ->
     if Env.mem x gamma'
-    then (refine_a ~backward:true (Env.cap env gamma') a (Env.find x gamma')
+    then (refine_a (Env.cap env gamma') a (Env.find x gamma')
       |> List.map (Env.cap gamma'))
     else [Env.add x (Env.find x env) gamma']
   ) |> List.flatten
-
-(*let forward env x a gammas =
-  gammas |>
-  List.map (fun gamma' ->
-    if Env.mem x gamma'
-    then (refine_a ~backward:false (Env.cap env gamma') a (Env.find x gamma')
-      |> List.map (Env.cap (Env.rm x gamma')))
-    else [gamma']
-  ) |> List.flatten*)
 
 let domain_included_in_singleton env x =
   List.for_all (fun v -> Variable.equals v x) (Env.domain env)

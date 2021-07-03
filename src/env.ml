@@ -1,10 +1,9 @@
 open Variable
 
-exception EnvIsBottom
-
 type t = Cduce.typ VarMap.t
 
 let empty = VarMap.empty
+let is_empty =  VarMap.is_empty
 let contains_empty = VarMap.exists (fun _ t -> Cduce.is_empty t)
 let singleton = VarMap.singleton
 
@@ -20,6 +19,10 @@ let find = VarMap.find
 
 let strengthen v t env =
   let t = if mem v env then Cduce.cap_o t (find v env) else t in
+  add v t env
+
+let strengthen_strict v t env =
+  let t = Cduce.cap_o t (find v env) in
   add v t env
 
 let cap =

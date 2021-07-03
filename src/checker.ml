@@ -138,21 +138,20 @@ and typeof tenv env e =
     end
 
 let refine_a env a t =
-  begin match a with
-  | Abstract s -> if disjoint s t then [] else [Env.empty]
-  | Const c -> if disjoint (Ast.const_to_typ c) t then [] else [Env.empty]
+  match a with
+  | Abstract s -> if disjoint s t then [] else [env]
+  | Const c -> if disjoint (Ast.const_to_typ c) t then [] else [env]
   | Pair (v1, v2) ->
     split_pair t
-    |> List.map (
+    |> List.filter_map (
       fun (t1, t2) ->
-        let env1 = Env.singleton v1 t1 in
-        let env2 = Env.singleton v2 t2 in
-        Env.cap env1 env2
+        env |>
+        option_chain [Env_refinement.refine v1 t1 ; Env_refinement.refine v2 t2]
     )
-  | Projection (Fst, v) -> [mk_times (cons t) any_node |> Env.singleton v]
-  | Projection (Snd, v) -> [mk_times any_node (cons t) |> Env.singleton v]
+  | Projection (Fst, v) -> [Env_refinement.refine v (mk_times (cons t) any_node) env] |> filter_options
+  | Projection (Snd, v) -> [Env_refinement.refine v (mk_times any_node (cons t)) env] |> filter_options
   | Projection (Field label, v) ->
-    [mk_record true [label, cons t] |> Env.singleton v]
+    [Env_refinement.refine v (mk_record true [label, cons t]) env] |> filter_options
   | RecordUpdate (v, label, None) ->
     split_record t
     |> List.filter_map (
@@ -162,50 +161,42 @@ let refine_a env a t =
           None
         end with Not_found -> (* If the field 'label' can be absent *)
           let ti = remove_field_info ti label in
-          Some (Env.singleton v ti)
+          Env_refinement.refine v ti env
     )
   | RecordUpdate (v, label, Some x) ->
     split_record t
-    |> List.map (
+    |> List.filter_map (
       fun ti ->
         let field_type = get_field_assuming_not_absent ti label in
         let ti = remove_field_info ti label in
-        Env.cap (Env.singleton v ti) (Env.singleton x field_type)
+        env |>
+        option_chain [Env_refinement.refine v ti ; Env_refinement.refine x field_type]
       )
   | App (v1, v2) ->
-    let t1 = Env.find v1 env in
+    let t1 = Env_refinement.find v1 env in
     square_split t1 t
-    |> List.map (
+    |> List.filter_map (
       fun (t1, t2) ->
-        let env1 = Env.singleton v1 t1 in
-        let env2 = Env.singleton v2 t2 in
-        Env.cap env1 env2
+        env |>
+        option_chain [Env_refinement.refine v1 t1 ; Env_refinement.refine v2 t2]
     )
   | Ite (v, s, x1, x2) ->
-    let env1 = Env.singleton v s in
-    let env2 = Env.singleton v (neg s) in
-    let env1' = Env.singleton x1 t in
-    let env2' = Env.singleton x2 t in
-    [Env.cap env1 env1' ; Env.cap env2 env2']
+    [ env |> option_chain [Env_refinement.refine v s       ; Env_refinement.refine x1 t] ;
+      env |> option_chain [Env_refinement.refine v (neg s) ; Env_refinement.refine x2 t] ]
+    |> filter_options
   | Lambda _ ->
-    if disjoint arrow_any t then [] else [Env.empty]
-  | Let (v1, v2) -> [Env.cap (Env.singleton v1 any) (Env.singleton v2 t)]
-  end
-  |> List.map (fun env' -> List.fold_left
-    (fun acc v -> Env.strengthen v (Env.find v env) acc)
-    env' (Env.domain env')) (* Inter *)
-  |> List.filter (fun env -> Env.contains_empty env |> not) (* RemoveBottomEnv *)
-  |> List.map (fun env' ->
-    Env.filter (fun v t -> subtype (Env.find v env) t |> not) env'
-    ) (* RemoveUselessVar *)
+    if disjoint arrow_any t then [] else [env]
+  | Let (v1, v2) ->
+    [ env |>
+    option_chain [Env_refinement.refine v1 any ; Env_refinement.refine v2 t]]
+    |> filter_options
 
-let backward env x a gammas =
+let propagate x a gammas =
   gammas |>
-  List.map (fun gamma' ->
-    if Env.mem x gamma'
-    then (refine_a (Env.cap env gamma') a (Env.find x gamma')
-      |> List.map (Env.cap gamma'))
-    else [Env.add x (Env.find x env) gamma']
+  List.map (fun gamma ->
+    if Env_refinement.has_refinement x gamma
+    then refine_a gamma a (Env_refinement.find x gamma)
+    else [gamma]
   ) |> List.flatten
 
 let domain_included_in_singleton env x =

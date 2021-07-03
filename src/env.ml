@@ -18,10 +18,6 @@ let rm = VarMap.remove
 let find = VarMap.find
 
 let strengthen v t env =
-  let t = if mem v env then Cduce.cap_o t (find v env) else t in
-  add v t env
-
-let strengthen_strict v t env =
   let t = Cduce.cap_o t (find v env) in
   add v t env
 

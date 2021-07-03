@@ -24,6 +24,11 @@ let log a =
 
 
 let option_map f = function None -> None | Some e -> Some (f e)
+let option_chain fs e =
+  List.fold_left (fun acc f -> match acc with None -> None | Some e -> f e) (Some e) fs
+  
+let identity x = x
+let filter_options elt = List.filter_map identity elt
 
 let memoize f input_transform ht =
   let rec aux input =

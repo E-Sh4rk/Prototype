@@ -6,6 +6,8 @@ let empty b = (b, Env.empty)
 let is_empty (_,r) = Env.is_empty r
 
 let refined_domain (_, r) = Env.domain r
+let has_refinement v (_,r) = Env.mem v r
+
 let domain (b,r) =
   let d1 = Env.domain b |> VarSet.of_list in
   let d2 = Env.domain r |> VarSet.of_list in
@@ -17,21 +19,18 @@ let find v (b, r) =
   else Env.find v b
 
 let strengthen v t (b,r) =
-  if Env.mem v r then (b, Env.strengthen_strict v t r)
-  else if Env.mem v b then begin
-    let ot = Env.find v b in
-    if Cduce.subtype ot t then (b, r)
-    else (b, Env.add v (Cduce.cap_o t ot) r)
-  end
-  else (b, Env.add v t r)
-
-let strengthen_strict v t (b,r) =
-  if Env.mem v r then (b, Env.strengthen_strict v t r)
+  if Env.mem v r then (b, Env.strengthen v t r)
   else begin
     let ot = Env.find v b in
     if Cduce.subtype ot t then (b, r)
     else (b, Env.add v (Cduce.cap_o t ot) r)
   end
+let refine v t (b,r) =
+  try
+    let ot = find v (b,r) in
+    if Cduce.disjoint t ot then None
+    else Some (strengthen v t (b,r))
+  with Not_found -> None
 
 let rm v (b,r) = (Env.rm v b, Env.rm v r)
 

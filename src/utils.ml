@@ -30,6 +30,13 @@ let option_chain fs e =
 let identity x = x
 let filter_options elt = List.filter_map identity elt
 
+let rec split4 lst =
+  match lst with
+  | [] -> ([],[],[],[])
+  | (a,b,c,d)::lst ->
+    let (ar,br,cr,dr) = split4 lst in
+    (a::ar,b::br,c::cr,d::dr)
+
 let memoize f input_transform ht =
   let rec aux input =
     let htbl_key = input_transform input in

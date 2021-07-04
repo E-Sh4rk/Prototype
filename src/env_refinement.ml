@@ -34,6 +34,12 @@ let refine v t (b,r) =
 
 let rm v (b,r) = (Env.rm v b, Env.rm v r)
 
+let to_env (b,r) =
+  List.fold_left (fun b x ->
+      let t = Env.find x r in
+      Env.add x t b
+    ) b (Env.domain r)
+
 let show (_,r) = Env.show r
 let pp fmt (_,r) = Env.pp fmt r
 let pp_filtered lst fmt (_,r) = Env.pp_filtered lst fmt r

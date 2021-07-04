@@ -127,7 +127,7 @@ let merge_annots' e1 e2 =
 
 let merge_annots es =
   match es with
-  | [] -> assert false
+  | [] -> raise Not_found
   | e::es -> List.fold_left merge_annots' e es
 
 

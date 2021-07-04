@@ -157,6 +157,9 @@ let has_atom (_, atoms) name =
 let conj ts = List.fold_left cap_o any ts
 let disj ts = List.fold_left cup_o empty ts
 
+let apply_opt t s =
+    if subtype s (domain t) then apply t s else any
+
 let branch_type lst =
     if lst = [] then arrow_any
     else begin

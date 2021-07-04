@@ -199,11 +199,13 @@ let propagate x a gammas =
     else [gamma]
   ) |> List.flatten
 
-let domain_included_in_singleton env x =
-  List.for_all (fun v -> Variable.equals v x) (Env.domain env)
+let empty_annots_a =
+  map_a
+  (function Bind (_, v, a, e) -> Bind (VarAnnot.empty, v, a, e) | e -> e)
+  (function Lambda (_, t, v, e) -> Lambda (VarAnnot.empty, t, v, e) | a -> a)
 
 let empty_annots =
-  map_a
+  map_e
   (function Bind (_, v, a, e) -> Bind (VarAnnot.empty, v, a, e) | e -> e)
   (function Lambda (_, t, v, e) -> Lambda (VarAnnot.empty, t, v, e) | a -> a)
 
@@ -212,12 +214,21 @@ let restrict_annots gamma =
   (function Bind (va, v, a, e) -> Bind (VarAnnot.restrict gamma va, v, a, e) | e -> e)
   (function Lambda (va, t, v, e) -> Lambda (VarAnnot.restrict gamma va, t, v, e) | a -> a)
 
-type infer_res = e * (Env.t list)
-exception Return of infer_res
+let merge_annots default es =
+  try merge_annots es with Not_found -> empty_annots default
 
-let merge_res res =
-  let (es, gammas) = List.split res in
-  (merge_annots es, List.concat gammas)
+let extract x gammas =
+  let vas =
+    gammas |> List.map (fun envr ->
+      VarAnnot.singleton
+        (Env_refinement.rm x envr |> Env_refinement.to_env)
+        (Env_refinement.find x envr)
+    ) in
+  let gammas =
+    gammas |> List.map (fun envr ->
+      Env_refinement.rm x envr
+    ) in
+  (VarAnnot.union vas, gammas)
 
 let typeof_nofail tenv env e =
   try typeof tenv env e
@@ -226,6 +237,69 @@ let typeof_nofail tenv env e =
 let typeof_a_nofail pos tenv env a =
   try typeof_a pos tenv env a
   with Ill_typed _ -> assert false
+
+type infer_res = e * (Env_refinement.t list) * bool (* Finished? *)
+
+let rec infer' tenv env e t =
+  let envr = Env_refinement.empty env in
+  match e with
+  | Var v -> (e, [Env_refinement.refine v t envr] |> filter_options, true)
+  | Bind (va, v, a, e) ->
+    log "@,@[<v 1>BIND for variable %a" Variable.pp v ;
+    let pos = Variable.get_locations v in
+    let splits = VarAnnot.splits env va in
+    let dom_a = disj splits in
+    let res =
+      if splits = []
+      then begin (* BindArgSkip *)
+        log "@,Skipping definition." ;
+        let (e, gammas, finished) = infer' tenv env e t in
+        (Bind (VarAnnot.empty, v, empty_annots_a a, e), gammas, finished)
+      end else begin
+        let (a, gammas_a, finished) = infer_a' pos tenv env a dom_a in
+        if gammas_a = []
+        then begin (* BindArgUntyp *)
+          log "@,Skipping definition." ;
+          let (e, gammas, finished) = infer' tenv env e t in
+          (Bind (VarAnnot.empty, v, a (* should be empty already *), e), gammas, finished)
+        end else if List.exists (fun envr -> Env_refinement.is_empty envr |> not) gammas_a
+        then begin (* BindArgRefEnv *)
+          log "@,The definition need refinements (going up)." ;
+          let gammas =
+            if List.exists Env_refinement.is_empty gammas_a
+            then gammas_a else envr::gammas_a in
+          let e = restrict_annots env e in
+          let va = VarAnnot.restrict env va in
+          (Bind (va, v, a, e), gammas, false)
+        end else if not finished then begin (* BindArgRefAnns *)
+          log "@,The definition need a new iteration." ;
+          infer' tenv env (Bind (va, v, a, e)) t
+        end else begin (* Bind *)
+          log "@,The definition has been successfully annotated." ;
+          let s = typeof_a_nofail pos tenv env a in
+          assert (subtype s dom_a) ;
+          let splits = partition s splits in
+          let res =
+            splits |> List.map (fun s ->
+              let env = Env.add v s env in
+              let (e, gammas, finished) = infer' tenv env e t in
+              let gammas = propagate v a gammas in
+              let (va, gammas) = extract v gammas in
+              (va, e, gammas, finished)
+            ) in
+          let (vas, es, gammass, finisheds) = split4 res in
+          let va = VarAnnot.union vas in
+          let e = merge_annots e es in
+          let gammas = List.flatten gammass in
+          let finished = List.for_all identity finisheds in
+          (Bind (va, v, a, e), gammas, finished)
+        end
+      end
+    in
+    log "@]@,END BIND for variable %a" Variable.pp v ; res
+
+and infer_a' pos tenv env a t =
+    failwith "TODO"
 
 let rec infer' tenv env e =
   let rec infer_with_split tenv env s x a e =
@@ -529,14 +603,19 @@ and infer_a' pos tenv env a =
   | Let (v1, v2) ->
     check_var_dom pos v1 env ; check_var_dom pos v2 env ; (a, [])
 
+let infer_iterated tenv e =
+  match infer' tenv Env.empty e any with
+  | (_, [], _) -> raise (Ill_typed ([], "Annotations inference failed."))
+  | (e, _, true) -> e
+  | (e, _, false) -> infer_iterated tenv e
+
 let infer tenv env e =
   let fv = fv_e e in
   let e = VarSet.fold (fun v acc ->
     Bind (VarAnnot.initial, v, Abstract (var_type [] v env), acc)
   ) fv e in
-  match infer' tenv Env.empty e with
-  | (e, []) -> log "@." ; e
-  | _ -> assert false
+  let e = infer_iterated tenv e in
+  log "@." ; e
 
 let typeof_simple tenv env e =
   let e = infer tenv env e in

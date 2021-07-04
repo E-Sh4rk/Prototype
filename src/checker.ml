@@ -99,10 +99,10 @@ let rec typeof_a pos tenv env a =
   | Lambda (va, Ast.ADomain s, v, e) ->
     let inferred_t = type_lambda env va v e in
     let dom = domain inferred_t in
-    if subtype s dom
+    if equiv s dom
     then inferred_t
     else raise (Ill_typed (pos,
-      "The inferred domain for the abstraction is too weak. "^(actual_expected dom s)))
+      "The inferred domain for the abstraction is different. "^(actual_expected dom s)))
   | Lambda (va, Ast.AArrow t, v, e) ->
     let inferred_t = type_lambda env va v e in
     if subtype inferred_t t
@@ -152,7 +152,7 @@ let refine_a env a t =
   | Projection (Snd, v) -> [Env_refinement.refine v (mk_times any_node (cons t)) env] |> filter_options
   | Projection (Field label, v) ->
     [Env_refinement.refine v (mk_record true [label, cons t]) env] |> filter_options
-  | RecordUpdate (v, label, None) ->
+  | RecordUpdate (v, label, None) -> (* TODO: simplify? *)
     split_record t
     |> List.filter_map (
       fun ti ->
@@ -163,7 +163,7 @@ let refine_a env a t =
           let ti = remove_field_info ti label in
           Env_refinement.refine v ti env
     )
-  | RecordUpdate (v, label, Some x) ->
+  | RecordUpdate (v, label, Some x) -> (* TODO: simplify? *)
     split_record t
     |> List.filter_map (
       fun ti ->
@@ -300,6 +300,75 @@ let rec infer' tenv env e t =
 
 and infer_a' pos tenv env a t =
   let envr = Env_refinement.empty env in
+  let type_lambda va v e t ~maxdom =
+    failwith "TODO"  (* TODO *)
+  in
+  (*
+    let rec infer_with_splits ~enforce_domain ~enforce_arrow tenv env x e splits =
+    let res = List.fold_left
+      (fun acc s ->
+        try (infer_with_split ~enforce_domain ~enforce_arrow tenv env s x e)::acc
+        with (Ill_typed _) as err -> begin
+          if enforce_domain then raise err
+          else acc
+        end
+      )
+      [] splits
+    in
+    if res = []
+    then raise (Ill_typed (pos, "Cannot infer the domain of this abstraction."))
+    else res
+  and infer_with_split ~enforce_domain ~enforce_arrow tenv env s x e =
+    let env' = Env.add x s env in
+    match infer' tenv env' e with
+    | (e, []) -> (* AbsSplitOk *)
+      begin match enforce_arrow with
+      | None -> ()
+      | Some lst -> if lst |> List.exists (fun (left, right) ->
+        subtype s left && (subtype (typeof_nofail tenv env' e) right |> not)
+      ) then
+        raise (Ill_typed (pos, "Cannot get the codomain specified for this abstraction."))
+      end ;
+      (VarAnnot.singleton env s, (e, []))
+    | (e, gammas) ->
+      if List.for_all (fun gamma -> domain_included_in_singleton gamma x) gammas
+      then (* AbsSplitTop *)
+        let splits =
+          List.map (fun gamma -> Env.find x (Env.cap gamma (Env.singleton x s))) gammas
+          |> partition s in
+        assert (disj splits |> subtype s) ;
+        let res = infer_with_splits ~enforce_domain ~enforce_arrow tenv env x e splits in
+        let (vas, res) = List.split res in
+        log "@,The split has been fully repercuted. Going down." ;
+        (VarAnnot.union vas, merge_res res)
+      else (* AbsSplitUp *)
+        let va = List.fold_left (fun acc gamma ->
+              let gamma = Env.cap gamma (Env.singleton x s) in
+              VarAnnot.add_split (Env.cap env (Env.rm x gamma)) (Env.find x gamma) acc
+            ) VarAnnot.empty gammas
+        in
+        assert (VarAnnot.is_empty va |> not) ;
+        let gammas = List.map (Env.rm x) gammas in
+        log "@,The split still has repercussions on earlier variables. Going up." ;
+        (va, (e, gammas))
+  in
+  let type_lambda_with_splits ~enforce_domain ?(enforce_arrow=None) lt tenv env splits x e =
+    log "@,@[<v 1>LAMBDA for variable %a" Variable.pp x ;
+    let t = match enforce_domain with
+    (* NOTE: if splits are empty, we assume it's because it hasn't been set yet. *)
+    | None -> if splits = [] then any else disj splits
+    | Some t -> t
+    in
+    let splits = partition t splits in
+    let enforce_domain = match enforce_domain with None -> false | _ -> true in
+    (* Abs *)
+    let res = infer_with_splits ~enforce_domain ~enforce_arrow tenv env x e splits in
+    let (vas, res) = List.split res in
+    let (e, gammas) = merge_res res in
+    log "@]@,END LAMBDA for variable %a" Variable.pp x ;
+    (Lambda (VarAnnot.union vas, lt, x, e), gammas)
+  in
+  *)
   match a with
   | Abstract s when subtype s t -> (a, [envr], true)
   | Abstract _ -> (a, [], true)
@@ -426,264 +495,23 @@ and infer_a' pos tenv env a t =
             ) in
           (a, gammas, true)
     end else (a, [], true)
-  (* TODO *)
-  | Lambda (va, (Ast.ADomain s as lt), v, e) ->
-    let splits = VarAnnot.splits env va in
-    type_lambda_with_splits ~enforce_domain:(Some s) lt tenv env splits v e
-  | Lambda (va, (Ast.Unnanoted as lt), v, e) ->
-    let splits = VarAnnot.splits env va in
-    type_lambda_with_splits ~enforce_domain:None lt tenv env splits v e
-  | Lambda (va, (Ast.AArrow t as lt), v, e) ->
-    let t = match dnf t with
-    | [] -> [(any, empty)]
-    | [lst] -> lst
-    | _ -> raise (Ill_typed (pos, "Function annotation cannot be a disjunction."))
-    in
-    let splits = VarAnnot.splits env va in
-    let left = List.map fst t in
-    let dom = disj left in
-    let splits = left@splits in
-    type_lambda_with_splits
-      ~enforce_domain:(Some dom) ~enforce_arrow:(Some t) lt tenv env splits v e
   | Let (v1, v2) ->
-    check_var_dom pos v1 env ; check_var_dom pos v2 env ; (a, [])
-    failwith "TODO"
+    let gammas =
+      [envr |> option_chain
+        [Env_refinement.refine v1 any ; Env_refinement.refine v2 t ]]
+      |> filter_options in
+      (a, gammas, true)
+  | Lambda (va, (Ast.ADomain s), v, e) ->
+    let t = cap_o t (mk_arrow (cons s) any_node) in
+    type_lambda va v e t ~maxdom:s
+  | Lambda (va, (Ast.Unnanoted), v, e) ->
+    let t = cap_o t arrow_any in
+    type_lambda va v e t ~maxdom:any
+  | Lambda (va, (Ast.AArrow s), v, e) ->
+    let t = cap_o t s in
+    type_lambda va v e t ~maxdom:(domain s)
 
-and infer_a' pos tenv env a =
-  let rec infer_with_splits ~enforce_domain ~enforce_arrow tenv env x e splits =
-    let res = List.fold_left
-      (fun acc s ->
-        try (infer_with_split ~enforce_domain ~enforce_arrow tenv env s x e)::acc
-        with (Ill_typed _) as err -> begin
-          if enforce_domain then raise err
-          else acc
-        end
-      )
-      [] splits
-    in
-    if res = []
-    then raise (Ill_typed (pos, "Cannot infer the domain of this abstraction."))
-    else res
-  and infer_with_split ~enforce_domain ~enforce_arrow tenv env s x e =
-    let env' = Env.add x s env in
-    match infer' tenv env' e with
-    | (e, []) -> (* AbsSplitOk *)
-      begin match enforce_arrow with
-      | None -> ()
-      | Some lst -> if lst |> List.exists (fun (left, right) ->
-        subtype s left && (subtype (typeof_nofail tenv env' e) right |> not)
-      ) then
-        raise (Ill_typed (pos, "Cannot get the codomain specified for this abstraction."))
-      end ;
-      (VarAnnot.singleton env s, (e, []))
-    | (e, gammas) ->
-      if List.for_all (fun gamma -> domain_included_in_singleton gamma x) gammas
-      then (* AbsSplitTop *)
-        let splits =
-          List.map (fun gamma -> Env.find x (Env.cap gamma (Env.singleton x s))) gammas
-          |> partition s in
-        assert (disj splits |> subtype s) ;
-        let res = infer_with_splits ~enforce_domain ~enforce_arrow tenv env x e splits in
-        let (vas, res) = List.split res in
-        log "@,The split has been fully repercuted. Going down." ;
-        (VarAnnot.union vas, merge_res res)
-      else (* AbsSplitUp *)
-        let va = List.fold_left (fun acc gamma ->
-              let gamma = Env.cap gamma (Env.singleton x s) in
-              VarAnnot.add_split (Env.cap env (Env.rm x gamma)) (Env.find x gamma) acc
-            ) VarAnnot.empty gammas
-        in
-        assert (VarAnnot.is_empty va |> not) ;
-        let gammas = List.map (Env.rm x) gammas in
-        log "@,The split still has repercussions on earlier variables. Going up." ;
-        (va, (e, gammas))
-  in
-  let type_lambda_with_splits ~enforce_domain ?(enforce_arrow=None) lt tenv env splits x e =
-    log "@,@[<v 1>LAMBDA for variable %a" Variable.pp x ;
-    let t = match enforce_domain with
-    (* NOTE: if splits are empty, we assume it's because it hasn't been set yet. *)
-    | None -> if splits = [] then any else disj splits
-    | Some t -> t
-    in
-    let splits = partition t splits in
-    let enforce_domain = match enforce_domain with None -> false | _ -> true in
-    (* Abs *)
-    let res = infer_with_splits ~enforce_domain ~enforce_arrow tenv env x e splits in
-    let (vas, res) = List.split res in
-    let (e, gammas) = merge_res res in
-    log "@]@,END LAMBDA for variable %a" Variable.pp x ;
-    (Lambda (VarAnnot.union vas, lt, x, e), gammas)
-  in
-  match a with
-  | Abstract _ -> (a, [])
-  | Const _ -> (a, [])
-  | Pair (v1, v2) ->
-    check_var_dom pos v1 env ; check_var_dom pos v2 env ; (a, [])
-  | Projection ((Fst | Snd), v) ->
-    let t = var_type pos v env in
-    if subtype t pair_any then begin
-      match split_pair t with
-      | [] -> (a, [])
-      | [_] -> (a, [])
-      | lst ->
-        let gammas = lst |> List.map (fun (t1, t2) ->
-          Env.singleton v (mk_times (cons t1) (cons t2))
-        ) in
-        (a, gammas)
-    end else begin
-      let t1 = cap_o t pair_any in
-      let t2 = diff t pair_any in
-      if is_empty t1 || is_empty t2
-      then raise (Ill_typed (pos,
-        "Bad domain for the projection. "^(actual_expected t pair_any)))
-      else (
-        let env1 = Env.singleton v t1 in
-        let env2 = Env.singleton v t2 in
-        (a, [env1;env2])
-      )
-    end
-  | Projection (Field label, v) ->
-    let t = var_type pos v env in
-    if subtype t (record_any_with label) then begin
-      match split_record t with
-      | [] -> (a, [])
-      | [_] -> (a, [])
-      | lst ->
-        let gammas = lst |> List.map (fun t' ->
-          Env.singleton v t')
-        in 
-        (a, gammas)
-    end
-    else
-      let t1 = cap_o t (record_any_with label) in
-      let t2 = diff t (record_any_with label) in
-      if is_empty t1 || is_empty t2 then
-        raise (Ill_typed (pos, 
-        "Bad domain for the projection. " ^ (actual_expected t (record_any_with label))))
-      else (
-        let env1 = Env.singleton v t1 in
-        let env2 = Env.singleton v t2 in
-        (a, [env1;env2])
-      )
-  | RecordUpdate (v, _, None) ->
-    let t = var_type pos v env in
-    if subtype t record_any then
-      (a, [])
-    else
-      let t1 = cap_o t record_any in
-      let t2 = diff t record_any in
-      if is_empty t1 || is_empty t2 then
-        raise (Ill_typed (pos, 
-        "Bad domain for the projection. " ^ (actual_expected t record_any)))
-      else (
-        let env1 = Env.singleton v t1 in
-        let env2 = Env.singleton v t2 in
-        (a, [env1;env2])
-      )
-  | RecordUpdate (v, _, Some f) ->
-    check_var_dom pos f env;
-    let t = var_type pos v env in
-    if subtype t record_any then
-      (a, [])
-    else
-      let t1 = cap_o t record_any in
-      let t2 = diff t record_any in
-      if is_empty t1 || is_empty t2 then
-        raise (Ill_typed (pos, 
-        "Bad domain for the projection. " ^ (actual_expected t record_any)))
-      else (
-        let env1 = Env.singleton v t1 in
-        let env2 = Env.singleton v t2 in
-        (a, [env1;env2])
-      )
-  | App (v1, v2) ->
-    let t1 = var_type pos v1 env in
-    let t2 = var_type pos v2 env in
-    if subtype t1 arrow_any then
-      begin match split_arrow t1 with
-      | [] -> (a, [])
-      | [t1] ->
-        begin match dnf t1 with
-        | [arrows] ->
-          let dom = domain t1 in
-          if subtype t2 dom
-          then begin
-            if List.for_all (fun (s,_) -> subtype t2 s || disjoint t2 s) arrows
-            then (a, [])
-            else begin
-              let gammas = arrows |> List.map (fun (s,_) -> cap_o s t2) |>
-                List.filter (fun t2 -> is_empty t2 |> not) |>
-                List.map (fun t2 -> Env.singleton v2 t2) in
-              (a, gammas)
-            end
-          end else begin
-            let t2' = cap_o t2 dom in
-            let t2'' = diff t2 dom in
-            if is_empty t2' || is_empty t2''
-            then raise (Ill_typed (pos,
-              "Bad domain for the application. "^(actual_expected t2 dom)))
-            else (
-              let env1 = Env.singleton v2 t2' in
-              let env2 = Env.singleton v2 t2'' in
-              (a, [env1;env2])
-            )
-          end
-        | _ -> assert false
-        end
-      | lst ->
-        let gammas = lst |> List.map (fun t1 -> Env.singleton v1 t1) in
-        (a, gammas)
-      end
-    else begin
-      let t1' = cap_o t1 arrow_any in
-      let t1'' = diff t1 arrow_any in
-      if is_empty t1' || is_empty t1''
-      then raise (Ill_typed (pos,
-        "Cannot apply a non-arrow type. "^(actual_expected t1 arrow_any)))
-      else (
-        let env1 = Env.singleton v1 t1' in
-        let env2 = Env.singleton v1 t1'' in
-        (a, [env1;env2])
-      )
-    end
-  | Ite (v, t, v1, v2) ->
-    let tv = var_type pos v env in
-    if is_empty tv
-    then (a, [])
-    else
-      let t1 = cap_o tv t in
-      let t2 = diff tv t in
-      if is_empty t2
-      then (check_var_dom pos v1 env ; (a, []))
-      else if is_empty t1
-      then (check_var_dom pos v2 env ; (a, []))
-      else begin
-        let env1 = Env.singleton v t1 in
-        let env2 = Env.singleton v t2 in
-        (a, [env1;env2])
-      end
-  | Lambda (va, (Ast.ADomain s as lt), v, e) ->
-    let splits = VarAnnot.splits env va in
-    type_lambda_with_splits ~enforce_domain:(Some s) lt tenv env splits v e
-  | Lambda (va, (Ast.Unnanoted as lt), v, e) ->
-    let splits = VarAnnot.splits env va in
-    type_lambda_with_splits ~enforce_domain:None lt tenv env splits v e
-  | Lambda (va, (Ast.AArrow t as lt), v, e) ->
-    let t = match dnf t with
-    | [] -> [(any, empty)]
-    | [lst] -> lst
-    | _ -> raise (Ill_typed (pos, "Function annotation cannot be a disjunction."))
-    in
-    let splits = VarAnnot.splits env va in
-    let left = List.map fst t in
-    let dom = disj left in
-    let splits = left@splits in
-    type_lambda_with_splits
-      ~enforce_domain:(Some dom) ~enforce_arrow:(Some t) lt tenv env splits v e
-  | Let (v1, v2) ->
-    check_var_dom pos v1 env ; check_var_dom pos v2 env ; (a, [])
-
-let infer_iterated tenv e =
+let rec infer_iterated tenv e =
   match infer' tenv Env.empty e any with
   | (_, [], _) -> raise (Ill_typed ([], "Annotations inference failed."))
   | (e, _, true) -> e

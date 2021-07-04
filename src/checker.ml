@@ -399,57 +399,34 @@ and infer_a' pos tenv env a t =
         in
         (a, gammas, true)
     end else (a, [], true)
-  (* TODO *)
   | App (v1, v2) ->
-    let t1 = var_type pos v1 env in
-    let t2 = var_type pos v2 env in
-    if subtype t1 arrow_any then
-      begin match split_arrow t1 with
-      | [] -> (a, [])
-      | [t1] ->
-        begin match dnf t1 with
-        | [arrows] ->
-          let dom = domain t1 in
-          if subtype t2 dom
-          then begin
-            if List.for_all (fun (s,_) -> subtype t2 s || disjoint t2 s) arrows
-            then (a, [])
-            else begin
-              let gammas = arrows |> List.map (fun (s,_) -> cap_o s t2) |>
-                List.filter (fun t2 -> is_empty t2 |> not) |>
-                List.map (fun t2 -> Env.singleton v2 t2) in
-              (a, gammas)
-            end
-          end else begin
-            let t2' = cap_o t2 dom in
-            let t2'' = diff t2 dom in
-            if is_empty t2' || is_empty t2''
-            then raise (Ill_typed (pos,
-              "Bad domain for the application. "^(actual_expected t2 dom)))
-            else (
-              let env1 = Env.singleton v2 t2' in
-              let env2 = Env.singleton v2 t2'' in
-              (a, [env1;env2])
-            )
-          end
-        | _ -> assert false
-        end
-      | lst ->
-        let gammas = lst |> List.map (fun t1 -> Env.singleton v1 t1) in
-        (a, gammas)
-      end
-    else begin
-      let t1' = cap_o t1 arrow_any in
-      let t1'' = diff t1 arrow_any in
-      if is_empty t1' || is_empty t1''
-      then raise (Ill_typed (pos,
-        "Cannot apply a non-arrow type. "^(actual_expected t1 arrow_any)))
-      else (
-        let env1 = Env.singleton v1 t1' in
-        let env2 = Env.singleton v1 t1'' in
-        (a, [env1;env2])
-      )
-    end
+    if Env.mem v1 env && Env.mem v2 env then begin
+      let vt1 = Env.find v1 env in
+      let vt2 = Env.find v2 env in
+      if is_empty vt1 || (is_empty vt2 && subtype vt1 arrow_any)
+      then (a, [envr], true)
+      else
+        let vt1 = cap_o vt1 arrow_any in
+        (* NOTE: In the paper, the rule AppR does not interstect vt1 with arrow_any *)
+        match dnf vt1 with
+        | [] -> (a, [], true)
+        | [arrows] -> (* AppR *)
+          let gammas =
+            arrows |> List.filter_map (fun (si,_) ->
+              let arrow_type = mk_arrow (cons si) (cons t) in
+              envr |> option_chain [
+                Env_refinement.refine v1 arrow_type ; Env_refinement.refine v2 si
+              ]
+            ) in
+          (a, gammas, true)
+        | lst -> (* AppL *)
+          let gammas =
+            lst |> List.filter_map (fun arrows ->
+              Env_refinement.refine v1 (branch_type arrows) envr
+            ) in
+          (a, gammas, true)
+    end else (a, [], true)
+  (* TODO *)
   | Lambda (va, (Ast.ADomain s as lt), v, e) ->
     let splits = VarAnnot.splits env va in
     type_lambda_with_splits ~enforce_domain:(Some s) lt tenv env splits v e

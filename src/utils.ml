@@ -30,6 +30,12 @@ let option_chain fs e =
 let identity x = x
 let filter_options elt = List.filter_map identity elt
 
+let rec split3 lst =
+  match lst with
+  | [] -> ([],[],[])
+  | (a,b,c)::lst ->
+    let (ar,br,cr) = split3 lst in
+    (a::ar,b::br,c::cr)
 let rec split4 lst =
   match lst with
   | [] -> ([],[],[],[])

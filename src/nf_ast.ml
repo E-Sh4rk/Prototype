@@ -102,7 +102,7 @@ let bound_vars =
 let bv_a = bound_vars |> fst
 let bv_e = bound_vars |> snd
 
-let merge_annots' e1 e2 =
+let merge_annots' =
   let rec aux_a a1 a2 =
     match a1, a2 with
     | Abstract t, _ -> Abstract t
@@ -123,12 +123,19 @@ let merge_annots' e1 e2 =
       Bind (VarAnnot.cup va1 va2, v, aux_a a1 a2, aux_e e1 e2)
     | Bind _, _ -> assert false
   in
-  aux_e e1 e2
+  (aux_a, aux_e)
 
-let merge_annots es =
+let merge_annots_a' = merge_annots' |> fst
+let merge_annots_e' = merge_annots' |> snd
+
+let merge_annots_a a_s =
+  match a_s with
+  | [] -> raise Not_found
+  | a::a_s -> List.fold_left merge_annots_a' a a_s
+let merge_annots_e es =
   match es with
   | [] -> raise Not_found
-  | e::es -> List.fold_left merge_annots' e es
+  | e::es -> List.fold_left merge_annots_e' e es
 
 
 let rec separate_defs bvs defs =

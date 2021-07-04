@@ -201,7 +201,7 @@ let empty_annots_a =
   (function Bind (_, v, a, e) -> Bind (VarAnnot.empty, v, a, e) | e -> e)
   (function Lambda (_, t, v, e) -> Lambda (VarAnnot.empty, t, v, e) | a -> a)
 
-let empty_annots =
+let empty_annots_e =
   map_e
   (function Bind (_, v, a, e) -> Bind (VarAnnot.empty, v, a, e) | e -> e)
   (function Lambda (_, t, v, e) -> Lambda (VarAnnot.empty, t, v, e) | a -> a)
@@ -211,8 +211,10 @@ let restrict_annots gamma =
   (function Bind (va, v, a, e) -> Bind (VarAnnot.restrict gamma va, v, a, e) | e -> e)
   (function Lambda (va, t, v, e) -> Lambda (VarAnnot.restrict gamma va, t, v, e) | a -> a)
 
-let merge_annots default es =
-  try merge_annots es with Not_found -> empty_annots default
+let merge_annots_a default a_s =
+  try merge_annots_a a_s with Not_found -> empty_annots_a default
+let merge_annots_e default es =
+  try merge_annots_e es with Not_found -> empty_annots_e default
 
 let extract x gammas =
   let vas =
@@ -286,7 +288,7 @@ let rec infer' tenv env e t =
             ) in
           let (vas, es, gammass, finisheds) = split4 res in
           let va = VarAnnot.union vas in
-          let e = merge_annots e es in
+          let e = merge_annots_e e es in
           let gammas = List.flatten gammass in
           let finished = List.for_all identity finisheds in
           (Bind (va, v, a, e), gammas, finished)
@@ -298,7 +300,21 @@ let rec infer' tenv env e t =
 and infer_a' pos tenv env a t =
   let envr = Env_refinement.empty env in
   let type_lambda va v e t ~maxdom =
-    failwith "TODO"  (* TODO *)
+    let t = cap_o t arrow_any in
+    (* NOTE: In the paper, the rule AbsUnion does not interstect t with arrow_any *)
+    match dnf t with
+    | [arrows] -> failwith "TODO"  (* TODO *)
+    | lst ->
+      let res =
+        lst |> List.map (fun arrows ->
+          infer_a' pos tenv env a (branch_type arrows)
+          )
+      in
+      let (a_s,gammas_s,finisheds) = split3 res in
+      let a = merge_annots_a a a_s in
+      let gammas = List.flatten gammas_s in
+      let finished = List.for_all identity finisheds in
+      (a, gammas, finished)
   in
   (*
     let rec infer_with_splits ~enforce_domain ~enforce_arrow tenv env x e splits =
@@ -475,7 +491,6 @@ and infer_a' pos tenv env a t =
         let vt1 = cap_o vt1 arrow_any in
         (* NOTE: In the paper, the rule AppR does not interstect vt1 with arrow_any *)
         match dnf vt1 with
-        | [] -> (a, [], true)
         | [arrows] -> (* AppR *)
           let gammas =
             arrows |> List.filter_map (fun (si,_) ->

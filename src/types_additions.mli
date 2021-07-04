@@ -73,6 +73,9 @@ val triangle_exact : typ -> typ -> typ
 val record_any_with : string -> typ
 (** [record_any_with l] creates the record type {l = Any ..} *)
 
+val record_any_without : string -> typ
+(** [record_any_without l] creates the record type {l =? Empty ..} *)
+
 val split_record : typ -> typ list
 (** [split_record t] splits a union of record types 
     into a list of individual record types *)

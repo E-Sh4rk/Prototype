@@ -313,6 +313,8 @@ let triangle_split f out =
 (* Record manipulation *)
 let record_any_with l = mk_record true [l, any_node]
 
+let record_any_without l = mk_record true [l, (or_absent empty |> cons)]
+
 let split_record t =
   let to_node (is_absent, t) =
     if is_absent then

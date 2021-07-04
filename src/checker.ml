@@ -26,6 +26,11 @@ let unbound_variable pos v =
 let var_type pos v env =
   if Env.mem v env then Env.find v env else unbound_variable pos v
 
+let typeof_const_atom tenv c =
+  match c with
+  | Ast.Atom str -> get_type tenv str
+  | c -> Ast.const_to_typ c
+
 let rec typeof_a pos tenv env a =
   let type_lambda env va v e =
     let splits = VarAnnot.splits env va in
@@ -41,8 +46,7 @@ let rec typeof_a pos tenv env a =
   in
   match a with
   | Abstract t -> t
-  | Const (Atom str) -> get_type tenv str
-  | Const c -> Ast.const_to_typ c
+  | Const c -> typeof_const_atom tenv c
   | Pair (v1, v2) ->
     let t1 = var_type pos v1 env in
     let t2 = var_type pos v2 env in
@@ -134,10 +138,10 @@ and typeof tenv env e =
         "Invalid splits (does not cover the initial domain). "^(splits_domain splits s)))
     end
 
-let refine_a env a t =
+let refine_a tenv env a t =
   match a with
   | Abstract s -> if disjoint s t then [] else [env]
-  | Const c -> if disjoint (Ast.const_to_typ c) t then [] else [env]
+  | Const c -> if disjoint (typeof_const_atom tenv c) t then [] else [env]
   | Pair (v1, v2) ->
     split_pair t
     |> List.filter_map (
@@ -185,11 +189,11 @@ let refine_a env a t =
     option_chain [Env_refinement.refine v1 any ; Env_refinement.refine v2 t]]
     |> filter_options
 
-let propagate x a gammas =
+let propagate tenv x a gammas =
   gammas |>
   List.map (fun gamma ->
     if Env_refinement.has_refinement x gamma
-    then refine_a gamma a (Env_refinement.find x gamma)
+    then refine_a tenv gamma a (Env_refinement.find x gamma)
     else [gamma]
   ) |> List.flatten
 
@@ -236,6 +240,7 @@ let typeof_a_nofail pos tenv env a =
 
 (*type infer_res = e * (Env_refinement.t list) * bool (* Finished? *)*)
 
+(* TODO: Add more log data (in particular for Lambda) *)
 let rec infer' tenv env e t =
   let envr = Env_refinement.empty env in
   match e with
@@ -279,7 +284,7 @@ let rec infer' tenv env e t =
             splits |> List.map (fun s ->
               let env = Env.add v s env in
               let (e, gammas, finished) = infer' tenv env e t in
-              let gammas = propagate v a gammas in
+              let gammas = propagate tenv v a gammas in
               let (va, gammas) = extract v gammas in
               (va, e, gammas, finished)
             ) in
@@ -340,7 +345,7 @@ and infer_a' pos tenv env a t =
   match a with
   | Abstract s when subtype s t -> (a, [envr], true)
   | Abstract _ -> (a, [], true)
-  | Const c when subtype (Ast.const_to_typ c) t -> (a, [envr], true)
+  | Const c when subtype (typeof_const_atom tenv c) t -> (a, [envr], true)
   | Const _ -> (a, [], true)
   | Pair (v1, v2) ->
     if Env.mem v1 env && Env.mem v2 env then begin
@@ -416,8 +421,8 @@ and infer_a' pos tenv env a t =
         let gammas =
           split_record t
           |> List.filter_map (fun ti ->
-            let ti = remove_field_info ti label in
             let si = get_field ti label in
+            let ti = remove_field_info ti label in
             envr |>
             option_chain [Env_refinement.refine v ti ; Env_refinement.refine f si ]
           )

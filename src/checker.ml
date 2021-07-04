@@ -152,18 +152,15 @@ let refine_a env a t =
   | Projection (Snd, v) -> [Env_refinement.refine v (mk_times any_node (cons t)) env] |> filter_options
   | Projection (Field label, v) ->
     [Env_refinement.refine v (mk_record true [label, cons t]) env] |> filter_options
-  | RecordUpdate (v, label, None) -> (* TODO: simplify? *)
+  | RecordUpdate (v, label, None) ->
+    let t = cap_o t (record_any_without label) in
     split_record t
     |> List.filter_map (
       fun ti ->
-        try begin (* If the field 'label' is required (i.e. it cannot be absent) *)
-          get_field ti label |> ignore ;
-          None
-        end with Not_found -> (* If the field 'label' can be absent *)
           let ti = remove_field_info ti label in
           Env_refinement.refine v ti env
     )
-  | RecordUpdate (v, label, Some x) -> (* TODO: simplify? *)
+  | RecordUpdate (v, label, Some x) ->
     split_record t
     |> List.filter_map (
       fun ti ->

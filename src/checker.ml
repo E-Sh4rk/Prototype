@@ -387,6 +387,18 @@ and infer_a' pos tenv env a t =
         in
         (a, gammas, true)
     end else (a, [], true)
+  | Ite (v, s, v1, v2) ->
+    if Env.mem v env then begin
+      let vt = Env.find v env in
+      if is_empty vt then (a, [envr], true)
+      else
+        let gammas =
+          [ envr |> option_chain [Env_refinement.refine v s       ; Env_refinement.refine v1 t] ;
+            envr |> option_chain [Env_refinement.refine v (neg s) ; Env_refinement.refine v2 t] ]
+          |> filter_options
+        in
+        (a, gammas, true)
+    end else (a, [], true)
   (* TODO *)
   | App (v1, v2) ->
     let t1 = var_type pos v1 env in
@@ -438,22 +450,6 @@ and infer_a' pos tenv env a t =
         (a, [env1;env2])
       )
     end
-  | Ite (v, t, v1, v2) ->
-    let tv = var_type pos v env in
-    if is_empty tv
-    then (a, [])
-    else
-      let t1 = cap_o tv t in
-      let t2 = diff tv t in
-      if is_empty t2
-      then (check_var_dom pos v1 env ; (a, []))
-      else if is_empty t1
-      then (check_var_dom pos v2 env ; (a, []))
-      else begin
-        let env1 = Env.singleton v t1 in
-        let env2 = Env.singleton v t2 in
-        (a, [env1;env2])
-      end
   | Lambda (va, (Ast.ADomain s as lt), v, e) ->
     let splits = VarAnnot.splits env va in
     type_lambda_with_splits ~enforce_domain:(Some s) lt tenv env splits v e

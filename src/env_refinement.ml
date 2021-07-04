@@ -28,7 +28,7 @@ let strengthen v t (b,r) =
 let refine v t (b,r) =
   try
     let ot = find v (b,r) in
-    if Cduce.disjoint t ot then None
+    if (Cduce.is_empty ot |> not) && Cduce.disjoint t ot then None
     else Some (strengthen v t (b,r))
   with Not_found -> None
 

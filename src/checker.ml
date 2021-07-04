@@ -303,8 +303,32 @@ and infer_a' pos tenv env a t =
     let t = cap_o t arrow_any in
     (* NOTE: In the paper, the rule AbsUnion does not interstect t with arrow_any *)
     match dnf t with
-    | [arrows] -> failwith "TODO"  (* TODO *)
-    | lst ->
+    | [arrows] -> (* Abs *)
+      (* NOTE: Here we ignore the negative part, though we should check there is no negative part.
+      But it would require a better simplification of union of arrow types to make negative parts disappear. *)
+      let splits = VarAnnot.splits env va in
+      let splits2 = List.map fst arrows in
+      let splits = splits@splits2 in
+      let splits = List.map (fun s -> cap_o s maxdom) splits in
+      let splits = partition_for_full_domain splits in
+      (* TODO: we should ensure that the domain of our splits is not larger than the domain of the annotations... *)
+      let res =
+        splits |> List.map (fun si ->
+          let env = Env.add v si env in
+          let (e, gammas, finished) = infer' tenv env e (apply_opt t si) in
+          let (va, gammas) = extract v gammas in
+          (va, e, gammas, finished)
+        ) in
+      let (vas, es, gammass, finisheds) = split4 res in
+      let va = VarAnnot.union vas in
+      let e = merge_annots_e e es in
+      let gammas = List.flatten gammass in
+      let finished = List.for_all identity finisheds in
+      let domain_covered = assert false (* TODO *) in
+      if subtype (domain t) domain_covered
+      then (Lambda (va, lt, v, e), gammas, finished) (* TODO: lt *)
+      else (Lambda (VarAnnot.empty, lt, v, empty_annots_e e), [], finished)
+    | lst -> (* AbsUnion *)
       let res =
         lst |> List.map (fun arrows ->
           infer_a' pos tenv env a (branch_type arrows)

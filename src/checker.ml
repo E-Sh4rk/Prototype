@@ -299,75 +299,180 @@ let rec infer' tenv env e t =
     log "@]@,END BIND for variable %a" Variable.pp v ; res
 
 and infer_a' pos tenv env a t =
-    failwith "TODO"
-
-let rec infer' tenv env e =
-  let rec infer_with_split tenv env s x a e =
-    let env' = Env.add x s env in
-    match infer' tenv env' e with
-    | (e, []) -> (* BindSplitOk *)
-      (*log "@,The BIND has been annotated." ;*)
-      (VarAnnot.singleton env s, (e, []))
-    | (e, gammas) ->
-      let gammas = backward env' x a gammas in
-      if List.for_all (fun gamma -> domain_included_in_singleton gamma x) gammas
-      then (* BindSplitTop *)
-        let splits = List.map (fun gamma -> Env.find x gamma) gammas
-        |> (fun lst -> assert_with (disj lst |> subtype s) (show_typ s ^ " is not a subtype of " ^ show_typ (disj lst)); lst)
-        |> partition s in
-        assert (disj splits |> subtype s) ;
-        let (vas, res) =
-          List.map (fun s -> infer_with_split tenv env s x a e) splits |>
-          List.split
+  let envr = Env_refinement.empty env in
+  match a with
+  | Abstract s when subtype s t -> (a, [envr], true)
+  | Abstract _ -> (a, [], true)
+  | Const c when subtype (Ast.const_to_typ c) t -> (a, [envr], true)
+  | Const _ -> (a, [], true)
+  | Pair (v1, v2) ->
+    if Env.mem v1 env && Env.mem v2 env then begin
+      if is_empty (Env.find v1 env) || is_empty (Env.find v2 env)
+      then (a, [envr], true)
+      else
+        let t = cap_o t pair_any in
+        let gammas =
+          split_pair t
+          |> List.filter_map (fun (ti,si) ->
+            envr |>
+            option_chain [Env_refinement.refine v1 ti ; Env_refinement.refine v2 si]
+          )
         in
-        log "@,The split has been fully repercuted. Going down." ;
-        (VarAnnot.union vas, merge_res res)
-      else (* BindSplitUp *)
-        let va = List.fold_left (fun acc gamma ->
-          VarAnnot.add_split (Env.cap env (Env.rm x gamma)) (Env.find x gamma) acc
-        ) VarAnnot.empty gammas
+        (a, gammas, true)
+    end else (a, [], true)
+  | Projection ((Fst|Snd), v) ->
+    if Env.mem v env then begin
+      let vt = Env.find v env in
+      if is_empty vt then (a, [envr], true)
+      else
+        let t =
+          match a with
+          | Projection (Fst, _) -> mk_times (cons t) any_node
+          | Projection (Snd, _) -> mk_times any_node (cons t)
+          | _ -> assert false
         in
-        assert (VarAnnot.is_empty va |> not) ;
-        let gammas = List.map (Env.rm x) gammas in
-        log "@,The split still has repercussions on earlier variables. Going up." ;
-        (va, (e, gammas))
-  in
-  match e with
-  | Var v ->
-    check_var_dom (Variable.get_locations v) v env ;
-    (e, [])
-  | Bind (va, v, a, e) ->
-    log "@,@[<v 1>BIND for variable %a" Variable.pp v ;
-    let res = 
-    try
-      let pos = Variable.get_locations v in
-      let res =
-        try infer_a' pos tenv env a
-        with Ill_typed _ -> (* BindDefUntypeable *)
-          log "@,Definition is untypeable. Skipping." ;
-          let a = empty_annots a in
-          let (e, gammas) = infer' tenv env e in
-          raise (Return (Bind (VarAnnot.empty, v, a, e), gammas))
-      in
-      begin match res with
-      | (a, (_::_ as gammas)) -> (* BindDefNeedSplit *)
-        log "@,The definition need a split. Going up." ;
-        let e = restrict_annots env e in
-        (Bind (va, v, a, e), gammas)
-      | (a, []) -> (* Bind *)
-        let t = typeof_a_nofail pos tenv env a in
-        let splits = VarAnnot.splits env va |> partition t in
-        assert (disj splits |> subtype t) ;
-        let (vas, res) = splits |>
-          List.map (fun s -> infer_with_split tenv env s v a e) |>
-          List.split
+        let gammas =
+          split_pair (cap_o vt t)
+          |> List.filter_map (fun (ti,si) ->
+            let t = mk_times (cons ti) (cons si) in
+            Env_refinement.refine v t envr
+          )
         in
-        let (e, gammas) = merge_res res in
-        (Bind (VarAnnot.union vas, v, a, e), gammas)
+        (a, gammas, true)
+    end else (a, [], true)
+  | Projection (Field label, v) ->
+    if Env.mem v env then begin
+      let vt = Env.find v env in
+      if is_empty vt then (a, [envr], true)
+      else
+        let t = mk_record true [label, cons t] in
+        let gammas =
+          split_record (cap_o vt t)
+          |> List.filter_map (fun ti ->
+            Env_refinement.refine v ti envr
+          )
+        in
+        (a, gammas, true)
+    end else (a, [], true)
+  (* TODO *)
+  | RecordUpdate (v, _, None) ->
+    let t = var_type pos v env in
+    if subtype t record_any then
+      (a, [])
+    else
+      let t1 = cap_o t record_any in
+      let t2 = diff t record_any in
+      if is_empty t1 || is_empty t2 then
+        raise (Ill_typed (pos, 
+        "Bad domain for the projection. " ^ (actual_expected t record_any)))
+      else (
+        let env1 = Env.singleton v t1 in
+        let env2 = Env.singleton v t2 in
+        (a, [env1;env2])
+      )
+  | RecordUpdate (v, _, Some f) ->
+    check_var_dom pos f env;
+    let t = var_type pos v env in
+    if subtype t record_any then
+      (a, [])
+    else
+      let t1 = cap_o t record_any in
+      let t2 = diff t record_any in
+      if is_empty t1 || is_empty t2 then
+        raise (Ill_typed (pos, 
+        "Bad domain for the projection. " ^ (actual_expected t record_any)))
+      else (
+        let env1 = Env.singleton v t1 in
+        let env2 = Env.singleton v t2 in
+        (a, [env1;env2])
+      )
+  | App (v1, v2) ->
+    let t1 = var_type pos v1 env in
+    let t2 = var_type pos v2 env in
+    if subtype t1 arrow_any then
+      begin match split_arrow t1 with
+      | [] -> (a, [])
+      | [t1] ->
+        begin match dnf t1 with
+        | [arrows] ->
+          let dom = domain t1 in
+          if subtype t2 dom
+          then begin
+            if List.for_all (fun (s,_) -> subtype t2 s || disjoint t2 s) arrows
+            then (a, [])
+            else begin
+              let gammas = arrows |> List.map (fun (s,_) -> cap_o s t2) |>
+                List.filter (fun t2 -> is_empty t2 |> not) |>
+                List.map (fun t2 -> Env.singleton v2 t2) in
+              (a, gammas)
+            end
+          end else begin
+            let t2' = cap_o t2 dom in
+            let t2'' = diff t2 dom in
+            if is_empty t2' || is_empty t2''
+            then raise (Ill_typed (pos,
+              "Bad domain for the application. "^(actual_expected t2 dom)))
+            else (
+              let env1 = Env.singleton v2 t2' in
+              let env2 = Env.singleton v2 t2'' in
+              (a, [env1;env2])
+            )
+          end
+        | _ -> assert false
+        end
+      | lst ->
+        let gammas = lst |> List.map (fun t1 -> Env.singleton v1 t1) in
+        (a, gammas)
       end
-    with Return r -> r
+    else begin
+      let t1' = cap_o t1 arrow_any in
+      let t1'' = diff t1 arrow_any in
+      if is_empty t1' || is_empty t1''
+      then raise (Ill_typed (pos,
+        "Cannot apply a non-arrow type. "^(actual_expected t1 arrow_any)))
+      else (
+        let env1 = Env.singleton v1 t1' in
+        let env2 = Env.singleton v1 t1'' in
+        (a, [env1;env2])
+      )
+    end
+  | Ite (v, t, v1, v2) ->
+    let tv = var_type pos v env in
+    if is_empty tv
+    then (a, [])
+    else
+      let t1 = cap_o tv t in
+      let t2 = diff tv t in
+      if is_empty t2
+      then (check_var_dom pos v1 env ; (a, []))
+      else if is_empty t1
+      then (check_var_dom pos v2 env ; (a, []))
+      else begin
+        let env1 = Env.singleton v t1 in
+        let env2 = Env.singleton v t2 in
+        (a, [env1;env2])
+      end
+  | Lambda (va, (Ast.ADomain s as lt), v, e) ->
+    let splits = VarAnnot.splits env va in
+    type_lambda_with_splits ~enforce_domain:(Some s) lt tenv env splits v e
+  | Lambda (va, (Ast.Unnanoted as lt), v, e) ->
+    let splits = VarAnnot.splits env va in
+    type_lambda_with_splits ~enforce_domain:None lt tenv env splits v e
+  | Lambda (va, (Ast.AArrow t as lt), v, e) ->
+    let t = match dnf t with
+    | [] -> [(any, empty)]
+    | [lst] -> lst
+    | _ -> raise (Ill_typed (pos, "Function annotation cannot be a disjunction."))
     in
-    log "@]@,END BIND for variable %a" Variable.pp v ; res
+    let splits = VarAnnot.splits env va in
+    let left = List.map fst t in
+    let dom = disj left in
+    let splits = left@splits in
+    type_lambda_with_splits
+      ~enforce_domain:(Some dom) ~enforce_arrow:(Some t) lt tenv env splits v e
+  | Let (v1, v2) ->
+    check_var_dom pos v1 env ; check_var_dom pos v2 env ; (a, [])
+    failwith "TODO"
 
 and infer_a' pos tenv env a =
   let rec infer_with_splits ~enforce_domain ~enforce_arrow tenv env x e splits =

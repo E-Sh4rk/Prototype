@@ -26,9 +26,6 @@ let unbound_variable pos v =
 let var_type pos v env =
   if Env.mem v env then Env.find v env else unbound_variable pos v
 
-let check_var_dom pos v env =
-  if Env.mem v env |> not then unbound_variable pos v
-
 let rec typeof_a pos tenv env a =
   let type_lambda env va v e =
     let splits = VarAnnot.splits env va in
@@ -229,15 +226,15 @@ let extract x gammas =
     ) in
   (VarAnnot.union vas, gammas)
 
-let typeof_nofail tenv env e =
+(*let typeof_nofail tenv env e =
   try typeof tenv env e
-  with Ill_typed _ -> assert false
+  with Ill_typed _ -> assert false*)
 
 let typeof_a_nofail pos tenv env a =
   try typeof_a pos tenv env a
   with Ill_typed _ -> assert false
 
-type infer_res = e * (Env_refinement.t list) * bool (* Finished? *)
+(*type infer_res = e * (Env_refinement.t list) * bool (* Finished? *)*)
 
 let rec infer' tenv env e t =
   let envr = Env_refinement.empty env in
@@ -299,7 +296,7 @@ let rec infer' tenv env e t =
 
 and infer_a' pos tenv env a t =
   let envr = Env_refinement.empty env in
-  let type_lambda va v e t ~maxdom =
+  let type_lambda va lt v e t ~maxdom =
     let t = cap_o t arrow_any in
     (* NOTE: In the paper, the rule AbsUnion does not interstect t with arrow_any *)
     match dnf t with
@@ -324,11 +321,11 @@ and infer_a' pos tenv env a t =
       let e = merge_annots_e e es in
       let gammas = List.flatten gammass in
       let finished = List.for_all identity finisheds in
-      let domain_covered = assert false (* TODO *) in
-      if subtype (domain t) domain_covered
-      then (Lambda (va, lt, v, e), gammas, finished) (* TODO: lt *)
+      if subtype (domain t) (VarAnnot.full_domain va)
+      then (Lambda (va, lt, v, e), gammas, finished)
       else (Lambda (VarAnnot.empty, lt, v, empty_annots_e e), [], finished)
     | lst -> (* AbsUnion *)
+      let a = Lambda (va, lt, v, e) in
       let res =
         lst |> List.map (fun arrows ->
           infer_a' pos tenv env a (branch_type arrows)
@@ -340,72 +337,6 @@ and infer_a' pos tenv env a t =
       let finished = List.for_all identity finisheds in
       (a, gammas, finished)
   in
-  (*
-    let rec infer_with_splits ~enforce_domain ~enforce_arrow tenv env x e splits =
-    let res = List.fold_left
-      (fun acc s ->
-        try (infer_with_split ~enforce_domain ~enforce_arrow tenv env s x e)::acc
-        with (Ill_typed _) as err -> begin
-          if enforce_domain then raise err
-          else acc
-        end
-      )
-      [] splits
-    in
-    if res = []
-    then raise (Ill_typed (pos, "Cannot infer the domain of this abstraction."))
-    else res
-  and infer_with_split ~enforce_domain ~enforce_arrow tenv env s x e =
-    let env' = Env.add x s env in
-    match infer' tenv env' e with
-    | (e, []) -> (* AbsSplitOk *)
-      begin match enforce_arrow with
-      | None -> ()
-      | Some lst -> if lst |> List.exists (fun (left, right) ->
-        subtype s left && (subtype (typeof_nofail tenv env' e) right |> not)
-      ) then
-        raise (Ill_typed (pos, "Cannot get the codomain specified for this abstraction."))
-      end ;
-      (VarAnnot.singleton env s, (e, []))
-    | (e, gammas) ->
-      if List.for_all (fun gamma -> domain_included_in_singleton gamma x) gammas
-      then (* AbsSplitTop *)
-        let splits =
-          List.map (fun gamma -> Env.find x (Env.cap gamma (Env.singleton x s))) gammas
-          |> partition s in
-        assert (disj splits |> subtype s) ;
-        let res = infer_with_splits ~enforce_domain ~enforce_arrow tenv env x e splits in
-        let (vas, res) = List.split res in
-        log "@,The split has been fully repercuted. Going down." ;
-        (VarAnnot.union vas, merge_res res)
-      else (* AbsSplitUp *)
-        let va = List.fold_left (fun acc gamma ->
-              let gamma = Env.cap gamma (Env.singleton x s) in
-              VarAnnot.add_split (Env.cap env (Env.rm x gamma)) (Env.find x gamma) acc
-            ) VarAnnot.empty gammas
-        in
-        assert (VarAnnot.is_empty va |> not) ;
-        let gammas = List.map (Env.rm x) gammas in
-        log "@,The split still has repercussions on earlier variables. Going up." ;
-        (va, (e, gammas))
-  in
-  let type_lambda_with_splits ~enforce_domain ?(enforce_arrow=None) lt tenv env splits x e =
-    log "@,@[<v 1>LAMBDA for variable %a" Variable.pp x ;
-    let t = match enforce_domain with
-    (* NOTE: if splits are empty, we assume it's because it hasn't been set yet. *)
-    | None -> if splits = [] then any else disj splits
-    | Some t -> t
-    in
-    let splits = partition t splits in
-    let enforce_domain = match enforce_domain with None -> false | _ -> true in
-    (* Abs *)
-    let res = infer_with_splits ~enforce_domain ~enforce_arrow tenv env x e splits in
-    let (vas, res) = List.split res in
-    let (e, gammas) = merge_res res in
-    log "@]@,END LAMBDA for variable %a" Variable.pp x ;
-    (Lambda (VarAnnot.union vas, lt, x, e), gammas)
-  in
-  *)
   match a with
   | Abstract s when subtype s t -> (a, [envr], true)
   | Abstract _ -> (a, [], true)
@@ -537,15 +468,15 @@ and infer_a' pos tenv env a t =
         [Env_refinement.refine v1 any ; Env_refinement.refine v2 t ]]
       |> filter_options in
       (a, gammas, true)
-  | Lambda (va, (Ast.ADomain s), v, e) ->
+  | Lambda (va, (Ast.ADomain s as lt), v, e) ->
     let t = cap_o t (mk_arrow (cons s) any_node) in
-    type_lambda va v e t ~maxdom:s
-  | Lambda (va, (Ast.Unnanoted), v, e) ->
+    type_lambda va lt v e t ~maxdom:s
+  | Lambda (va, (Ast.Unnanoted as lt), v, e) ->
     let t = cap_o t arrow_any in
-    type_lambda va v e t ~maxdom:any
-  | Lambda (va, (Ast.AArrow s), v, e) ->
+    type_lambda va lt v e t ~maxdom:any
+  | Lambda (va, (Ast.AArrow s as lt), v, e) ->
     let t = cap_o t s in
-    type_lambda va v e t ~maxdom:(domain s)
+    type_lambda va lt v e t ~maxdom:(domain s)
 
 let rec infer_iterated tenv e =
   match infer' tenv Env.empty e any with

@@ -36,6 +36,9 @@ module VarAnnot = struct
 
   let singleton env t = [(env, t)]
 
+  let full_domain t =
+    List.map snd t |> Types_additions.disj
+
   let splits env va =
     List.filter (fun (env',_) -> Env.leq env env') va
     |> List.map snd

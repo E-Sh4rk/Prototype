@@ -411,7 +411,7 @@ let fac3 =  fun (f : Int -> Int) ->
 
 (*let factorial = fixpoint fac3*)
 
-let typeable_in_racket =
+debug let typeable_in_racket =
   let id = fun x -> x in
   (id 42) + 3
 

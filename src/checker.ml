@@ -240,7 +240,6 @@ let typeof_a_nofail pos tenv env a =
 
 (*type infer_res = e * (Env_refinement.t list) * bool (* Finished? *)*)
 
-(* TODO: Add more log data (in particular for Lambda) *)
 let rec infer' tenv env e t =
   let envr = Env_refinement.empty env in
   match e with
@@ -280,6 +279,7 @@ let rec infer' tenv env e t =
           let s = typeof_a_nofail pos tenv env a in
           assert (subtype s dom_a) ;
           let splits = partition s splits in
+          log "@,Using the following split: %a." (Utils.pp_list Cduce.pp_typ) splits ;
           let res =
             splits |> List.map (fun s ->
               let env = Env.add v s env in
@@ -302,45 +302,50 @@ let rec infer' tenv env e t =
 and infer_a' pos tenv env a t =
   let envr = Env_refinement.empty env in
   let type_lambda va lt v e t ~maxdom =
+    log "@,@[<v 1>LAMBDA for variable %a" Variable.pp v ;
     let t = cap_o t arrow_any in
     (* NOTE: In the paper, the rule AbsUnion does not interstect t with arrow_any *)
-    match dnf t with
-    | [arrows] -> (* Abs *)
-      (* NOTE: Here we ignore the negative part, though we should check there is no negative part.
-      But it would require a better simplification of union of arrow types to make negative parts disappear. *)
-      let splits = VarAnnot.splits env va in
-      let splits2 = List.map fst arrows in
-      let splits = splits@splits2 in
-      let splits = List.map (fun s -> cap_o s maxdom) splits in
-      let splits = partition_for_full_domain splits in
-      (* TODO: we should ensure that the domain of our splits is not larger than the domain of the annotations... *)
-      let res =
-        splits |> List.map (fun si ->
-          let env = Env.add v si env in
-          let (e, gammas, finished) = infer' tenv env e (apply_opt t si) in
-          let (va, gammas) = extract v gammas in
-          (va, e, gammas, finished)
-        ) in
-      let (vas, es, gammass, finisheds) = split4 res in
-      let va = VarAnnot.union vas in
-      let e = merge_annots_e e es in
-      let gammas = List.flatten gammass in
-      let finished = List.for_all identity finisheds in
-      if subtype (domain t) (VarAnnot.full_domain va)
-      then (Lambda (va, lt, v, e), gammas, finished)
-      else (Lambda (VarAnnot.empty, lt, v, empty_annots_e e), [], finished)
-    | lst -> (* AbsUnion *)
-      let a = Lambda (va, lt, v, e) in
-      let res =
-        lst |> List.map (fun arrows ->
-          infer_a' pos tenv env a (branch_type arrows)
-          )
+    let res =
+      match dnf t with
+      | [arrows] -> (* Abs *)
+        (* NOTE: Here we ignore the negative part, though we should check there is no negative part.
+        But it would require a better simplification of union of arrow types to make negative parts disappear. *)
+        let splits = VarAnnot.splits env va in
+        let splits2 = List.map fst arrows in
+        let splits = splits@splits2 in
+        let splits = List.map (fun s -> cap_o s maxdom) splits in
+        let splits = partition_for_full_domain splits in
+        log "@,Using the following split: %a." (Utils.pp_list Cduce.pp_typ) splits ;
+        (* TODO: we should ensure that the domain of our splits is not larger than the domain of the annotations... *)
+        let res =
+          splits |> List.map (fun si ->
+            let env = Env.add v si env in
+            let (e, gammas, finished) = infer' tenv env e (apply_opt t si) in
+            let (va, gammas) = extract v gammas in
+            (va, e, gammas, finished)
+          ) in
+        let (vas, es, gammass, finisheds) = split4 res in
+        let va = VarAnnot.union vas in
+        let e = merge_annots_e e es in
+        let gammas = List.flatten gammass in
+        let finished = List.for_all identity finisheds in
+        if subtype (domain t) (VarAnnot.full_domain va)
+        then (Lambda (va, lt, v, e), gammas, finished)
+        else (Lambda (VarAnnot.empty, lt, v, empty_annots_e e), [], finished)
+      | lst -> (* AbsUnion *)
+        let a = Lambda (va, lt, v, e) in
+        let res =
+          lst |> List.map (fun arrows ->
+            infer_a' pos tenv env a (branch_type arrows)
+            )
+        in
+        let (a_s,gammas_s,finisheds) = split3 res in
+        let a = merge_annots_a a a_s in
+        let gammas = List.flatten gammas_s in
+        let finished = List.for_all identity finisheds in
+        (a, gammas, finished)
       in
-      let (a_s,gammas_s,finisheds) = split3 res in
-      let a = merge_annots_a a a_s in
-      let gammas = List.flatten gammas_s in
-      let finished = List.for_all identity finisheds in
-      (a, gammas, finished)
+      log "@]@,END LAMBDA for variable %a" Variable.pp v ; res
   in
   match a with
   | Abstract s when subtype s t -> (a, [envr], true)

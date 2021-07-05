@@ -279,7 +279,7 @@ let rec infer' tenv env e t =
           let s = typeof_a_nofail pos tenv env a in
           assert (subtype s dom_a) ;
           let splits = partition s splits in
-          log "@,Using the following split: %a." (Utils.pp_list Cduce.pp_typ) splits ;
+          log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
           let res =
             splits |> List.map (fun s ->
               let env = Env.add v s env in
@@ -302,7 +302,7 @@ let rec infer' tenv env e t =
 and infer_a' pos tenv env a t =
   let envr = Env_refinement.empty env in
   let type_lambda va lt v e t ~maxdom =
-    log "@,@[<v 1>LAMBDA for variable %a" Variable.pp v ;
+    log "@,@[<v 1>LAMBDA for variable %a with t=%a" Variable.pp v pp_typ t ;
     let t = cap_o t arrow_any in
     (* NOTE: In the paper, the rule AbsUnion does not interstect t with arrow_any *)
     let res =
@@ -315,7 +315,7 @@ and infer_a' pos tenv env a t =
         let splits = splits@splits2 in
         let splits = List.map (fun s -> cap_o s maxdom) splits in
         let splits = partition_for_full_domain splits in
-        log "@,Using the following split: %a." (Utils.pp_list Cduce.pp_typ) splits ;
+        log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
         (* TODO: we should ensure that the domain of our splits is not larger than the domain of the annotations... *)
         let res =
           splits |> List.map (fun si ->
@@ -459,7 +459,7 @@ and infer_a' pos tenv env a t =
         | [arrows] -> (* AppR *)
           let gammas =
             arrows |> List.filter_map (fun (si,_) ->
-              let arrow_type = mk_arrow (cons si) (cons t) in
+              let arrow_type = mk_arrow (cons (cap_o si vt2)) (cons t) in
               envr |> option_chain [
                 Env_refinement.refine v1 arrow_type ; Env_refinement.refine v2 si
               ]

@@ -282,13 +282,12 @@ let rec infer' tenv env e t =
           log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
           let res =
             splits |> List.map (fun s ->
-              let env = Env.add v s env in
-              let (e, gammas, finished) = infer' tenv env e t in
+              let (e, gammas, finished) = infer' tenv (Env.add v s env) e t in
               let gammas = propagate tenv v a gammas in
               let (va, gammas) = extract v gammas in
-              (* If the new splits require a smaller type for s, we must retype the definition *)
+              (* If the splits for this definition have changed, we must retype the definition. *)
               let finished =
-                if subtype s (VarAnnot.full_domain va)
+                if subtype s (VarAnnot.splits env va |> disj)
                 then finished
                 else false
               in
@@ -325,8 +324,7 @@ and infer_a' pos tenv env a t =
         (* TODO: we should ensure that the domain of our splits is not larger than the domain of the annotations... *)
         let res =
           splits |> List.map (fun si ->
-            let env = Env.add v si env in
-            let (e, gammas, finished) = infer' tenv env e (apply_opt t si) in
+            let (e, gammas, finished) = infer' tenv (Env.add v si env) e (apply_opt t si) in
             let (va, gammas) = extract v gammas in
             (va, e, gammas, finished)
           ) in

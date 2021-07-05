@@ -286,6 +286,12 @@ let rec infer' tenv env e t =
               let (e, gammas, finished) = infer' tenv env e t in
               let gammas = propagate tenv v a gammas in
               let (va, gammas) = extract v gammas in
+              (* If the new splits require a smaller type for s, we must retype the definition *)
+              let finished =
+                if subtype s (VarAnnot.full_domain va)
+                then finished
+                else false
+              in
               (va, e, gammas, finished)
             ) in
           let (vas, es, gammass, finisheds) = split4 res in
@@ -331,7 +337,7 @@ and infer_a' pos tenv env a t =
         let finished = List.for_all identity finisheds in
         if subtype (domain t) (VarAnnot.full_domain va)
         then (Lambda (va, lt, v, e), gammas, finished)
-        else (Lambda (VarAnnot.empty, lt, v, empty_annots_e e), [], finished)
+        else (Lambda (VarAnnot.empty, lt, v, empty_annots_e e), [], true)
       | lst -> (* AbsUnion *)
         let a = Lambda (va, lt, v, e) in
         let res =
@@ -470,7 +476,7 @@ and infer_a' pos tenv env a t =
             lst |> List.filter_map (fun arrows ->
               Env_refinement.refine v1 (branch_type arrows) envr
             ) in
-          (a, gammas, true)
+          (a, gammas, false)
     end else (a, [], true)
   | Let (v1, v2) ->
     let gammas =

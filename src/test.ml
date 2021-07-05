@@ -80,13 +80,13 @@ let records_ok =
   let record = {id=0, name='a'} in
   destruct record
 
-(* Must fail because we do not know whether x has a field a *) 
+(* Must fail because we do not know whether x has a field a *)
 let records_fail2 =
   fun ({..} -> Any) x ->
     if {x with a=0} is {a=Int ..} then x.a else 0
 
-(* 
-  This should work because x\a is of type  {b=Int ..} since 
+(*
+  This should work because x\a is of type  {b=Int ..} since
   it is of type {b=Int a=?Empty, ..} which is a subtype of
   {b=Int ..}
 *)
@@ -94,9 +94,9 @@ let records_ok1 =
   fun ({b = Int ..} -> Int) x ->
     if x\a is {b=Int ..} then x.b else x.c
 
-(* 
-   This should fail since  x\a is of type  {b=Int a=?Empty ..} 
-   which is a subtype of {b=Int ..} = {b=Int a=?Any ..}  
+(*
+   This should fail since  x\a is of type  {b=Int a=?Empty ..}
+   which is a subtype of {b=Int ..} = {b=Int a=?Any ..}
 *)
 let records_fail1 =
   fun ({b = Int ..} -> Int) x ->
@@ -115,23 +115,23 @@ let records_ok2 =
 let records_ok3 =
   let x = { flag=true, id=10 } in
   x\flag
-  
+
 let records_ok4 =
   fun x ->
     if {x with a=0} is {a=Int ..} then true else false
 
-let w = {b = 3, c=4}\l 
+let w = {b = 3, c=4}\l
 
-(* Memento: we should improve the printing of types. When the 
+(* Memento: we should improve the printing of types. When the
    type is closed we should not print the fields of type =?Empty
  *)
 
 let x = <{..}>
-let y = {x with a = 0}         
+let y = {x with a = 0}
 let u = if {x with a=0} is {..} then 0 else 1
 let v = if {x with a=0} is {b=?Any ..} then 0 else 1
-let s = if {x with a=0} is {a=?Bool ..} then 0 else 1      
-let t = if {x with a=0} is {a=Int ..} then 0 else 1      
+let s = if {x with a=0} is {a=?Bool ..} then 0 else 1
+let t = if {x with a=0} is {a=Int ..} then 0 else 1
 let z = if {x with a=0} is {b=?Empty ..} then 0 else x.b
 
 let records_ok5 =
@@ -149,7 +149,7 @@ let paper_example2 =
 let paper_example3 =
   fun x ->
     if x is {a=Int, b=Bool ..} | {a=Bool, b=Int ..} then x.b else false
-  
+
 let paper_example4 =
   fun x ->
     if {x with a=0} is {a=Int, b=Bool ..} | {a=Bool, b=Int ..} then x.b else false
@@ -173,13 +173,13 @@ let is_empty_node = fun (x : Node) ->
 
 (*
 type IntList = Nil | (Int,IntList)
- and AnyList = Nil | (Any, AnyList)                   
+ and AnyList = Nil | (Any, AnyList)
  and IntTree = (Any \IntList) | Nil | (IntList,IntTree)
-      
+
 let concat = fun (x : AnyList) ->
               fun (y : AnyList) ->
-                  if x is Nil then y else (fst x , (concat (snd x) y)) 
-                                  
+                  if x is Nil then y else (fst x , (concat (snd x) y))
+
 let flatten = fun x ->
   if x is Nil then true
   else if x is (Any,Any) then concat (flatten(fst x)) (flatten(snd x))
@@ -237,24 +237,24 @@ let add x y =
         if y is Int then x + y
         else concat (to_string x) y
     else if y is String then concat (to_string x) y
-    else concat (to_string x) (to_string y)                                                               
-                         
+    else concat (to_string x) (to_string y)
+
 atom a
 atom b
 atom c
 atom d
-atom e  
+atom e
 
 type S2 = A | B
 type S1 = E | (C,(S2,S2)) |  (D,(S1,S1))
 
 let g = <((E -> A) & ((S1\E) -> B)) >
 
-         
+
 let f v =
   if v is (C,(Any,Any)) then (c , ( fst(snd v) , fst(snd v) )) else
   if v is (D,(Any,Any)) then (c , ( g(fst(snd v)) , g(fst(snd v)) )) else
-  if v is E then v else nil   
+  if v is E then v else nil
 
 (*
 
@@ -402,7 +402,7 @@ let diverge = fixpoint id
 
 let fac1 =  fun ((Int -> Int) -> (Int -> Int)) f ->
   fun (Int -> Int) x -> if x is (0--1) then 1 else x * (f(x-1))
-               
+
 let fac2 =  fun (f : Int -> Int) ->
   fun (x : Int) -> if x is 0 then 1 else x * (f(x-1))
 
@@ -424,3 +424,11 @@ bind aux1 = snd 0 in
 bind aux2 = aux1 42 in
 bind aux3 = aux2 + 1
 *)
+
+
+let negate = fun f -> (fun x -> lnot (f x))
+let paper_ex = fun (a : (Int -> Int)|(Int,(Int|Bool))) -> fun (n:Int) ->
+    if (a n) is Int then n
+    else
+    else if a is (Int, Int) then (fun x -> x) ((fst a) + (snd a))
+    else (fun x -> x) ((fst a) + n)

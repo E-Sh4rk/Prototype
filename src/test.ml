@@ -427,8 +427,3 @@ bind aux3 = aux2 + 1
 
 
 let negate = fun f -> (fun x -> lnot (f x))
-let paper_ex = fun (a : (Int -> Int)|(Int,(Int|Bool))) -> fun (n:Int) ->
-    if (a n) is Int then n
-    else
-    else if a is (Int, Int) then (fun x -> x) ((fst a) + (snd a))
-    else (fun x -> x) ((fst a) + n)

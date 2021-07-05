@@ -315,27 +315,29 @@ and infer_a' pos tenv env a t =
       | [arrows] -> (* Abs *)
         (* NOTE: Here we ignore the negative part, though we should check there is no negative part.
         But it would require a better simplification of union of arrow types to make negative parts disappear. *)
-        let splits = VarAnnot.splits env va in
+        let splits1 = VarAnnot.splits env va in
         let splits2 = List.map fst arrows in
-        let splits = splits@splits2 in
-        let splits = List.map (fun s -> cap_o s maxdom) splits in
-        let splits = partition_for_full_domain splits in
-        log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
-        (* TODO: we should ensure that the domain of our splits is not larger than the domain of the annotations... *)
-        let res =
-          splits |> List.map (fun si ->
-            let (e, gammas, finished) = infer' tenv (Env.add v si env) e (apply_opt t si) in
-            let (va, gammas) = extract v gammas in
-            (va, e, gammas, finished)
-          ) in
-        let (vas, es, gammass, finisheds) = split4 res in
-        let va = VarAnnot.union vas in
-        let e = merge_annots_e e es in
-        let gammas = List.flatten gammass in
-        let finished = List.for_all identity finisheds in
-        if subtype (domain t) (VarAnnot.full_domain va)
-        then (Lambda (va, lt, v, e), gammas, finished)
-        else (Lambda (VarAnnot.empty, lt, v, empty_annots_e e), [], true)
+        if splits1 = [] || (subtype (disj splits2) (disj splits1) |> not)
+        then (Lambda (VarAnnot.empty, lt, v, empty_annots_e e), [], true)
+        else
+          let splits = splits1@splits2 in
+          let splits = List.map (fun s -> cap_o s maxdom) splits in
+          let splits = partition_for_full_domain splits in
+          log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
+          let res =
+            splits |> List.map (fun si ->
+              let (e, gammas, finished) = infer' tenv (Env.add v si env) e (apply_opt t si) in
+              let (va, gammas) = extract v gammas in
+              (va, e, gammas, finished)
+            ) in
+          let (vas, es, gammass, finisheds) = split4 res in
+          let va = VarAnnot.union vas in
+          let e = merge_annots_e e es in
+          let gammas = List.flatten gammass in
+          let finished = List.for_all identity finisheds in
+          if subtype (domain t) (VarAnnot.full_domain va)
+          then (Lambda (va, lt, v, e), gammas, finished)
+          else (Lambda (VarAnnot.empty, lt, v, empty_annots_e e), [], true)
       | lst -> (* AbsUnion *)
         let a = Lambda (va, lt, v, e) in
         let res =

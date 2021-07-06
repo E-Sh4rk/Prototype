@@ -218,7 +218,7 @@ let regex (x: [ Int -> Bool ; Bool* ; Int? ; String+ ]) = 0
 
 (* Test prefix/infix operators *)
 
-let (+) = <Int -> Int -> Int>
+let (+) = <(Int -> Int -> Int)&(Bool -> Bool -> Bool)>
 let (-) = <Int -> Int -> Int>
 let ( * ) = <Int -> Int -> Int>
 let (/) = <Int -> Int -> Int>
@@ -378,10 +378,46 @@ let example14_curry = fun (input : Int|String) ->
         add (strlen input) (fst extra)
     else 0
 
+
+(* Example new paper *)
+
+let a = <(Int -> (Int|Bool)) | ( Int, (Int|Bool))>
+let n = <Int>
+
+let example_new_paper =
+  if a is (Int,Int) then ((fst a)=(snd a))
+  else if a is (Any,Any) then (snd a)
+  else if (a n) is Int then ((a n) = 42)
+  else (a n)
+
+let example_new1 =
+fun (a : (Int -> (Int|Bool)) | ( Int, (Int|Bool))) ->
+fun n ->
+  if a is (Int,Int) then ((fst a)=(snd a))
+  else if a is (Any,Any) then (snd a)
+  else if (a n) is Int then ((a n) =  42)
+  else (a n)
+
+(* Très intéressant ... il trouve ce type surchargé
+
+  ((Int -> Bool | Int) -> Int -> Bool)
+& ((Int,Bool | Int) -> Any -> Bool) 
+
+ca marche avec Any seulement si c'est un produit
+*)
+let example_new2 =
+fun (a : (Int -> (Int|Bool)) | ( Int, (Int|Bool))) ->
+fun n ->
+  if a is (Int,Int) then ((fst a)=(snd a))
+  else if a is (Any,Any) then ((snd a) + (n = 42))
+  else if (a n) is Int then ((a n) =  42)
+  else (a n)
+
+
 (* Fix-point combinator *)
 
-type Input = Int (* Any   *)
-and Output = Bool (* Empty *)
+type Input = [Int] (* Any   *)
+and Output = [Bool] (* Empty *)
 
 type X = X -> Input -> Output
 

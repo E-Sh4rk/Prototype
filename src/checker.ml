@@ -240,6 +240,9 @@ let typeof_a_nofail pos tenv env a =
 
 (*type infer_res = e * (Env_refinement.t list) * bool (* Finished? *)*)
 
+(* TODO: Instead of this "finished" flag, use a "annotations modified" flag
+(more similar to the paper, and I think there might be some problems with the current system where one last teration is missing) *)
+
 let normalize_output_a (a,gammas,finished) =
   if gammas = []
   then (empty_annots_a a(* Just to be sure *),gammas,true)

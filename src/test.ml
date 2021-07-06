@@ -427,3 +427,12 @@ bind aux3 = aux2 + 1
 
 
 let negate = fun f -> (fun x -> lnot (f x))
+
+let a = <(Int -> (Int|Bool)) | ( Int, (Int|Bool))>
+let n = <Int>
+
+let example_new =
+  if a is (Int,Int) then ( ((fun x -> x)(fst a))=(snd a))
+  else if a is (Any,Any) then (snd a)
+  else if ((fun x -> x)(a n)) is Int then ((a n) =  ((fun x -> x) 42))
+  else (a n)

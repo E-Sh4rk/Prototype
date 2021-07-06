@@ -240,6 +240,16 @@ let typeof_a_nofail pos tenv env a =
 
 (*type infer_res = e * (Env_refinement.t list) * bool (* Finished? *)*)
 
+let normalize_output_a (a,gammas,finished) =
+  if gammas = []
+  then (empty_annots_a a(* Just to be sure *),gammas,true)
+  else (a,gammas,finished)
+
+let normalize_output_e (e,gammas,finished) =
+  if gammas = []
+  then (empty_annots_e e(* Just to be sure *),gammas,true)
+  else (e,gammas,finished)
+
 let rec infer' tenv env e t =
   let envr = Env_refinement.empty env in
   match e with
@@ -277,6 +287,8 @@ let rec infer' tenv env e t =
         end else begin (* Bind *)
           log "@,The definition has been successfully annotated." ;
           let s = typeof_a_nofail pos tenv env a in
+          (* if subtype s dom_a |> not
+          then Format.printf "%a@.%s@." pp_a a (actual_expected s dom_a) ;*)
           assert (subtype s dom_a) ;
           let splits = partition s splits in
           log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
@@ -302,7 +314,7 @@ let rec infer' tenv env e t =
         end
       end
     in
-    log "@]@,END BIND for variable %a" Variable.pp v ; res
+    log "@]@,END BIND for variable %a" Variable.pp v ; normalize_output_e res
 
 and infer_a' pos tenv env a t =
   let envr = Env_refinement.empty env in
@@ -311,7 +323,7 @@ and infer_a' pos tenv env a t =
     let t = cap_o t arrow_any in
     (* NOTE: In the paper, the rule AbsUnion does not interstect t with arrow_any *)
     let res =
-      match dnf t with
+      match dnf t |> simplify_dnf with
       | [arrows] -> (* Abs *)
         (* NOTE: Here we ignore the negative part, though we should check there is no negative part.
         But it would require a better simplification of union of arrow types to make negative parts disappear. *)
@@ -353,7 +365,7 @@ and infer_a' pos tenv env a t =
       in
       log "@]@,END LAMBDA for variable %a" Variable.pp v ; res
   in
-  match a with
+  begin match a with
   | Abstract s when subtype s t -> (a, [envr], true)
   | Abstract _ -> (a, [], true)
   | Const c when subtype (typeof_const_atom tenv c) t -> (a, [envr], true)
@@ -461,11 +473,17 @@ and infer_a' pos tenv env a t =
       else
         let vt1 = cap_o vt1 arrow_any in
         (* NOTE: In the paper, the rule AppR does not interstect vt1 with arrow_any *)
-        match dnf vt1 with
+        match dnf vt1 |> simplify_dnf with
         | [arrows] -> (* AppR *)
           let gammas =
             arrows |> List.filter_map (fun (si,_) ->
               let arrow_type = mk_arrow (cons (cap_o si vt2)) (cons t) in
+              let arg = (cap_o si vt2) in
+              if (is_empty arg |> not) && (subtype vt1 arrow_type) && (subtype (apply vt1 arg) (apply arrow_type arg) |> not)
+              then begin
+                Format.printf "t:%a@.arrow_needed:%a@.simplified vt1:%a@.vt2:%a@.si:%a@." pp_typ t pp_typ arrow_type pp_typ (simplify_typ vt1) pp_typ vt2 pp_typ si ;
+                failwith "Cduce error :("
+              end ;
               envr |> option_chain [
                 Env_refinement.refine v1 arrow_type ; Env_refinement.refine v2 si
               ]
@@ -493,6 +511,8 @@ and infer_a' pos tenv env a t =
   | Lambda (va, (Ast.AArrow s as lt), v, e) ->
     let t = cap_o t s in
     type_lambda va lt v e t ~maxdom:(domain s)
+  end
+  |> normalize_output_a
 
 let rec infer_iterated tenv e =
   match infer' tenv Env.empty e any with

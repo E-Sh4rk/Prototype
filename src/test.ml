@@ -249,7 +249,7 @@ let regex (x: [ Int -> Bool ; Bool* ; Int? ; String+ ]) = 0
 
 (* Test prefix/infix operators *)
 
-let (+) = <(Int -> Int -> Int)&(Bool -> Bool -> Bool)>
+let (+) = <(Int -> Int -> Int)>
 let (-) = <Int -> Int -> Int>
 let ( * ) = <Int -> Int -> Int>
 let (/) = <Int -> Int -> Int>
@@ -340,8 +340,11 @@ let g = fun ((Int, Int) -> Int) x -> magic
 
 (*Interesting points:
   - example2: we do not need the annotation, while TH&F yes
-  - example6: not typable with the annotation, but
-    if WE remove annotations becomes typable
+  - example6: not typable with the annotation Int|String
+    (as expected), BUT
+    if WE remove annotations becomes typable. That is
+    our system finds the right constraints to make that
+    expression typable (no way TH&F can do it :-)
   - in examples 10 11 12 we do not have to assume that p is
     a product the system deduces it alone
   - same for the example 14. We do not have to assume that
@@ -512,6 +515,7 @@ let example_new_paper =
   else if (a n) is Int then ((a n) = 42)
   else (a n)
 
+(* We add explicit lambda abstractions *)
 let example_new1 =
 fun (a : (Int -> (Int|Bool)) | ( Int, (Int|Bool))) ->
 fun n ->
@@ -525,8 +529,15 @@ fun n ->
   ((Int -> Bool | Int) -> Int -> Bool)
 & ((Int,Bool | Int) -> Any -> Bool) 
 
-ca marche avec Any seulement si c'est un produit
+  c-a-d ca marche avec Any seulement si c'est un produit
 *)
+
+
+(* We force n to be an integer in the second branching *)
+
+(* let's make + work with Booleans *)
+let (+) = <(Int -> Int -> Int)&(Bool -> Bool -> Bool)>
+
 let example_new2 =
 fun (a : (Int -> (Int|Bool)) | ( Int, (Int|Bool))) ->
 fun n ->
@@ -535,6 +546,18 @@ fun n ->
   else if (a n) is Int then ((a n) =  42)
   else (a n)
 
+(* And now I swap the arguments of the equality *)
+
+let example_new2swap =
+fun (a : (Int -> (Int|Bool)) | ( Int, (Int|Bool))) ->
+fun n ->
+  if a is (Int,Int) then ((fst a)=(snd a))
+  else if a is (Any,Any) then ((snd a)+(42 = n))
+  else if (a n) is Int then ((a n) =  42)
+  else (a n)
+
+(* The same but with a curried and_ *)
+
 let example_new3 =
 fun (a : (Int -> (Int|Bool)) | ( Int, (Int|Bool))) ->
 fun n ->
@@ -542,6 +565,8 @@ fun n ->
   else if a is (Any,Any) then (and_ (snd a) (n = 42))
   else if (a n) is Int then ((a n) =  42)
   else (a n)
+
+
 
 
 (* Fix-point combinator *)

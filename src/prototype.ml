@@ -25,15 +25,20 @@ let type_check_program
     begin
       let var = Variable.create (Some name) in
       let annot_expr = Ast.parser_expr_to_annot_expr tenv varm parsed_expr in
-      let time = Unix.gettimeofday () in
+      let time0 = Unix.gettimeofday () in
       let nf_expr = convert_to_normal_form annot_expr in
+      let time1 = Unix.gettimeofday () in
       assert (VarSet.subset (fv_e nf_expr) (Env.domain env |> VarSet.of_list)) ;
       try
         let typ = Checker.typeof_simple tenv env nf_expr in
-        let time = (Unix.gettimeofday ()) -. time in
+        let time2 = Unix.gettimeofday () in
+        let msc_time = (time1 -. time0 ) *. 1000. in
+        let typ_time = (time2 -. time1) *. 1000. in
+        let time = (time2 -. time1) *. 1000. in
         let varm = StrMap.add name var varm in
         let env = Env.add var typ env in
-        Format.ksprintf pr "%s (checked in %fs)\n" (Cduce.string_of_type typ) time;
+        Format.ksprintf pr "%s (checked in %.02fms (msc:%.02fms, type:%.02fms))\n" 
+          (Cduce.string_of_type typ) time msc_time typ_time;
         pr_logs () ; (varm, env)
       with Checker.Ill_typed (pos, str) ->
         (*Format.printf "%a\n" pp_e nf_expr ;*)

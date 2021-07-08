@@ -622,6 +622,14 @@ let test = fun(x:Any) -> x + 1
 
 let negate = fun f -> (fun x -> lnot (f x))
 
+
+
+let test_abs_union =
+  let id = fun x -> x in
+  if bool then succ (id 0) else lnot (id false)
+
+
+
 let a = <(Int -> (Int|Bool)) | ( Int, (Int|Bool))>
 let n = <Int>
 

@@ -354,6 +354,8 @@ and infer_a' pos tenv env a t =
           then (Lambda (va, lt, v, e), gammas, finished)
           else (Lambda (VarAnnot.empty, lt, v, empty_annots_e e), [], true)
       | lst -> (* AbsUnion *)
+        (* TODO: Update this part once we will be fixed paperwise *)
+        if lst <> [] then failwith "AbsUnion needed :(" ;
         let a = Lambda (va, lt, v, e) in
         let res =
           lst |> List.map (fun arrows ->

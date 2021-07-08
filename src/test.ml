@@ -618,7 +618,7 @@ bind aux3 = aux2 + 1
 
 
 let test = fun x -> x + 1
-let test = fun(x:Any) -> x + 1
+let test_fail = fun(x:Any) -> x + 1
 
 let negate = fun f -> (fun x -> lnot (f x))
 

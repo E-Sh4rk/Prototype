@@ -212,8 +212,8 @@ let restrict_annots gamma =
   (function Bind (va, v, a, e) -> Bind (VarAnnot.restrict gamma va, v, a, e) | e -> e)
   (function Lambda (va, t, v, e) -> Lambda (VarAnnot.restrict gamma va, t, v, e) | a -> a)
 
-let merge_annots_a default a_s =
-  try merge_annots_a a_s with Not_found -> empty_annots_a default
+(*let merge_annots_a default a_s =
+  try merge_annots_a a_s with Not_found -> empty_annots_a default*)
 let merge_annots_e default es =
   try merge_annots_e es with Not_found -> empty_annots_e default
 
@@ -319,7 +319,7 @@ let rec infer' tenv env e t =
     in
     log "@]@,END BIND for variable %a" Variable.pp v ; normalize_output_e res
 
-and infer_a' pos tenv env a t =
+and infer_a' (*pos*)_ tenv env a t =
   let envr = Env_refinement.empty env in
   let type_lambda va lt v e t ~maxdom =
     log "@,@[<v 1>LAMBDA for variable %a with t=%a" Variable.pp v pp_typ t ;
@@ -353,20 +353,9 @@ and infer_a' pos tenv env a t =
           if subtype (domain t) (VarAnnot.full_domain va)
           then (Lambda (va, lt, v, e), gammas, finished)
           else (Lambda (VarAnnot.empty, lt, v, empty_annots_e e), [], true)
-      | lst -> (* AbsUnion *)
-        (* TODO: Update this part once we will be fixed paperwise *)
-        if lst <> [] then failwith "AbsUnion needed :(" ;
-        let a = Lambda (va, lt, v, e) in
-        let res =
-          lst |> List.map (fun arrows ->
-            infer_a' pos tenv env a (branch_type arrows)
-            )
-        in
-        let (a_s,gammas_s,finisheds) = split3 res in
-        let a = merge_annots_a a a_s in
-        let gammas = List.flatten gammas_s in
-        let finished = List.for_all identity finisheds in
-        (a, gammas, finished)
+      | lst -> (* AbsUntypeable *)
+        if lst <> [] then Format.printf "Warning: An AbsUnion rule would be needed..." ;
+        (Lambda (VarAnnot.empty, lt, v, empty_annots_e e), [], true)
       in
       log "@]@,END LAMBDA for variable %a" Variable.pp v ; res
   in

@@ -626,10 +626,16 @@ let test_abs_union =
   let id = fun x -> x in
   if bool then succ (id 0) else lnot (id false)
 
-let benchmark =
+(*let benchmark =
   let id = fun x -> x in
-  ((id 0) + 42, (id 1) + 42, (id 2) + 42, (id 3) + 42, (id 4) + 42)
+  ((id 0) + 42, (id 1) + 42, (id 2) + 42, (id 3) + 42, (id 4) + 42)*)
 
+let f = <(Int -> Int) & (Bool -> Bool)>
+
+let test_that_should_need_abs_union_but_actually_seems_not =
+  let id = fun x -> x in
+  let x = id 0 in
+  f x
 
 
 let a = <(Int -> (Int|Bool)) | ( Int, (Int|Bool))>

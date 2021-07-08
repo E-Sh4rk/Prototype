@@ -414,7 +414,7 @@ let example9 = fun (x : Any) ->
      (if is_int x is True then is_int x else is_string x)
      is True then  f x else 0
 
-let implict9 = fun (x : Any) ->
+let implict9 = fun x  ->
   if
      (if is_int x is True then is_int x else is_string x)
      is True then  f x else 0

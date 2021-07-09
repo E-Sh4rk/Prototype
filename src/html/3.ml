@@ -6,6 +6,7 @@ let (+) = <(Int -> Int -> Int)>
 let and_ = fun x -> fun y ->
   if x is True then if y is True
   then true else false
+  else false
 
 let is_int = fun x ->
   if x is Int then true else false  

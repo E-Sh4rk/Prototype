@@ -66,12 +66,12 @@ let type_check_program
 
 
 let main f =
+  try
   let ast =
     match f with
       `File fn -> parse_program_file fn
     | `String s -> parse_program_string s
   in
-    try
       type_check_program ast print_result print_logs print_ill_typed
     with e ->
       let msg = Printexc.to_string e

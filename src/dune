@@ -1,9 +1,11 @@
 
- (ocamllex lexer)
- (menhir (modules parser))
+(ocamllex lexer)
+(menhir (modules parser))
 
 (executable
  (name prototype)
- (libraries num str threads cduce-types cduce.lib.core pomap)
+ (libraries num unix cduce-types cduce.lib.core pomap)
  (preprocess (pps ppx_deriving.show ppx_deriving.ord ppx_deriving.eq))
  (modules (:standard \ test)))
+
+

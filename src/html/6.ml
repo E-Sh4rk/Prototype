@@ -12,7 +12,7 @@
     (as expected), BUT
     if WE remove annotations becomes typable. That is
     our system finds the right constraints to make that
-    expression typable (no way TH&F can do it :-)
+    expression typable
   - in examples 10 11 12 we do not have to assume that p is
     a product the system deduces it alone
   - same for the example 14. We do not have to assume that

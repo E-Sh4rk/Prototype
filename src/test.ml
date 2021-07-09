@@ -21,6 +21,7 @@ let test_1 = fun x -> fun y ->
   if land (lor x (lnot x)) (lor (lnot y) y) then true else false
 
 let is_int = fun x -> if x is Int then true else false
+
 let is_bool = fun x -> if x is Bool then true else false
 
 
@@ -58,6 +59,7 @@ let test_2 = fun (x:Any) ->
 let test_3 = fun (b:Bool) -> lor b bool
 
 let bool_id = fun ((True -> True) & (False -> False)) x -> x
+
 let succ = fun (x:Int) -> x
 
 let test_4 = fun x -> if x is Bool then x else x
@@ -71,6 +73,9 @@ let test_6 = fun x ->
   if y is 1 then true else false
 
 (* Examples from the previous paper *)
+
+let (+) = <Int -> Int -> Int>
+
 let two_steps =
   let f = fun (( Any\Int -> (Any, Any)\(Int,Int) ) & ( Int -> (Int,Int) )) x -> magic
   in
@@ -80,6 +85,7 @@ let two_steps =
       if fst (f x) is Int then x
       else 0
     else 0
+
 
 let plus = <Int->Int->Int>
 let bti = <Bool->Int>
@@ -703,7 +709,7 @@ fun n ->
  *                        *
  **************************)
 
-type Input = [Int] (* Any   *)
+type Input = [Int]  (* Any   *)
 and Output = [Bool] (* Empty *)
 
 type X = X -> Input -> Output
@@ -790,3 +796,30 @@ let test_that_should_need_abs_union_but_actually_seems_not =
   let x = id 0 in
   f x
 
+(* Kind of bug? *)
+
+let f = <(Any\Int -> (Any, Any)\(Int,Int) ) & ( Int -> (Int,Int) )>
+
+let two_steps_ok1 =
+  fun x ->
+    if snd (f x) is Int
+    then (fst (f x))
+    else x
+
+let two_steps_ok2 =
+  fun x ->
+    if snd (f x) is Int
+    then x
+    else x
+
+let two_steps_not1 =
+  fun x ->
+    if snd (f x) is Int
+    then (fst (f x)) + 1
+    else x
+
+let two_steps_not2 =
+  fun x ->
+    if snd (f x) is Int
+    then (fst (f x)) + x
+    else x

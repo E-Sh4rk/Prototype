@@ -48,6 +48,10 @@ let test_1 = fun (x:Any) -> fun (y:Any) ->
 let is_int = fun (x:Any) -> if x is Int then true else false
 let is_bool = fun (x:Any) -> if x is Bool then true else false
 
+(************************)
+(* Various simple tests *)
+(************************)
+
 let test_2 = fun (x:Any) ->
   lor (is_int x) (is_bool x)
 
@@ -91,12 +95,25 @@ let appl1_ok =
     fun ( (Int | Bool) -> (Int | Bool) ) x2 ->
       if (x1 x2) is Int then plus x2 (x1 x2) else land x2 (x1 x2)
 
+let appl1_im =
+  fun ( ((Int -> Int) & (Bool -> Bool)) -> (Int | Bool) -> (Int | Bool)) x1 ->
+    fun x2 ->
+      if (x1 x2) is Int then plus x2 (x1 x2) else land x2 (x1 x2)
+
 let appl2 =
   let bti =
     fun (Bool -> Int) b -> magic
   in
   fun ( ( (Int|Char -> Int) | (Bool|Char -> Bool) ) -> Char -> Int) x1 ->
     fun (Char -> Int) x2 ->
+      if (x1 x2) is Int then incr (x1 (x1 x2)) else bti (x1 (x1 x2))
+
+let appl2_im =
+  let bti =
+    fun (Bool -> Int) b -> magic
+  in
+  fun ( ( (Int|Char -> Int) | (Bool|Char -> Bool) ) -> Char -> Int) x1 ->
+    fun  x2 ->
       if (x1 x2) is Int then incr (x1 (x1 x2)) else bti (x1 (x1 x2))
 
 (* Examples on records *)
@@ -187,6 +204,11 @@ let paper_example4 =
 
 let paper_example =
   fun ({..} -> Bool) x ->
+    if {x with a=0} is {a=Int, b=Bool ..} | {a=Bool, b=Int ..} then x.b else false
+
+
+let paper_example_implicit =
+  fun  x ->
     if {x with a=0} is {a=Int, b=Bool ..} | {a=Bool, b=Int ..} then x.b else false
 
 type Document = { nodeType=9 ..}
@@ -515,7 +537,103 @@ fun extra ->
  else 0
 
 
-(* Example new paper *)
+
+
+
+
+(***************************
+ *                         *
+ * CODE NEW PAPER \/-Elim  *
+ *                         *
+ ***************************)
+
+(* Code 1 from the submission *)
+
+let is_int = fun x ->
+  if x is Int then true else false
+
+let is_bool = fun x ->
+  if x is Bool then true else false
+
+(* Code 2 from the submission *)
+
+let not_ = fun x ->
+  if x is True then false else true
+
+let and_ = fun x -> fun y ->
+  if x is True then if y is True
+  then true else false
+  else false
+
+let or_ = fun x -> fun y ->
+  not_ ( and_ ( not_ x ) ( not_ y ))
+(* Code 3 from  the submission *)
+
+let strlen = <(String -> Int)>
+let (+) = <(Int -> Int -> Int)>
+
+
+let and_ = fun x -> fun y ->
+  if x is True then if y is True
+  then true else false
+  else false
+
+let is_int = fun x ->
+  if x is Int then true else false  
+
+let example14 =
+  fun input -> fun extra ->
+  if and_ ( is_int input ) ( is_int ( fst extra )) is True
+  then input + ( fst extra )
+  else if is_int ( fst extra ) is True
+  then ( strlen input ) + ( fst extra )
+  else 0
+(* Code 4 from the submission *)
+
+let strlen = <(String -> Int)>
+let (+) = <(Int -> Int -> Int)>
+
+let and_ = fun x -> fun y ->
+  if x is True then if y is True
+  then true else false
+  else false
+
+let is_int = fun x ->
+  if x is Int then true else false  
+
+let is_string = fun x ->
+  if x is String then true else false  
+  
+let example6_wrong =
+  fun (x : Int | String ) -> fun ( y : Any ) ->
+  if and_ (is_int x) (is_string y) is True 
+  then x + (strlen y) else strlen x
+
+let example6_ok =
+  fun x -> fun y ->
+  if and_ (is_int x) (is_string y) is True 
+  then x + (strlen y) else strlen x
+(* Code 5 from the submission *)
+
+let (<) = <( Int -> Int -> Bool )>
+let (=) = <( Any -> Any -> Bool )>
+
+let detailed_ex =
+  fun (a : ( Int -> ( Int | Bool ))
+  |( Int , ( Int | Bool ))) ->
+  fun (n : Int ) ->
+  if a is ( Int , Int ) then ( fst a )=( snd a )
+  else if a is ( Any , Any ) then snd a
+  else if (a n) is Int then ( a n ) < 42
+  else a n
+
+
+(*************************************
+ *                                   *
+ * Variations for NEW PAPER \/-Elim  *
+ *                                   *
+ *************************************)
+
 
 let a = <(Int -> (Int|Bool)) | ( Int, (Int|Bool))>
 let n = <Int>
@@ -579,11 +697,11 @@ fun n ->
 
 
 
-(*************************
-*                        *
-*  Fix-point combinator  *
-*                        *
-*************************)
+(**************************
+ *                        *
+ *  Fix-point combinator  *
+ *                        *
+ **************************)
 
 type Input = [Int] (* Any   *)
 and Output = [Bool] (* Empty *)
@@ -616,6 +734,15 @@ let fac3 =  fun (f : Int -> Int) ->
 
 (*let factorial = fixpoint fac3*)
 
+
+
+
+(**************************
+ *                        *
+ *     Misc examples      *
+ *                        *
+ **************************)
+
 let typeable_in_racket =
   let id = fun x -> x in
   (id 42) + 3
@@ -634,9 +761,19 @@ bind aux3 = aux2 + 1
 let test = fun x -> x + 1
 let test_fail = fun(x:Any) -> x + 1
 
-let negate = fun f -> (fun x -> lnot (f x))
-let negate2 = fun (f:Empty->Any) -> (fun x -> lnot (f x))
+(* function types for parameters cannot be inferred *)
 
+let negate_fail = fun f -> (fun x -> lnot (f x))
+let negate2_fail = fun (f:Empty->Any) -> (fun x -> lnot (f x))
+
+(* Explicit type annotations cannot be shrinked *)
+
+let succ_ok = fun x -> x + 1
+let succ_fail = fun (x : Any) -> x + 1
+
+
+
+(* test to check whether we need a rule [AbsUnion] *)
 
 let test_abs_union =
   let id = fun x -> x in
@@ -653,12 +790,3 @@ let test_that_should_need_abs_union_but_actually_seems_not =
   let x = id 0 in
   f x
 
-
-let a = <(Int -> (Int|Bool)) | ( Int, (Int|Bool))>
-let n = <Int>
-
-let example_new =
-  if a is (Int,Int) then ( ((fun x -> x)(fst a))=(snd a))
-  else if a is (Any,Any) then (snd a)
-  else if ((fun x -> x)(a n)) is Int then ((a n) =  ((fun x -> x) 42))
-  else (a n)

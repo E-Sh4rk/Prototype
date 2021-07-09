@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Semantic Occurrence typing</title>
+    <script type="text/javascript" src="sources.js" ></script>
+    <style>
+      #output {
+        white-space: pre;
+      }
+      #code {
+		  background: black;
+		  color: white;
+		  font-family: monospace;
+      }
+	  .error {
+      display: inline-block;
+      padding-left:15px;
+      color: red;
+	  }
+    .warning {
+      display: inline-block;
+      padding-left:15px;
+      color: orange;
+	  }
+    </style>
+  </head>
+  <body>
+    <div class="menu">
+      <select id="select">
+        <option selected="selected"></option>
+        <option value="1">Example 1</option>
+        <option value="2">Example 2</option>
+        <option value="3">Example 3</option>
+        <option value="4">Example 4</option>
+        <option value="5">Example 5</option>
+        <option value="6">Example 6</option>
+        <option value="7">Example 7</option>
+        <option value="8">Example 8</option>
+        <option value="9">Example 9</option>
+        <option value="10">Example 10</option>
+		    <option value="11">Fix-point combinator</option>
+        <option value="12">Examples from Tobin-Hochstadt and Felleisen [2010]</option>
+        <option value="13">Example 'typeof'</option>
+      </select>
+      <button id="checkButton">Typecheck</button>
+    </div>
+    <div id="codeContainer">
+      <textarea id="code" cols="80" rows="25" style="resize:none;" >
+      </textarea>
+    </div>
+    <div id="output"></div>
+    <script type="text/javascript" src="prototype_js.js" ></script>
+  </body>
+</html>

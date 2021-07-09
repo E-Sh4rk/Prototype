@@ -1,11 +1,26 @@
-
 (ocamllex lexer)
-(menhir (modules parser))
+
+(menhir
+ (modules parser))
+
+(library
+ (name main)
+ (libraries num unix cduce-types cduce.lib.core pomap)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.ord ppx_deriving.eq))
+ (modules
+  (:standard
+   \
+   ("prototype_js" prototype test))))
 
 (executable
  (name prototype)
- (libraries num unix cduce-types cduce.lib.core pomap)
- (preprocess (pps ppx_deriving.show ppx_deriving.ord ppx_deriving.eq))
- (modules (:standard \ test)))
+ (libraries main)
+ (modules prototype))
 
-
+(executable
+ (name prototype_js)
+ (libraries main)
+ (modes js)
+ (preprocess (pps js_of_ocaml-ppx))
+ (modules prototype_js))

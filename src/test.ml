@@ -755,7 +755,7 @@ let typeable_in_racket =
 
 let how_to_type_that =
   let snd_ = fun x -> (fun y -> y) in
-  (snd_ 0 42) + 1
+  (snd_ 0 42) + 1 
 (* becomes
 bind snd = lambda x. lambda y. y in
 bind aux1 = snd 0 in
@@ -764,8 +764,9 @@ bind aux3 = aux2 + 1
 *)
 
 
-let test = fun x -> x + 1
-let test_fail = fun(x:Any) -> x + 1
+let how_to_type_that_harder =
+  let snd_ = fun x -> (fun y -> y) in
+  (snd_ true ( snd_ 42 3) ) + (snd_ "ok"  3)
 
 (* function types for parameters cannot be inferred *)
 

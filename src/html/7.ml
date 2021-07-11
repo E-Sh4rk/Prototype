@@ -16,12 +16,15 @@ let two_steps =
 
 (***********************************************
  Type annotations written by the programmer are
- are directives that must be checked as they are
+ directives that must be checked as they are
  and thus cannot be refined.
  λx:Any.(x+1) is ill typed because cannot be
  applied to "Any" argument but just to integers
 ************************************************)
 
+(* declare "+" as an infix function on integers *)  
+let (+) = <Int -> Int -> Int>
+                           
 let succ_ok = fun x -> x + 1
 
 let succ_fail = fun (x : Any) -> x + 1

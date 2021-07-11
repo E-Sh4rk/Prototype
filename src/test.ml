@@ -798,18 +798,23 @@ let test_that_should_need_abs_union_but_actually_seems_not =
 
 (* Kind of bug? *)
 
+
+
+let f = <(Any\Int -> (Any\Int, Any\Int) ) & ( Int -> (Int,Int) )>
 let f = <(Any\Int -> (Any, Any)\(Int,Int) ) & ( Int -> (Int,Int) )>
+
+(*
+let dummy = <Any\Int>
+
+let f = fun x ->
+     if x is Int then (x,x)
+     else (dummy,x)
+*)
 
 let two_steps_ok1 =
   fun x ->
     if snd (f x) is Int
     then (fst (f x))
-    else x
-
-let two_steps_ok2 =
-  fun x ->
-    if snd (f x) is Int
-    then x
     else x
 
 let two_steps_not1 =

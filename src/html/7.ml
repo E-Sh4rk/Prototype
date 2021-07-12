@@ -28,3 +28,25 @@ let (+) = <Int -> Int -> Int>
 let succ_ok = fun x -> x + 1
 
 let succ_fail = fun (x : Any) -> x + 1
+
+
+(***********************************************
+ A complicated example of inference where
+ the inferred type is
+ ( Int  ->  (String->String) & (Int -> Int)) &
+ ( ¬Int ->  Any -> Int )
+ and tells us precisely how the type of the
+ second argument depends on the type of the
+ first argument
+************************************************)
+
+let (+) = <Int -> Int -> Int>
+let concat = < String -> String -> String>
+let to_string = <Any -> String>
+
+let add x y =
+    if x is Int then
+        if y is Int then x + y
+        else concat (to_string x) y
+    else if y is String then concat (to_string x) y
+    else concat (to_string x) (to_string y)

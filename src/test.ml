@@ -72,7 +72,11 @@ let test_6 = fun x ->
   let y = custom_id x in
   if y is 1 then true else false
 
+
+(************************************)
 (* Examples from the previous paper *)
+(* the one submitted at SciComPro   *)
+(************************************)
 
 let (+) = <Int -> Int -> Int>
 
@@ -223,7 +227,12 @@ and Element = { nodeType=1, childNodes = NodeList ..}
 and Text = { nodeType=3, isElementContentWhiteSpace=Bool ..}
 and Node = Document | Element | Text
 
-let is_empty_node = fun (x : Node) ->
+let is_empty_node_expl = fun (x : Node) ->
+  if x.nodeType is 9 then false
+  else if x.nodeType is 3 then x.isElementContentWhiteSpace
+  else if x.childNodes is Nil then true else false
+
+let is_empty_node_impl = fun x ->
   if x.nodeType is 9 then false
   else if x.nodeType is 3 then x.isElementContentWhiteSpace
   else if x.childNodes is Nil then true else false

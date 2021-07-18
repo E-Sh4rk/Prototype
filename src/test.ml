@@ -852,3 +852,16 @@ let new_typescript_foo = fun arg ->
     toUpperCase arg
   else
     42
+
+let idStringOrInt = <String | Int -> String | Int>
+let idBool = <Bool -> Bool>
+
+let new_typescript_f = fun (x : String | Int | Bool) ->
+  let isString = if x is String then true else false in
+  let isInt = if x is Int then true else false in
+  let isStringOrInt = lor isString isInt in
+  if isStringOrInt is True then
+    idStringOrInt x
+  else
+    idBool x
+

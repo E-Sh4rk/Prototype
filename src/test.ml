@@ -838,3 +838,17 @@ let two_steps_not2 =
     if snd (f x) is Int
     then (fst (f x)) + x
     else x
+
+let toUpperCase = <String -> String>
+
+let new_typescript_foo = fun arg ->
+  let argIsString = 
+    if arg is String then 
+      true 
+    else 
+      false 
+    in
+  if argIsString is True then 
+    toUpperCase arg
+  else
+    42

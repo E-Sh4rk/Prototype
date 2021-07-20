@@ -1,9 +1,11 @@
 (**********************************************************
+
   TypeScript 4.4beta adds ControlFlow analysis 
   to type the functions "area" and "f" below.
   The examples come from
   https://devblogs.microsoft.com/typescript/ \
   announcing-typescript-4-4-beta/#cfa-aliased-conditions
+
  **********************************************************)
 
 
@@ -79,7 +81,8 @@ let typescript_beta_f =  fun (x : String | Int | Bool) ->
     (Bool -> Bool) &
     (String -> String ) &
     (Int -> Int) &
-    (¬(Bool∣String|Int) ->  ¬(Bool∣String|Int)) 
+    (Unit -> Unit ) &
+    (¬(Bool∣String|Int|Unit) ->  ¬(Bool∣String|Int|Unit)) 
 *)
 
   

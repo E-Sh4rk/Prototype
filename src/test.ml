@@ -841,6 +841,12 @@ let two_steps_not2 =
     else x
 
 
+(*************************************
+
+        TypeScript 4.4b examples  
+
+ *************************************)
+
 let toUpperCase = <String -> String>
 
 let new_typescript_foo = fun arg ->
@@ -855,6 +861,79 @@ let new_typescript_foo = fun arg ->
   else
     42
 
+let ( ** ) = <Int -> Int -> Int>   
+                              
+(* 
+   explicitly typed version of the area function 
+   the deduced type is Shape -> Int 
+*)
+                              
+type Shape =
+      { kind = "circle", radius = Int }
+    | { kind = "square", sideLength = Int }
+
+let area = fun (shape: Shape) ->
+    let isCircle = if shape.kind is "circle" then true else false in
+    if isCircle is True then
+      (* We know we have a circle here! *)
+        (shape.radius) ** 7 
+    else 
+      (* We know we're left with a square here! *)
+        (shape.sideLength) ** 2
+
+
+(* 
+   implicitly typed version of area. The type deduced
+   by our system is equivalent to    
+     { kind="circle"  radius=Int .. } 
+   | { kind=(¬"circle") sideLength=Int  .. }  -> Int    
+*)
+    
+let area_implicit = fun shape ->
+    let isCircle = if shape.kind is "circle" then true else false in
+    if isCircle is True then
+      (* We know we have a circle here! *)
+        (shape.radius) ** 7 
+    else 
+      (* We know we're left with a square here! *)
+        (shape.sideLength) ** 2
+
+    
+(* 
+  explicitly-typed version of the function f 
+  The type deduced for the function is:
+  (Bool -> Bool) &
+  (String -> String ) &
+  (Int -> Int)
+*)                   
+
+let typescript_beta_f =  fun (x : String | Int | Bool) ->
+  let isString = if typeof x is "String" then true else false in
+  let isNumber = if typeof x is "Number" then true else false in
+  let isStringOrNumber =  or_ isString isNumber in                                         
+  if isStringOrNumber is True then x else x
+
+
+(* implicitly-typed version for f. The deduced type
+   is equivalent to
+    (Bool -> Bool) &
+    (String -> String ) &
+    (Int -> Int) &
+    (¬(Bool∣String|Int) ->  ¬(Bool∣String|Int)) 
+*)
+
+  
+let typescript_beta_f_implicit =  fun x ->
+  let isString = if typeof x is "String" then true else false in
+  let isNumber = if typeof x is "Number" then true else false in
+  let isStringOrNumber =  or_ isString isNumber in                                         
+  if isStringOrNumber is True
+    then x
+    else x
+
+
+(* versions without typeof *)
+  
 let idStringOrInt = <String | Int -> String | Int>
 let idBool = <Bool -> Bool>
 

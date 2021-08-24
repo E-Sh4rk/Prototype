@@ -8,13 +8,13 @@
 
 (*
  Interesting points:
-  - example2: does not need the annotation, while TH&F yes
+  - example2: does not need the annotation, while TH&F does
   - example6: not typable with the annotation Int|String
-    (as expected), but if we remove annotations becomes typable. 
-    That is our system finds the right constraints to make the
+    (as expected), but if we remove annotations it becomes typable. 
+    That is, our system finds the right constraints to make the
     expression typable
   - in examples 10 11 12 we do not have to assume that p is
-    a product the system deduces it alone
+    a product, the system deduces it alone
   - same for the example 14. We do not have to assume that
     the parameter input is Int|String and extra is a pair. The system
     finds it alone and it works for user defined "and"
@@ -23,7 +23,7 @@
 
 (* prelude *)
 
-atom no
+atom no 
 
 let and_ = fun x -> fun y -> 
      if x is True then if y is True then y else false else false

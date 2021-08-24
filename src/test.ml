@@ -748,6 +748,7 @@ let fac2 =  fun (f : Int -> Int) ->
 let fac3 =  fun (f : Int -> Int) ->
   fun x -> if x is 0 then 1 else x * (f(x-1))
 
+                   
 (*let factorial = fixpoint fac3*)
 
 

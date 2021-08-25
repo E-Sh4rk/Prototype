@@ -750,8 +750,34 @@ let fac3 =  fun (f : Int -> Int) ->
 (*let factorial = fixpoint fac3*)
 
 
+(********************************
+*                               *
+*   An example where we need    *
+*   polymorphism ... the filter *
+*   function whose polymorphic  *
+*   type should be              *
+*    ((α→true) & (¬α→false))    * 
+*       → [β*]                  *
+*       → [(α&β)*]              *
+*                               *
+*********************************)
+
+type Alpha = Int | Char 
+type Beta = Int | String
+type ABList = Nil | ( Alpha & Beta , ABList) 
+type BList = Nil | ( Beta , BList) 
 
 
+(* filter should be of type ((Alpha->True) & ((Any\Alpha)->False)) ->  BList ->  ABList * )
+
+let filter = fun ( p : ((Alpha -> True) & ((Any\Alpha) -> False)) ) ->
+     fun ( l : BList) ->
+       if p (fst l) is True
+        then ( (fst l), (filter p (snd l)))
+        else filter p (snd l)          
+*)
+
+	
 (**************************
  *                        *
  *     Misc examples      *
@@ -771,6 +797,7 @@ bind aux1 = snd 0 in
 bind aux2 = aux1 42 in
 bind aux3 = aux2 + 1
 *)
+
 
 
 let how_to_type_that_harder =

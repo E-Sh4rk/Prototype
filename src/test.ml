@@ -777,8 +777,8 @@ let filter = fun ( p : ((Alpha -> True) & ((Any\Alpha) -> False)) ) ->
        if p (fst l) is True
         then ( (fst l), (filter p (snd l)))
         else filter p (snd l)          
-*)
 
+*)
 	
 (**************************
  *                        *

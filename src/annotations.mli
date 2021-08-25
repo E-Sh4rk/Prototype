@@ -10,6 +10,7 @@ module VarAnnot : sig
   val is_empty : t -> bool
   val singleton : Env.t -> Cduce.typ -> t
   val full_domain : t -> Cduce.typ
+  val size : t -> int
   val splits : Env.t -> t -> Cduce.typ list
   val add_split : Env.t -> Cduce.typ -> t -> t
   val restrict : Env.t -> t -> t

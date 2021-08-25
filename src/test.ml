@@ -337,6 +337,7 @@ let f (g : ((<e>[] -> <a>[]) & ((S1\<e>[]) -> <b>[]))) (v : S1) : (S1 \ (<c>[<a>
  *)
 
 
+
 (*************************************************
 *          Tobin-Hochstadt & Felleisen           *
 *     exampleX = EXPLICITLY ANNOTATED VERSIONS   *
@@ -747,6 +748,7 @@ let fac2 =  fun (f : Int -> Int) ->
 let fac3 =  fun (f : Int -> Int) ->
   fun x -> if x is 0 then 1 else x * (f(x-1))
 
+                   
 (*let factorial = fixpoint fac3*)
 
 
@@ -865,3 +867,173 @@ let two_steps_not2 =
     if snd (f x) is Int
     then (fst (f x)) + x
     else x
+
+
+(*************************************
+
+        TypeScript 4.4b examples  
+
+ *************************************)
+
+let toUpperCase = <String -> String>
+
+let new_typescript_foo = fun arg ->
+  let argIsString = 
+    if arg is String then 
+      true 
+    else 
+      false 
+    in
+  if argIsString is True then 
+    toUpperCase arg
+  else
+    42
+
+let ( ** ) = <Int -> Int -> Int>   
+                              
+(* 
+   explicitly typed version of the area function 
+   the deduced type is Shape -> Int 
+*)
+                              
+type Shape =
+      { kind = "circle", radius = Int }
+    | { kind = "square", sideLength = Int }
+
+let area = fun (shape: Shape) ->
+    let isCircle = if shape.kind is "circle" then true else false in
+    if isCircle is True then
+      (* We know we have a circle here! *)
+        (shape.radius) ** 7 
+    else 
+      (* We know we're left with a square here! *)
+        (shape.sideLength) ** 2
+
+
+(* 
+   implicitly typed version of area. The type deduced
+   by our system is equivalent to    
+     { kind="circle"  radius=Int .. } 
+   | { kind=(¬"circle") sideLength=Int  .. }  -> Int    
+*)
+    
+let area_implicit = fun shape ->
+    let isCircle = if shape.kind is "circle" then true else false in
+    if isCircle is True then
+      (* We know we have a circle here! *)
+        (shape.radius) ** 7 
+    else 
+      (* We know we're left with a square here! *)
+        (shape.sideLength) ** 2
+
+    
+(* 
+  explicitly-typed version of the function f 
+  The type deduced for the function is:
+  (Bool -> Bool) &
+  (String -> String ) &
+  (Int -> Int)
+*)                   
+
+let typescript_beta_f =  fun (x : String | Int | Bool) ->
+  let isString = if typeof x is "String" then true else false in
+  let isNumber = if typeof x is "Number" then true else false in
+  let isStringOrNumber =  or_ isString isNumber in                                         
+  if isStringOrNumber is True then x else x
+
+
+(* implicitly-typed version for f. The deduced type
+   is equivalent to
+    (Bool -> Bool) &
+    (String -> String ) &
+    (Int -> Int) &
+    (¬(Bool∣String|Int) ->  ¬(Bool∣String|Int)) 
+*)
+
+  
+let typescript_beta_f_implicit =  fun x ->
+  let isString = if typeof x is "String" then true else false in
+  let isNumber = if typeof x is "Number" then true else false in
+  let isStringOrNumber =  or_ isString isNumber in                                         
+  if isStringOrNumber is True
+    then x
+    else x
+
+
+(* versions without typeof *)
+  
+let idStringOrInt = <String | Int -> String | Int>
+let idBool = <Bool -> Bool>
+
+let new_typescript_f = fun (x : String | Int | Bool) ->
+  let isString = if x is String then true else false in
+  let isInt = if x is Int then true else false in
+  let isStringOrInt = lor isString isInt in
+  if isStringOrInt is True then
+    idStringOrInt x
+  else
+    idBool x
+
+
+let typescript_beta_f =  fun (x : String | Int | Bool) ->
+  let isString = if typeof x is "String" then true else false in
+  let isNumber = if typeof x is "Number" then true else false in
+  let isStringOrNumber =  lor isString isNumber in                                         
+  if isStringOrNumber is True then x else x
+
+let typescript_beta_f_implicit =  fun x ->
+  let isString = if typeof x is "String" then true else false in
+  let isNumber = if typeof x is "Number" then true else false in
+  let isStringOrNumber =  lor isString isNumber in                                         
+  if isStringOrNumber is True then x else x
+                                            
+(*  
+type RBtree = Btree | Rtree;;
+type Btree = [] | <black elem=Int>[ RBtree RBtree ];;
+type Rtree = <red elem=Int>[ Btree Btree ];;
+type Wrongtree = Wrongleft | Wrongright;;
+type Wrongleft = <red elem=Int>[ Rtree Btree ];;
+type Wrongright = <red elem=Int>[ Btree Rtree ];;
+type Unbalanced = <black elem=Int>([ Wrongtree RBtree ] | [ RBtree Wrongtree ])
+let balance ( Unbalanced -> Rtree ; Rtree -> Rtree ; Btree\[] -> Btree\[] ;
+              [] -> [] ; Wrongleft -> Wrongleft ; Wrongright -> Wrongright)
+  | <black (z)>[ <red (y)>[ <red (x)>[ a b ] c ] d ]
+  | <black (z)>[ <red (x)>[ a <red (y)>[ b c ] ] d ]
+  | <black (x)>[ a <red (z)>[ <red (y)>[ b c ] d ] ]
+  | <black (x)>[ a <red (y)>[ b <red (z)>[ c d ] ] ] ->
+        <red (y)>[ <black (x)>[ a b ] <black (z)>[ c d ] ]
+  | x -> x
+
+let insert (x : Int) (t : Btree) : Btree =
+let ins_aux ( [] -> Rtree ; Btree\[] -> RBtree\[]; Rtree -> Rtree|Wrongtree)
+  | [] -> <red elem=x>[ [] [] ]
+  | (<(color) elem=y>[ a b ]) & z ->
+         if x << y then balance <(color) elem=y>[ (ins_aux a) b ]
+	 else if x >> y then balance <(color) elem=y>[ a (ins_aux b) ]
+	 else z
+  in match ins_aux t with
+     | <_ (y)>[ a b ] -> <black (y)>[ a b ]
+ *)
+
+atom blk
+atom red
+atom emp
+  
+  
+type RBtree = Btree | Rtree
+ and Btree = Emp | (Blk,[ Int; RBtree; RBtree ])
+ and Rtree = (Red,[ Int; Btree; Btree ])
+ and Wrongtree = Wrongleft | Wrongright
+ and Wrongleft = (Red,[ Int ; Rtree; Btree ])
+ and Wrongright = (Red,[ Int; Btree; Rtree ])
+ and Unbalanced = (Blk,([ Int; Wrongtree; RBtree ] | [ Int; RBtree; Wrongtree ]))
+
+let balance = fun (
+                (Unbalanced -> Rtree)
+              & (Rtree -> Rtree)
+              & (Btree\Emp -> Btree\Emp) 
+              & (Emp -> Emp )
+              & (Wrongleft -> Wrongleft)
+              & (Wrongright -> Wrongright)
+  )  x -> magic
+

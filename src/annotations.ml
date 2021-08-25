@@ -39,6 +39,8 @@ module VarAnnot = struct
   let full_domain t =
     List.map snd t |> Types_additions.disj
 
+  let size t = List.length t
+
   let splits env va =
     List.filter (fun (env',_) -> Env.leq env env') va
     |> List.map snd

@@ -770,15 +770,17 @@ type ABList = Nil | ( Alpha & Beta , ABList)
 type BList = Nil | ( Beta , BList) 
 
 
-(* filter should be of type ((Alpha->True) & ((Any\Alpha)->False)) ->  BList ->  ABList * )
-
+(* filter should be of type ((Alpha->True) & ((Any\Alpha)->False)) ->  BList ->  ABList *)
+                 
+let rfilter = < ((Alpha->True) & ((Any\Alpha)->False)) ->  BList ->  ABList>
+                                                                       
 let filter = fun ( p : ((Alpha -> True) & ((Any\Alpha) -> False)) ) ->
-     fun ( l : BList) ->
+  fun ( l : BList) ->
+    if l is Nil then nil else
        if p (fst l) is True
-        then ( (fst l), (filter p (snd l)))
-        else filter p (snd l)          
+        then ( (fst l), (rfilter p (snd l)))
+        else rfilter p (snd l)          
 
-*)
 	
 (**************************
  *                        *

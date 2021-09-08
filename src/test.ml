@@ -237,6 +237,24 @@ let is_empty_node_impl = fun x ->
   else if x.nodeType is 3 then x.isElementContentWhiteSpace
   else if x.childNodes is Nil then true else false
 
+
+type InferredType =  ({ nodeType=3, isElementContentWhiteSpace=Any, childNodes=?Empty .. } |
+{ nodeType=3, isElementContentWhiteSpace=Any, childNodes=[  ] .. } |
+{ nodeType=3, isElementContentWhiteSpace=Any, childNodes=Any \ [  ] .. } -> Any) &
+({ nodeType=Any \ (3 | 9), isElementContentWhiteSpace=Any, childNodes=[  ] .. } |
+{ nodeType=Any \ (3 | 9), isElementContentWhiteSpace=?Empty, childNodes=[  ] .. } -> True) &
+({ nodeType=9, isElementContentWhiteSpace=Any, childNodes=?Empty .. } |
+{ nodeType=9, isElementContentWhiteSpace=Any, childNodes=[  ] .. } |
+{ nodeType=Any \ 3, isElementContentWhiteSpace=Any, childNodes=Any \ [  ] .. } |
+{ nodeType=9, isElementContentWhiteSpace=?Empty, childNodes=?Empty .. } |
+{ nodeType=9, isElementContentWhiteSpace=?Empty, childNodes=[  ] .. } |
+{ nodeType=Any \ 3, isElementContentWhiteSpace=?Empty,childNodes=Any \ [  ] .. } -> False)
+
+let is_empty_node_perfect_annotations  = fun (InferredType) x ->
+  if x.nodeType is 9 then false
+  else if x.nodeType is 3 then x.isElementContentWhiteSpace
+  else if x.childNodes is Nil then true else false
+
 (* Examples with recursive functions *)
 
 (*

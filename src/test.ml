@@ -712,6 +712,30 @@ fun n ->
   else (a n)
 
 
+(**************************
+ *                        *
+ *  Example by TH (PM)    *
+ *                        *
+ **************************)
+
+let append = <String -> String -> String>
+let (+) = <Int -> Int -> Int>
+
+let sum = fun x ->
+     if fst x is String 
+        then append (fst x) (snd x)
+        else (fst x) + (snd x)
+
+let sum_cur = fun x y ->
+     if x is String 
+        then append x y
+        else x + y
+
+
+let sum_cur_expl_wrong = fun (x: Int|String) -> fun (y: Int|String) ->
+     if x is String 
+        then append x y
+        else x + y
 
 (**************************
  *                        *

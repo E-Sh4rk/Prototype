@@ -237,6 +237,24 @@ let is_empty_node_impl = fun x ->
   else if x.nodeType is 3 then x.isElementContentWhiteSpace
   else if x.childNodes is Nil then true else false
 
+
+type InferredType =  ({ nodeType=3, isElementContentWhiteSpace=Any, childNodes=?Empty .. } |
+{ nodeType=3, isElementContentWhiteSpace=Any, childNodes=[  ] .. } |
+{ nodeType=3, isElementContentWhiteSpace=Any, childNodes=Any \ [  ] .. } -> Any) &
+({ nodeType=Any \ (3 | 9), isElementContentWhiteSpace=Any, childNodes=[  ] .. } |
+{ nodeType=Any \ (3 | 9), isElementContentWhiteSpace=?Empty, childNodes=[  ] .. } -> True) &
+({ nodeType=9, isElementContentWhiteSpace=Any, childNodes=?Empty .. } |
+{ nodeType=9, isElementContentWhiteSpace=Any, childNodes=[  ] .. } |
+{ nodeType=Any \ 3, isElementContentWhiteSpace=Any, childNodes=Any \ [  ] .. } |
+{ nodeType=9, isElementContentWhiteSpace=?Empty, childNodes=?Empty .. } |
+{ nodeType=9, isElementContentWhiteSpace=?Empty, childNodes=[  ] .. } |
+{ nodeType=Any \ 3, isElementContentWhiteSpace=?Empty,childNodes=Any \ [  ] .. } -> False)
+
+let is_empty_node_perfect_annotations  = fun (InferredType) x ->
+  if x.nodeType is 9 then false
+  else if x.nodeType is 3 then x.isElementContentWhiteSpace
+  else if x.childNodes is Nil then true else false
+
 (* Examples with recursive functions *)
 
 (*
@@ -794,15 +812,17 @@ type ABList = Nil | ( Alpha & Beta , ABList)
 type BList = Nil | ( Beta , BList) 
 
 
-(* filter should be of type ((Alpha->True) & ((Any\Alpha)->False)) ->  BList ->  ABList * )
-
+(* filter should be of type ((Alpha->True) & ((Any\Alpha)->False)) ->  BList ->  ABList *)
+                 
+let rfilter = < ((Alpha->True) & ((Any\Alpha)->False)) ->  BList ->  ABList>
+                                                                       
 let filter = fun ( p : ((Alpha -> True) & ((Any\Alpha) -> False)) ) ->
-     fun ( l : BList) ->
+  fun ( l : BList) ->
+    if l is Nil then nil else
        if p (fst l) is True
-        then ( (fst l), (filter p (snd l)))
-        else filter p (snd l)          
+        then ( (fst l), (rfilter p (snd l)))
+        else rfilter p (snd l)          
 
-*)
 	
 (**************************
  *                        *

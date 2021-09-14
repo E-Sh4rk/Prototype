@@ -81,6 +81,13 @@ let is_empty_node_expl = fun (x : Node) ->
   else if x.nodeType is 3 then x.isElementContentWhiteSpace
   else if x.childNodes is Nil then true else false
 
+
+(*
+ Warning: typing the following function fails with a stack overflow on
+ Chrome-based browsers, due to the very small JavaScript call stack.
+ It is correctly typechecked when using Firefox or the native prototype.
+*)
+  
 let is_empty_node_impl = fun x ->
   if x.nodeType is 9 then false
   else if x.nodeType is 3 then x.isElementContentWhiteSpace

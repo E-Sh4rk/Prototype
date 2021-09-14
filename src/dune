@@ -4,8 +4,8 @@
  (modules parser))
 
 (library
- (name main)
- (libraries num unix cduce-types cduce.lib.core pomap)
+ (name main_proto)
+ (libraries num unix cduce-types cduce.lib pomap)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.ord ppx_deriving.eq))
  (modules
@@ -15,12 +15,12 @@
 
 (executable
  (name prototype)
- (libraries main)
+ (libraries main_proto)
  (modules prototype))
 
 (executable
  (name prototype_js)
- (libraries main)
+ (libraries main_proto)
  (modes js)
  (preprocess (pps js_of_ocaml-ppx))
  (modules prototype_js))

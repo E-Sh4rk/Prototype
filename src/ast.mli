@@ -2,6 +2,8 @@ open Types_additions
 open Variable
 open Pomap
 
+exception UndefinedSymbol of string
+
 type varname = string
 type exprid = int
 

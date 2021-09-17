@@ -2,6 +2,8 @@ open Types_additions
 open Variable
 open Pomap
 
+exception UndefinedSymbol of string
+
 type varname = string
 type exprid = int
 
@@ -90,7 +92,7 @@ let parser_expr_to_annot_expr tenv name_var_map e =
             then Var (StrMap.find str env)
             else if has_atom tenv str
             then Const (Atom str)
-            else assert false
+            else raise (UndefinedSymbol (str))
         | Lambda (t,str,e) ->
             let t = match t with
             | Unnanoted -> Unnanoted

@@ -4,6 +4,8 @@ module StrMap = Map.Make(String)
 module StrSet = Set.Make(String)
 module LabelMap = CD.Ident.LabelMap
 
+exception TypeDefinitionError of string
+
 (* Construction of types *)
 
 type type_base =
@@ -51,7 +53,7 @@ let derecurse_types env defs =
     let () =
         List.iter (fun (name, def) ->
                 if StrMap.mem name env then 
-                    failwith (Printf.sprintf "Type %s already defined!" name)
+                    raise (TypeDefinitionError (Printf.sprintf "Type %s already defined!" name))
                 else
                     Hashtbl.add henv name (def, None)) defs
     in
@@ -67,7 +69,7 @@ let derecurse_types env defs =
         | exception Not_found -> 
             try Typepat.mk_type (descr (StrMap.find name env))
             with Not_found -> 
-                failwith (Printf.sprintf "Type %s undefined!" name)
+                raise (TypeDefinitionError (Printf.sprintf "Type %s undefined!" name))
     and aux t =
         match t with
         | TBase tb -> Typepat.mk_type (type_base_to_typ tb)
@@ -135,14 +137,13 @@ let define_atom (env, atoms) name =
     let atom = String.uncapitalize_ascii name in
     let typ = String.capitalize_ascii name in
     if StrMap.mem typ env
-    then failwith (Printf.sprintf "Type %s already defined!" typ)
+    then raise (TypeDefinitionError (Printf.sprintf "Type %s already defined!" typ))
     else (StrMap.add typ (cons (mk_atom atom)) env, StrSet.add atom atoms)
-
 
 let get_type (env, _) name =
     let name = String.capitalize_ascii name in
     try descr (StrMap.find name env)
-    with Not_found -> failwith (Printf.sprintf "Type %s undefined!" name)
+    with Not_found -> raise (TypeDefinitionError (Printf.sprintf "Type %s undefined!" name))
 
 let has_type (env, _) name =
     let name = String.capitalize_ascii name in

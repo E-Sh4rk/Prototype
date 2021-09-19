@@ -1,0 +1,62 @@
+<pre>
+                              ARGUMENTS
+
+<i>a</i>  ::=  <i>x</i>                                          (argument)
+        (<i>x</i>:<i>t</i>)                                      (explicitely typed argument)
+
+                              EXPRESSIONS
+
+<i>e</i>  ::=  fun <i>a</i> ... <i>a</i> . <i>e</i>                            (function)
+        fun (<i>t</i>) <i>x</i> ... <i>x</i> -> <i>e</i>                       (explicitely typed function)
+
+        let <i>x</i> = <i>e</i> in <i>e</i>                             (let)
+        let <i>x</i> <i>a</i> ... <i>a</i> = <i>e</i> in <i>e</i>                     (let function)
+
+        &lt;<i>t</i>&gt;                                        (magic expression)
+	
+        if <i>e</i> is <i>t</i> then <i>e</i> else <i>e</i>                    (typecase)
+        <i>e</i> <i>e</i>                                        (application)
+        (<i>e</i>, <i>e</i>)                                     (pair)
+        [<i>e</i>;...; <i>e</i>]                                 (list)
+        ()                                         (unit)
+        "..."                                      (string constant)
+        true                                       ([true] boolean constant)
+        false                                      ([false] boolean constant)
+        <i>n</i>                                          (numeric constant)
+        <i>id</i>                                         (user-defined constant)
+        <i>x</i>                                          (variable)
+
+                        TOP LEVEL DEFINITIONS
+
+        let <i>x</i> = <i>e</i>                                  (let)
+        let <i>x</i> <i>a</i> ... <i>a</i> = <i>e</i>                          (let function)
+        atom <i>id</i>                                    (constant and atomic type definition)
+        type <i>Id</i> = <i>t</i> and <i>Id</i> = <i>t</i> ...                 (recursive types definition)
+
+
+
+                              TYPES
+
+<i>t</i> ::=  Bool                                       (booleans)
+       Int                                        (integers)
+       String                                     (strings)
+       True                                       (singleton [true])
+       False                                      (singleton [false])
+       <i>n</i>                                          (singleton [integers])
+       "..."                                      (singleton [strings])
+       Unit                                       (unit)
+       [<i>t</i>*]                                       (lists of <i>t</i>)
+       <i>n</i>--<i>n</i>                                       (interval of integers)
+       <i>Id</i>                                         (user-defined type)
+
+       <i>t</i>-><i>t</i>                                       (functions)
+       (<i>t</i>,<i>t</i>)                                      (products)
+
+       <i>t</i>|<i>t</i>                                        (union)
+       <i>t</i>&<i>t</i>                                        (intersection)
+       <i>t</i>\<i>t</i>                                        (difference)
+       ~<i>t</i>                                         (negation)
+
+       Empty                                      (empty type)
+       Any                                        (top type)
+</pre>

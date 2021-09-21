@@ -1004,6 +1004,10 @@ let typescript_beta_f_implicit =  fun x ->
     else x
 
 
+let example_kent_section_5_4 y =
+  let is_a_number x = if y is Int then true else false in
+  if is_a_number false then succ y else 0
+
 (* versions without typeof *)
   
 let idStringOrInt = <String | Int -> String | Int>

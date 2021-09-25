@@ -8,7 +8,7 @@ type node = CD.Types.Node.t
 
 let register s = 
   let module U = Encodings.Utf8 in
-  CD.Types.Print.register_global "" (Ns.Uri.mk (U.mk ""), U.mk s)
+  CD.Types.Print.register_global "" (Ns.Uri.mk (U.mk ""), U.mk s) ?params:None
 let pp_typ = CD.Types.Print.print_noname
 let show_typ t = Format.asprintf "%a" pp_typ t
 
@@ -21,8 +21,8 @@ let cons = CD.Types.cons
 
 let any = CD.Types.any
 let empty = CD.Types.empty
-let any_node = CD.Types.any_node
-let empty_node = CD.Types.empty_node
+let any_node = cons any
+let empty_node = cons empty
 
 (* ----- *)
 
@@ -56,14 +56,14 @@ let from_label lbl = CD.Ident.Label.get_ascii lbl
     CD.Types.var var*)
 
 let mk_atom ascii_name =
-    ascii_name |> CD.Atoms.V.mk_ascii |> CD.Atoms.atom |> CD.Types.atom
+    ascii_name |> CD.AtomSet.V.mk_ascii |> CD.AtomSet.atom |> CD.Types.atom
 let true_typ = CD.Builtin_defs.true_type
 let false_typ = CD.Builtin_defs.false_type
 let bool_typ = cup true_typ false_typ
 let int_typ = CD.Types.Int.any
 let char_typ = CD.Types.Char.any
 let unit_typ = mk_atom "unit"
-let nil_typ = CD.Sequence.nil_type
+let nil_typ = CD.Types.Sequence.nil_type
 
 let string_typ =
   let str = CD.Types.make () in
@@ -98,8 +98,8 @@ let interval i1 i2 =
     CD.Types.Int.any
     
 let single_char c =
-  let c = CD.Chars.V.mk_char c in
-  let c = CD.Chars.atom c in
+  let c = CD.CharSet.V.mk_char c in
+  let c = CD.CharSet.atom c in
   CD.Types.char c
 
 let single_string str =
@@ -142,7 +142,7 @@ let normalize_typ = CD.Types.normalize
 
 let mk_times = CD.Types.times
 
-let pair_any = CD.Types.Product.any
+let pair_any = CD.Types.Times.any
 
 let pi1 t =
   CD.Types.Product.pi1 (CD.Types.Product.get t)
@@ -159,17 +159,17 @@ let mk_record is_open fields =
   let fields = LabelMap.from_list_disj fields in
   CD.Types.record_fields (is_open, fields)
 
-let record_any = CD.Types.Record.any
+let record_any = CD.Types.Rec.any
 
-let absent = CD.Types.Record.absent
+let absent = CD.Types.Absent.any
 
 let has_absent = CD.Types.Record.has_absent
 
 let any_or_absent = CD.Types.Record.any_or_absent
 
-let absent_node = CD.Types.Record.absent_node
+let absent_node = cons absent
 
-let any_or_absent_node = CD.Types.Record.any_or_absent_node
+let any_or_absent_node = any_or_absent |> cons
 
 let or_absent = CD.Types.Record.or_absent
 
@@ -183,10 +183,6 @@ let get_field record field =
 let get_field_assuming_not_absent record field =
   CD.Types.Record.project_opt record (to_label field)
 
-let all_fields record =
-  let lbls = CD.Types.Record.all_labels record in
-  List.map from_label (LabelSet.get lbls)
-
 let merge_records = CD.Types.Record.merge
 
 let remove_field record field =
@@ -196,7 +192,7 @@ let remove_field record field =
 (* Maybe not optimised (if no memoisation for Arrow.get). We'll see that later. *)
 let mk_arrow = CD.Types.arrow
 
-let arrow_any = CD.Types.Arrow.any
+let arrow_any = CD.Types.Function.any
 
 let domain t =
   if subtype t arrow_any then

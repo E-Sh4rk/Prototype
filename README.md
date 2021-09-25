@@ -14,8 +14,8 @@ eval `opam config env`
 
 ```
 sudo apt install m4
-opam pin add cduce-types 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#dune-switch'
-opam pin add cduce 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#dune-switch'
+opam pin add cduce-types 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#polymorphic'
+opam pin add cduce 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#polymorphic'
 ```
 
 ## Building the prototype

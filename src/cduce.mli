@@ -53,6 +53,7 @@ val pi2 : typ -> typ
 val split_pair : typ -> (typ * typ) list
 
 val to_label : string -> Ns.Label.t
+val from_label : Ns.Label.t -> string
 val mk_record : bool -> (string * node) list -> typ
 val record_any : typ
 val absent : typ
@@ -65,7 +66,6 @@ val empty_closed_record : typ
 val empty_open_record : typ
 val get_field : typ -> string -> typ (* Can raise Not_found *)
 val get_field_assuming_not_absent : typ -> string -> typ
-val all_fields : typ -> string list
 val merge_records : typ -> typ -> typ
 val remove_field : typ -> string -> typ
 

@@ -36,14 +36,27 @@ $ opam install cduce-types cduce
 Once CDuce is installed, the prototype can be built using
 
 ```
-git clone git@github.com:E-Sh4rk/Prototype.git
-git checkout -b popl22-AE origin/popl22-AE
-cd Prototype/src
-opam install dune
-eval $(opam env)
-opam install ppx_deriving menhir pomap
-make
+$ git clone git@github.com:E-Sh4rk/Prototype.git
+$ git checkout -b popl22-AE origin/popl22-AE
+$ cd Prototype/src
+$ opam install dune
+$ eval $(opam env)
+$ opam install ppx_deriving menhir pomap
+$ make
 ```
+
+### Building the Javascript prototype
+
+First, build the native prototype then :
+
+```
+$ make js
+```
+
+Then either serve the whole content of the [html/] directory through a Web server or open the file [index.html]
+directly from a browser (**warning** : directly opening the file only works from Chrome/Chromium. Firefox will not
+be able to load the prototype but not the example files due to the same-origin policy).
+
 
 ## Running the prototype
 

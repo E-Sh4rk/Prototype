@@ -75,17 +75,17 @@
                               ARGUMENTS
 
 <i>a</i>  ::=  <i>x</i>                                          (argument)
-        (<i>x</i>:<i>t</i>)                                      (explicitely typed argument)
+        (<i>x</i>:<i>t</i>)                                      (explicitly typed argument)
 
                               EXPRESSIONS
 
 <i>e</i>  ::=  fun <i>a</i> ... <i>a</i> . <i>e</i>                            (function)
-        fun (<i>t</i>) <i>x</i> ... <i>x</i> -> <i>e</i>                       (explicitely typed function)
+        fun (<i>t</i>) <i>x</i> ... <i>x</i> -> <i>e</i>                       (explicitly typed function)
 
         let <i>x</i> = <i>e</i> in <i>e</i>                             (let)
         let <i>x</i> <i>a</i> ... <i>a</i> = <i>e</i> in <i>e</i>                     (let function)
 
-        &lt;<i>t</i>&gt;                                        (magic expression)
+        &lt;<i>t</i>&gt;                                        ("magic" constant of type <i>t</i>)
 	
         if <i>e</i> is <i>t</i> then <i>e</i> else <i>e</i>                    (typecase)
         <i>e</i> <i>e</i>                                        (application)
@@ -93,8 +93,8 @@
         [<i>e</i>;...; <i>e</i>]                                 (list)
         ()                                         (unit)
         "..."                                      (string constant)
-        true                                       ([true] boolean constant)
-        false                                      ([false] boolean constant)
+        true                                       ([true] Boolean constant)
+        false                                      ([false] Boolean constant)
         <i>n</i>                                          (numeric constant)
         <i>id</i>                                         (user-defined constant)
         <i>x</i>                                          (variable)

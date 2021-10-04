@@ -4,8 +4,12 @@ open Pomap
 
 exception UndefinedSymbol of string
 
+exception LexicalError of int * string
+exception SyntaxError of string * string (* position * msg *)
+
 type varname = string
 type exprid = int
+
 
 type annotation = exprid Position.located
 

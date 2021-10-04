@@ -67,13 +67,20 @@ let type_check_program
 
 let main f =
   try
-  let ast =
-    match f with
-      `File fn -> parse_program_file fn
-    | `String s -> parse_program_string s
-  in
-      type_check_program ast print_result print_logs print_ill_typed
-    with e ->
+    let ast =
+      match f with
+        `File fn -> parse_program_file fn
+      | `String s -> parse_program_string s
+    in
+    type_check_program ast print_result print_logs print_ill_typed
+  with
+    | Ast.LexicalError(pos, msg) ->
+        Format.fprintf !err_fmt "Lexical error at position %d, %s\n%!" pos msg
+    | Ast.SyntaxError (spos, msg) ->
+       Format.fprintf !err_fmt "Syntax error: %s, %s\n%!" spos msg
+    | Ast.UndefinedSymbol s ->
+      Format.fprintf  !err_fmt "Error: undefined symbol `%s'%!" s
+    | e ->
       let msg = Printexc.to_string e
       and stack = Printexc.get_backtrace () in
       Format.fprintf !err_fmt "Uncaught exception: %s%s\n%!" msg stack

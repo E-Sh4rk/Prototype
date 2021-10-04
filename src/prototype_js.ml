@@ -6,7 +6,7 @@ let () =
     (fun s i l ->
       let s = String.sub s i l in
       let s = if err then
-        "<span class='errror'>" ^ s ^ "</span>"
+        "<span class='error'>" ^ s ^ "</span>"
       else s in
       output ##. innerHTML :=
       Js.string ((Js.to_string output##.innerHTML) ^ s);

@@ -4,8 +4,7 @@
   open Types_additions
 
   let parsing_error pos msg =
-    Printf.eprintf "%s:\n  %s\n" (Position.string_of_pos pos) msg;
-    exit 1
+    raise (SyntaxError (Position.string_of_pos pos, msg))
 
   let var_or_primitive = function
     | x -> Var x

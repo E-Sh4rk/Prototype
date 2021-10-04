@@ -105,9 +105,8 @@ rule token = parse
 | type_id as s { TID s }
 | eof     { EOF }
 | _ as c  {
-  Printf.eprintf "Lexing error at %d: Unexpected `%c'."
-    lexbuf.Lexing.lex_curr_pos c;
-  exit 1
+  raise (Ast.LexicalError (lexbuf.Lexing.lex_curr_pos,
+      Printf.sprintf "Unexpected `%c'" c))
 }
 
 and comment depth = parse
@@ -119,8 +118,8 @@ and comment depth = parse
   comment (depth + 1) lexbuf
 }
 | eof {
-  Printf.eprintf "Unexpected EOF inside comments.";
-  exit 1
+    raise (Ast.LexicalError (lexbuf.Lexing.lex_curr_pos,
+      "Unexecpted EOF inside comments."))
 }
 | _ {
   comment depth lexbuf

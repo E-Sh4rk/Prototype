@@ -23,6 +23,7 @@ let () =
          match Dom_html.getElementById_coerce "code" Dom_html.CoerceTo.textarea with
          None -> Js._true
          | Some textArea ->  let txt = textArea##.value in
-           Main_proto.main (`String (Js.to_string txt))
+           Main_proto.main (`String (Js.to_string txt));
+           output ##.innerHTML := Js.string "";
          ;  Js._true)
     ) Js._false

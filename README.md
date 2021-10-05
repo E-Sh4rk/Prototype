@@ -3,7 +3,7 @@
 ## Installing
 ### Online prototype
 
-On online prototype is available [here](https://typecaseunion.github.io/) to test the prototype directly in the browser.
+An **online prototype** is available [here](https://typecaseunion.github.io/) to test the prototype directly in the browser (we recommend using Firefox).
 
 ### Virtual Machine Image
 

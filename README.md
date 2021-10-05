@@ -7,7 +7,7 @@ An **online prototype** is available [here](https://typecaseunion.github.io/) to
 
 ### Virtual Machine Image
 
-An Ubuntu 20.04 virtual machine image with the pre-installed prototype is available [here]().
+An Ubuntu 20.04 virtual machine image with the pre-installed prototype is available [here](https://www.lri.fr/~kn/files/TypecaseUnion.ova).
 
 ### Dockerfile
 

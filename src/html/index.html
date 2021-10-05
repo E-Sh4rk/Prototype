@@ -41,6 +41,10 @@
       align-items: stretch;
       flex-grow: 1;
     }
+    #syntax i {
+        color: darkblue;
+        font-weight: bold;
+    }
     </style>
   </head>
   <body>
@@ -72,7 +76,7 @@
         </div>
         <div id="output"></div>
       </div>
-      <div class="column">
+      <div id="syntax" class="column">
 <pre>
                               ARGUMENTS
 
@@ -88,9 +92,10 @@
         let <i>x</i> <i>a</i> ... <i>a</i> = <i>e</i> in <i>e</i>                     (let function)
 
         &lt;<i>t</i>&gt;                                        ("magic" constant of type <i>t</i>)
-	
+
         if <i>e</i> is <i>t</i> then <i>e</i> else <i>e</i>                    (typecase)
         <i>e</i> <i>e</i>                                        (application)
+        <i>e</i> <i>op</i> <i>e</i>                                     (infix operator)
         (<i>e</i>, <i>e</i>)                                     (pair)
         [<i>e</i>;...; <i>e</i>]                                 (list)
         ()                                         (unit)
@@ -104,11 +109,15 @@
                         TOP LEVEL DEFINITIONS
 
         let <i>x</i> = <i>e</i>                                  (let)
+        let (<i>op</i>) = <i>e</i>                               (let infix operator)
         let <i>x</i> <i>a</i> ... <i>a</i> = <i>e</i>                          (let function)
         atom <i>id</i>                                    (constant and atomic type definition)
         type <i>Id</i> = <i>t</i> and <i>Id</i> = <i>t</i> ...                 (recursive types definition)
 
 
+                         INFIX OPERATORS
+
+<i>op</i> ::= + | - | * | / | = | &lt; | &gt;
 
                               TYPES
 

@@ -78,7 +78,17 @@
       </div>
       <div id="syntax" class="column">
 <pre>
-                              ARGUMENTS
+
+                         TOP LEVEL DEFINITIONS
+
+        let <i>x</i> = <i>e</i>                                  (let)
+        let (<i>op</i>) = <i>e</i>                               (definition of an infix operator <i>op</i>)
+        let <i>x</i> <i>a</i> ... <i>a</i> = <i>e</i>                          (let function)
+        atom <i>id</i>                                    (constant and atomic type definition)
+        type <i>Id</i> = <i>t</i> and <i>Id</i> = <i>t</i> ...                 (recursive types definition)
+
+
+                               ARGUMENTS
 
 <i>a</i>  ::=  <i>x</i>                                          (argument)
         (<i>x</i>:<i>t</i>)                                      (explicitly typed argument)
@@ -106,43 +116,32 @@
         <i>id</i>                                         (user-defined constant)
         <i>x</i>                                          (variable)
 
-                        TOP LEVEL DEFINITIONS
-
-        let <i>x</i> = <i>e</i>                                  (let)
-        let (<i>op</i>) = <i>e</i>                               (let infix operator)
-        let <i>x</i> <i>a</i> ... <i>a</i> = <i>e</i>                          (let function)
-        atom <i>id</i>                                    (constant and atomic type definition)
-        type <i>Id</i> = <i>t</i> and <i>Id</i> = <i>t</i> ...                 (recursive types definition)
-
-
-                         INFIX OPERATORS
-
-<i>op</i> ::= + | - | * | / | = | &lt; | &gt;
+	
 
                               TYPES
 
 <i>t</i> ::=  Bool                                       (booleans)
-       Int                                        (integers)
-       String                                     (strings)
-       True                                       (singleton [true])
-       False                                      (singleton [false])
-       <i>n</i>                                          (singleton [integers])
-       "..."                                      (singleton [strings])
-       Unit                                       (unit)
-       [<i>t</i>*]                                       (lists of <i>t</i>)
-       <i>n</i>--<i>n</i>                                       (interval of integers)
-       <i>Id</i>                                         (user-defined type)
+        Int                                        (integers)
+        String                                     (strings)
+        True                                       (singleton [true])
+        False                                      (singleton [false])
+        <i>n</i>                                          (singleton [integers])
+        "..."                                      (singleton [strings])
+        Unit                                       (unit)
+        [<i>t</i>*]                                       (lists of <i>t</i>)
+        <i>n</i>--<i>n</i>                                       (interval of integers)
+        <i>Id</i>                                         (user-defined type)
 
-       <i>t</i>-><i>t</i>                                       (functions)
-       (<i>t</i>,<i>t</i>)                                      (products)
+        <i>t</i>-><i>t</i>                                       (functions)
+        (<i>t</i>,<i>t</i>)                                      (products)
 
-       <i>t</i>|<i>t</i>                                        (union)
-       <i>t</i>&<i>t</i>                                        (intersection)
-       <i>t</i>\<i>t</i>                                        (difference)
-       ~<i>t</i>                                         (negation)
+        <i>t</i>|<i>t</i>                                        (union)
+        <i>t</i>&<i>t</i>                                        (intersection)
+        <i>t</i>\<i>t</i>                                        (difference)
+        ~<i>t</i>                                         (negation)
 
-       Empty                                      (empty type)
-       Any                                        (top type)
+        Empty                                      (empty type)
+        Any                                        (top type)
 </pre>
       </div>  
     </div>

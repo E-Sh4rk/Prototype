@@ -1,4 +1,4 @@
-# Occurence Typing with semantic types prototype
+# Occurence Typing with Set-Theoretic Types prototype
 
 ## Installing
 ### Online prototype

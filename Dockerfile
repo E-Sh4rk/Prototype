@@ -1,4 +1,4 @@
-FROM ubuntu:20.04
+FROM debian:unstable-20210816-slim
 
 LABEL maintainer="Kim Nguyen <kim.nguyen@universite-paris-saclay.fr>"
 
@@ -12,7 +12,7 @@ RUN apt-get update -y && \
          binutils-dev binutils-x86-64-linux-gnu bsdmainutils build-essential \
          cpp cpp-9 dwz g++ g++-9 gcc gcc-9 gcc-9-base gettext gettext-base \
          groff-base intltool-debian libarchive-zip-perl libasan5 libatomic1 \
-         libbinutils libc-dev-bin libc6-dev libcc1-0 libcroco3 libcrypt-dev \
+         libbinutils libc-dev-bin libc6-dev libcc1-0 libcrypt-dev \
          libctf-nobfd0 libctf0 libdebhelper-perl libdpkg-perl libelf1 \
          libfile-stripnondeterminism-perl libgcc-9-dev libgomp1 libiberty-dev\
          libisl22 libitm1 liblsan0 libmpc3 libmpfr6 libncurses-dev \

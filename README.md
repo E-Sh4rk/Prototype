@@ -19,7 +19,7 @@ docker build --no-cache -t occtyping .
 ```
 Once the image is build, start the container with :
 ```
-docker run -ti occtyping
+docker run -ti --rm occtyping
 ```
 The `Prototype` directory contains the source code of the  prototype, already built. You can then  [run the prototype](#running-the-prototype).
 

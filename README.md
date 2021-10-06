@@ -7,7 +7,7 @@ An **online prototype** is available [here](https://typecaseunion.github.io/) to
 
 ### Virtual Machine Image
 
-An Ubuntu 20.04 virtual machine image with the pre-installed prototype is available [here](https://www.lri.fr/~kn/files/TypecaseUnion.ova). The VM starts a graphical user session (LXDE) with a two icons, a `README.txt` file and `LXTerminal` shortcut. The terminal can be used to access the `Prototype` directory containing the code, already built. You can then [run the prototype](#running-the-prototype).
+An Debian based virtual machine image with the pre-installed prototype is available [here](https://www.lri.fr/~kn/files/TypecaseUnion.ova). The VM starts a graphical user session (LXDE) with a two icons, a `README.txt` file and `LXTerminal` shortcut. The terminal can be used to access the `Prototype` directory containing the code, already built. You can then [run the prototype](#running-the-prototype).
 
 
 ### Dockerfile

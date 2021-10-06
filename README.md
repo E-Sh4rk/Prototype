@@ -70,8 +70,8 @@ be able to load the prototype but not the example files due to the same-origin p
 
 ## Running the prototype
 
-Once compiled, the prototype can be executed with :
+Once compiled, the prototype can be executed with (assuming the current directory is `Prototype/src`):
 ```
-dune exec -- prototype.exe [file]
+dune exec -- ./prototype.exe [file]
 ```
 If no file is given, the file `test.ml` from the current path is used. The [html]() directory of the repository contains several example files. The syntax is given on the [webpage of the online prototype](https://typecaseunion.github.io/).

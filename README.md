@@ -1,29 +1,5 @@
 # Occurence Typing with Set-Theoretic Types prototype
 
-## Installing
-### Online prototype
-
-An **online prototype** is available [here](https://typecaseunion.github.io/) to test the prototype directly in the browser (we recommend using Firefox).
-
-### Virtual Machine Image
-
-An Debian based virtual machine image with the pre-installed prototype is available [here](https://www.lri.fr/~kn/files/TypecaseUnion.ova). The VM starts a graphical user session (LXDE) with a two icons, a `README.txt` file and `LXTerminal` shortcut. The terminal can be used to access the `Prototype` directory containing the code, already built. You can then [run the prototype](#running-the-prototype).
-
-
-### Dockerfile
-
-A minimal container can be built from the [Dockerfile]() present in the repository. An image can be build with (assuming the Dockerfile is in the current repository)
-:
-```
-docker build --no-cache -t occtyping .
-```
-Once the image is build, start the container with :
-```
-docker run -ti --rm occtyping
-```
-The `Prototype` directory contains the source code of the  prototype, already built. You can then  [run the prototype](#running-the-prototype).
-
-
 ## Compiling from scratch
 
 The easiest way to install from scratch is through [opam](https://opam.ocaml.org/), the OCaml Package Manager.
@@ -43,11 +19,11 @@ opam install cduce-types cduce
 ```
 
 ### Building the prototype
+
 Once CDuce is installed, the prototype can be built using
 
 ```
 git clone git@github.com:E-Sh4rk/Prototype.git
-git checkout -b popl22-AE origin/popl22-AE
 cd Prototype/src
 opam install dune
 eval $(opam env)

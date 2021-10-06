@@ -34,11 +34,11 @@ Once `opam` is installed, CDuce needs to be installed before the prototype.
 ### Installing CDuce
 
 ```
-$ opam pin add cduce-types 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#polymorphic'
+opam pin add cduce-types 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#polymorphic'
 
-$ opam pin add cduce 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#polymorphic'
+opam pin add cduce 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#polymorphic'
 
-$ opam install cduce-types cduce
+opam install cduce-types cduce
 
 ```
 
@@ -46,13 +46,13 @@ $ opam install cduce-types cduce
 Once CDuce is installed, the prototype can be built using
 
 ```
-$ git clone git@github.com:E-Sh4rk/Prototype.git
-$ git checkout -b popl22-AE origin/popl22-AE
-$ cd Prototype/src
-$ opam install dune
-$ eval $(opam env)
-$ opam install ppx_deriving menhir pomap
-$ make
+git clone git@github.com:E-Sh4rk/Prototype.git
+git checkout -b popl22-AE origin/popl22-AE
+cd Prototype/src
+opam install dune
+eval $(opam env)
+opam install ppx_deriving menhir pomap
+make
 ```
 
 ### Building the Javascript prototype
@@ -60,7 +60,7 @@ $ make
 First, build the native prototype then :
 
 ```
-$ make js
+make js
 ```
 
 Then either serve the whole content of the [html/] directory through a Web server or open the file [index.html]

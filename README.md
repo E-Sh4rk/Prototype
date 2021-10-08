@@ -41,6 +41,16 @@ opam pin add cduce 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#po
 opam install cduce-types cduce
 
 ```
+In the unlikely event that the main server is down, an alternative URL can be used:
+```
+opam pin add cduce-types 'git+https://www.lri.fr/~kn/mirror/cduce.git#polymorphic'
+
+opam pin add cduce 'git+https://www.lri.fr/~kn/mirror/cduce.git#polymorphic'
+
+opam install cduce-types cduce
+
+```
+
 
 ### Building the prototype
 Once CDuce is installed, the prototype can be built using

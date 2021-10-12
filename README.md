@@ -56,9 +56,10 @@ opam install cduce-types cduce
 Once CDuce is installed, the prototype can be built using
 
 ```
-git clone git@github.com:E-Sh4rk/Prototype.git
+git clone https://github.com/E-Sh4rk/Prototype.git
+cd Prototype
 git checkout -b popl22-AE origin/popl22-AE
-cd Prototype/src
+cd src
 opam install dune
 eval $(opam env)
 opam install ppx_deriving menhir pomap

@@ -27,7 +27,7 @@ The `Prototype` directory contains the source code of the  prototype, already bu
 ## Compiling from scratch
 
 The easiest way to install from scratch is through [opam](https://opam.ocaml.org/), the OCaml Package Manager.
-The prototype supports OCaml version 4.07.1 to 4.13.1.
+The prototype supports OCaml version 4.08.1 to 4.13.1.
 
 Once `opam` is installed, CDuce needs to be installed before the prototype.
 

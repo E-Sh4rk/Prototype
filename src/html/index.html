@@ -58,6 +58,8 @@
             <option selected="selected"></option>
             <option value="1">Code 1</option>
             <option value="2">Code 2</option>
+            <option value="2_new">Code 2 (revised)</option>
+
             <option value="3">Code 3</option>
             <option value="4">Code 4</option>
             <option value="5">Code 5</option>
@@ -106,6 +108,8 @@
         if <i>e</i> is <i>t</i> then <i>e</i> else <i>e</i>                    (typecase)
         <i>e</i> <i>e</i>                                        (application)
         <i>e</i> <i>op</i> <i>e</i>                                     (infix operator)
+        fst <i>e</i>                                      (first projection)
+        snd <i>e</i>                                      (second projection)
         (<i>e</i>, <i>e</i>)                                     (pair)
         [<i>e</i>;...; <i>e</i>]                                 (list)
         ()                                         (unit)

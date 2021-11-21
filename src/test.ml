@@ -73,6 +73,23 @@ let test_6 = fun x ->
   if y is 1 then true else false
 
 
+(************************************
+ * 
+ * Example foo function from slides
+ *
+ ************************************)
+  
+let trim = <String -> String>
+let (+) = <Int -> Int -> Int>
+let is_int_or_fun = fun x ->
+  if x is Int then true else if x is Empty -> Any then true else false
+
+let foo = fun x ->
+  if is_int_or_fun x is True then x+1 else trim x
+
+
+
+  
 (************************************)
 (* Examples from the previous paper *)
 (* the one submitted at SciComPro   *)

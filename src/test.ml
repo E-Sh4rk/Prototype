@@ -73,6 +73,23 @@ let test_6 = fun x ->
   if y is 1 then true else false
 
 
+(************************************
+ * 
+ * Example foo function from slides
+ *
+ ************************************)
+  
+let trim = <String -> String>
+let (+) = <Int -> Int -> Int>
+let is_int_or_fun = fun x ->
+  if x is Int then true else if x is Empty -> Any then true else false
+
+let foo = fun x ->
+  if is_int_or_fun x is True then x+1 else trim x
+
+
+
+  
 (************************************)
 (* Examples from the previous paper *)
 (* the one submitted at SciComPro   *)
@@ -601,12 +618,37 @@ let and_ = fun x -> fun y ->
 
 let or_ = fun x -> fun y ->
   not_ ( and_ ( not_ x ) ( not_ y ))
+
+
+(* Code 2 final version *)
+
+                   
+
+type Falsy = False | "" | 0
+type Truthy = ~Falsy
+
+let not_ = fun x ->
+  if x is Truthy then false else true
+
+let to_Bool = fun x -> not_ (not_ x)
+
+
+let and_ = fun x -> fun y ->
+  if x is Truthy then to_Bool y else false
+
+
+let or_ = fun x -> fun y ->
+  not_ (and_ (not_ x) (not_ y))
+
+
+
+
 (* Code 3 from  the submission *)
 
 let strlen = <(String -> Int)>
 let (+) = <(Int -> Int -> Int)>
 
-
+(*
 let and_ = fun x -> fun y ->
   if x is True then if y is True
   then true else false
@@ -614,7 +656,8 @@ let and_ = fun x -> fun y ->
 
 let is_int = fun x ->
   if x is Int then true else false  
-
+ *)
+            
 let example14 =
   fun input -> fun extra ->
   if and_ ( is_int input ) ( is_int ( fst extra )) is True
@@ -627,11 +670,13 @@ let example14 =
 let strlen = <(String -> Int)>
 let (+) = <(Int -> Int -> Int)>
 
+(*
 let and_ = fun x -> fun y ->
   if x is True then if y is True
   then true else false
   else false
-
+ *)
+            
 let is_int = fun x ->
   if x is Int then true else false  
 

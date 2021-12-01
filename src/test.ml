@@ -1130,3 +1130,48 @@ let balance = fun (
               & (Wrongright -> Wrongright)
   )  x -> magic
 
+
+
+     
+(*******************************
+ *                             *
+ *  Examples for polymorphism  *
+ *                             *
+ *******************************)
+
+
+type Falsy = False | "" | 0
+type Truthy = ~Falsy
+let succ = <Int -> Int>
+
+let and_ = fun x -> fun y ->
+  if x is Falsy then x else y
+
+(* expected type:
+      ('a & Falsy -> Any -> 'a & Falsy)
+     &(Truthy -> ´b -> 'b)
+*)
+
+
+
+let and_ = fun x -> fun y ->
+  if x is Falsy then x else (y, succ x)
+
+  
+
+(* expected type:
+      ('a & Falsy -> Any -> 'a & Falsy)
+     &(Truthy&Int -> 'b -> ('b,Int))
+ *)
+
+
+let test = fun x ->
+   if fst x is Falsy then x else succ (fst x)
+
+
+(* expected type:
+      ( ('a & Falsy , 'b) -> ('a & Falsy , 'b))
+     &( (Int,Any) -> Int)
+ *)
+
+

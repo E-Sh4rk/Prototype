@@ -1169,9 +1169,5 @@ let test = fun x ->
    if fst x is Falsy then x else succ (fst x)
 
 
-(* expected type:
-      ( ('a & Falsy , 'b) -> ('a & Falsy , 'b))
-     &( (Int,Any) -> Int)
- *)
 
 

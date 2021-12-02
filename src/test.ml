@@ -1140,8 +1140,9 @@ let balance = fun (
  *******************************)
 
 
-type Falsy = False | "" | 0
-type Truthy = ~Falsy
+(* type Falsy = False | "" | 0
+   type Truthy = ~Falsy
+ *)
 let succ = <Int -> Int>
 
 let and_ = fun x -> fun y ->
@@ -1157,17 +1158,47 @@ let and_ = fun x -> fun y ->
 let and_ = fun x -> fun y ->
   if x is Falsy then x else (y, succ x)
 
-  
-
 (* expected type:
       ('a & Falsy -> Any -> 'a & Falsy)
      &(Truthy&Int -> 'b -> ('b,Int))
- *)
+*)
 
 
 let test = fun x ->
    if fst x is Falsy then x else succ (fst x)
+                                   
+(* expected type:
+      ('a & Falsy -> 'a & Falsy)
+     &(Int -> Int )
+*)
+
+(******************************************
+ *                                        *
+ *         higher order paramaters        *                                   
+ *                                        *
+ ******************************************)
+
+let lnot = fun (x : Bool) -> if x is True then false else true   
+
+let ho0 = fun f -> fun b -> if b is True then f b else lnot b
+
+(* expected type: (True -> 'a) -> Bool -> ('a | Bool)  *)                          
+                          
+let ho0_expl = fun  ((True -> "alpha") -> Bool -> ( "alpha" | Bool)) f b -> if b is True then f b else lnot b
 
 
+  
+let ho1 = fun f -> fun b ->
+     ((lnot b), (if b is True then succ (f b) else 42))              
+
+(* expected  type:
+    (Any -> False -> (True,42))     
+   &((True -> Int) -> True -> (False,Int))
+ *)
+                   
+let ho1_explicit =
+  fun ( (Any -> False -> (True,42)) & ((True -> Int) -> True -> (False,Int)) ) f b ->
+     ((lnot b), (if b is True then succ (f b) else 42))              
 
 
+       

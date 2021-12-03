@@ -1178,16 +1178,28 @@ let test = fun x ->
  *                                        *
  ******************************************)
 
+  
 let lnot = fun (x : Bool) -> if x is True then false else true   
 
+let ho = fun f -> fun x ->  if x is String then f x else x
+
+(* expected type: (String -> 'a) -> 'b -> ('a | 'b)  *)                          
+                          
+  
 let ho0 = fun f -> fun b -> if b is True then f b else lnot b
 
 (* expected type: (True -> 'a) -> Bool -> ('a | Bool)  *)                          
                           
-let ho0_expl = fun  ((True -> "alpha") -> Bool -> ( "alpha" | Bool)) f b -> if b is True then f b else lnot b
+let ho0_explicit = fun  ((True -> "alpha") -> Bool -> ( "alpha" | Bool)) f b -> if b is True then f b else lnot b
 
 
-  
+let ho2 = fun f -> fun x -> if x is Int then (f x) + x else lnot x
+                          
+(* expected type: (Int -> Int) -> (Int | Bool) -> (Int | Bool)  *)                          
+
+let ho2_explicit = fun ( (Int -> Int) -> (Int | Bool) -> (Int | Bool)) f x -> if x is Int then (f x) + x else lnot x
+
+                          
 let ho1 = fun f -> fun b ->
      ((lnot b), (if b is True then succ (f b) else 42))              
 

@@ -1183,12 +1183,20 @@ let lnot = fun (x : Bool) -> if x is True then false else true
 
 let ho = fun f -> fun x ->  if x is String then f x else x
 
-(* expected type: (String -> 'a) -> 'b -> ('a | 'b)  *)                          
+(* expected type:
+    ((String -> 'a) -> 'b -> ('a | 'b))                            
+  & ((String -> 'a) -> String -> 'a)                       
+  & (Any -> 'a&¬String -> 'a&¬String)
+ *)
                           
-  
 let ho0 = fun f -> fun b -> if b is True then f b else lnot b
 
-(* expected type: (True -> 'a) -> Bool -> ('a | Bool)  *)                          
+(* expected type:
+    (True -> 'a) -> Bool -> ('a | Bool)
+   or more precisely
+     ( (True -> 'a) -> True -> 'a )
+   & ( Any ->  False -> True )
+ *)                          
                           
 let ho0_explicit = fun  ((True -> "alpha") -> Bool -> ( "alpha" | Bool)) f b -> if b is True then f b else lnot b
 
@@ -1214,3 +1222,4 @@ let ho1_explicit =
 
 
        
+let bad = fun x -> if x is Int then x + 1 else (42 3)

@@ -49,9 +49,9 @@ let test_1 = fun (x:Any) -> fun (y:Any) ->
 let is_int = fun (x:Any) -> if x is Int then true else false
 let is_bool = fun (x:Any) -> if x is Bool then true else false
 
-(************************)
-(* Various simple tests *)
-(************************)
+(************************
+ * Various simple tests *
+ ************************)
 
 let test_2 = fun (x:Any) ->
   lor (is_int x) (is_bool x)
@@ -90,10 +90,10 @@ let foo = fun x ->
 
 
   
-(************************************)
-(* Examples from the previous paper *)
-(* the one submitted at SciComPro   *)
-(************************************)
+(************************************
+ * Examples from the previous paper *
+ * the one submitted at SciComPro   *
+ ************************************)
 
 let (+) = <Int -> Int -> Int>
 
@@ -845,7 +845,7 @@ let fac3 =  fun (f : Int -> Int) ->
 *   polymorphism ... the filter *
 *   function whose polymorphic  *
 *   type should be              *
-*    ((α→true) & (¬α→false))    * 
+*    ((α→true) & (¬α→false))    *
 *       → [β*]                  *
 *       → [(α&β)*]              *
 *                               *
@@ -1174,10 +1174,11 @@ let test = fun x ->
 
 (******************************************
  *                                        *
- *         higher order paramaters        *                                   
+ *         higher order parameters        *
  *                                        *
  ******************************************)
 
+atom alph
   
 let lnot = fun (x : Bool) -> if x is True then false else true   
 
@@ -1198,14 +1199,19 @@ let ho0 = fun f -> fun b -> if b is True then f b else lnot b
    & ( Any ->  False -> True )
  *)                          
                           
-let ho0_explicit = fun  ((True -> "alpha") -> Bool -> ( "alpha" | Bool)) f b -> if b is True then f b else lnot b
+let ho0_explicit = fun  ((True -> Alph) -> Bool -> ( Alph | Bool)) f b -> if b is True then f b else lnot b
 
 
 let ho2 = fun f -> fun x -> if x is Int then (f x) + x else lnot x
                           
-(* expected type: (Int -> Int) -> (Int | Bool) -> (Int | Bool)  *)                          
+(* expected type: (Int -> Int) -> (Int | Bool) -> (Int | Bool)
+   more precise: (Int -> Int) -> Int -> Int) & (Any -> Bool -> Bool)
+   even more:    (Int -> Int) -> Int -> Int) & (Any -> (True -> False) & (False -> True))
+ *)                          
 
 let ho2_explicit = fun ( (Int -> Int) -> (Int | Bool) -> (Int | Bool)) f x -> if x is Int then (f x) + x else lnot x
+
+let ho2_moreexpl = fun ( ( (Int -> Int) -> Int -> Int) & (Any -> (True -> False) & (False -> True)) ) f x -> if x is Int then (f x) + x else lnot x
 
                           
 let ho1 = fun f -> fun b ->
@@ -1221,5 +1227,19 @@ let ho1_explicit =
      ((lnot b), (if b is True then succ (f b) else 42))              
 
 
-       
+let ho4 = fun f -> fun b ->
+     ((lnot b), (if b is True then f (succ (f b)) else 42))              
+
+(* expected  type:
+    (Any -> False -> (True,42))     
+   &( ((True -> Int)&(Int ->'a)) -> True -> (False,'a))
+ *)
+
+
+let ho4_explicit =
+  fun ( (Any -> False -> (True,42)) & ( ((True -> Int)&(Int -> Alph)) -> True -> (False,Alph)) ) f b ->
+     ((lnot b), (if b is True then f(succ (f b)) else 42))              
+
+
+     
 let bad = fun x -> if x is Int then x + 1 else (42 3)

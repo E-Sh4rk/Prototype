@@ -1,5 +1,5 @@
 open IO
-open Nf_ast
+open Msc
 open Types_additions
 open Variable
 
@@ -29,7 +29,7 @@ let type_check_program
       let var = Variable.create (Some name) in
       let annot_expr = Ast.parser_expr_to_annot_expr tenv varm parsed_expr in
       let time0 = Unix.gettimeofday () in
-      let nf_expr = convert_to_normal_form annot_expr in
+      let nf_expr = convert_to_msc annot_expr in
       let time1 = Unix.gettimeofday () in
       assert (VarSet.subset (fv_e nf_expr) (Env.domain env |> VarSet.of_list)) ;
       try

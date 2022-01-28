@@ -160,7 +160,7 @@ let filter_expr_map vals em =
 
 exception IsVar of Variable.t
 
-let convert_to_normal_form ast =
+let convert_to_msc ast =
   let aux expr_var_map ast =
     let rec to_defs_and_a expr_var_map ast =
       let (_, e) = ast in

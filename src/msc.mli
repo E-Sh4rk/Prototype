@@ -16,7 +16,7 @@ and e =
   | Bind of VarAnnot.t * Variable.t * a * e
   | Var of Variable.t
 
-val convert_to_normal_form : Ast.annot_expr -> e
+val convert_to_msc : Ast.annot_expr -> e
 val map_e : (e -> e) -> (a -> a) -> e -> e
 val map_a : (e -> e) -> (a -> a) -> a -> a
 val fold_e : (e -> 'a list -> 'a) -> (a -> 'a list -> 'a) -> e -> 'a

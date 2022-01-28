@@ -1,5 +1,5 @@
 open Cduce
-open Nf_ast
+open Msc
 open Types_additions
 open Annotations
 open Variable

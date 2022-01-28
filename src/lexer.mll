@@ -20,6 +20,8 @@ let int = decimal
 
 (*let fn = (int "." decimal?) | (int? "." decimal)*)
 
+let type_var = '\'' ['a'-'z''A'-'Z''0'-'9''_']+
+
 let char = '\'' ['a'-'z''A'-'Z''0'-'9''_'' ''-'] '\''
 
 let string = '"' ['a'-'z''A'-'Z''0'-'9''_'' ''-']* '"'
@@ -103,6 +105,7 @@ rule token = parse
 | char as c { LCHAR (c.[1]) }
 | id as s { ID s }
 | type_id as s { TID s }
+| type_var as s { TVAR s }
 | eof     { EOF }
 | _ as c  {
   raise (Ast.LexicalError (lexbuf.Lexing.lex_curr_pos,

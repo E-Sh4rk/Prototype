@@ -21,6 +21,7 @@ type type_regexp =
     | ReAlt of type_regexp * type_regexp
 
 and type_expr =
+    | TVar of string
     | TBase of type_base
     | TCustom of string
     | TPair of type_expr * type_expr
@@ -32,9 +33,11 @@ and type_expr =
     | TDiff of type_expr * type_expr
     | TNeg of type_expr
 
-type type_env = node StrMap.t * StrSet.t (* Atoms *)
+type type_env = node StrMap.t (* User-defined types *) * StrSet.t (* Atoms *)
+type var_type_env = typ StrMap.t (* Var types *)
 
 let empty_tenv = (StrMap.empty, StrSet.empty)
+let empty_vtenv = StrMap.empty
 
 let type_base_to_typ t =
     match t with
@@ -47,8 +50,13 @@ let type_base_to_typ t =
     | TAny -> Cduce.any | TEmpty -> Cduce.empty
     | TString -> Cduce.string_typ | TList -> Cduce.list_typ
 
-let derecurse_types env defs =
+let derecurse_types env venv defs =
     let open Cduce_core in
+    let venv =
+        let h = Hashtbl.create 16 in
+        StrMap.iter (fun n v -> Hashtbl.add h n v) venv ;
+        h
+    in
     let henv = Hashtbl.create 16 in
     let () =
         List.iter (fun (name, def) ->
@@ -72,6 +80,12 @@ let derecurse_types env defs =
                 raise (TypeDefinitionError (Printf.sprintf "Type %s undefined!" name))
     and aux t =
         match t with
+        | TVar v ->
+            begin try Typepat.mk_type (Hashtbl.find venv v)
+            with Not_found ->
+                let t = mk_var v in
+                Hashtbl.add venv v t ;
+                Typepat.mk_type t end
         | TBase tb -> Typepat.mk_type (type_base_to_typ tb)
         | TCustom n -> get_name n
         | TPair (t1,t2) -> Typepat.mk_prod (aux t1) (aux t2)
@@ -85,7 +99,6 @@ let derecurse_types env defs =
                 Cduce_types.Ident.LabelMap.from_list_disj (List.map aux' fields)
             in
             Typepat.mk_record is_open lmap
-
         | TSList lst -> Typepat.rexp (aux_re lst)
         | TArrow (t1,t2) -> Typepat.mk_arrow (aux t1) (aux t2)
         | TCup (t1,t2) ->
@@ -111,27 +124,31 @@ let derecurse_types env defs =
         | ReStar r -> Typepat.mk_star (aux_re r)
     in
     let nodes = List.map (fun (name, def) -> name, aux def) defs in
-    List.map (fun (name, node) -> (name, 
-                        (Typepat.internalize node; Typepat.typ node))) nodes
+    let res =
+        List.map (fun (name, node) -> (name, 
+                            (Typepat.internalize node; Typepat.typ node))) nodes
+    in
+    let venv = Hashtbl.fold StrMap.add venv StrMap.empty in
+    (res, venv)
 
-
-let type_expr_to_typ (tenv, _) t = 
-    match derecurse_types tenv [ ("", t) ] with
-    | [ _, n ] -> n
+let type_expr_to_typ (tenv, _) venv t = 
+    match derecurse_types tenv venv [ ("", t) ] with
+    | ([ _, n ], venv) -> (n, venv)
     | _ -> assert false
 
-let define_types (tenv, aenv) defs =
+let define_types (tenv, aenv) venv defs =
     let defs = List.map
         (fun (name, decl) -> (String.capitalize_ascii name, decl))
         defs
     in
+    let (res, venv) = derecurse_types tenv venv defs in
     let tenv = List.fold_left
         (fun acc (name, typ) ->
             Cduce.register name typ; 
             StrMap.add name (cons typ) acc)
         tenv
-        (derecurse_types tenv defs)
-    in (tenv, aenv)
+        res
+    in ((tenv, aenv), venv)
 
 let define_atom (env, atoms) name =
     let atom = String.uncapitalize_ascii name in

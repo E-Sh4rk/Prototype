@@ -86,10 +86,12 @@ let new_annot p =
 let copy_annot a =
     new_annot (Position.position a)
 
-let parser_expr_to_annot_expr tenv name_var_map e =
-    let rec aux env ((exprid,pos),e) =
+let parser_expr_to_annot_expr tenv vtenv name_var_map e =
+    let rec aux vtenv env ((exprid,pos),e) =
         let e = match e with
-        | Abstract t -> Abstract (type_expr_to_typ tenv t)
+        | Abstract t ->
+            let (t, _) = type_expr_to_typ tenv vtenv t in
+            Abstract t
         | Const c -> Const c
         | Var str ->
             if StrMap.mem str env
@@ -98,36 +100,40 @@ let parser_expr_to_annot_expr tenv name_var_map e =
             then Const (Atom str)
             else raise (UndefinedSymbol (str))
         | Lambda (t,str,e) ->
-            let t = match t with
-            | Unnanoted -> Unnanoted
-            | ADomain t -> ADomain (type_expr_to_typ tenv t)
-            | AArrow t -> AArrow (type_expr_to_typ tenv t)
+            let (t, vtenv) = match t with
+            | Unnanoted -> (Unnanoted, vtenv)
+            | ADomain t ->
+                let (t, vtenv) = type_expr_to_typ tenv vtenv t in
+                (ADomain (t), vtenv)
+            | AArrow t ->
+                let (t, vtenv) = type_expr_to_typ tenv vtenv t in
+                (AArrow (t), vtenv)
             in
             let var = Variable.create (Some str) in
             Variable.attach_location var pos ;
             let env = StrMap.add str var env in
-            Lambda (t, var, aux env e)
+            Lambda (t, var, aux vtenv env e)
         | Ite (e, t, e1, e2) ->
-            let t = type_expr_to_typ tenv t in
+            let (t, vtenv) = type_expr_to_typ tenv vtenv t in
             if is_test_type t
-            then Ite (aux env e, t, aux env e1, aux env e2)
+            then Ite (aux vtenv env e, t, aux vtenv env e1, aux vtenv env e2)
             else failwith "Cannot make a typecase with a non-trvial arrow type."
         | App (e1, e2) ->
-            App (aux env e1, aux env e2)
+            App (aux vtenv env e1, aux vtenv env e2)
         | Let (str, e1, e2) ->
             let var = Variable.create (Some str) in
             Variable.attach_location var pos ;
             let env' = StrMap.add str var env in
-            Let (var, aux env e1, aux env' e2)
+            Let (var, aux vtenv env e1, aux vtenv env' e2)
         | Pair (e1, e2) ->
-            Pair (aux env e1, aux env e2)
-        | Projection (p, e) -> Projection (p, aux env e)
+            Pair (aux vtenv env e1, aux vtenv env e2)
+        | Projection (p, e) -> Projection (p, aux vtenv env e)
         | RecordUpdate (e1, l, e2) ->
-            RecordUpdate (aux env e1, l, Utils.option_map (aux env) e2)
+            RecordUpdate (aux vtenv env e1, l, Utils.option_map (aux vtenv env) e2)
         in
         ((exprid,pos),e)
     in
-    aux name_var_map e
+    aux vtenv name_var_map e
 
 let rec unannot (_,e) =
     let e = match e with

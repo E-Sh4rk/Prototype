@@ -40,7 +40,7 @@ val cap_o : typ -> typ -> typ
 val diff : typ -> typ -> typ
 val neg : typ -> typ
 
-(*val mk_var : bool -> string -> typ*)
+val mk_var : string -> typ
 val mk_atom : string -> typ
 val mk_new_typ: unit -> node
 val define_typ: node -> typ -> unit

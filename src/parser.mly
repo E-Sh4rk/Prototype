@@ -56,6 +56,7 @@
 %token LBRACKET RBRACKET SEMICOLON
 %token<string> ID
 %token<string> TID
+%token<string> TVAR
 (*%token<float> LFLOAT*)
 %token<int> LINT
 %token<bool> LBOOL
@@ -220,6 +221,7 @@ typ:
 atomic_typ:
   x=type_constant { TBase x }
 | s=TID { TCustom s }
+| s=TVAR { TVar s }
 | LPAREN lhs=typ COMMA rhs=typ RPAREN { TPair (lhs, rhs) }
 | LPAREN t=typ RPAREN { t }
 | LBRACE fs=separated_list(COMMA, typ_field) RBRACE { TRecord (false, fs) }

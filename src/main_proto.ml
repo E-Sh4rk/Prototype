@@ -27,7 +27,7 @@ let type_check_program
     Format.ksprintf pr "%s: " name;
     begin
       let var = Variable.create (Some name) in
-      let annot_expr = Ast.parser_expr_to_annot_expr tenv varm parsed_expr in
+      let annot_expr = Ast.parser_expr_to_annot_expr tenv empty_vtenv varm parsed_expr in
       let time0 = Unix.gettimeofday () in
       let nf_expr = convert_to_msc annot_expr in
       let time1 = Unix.gettimeofday () in
@@ -59,7 +59,7 @@ let type_check_program
         let tenv = List.fold_left define_atom tenv lst in
         (tenv,varm,env)
       | Ast.Types lst ->
-        let tenv = define_types tenv lst in
+        let (tenv, _) = define_types tenv empty_vtenv lst in
         (tenv,varm,env)
     in
     ignore (List.fold_left treat_elem (empty_tenv, Ast.empty_name_var_map, Env.empty) program)

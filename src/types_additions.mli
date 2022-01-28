@@ -20,6 +20,7 @@ type type_regexp =
     | ReAlt of type_regexp * type_regexp
 
 and type_expr =
+    | TVar of string
     | TBase of type_base
     | TCustom of string
     | TPair of type_expr * type_expr
@@ -32,16 +33,18 @@ and type_expr =
     | TNeg of type_expr
 
 type type_env
+type var_type_env
 
 val empty_tenv : type_env
+val empty_vtenv : var_type_env
 
 val type_base_to_typ : type_base -> typ
 
-val type_expr_to_typ : type_env -> type_expr -> typ
+val type_expr_to_typ : type_env -> var_type_env -> type_expr -> typ * var_type_env
 
 val define_atom : type_env -> string -> type_env
 
-val define_types : type_env -> (string * type_expr) list -> type_env
+val define_types : type_env -> var_type_env -> (string * type_expr) list -> type_env * var_type_env
 
 val get_type : type_env -> string -> typ
 

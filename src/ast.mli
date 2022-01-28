@@ -55,7 +55,7 @@ val position_of_expr : (annotation, 'a, 'b) t -> Position.t
 val new_annot : Position.t -> annotation
 val copy_annot : annotation -> annotation
 
-val parser_expr_to_annot_expr : type_env -> name_var_map -> parser_expr -> annot_expr
+val parser_expr_to_annot_expr : type_env -> var_type_env -> name_var_map -> parser_expr -> annot_expr
 
 (*val unannot : annot_expr -> expr*)
 val unannot_and_normalize : annot_expr -> expr

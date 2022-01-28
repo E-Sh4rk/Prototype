@@ -51,9 +51,9 @@ let from_label lbl = CD.Ident.Label.get_ascii lbl
 
 (* ----- *)
 
-(*let mk_var internal name =
-    let var = CD.Var.mk ~internal:internal name in
-    CD.Types.var var*)
+let mk_var name =
+    let var = CD.Var.mk name in
+    CD.Types.var var
 
 let mk_atom ascii_name =
     ascii_name |> CD.AtomSet.V.mk_ascii |> CD.AtomSet.atom |> CD.Types.atom

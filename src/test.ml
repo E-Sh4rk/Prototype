@@ -1150,7 +1150,7 @@ let and_ = fun x -> fun y ->
 
 (* expected type:
       ('a & Falsy -> Any -> 'a & Falsy)
-     &(Truthy -> ´b -> 'b)
+     &(Truthy -> 'b -> 'b)
 *)
 
 
@@ -1172,6 +1172,7 @@ let test = fun x ->
      &(Int -> Int )
 *)
 
+
 (******************************************
  *                                        *
  *         higher order parameters        *
@@ -1179,13 +1180,15 @@ let test = fun x ->
  ******************************************)
 
 atom alph
+atom bet
+atom gamm
   
 let lnot = fun (x : Bool) -> if x is True then false else true   
 
 let ho = fun f -> fun x ->  if x is String then f x else x
 
-(* expected type:
-    ((String -> 'a) -> 'b -> ('a | 'b))                            
+(* expected type [first type of the intersection useless]:
+    ((String -> 'a) -> 'b -> ('a | 'b))                             
   & ((String -> 'a) -> String -> 'a)                       
   & (Any -> 'a&¬String -> 'a&¬String)
  *)
@@ -1201,6 +1204,20 @@ let ho0 = fun f -> fun b -> if b is True then f b else lnot b
                           
 let ho0_explicit = fun  ((True -> Alph) -> Bool -> ( Alph | Bool)) f b -> if b is True then f b else lnot b
 
+
+
+let ho1 = fun f -> fun g -> fun x -> if g x is Int then f (g x) else 0
+
+(*  expected type:
+    ( ('a & Int -> 'b ) -> ( 'c -> 'a & Int) -> 'c -> 'b )
+   &( Any -> ('c -> 'a \ Int) -> 'c -> 0 )
+   &( ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b | 0 )
+*)
+
+let ho1_explicit = fun   ( ( (Any & Int -> Bet ) -> ( Gamm -> Any & Int) -> Gamm -> Bet )
+                          &( Any -> (Gamm -> Any \ Int) -> Gamm -> 0 )
+                          &( (Alph -> Bet) -> (Gamm -> Alph) -> Gamm -> Bet | 0 ) 
+                         ) f g x -> if g x is Int then f (g x) else 0
 
 let ho2 = fun f -> fun x -> if x is Int then (f x) + x else lnot x
                           

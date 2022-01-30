@@ -310,7 +310,6 @@ and infer_a' (*pos*)_ tenv env a t =
   let type_lambda va lt v e t ~maxdom =
     log "@,@[<v 1>LAMBDA for variable %a with t=%a" Variable.pp v pp_typ t ;
     let t = cap_o t arrow_any in
-    (* NOTE: In the paper, the rule AbsUnion does not interstect t with arrow_any *)
     let res =
       match dnf t |> simplify_dnf with
       | [arrows] -> (* Abs *)

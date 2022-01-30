@@ -44,7 +44,7 @@ let type_check_program
           (Cduce.string_of_type typ) time msc_time typ_time;
         pr_logs () ; (varm, env)
       with Checker.Ill_typed (pos, str) ->
-        (*Format.printf "%a\n" pp_e nf_expr ;*)
+        (*Format.printf "%a@." pp_e nf_expr ;*)
         pr_ill_typed (pos, str); (varm,env)
       end
     in

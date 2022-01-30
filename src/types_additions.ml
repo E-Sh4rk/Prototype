@@ -230,12 +230,9 @@ let simplify_dnf dnf =
     rm (fun t ts -> subtype t (disj ts)) [] splits
     |> List.map simplify_conjuncts
 
-let simplify_arrow t = (* Warning: only keep the positive part *)
-    let res = dnf t |> simplify_dnf |> List.map branch_type |> disj in
-    assert (equiv res (dnf t |> List.map branch_type |> disj)) ; res
-
-let simplify_typ t = (* Warning: only keep the positive part of functions *)
-    let arrow = cap_o t arrow_any |> simplify_arrow in
+let simplify_typ t = (* Warning: only keep the positive part of functions. Unsound if there are type variables. *)
+    (* TODO: Make it support type variables. Add assert to check soundness. *)
+    let arrow = cap_o t arrow_any |> dnf |> simplify_dnf |> List.map branch_type |> disj in
     let non_arrow = diff t arrow_any |> normalize_typ in
     cup_o arrow non_arrow
     

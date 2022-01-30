@@ -186,6 +186,16 @@ let branch_type lst =
         |> conj
     end
 
+let full_branch_type ((pvs, nvs), (ps, ns)) =
+    let pvs = pvs |> conj in
+    let nvs = nvs |> List.map neg |> conj in
+    let ps = ps |>
+        List.map (fun (a, b) -> mk_arrow a b) |> conj in
+    let ns = ns |>
+        List.map (fun (a, b) -> mk_arrow a b |> neg) |> conj in
+    let t = [pvs;nvs;ps;ns] |> conj in
+    cap_o arrow_any t
+
 let rec take_one lst =
     match lst with
     | [] -> []
@@ -228,13 +238,57 @@ let simplify_dnf dnf =
         conjuncts |> List.split |> fst |> regroup (* Regroup conjuncts with similar domain/codomain *)
     in
     rm (fun t ts -> subtype t (disj ts)) [] splits
+    |> List.map simplify_conjuncts        
+
+let simplify_full_dnf dnf =
+    let splits = List.map full_branch_type dnf in
+    let splits = List.combine dnf splits in
+    let rec rm f kept lst = match lst with
+    | [] -> kept
+    | (dnf, t)::lst ->
+        let (_, ts1) = List.split lst in
+        let (_, ts2) = List.split kept in
+        if f t (ts1@ts2) then rm f kept lst else rm f ((dnf, t)::kept) lst
+    in
+    let rec regroup conjuncts =
+        let rec aux (l,r) lst = match lst with
+        | [] -> ((l,r), [])
+        | (l',r')::lst ->
+            if equiv (descr l) (descr l')
+            then aux (l, cap_o (descr r) (descr r') |> cons) lst
+            else if equiv (descr r) (descr r')
+            then aux (cup_o (descr l) (descr l') |> cons, r) lst
+            else
+                let ((l,r),lst) = aux (l,r) lst in
+                ((l,r), (l',r')::lst)
+        in
+        match conjuncts with
+        | [] -> []
+        | (l, r)::lst ->
+            let ((l,r),lst) = aux (l,r) lst in
+            (l,r)::(regroup lst)
+    in
+    let simplify_conjuncts (((pvs, nvs), (ps, ns)), _) =
+        let ps = ps |>
+            List.map (fun (a, b) -> ((a,b), mk_arrow a b)) |>
+            rm (fun t ts -> subtype (conj ts) t) [] |> (* Remove redundant positive conjuncts *)
+            List.split |> fst |> regroup (* Regroup positive conjuncts with similar domain/codomain *)
+        in
+        let ns = ns |>
+            List.map (fun (a, b) -> ((a,b), mk_arrow a b |> neg)) |>
+            rm (fun t ts -> subtype (conj ts) t) [] |> (* Remove redundant negative conjuncts *)
+            List.split |> fst
+        in
+        ((pvs, nvs), (ps, ns))
+    in
+    rm (fun t ts -> subtype t (disj ts)) [] splits
     |> List.map simplify_conjuncts
 
-let simplify_typ t = (* Warning: only keep the positive part of functions. Unsound if there are type variables. *)
-    (* TODO: Make it support type variables. Add assert to check soundness. *)
-    let arrow = cap_o t arrow_any |> dnf |> simplify_dnf |> List.map branch_type |> disj in
-    let non_arrow = diff t arrow_any |> normalize_typ in
-    cup_o arrow non_arrow
+let simplify_typ t =
+    let arrow = t |> full_dnf |> simplify_full_dnf |> List.map full_branch_type |> disj in
+    let non_arrow = diff t arrow_any in
+    let res = cup_o arrow non_arrow |> normalize_typ in
+    assert (equiv res t) ; res
     
 let split_arrow t =
   dnf t

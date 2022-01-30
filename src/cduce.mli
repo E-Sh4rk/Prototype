@@ -74,6 +74,7 @@ val arrow_any : typ
 val domain : typ -> typ
 val apply : typ -> typ -> typ
 val dnf : typ -> (typ * typ) list list
+val full_dnf : typ -> ((typ list * typ list) * ((node * node) list * (node * node) list)) list
 
 val is_empty : typ -> bool
 val non_empty: typ -> bool

@@ -60,7 +60,7 @@ val disj : typ list -> typ
 val apply_opt : typ -> typ -> typ
 
 val simplify_dnf : (typ * typ) list list -> (typ * typ) list list
-val simplify_typ : typ -> typ (* Warning: only keep the positive part of functions *)
+val simplify_typ : typ -> typ
 
 val branch_type : (typ*typ) list -> typ
 val split_arrow : typ -> typ list

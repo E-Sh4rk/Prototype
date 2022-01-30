@@ -284,10 +284,10 @@ let simplify_full_dnf dnf =
     rm (fun t ts -> subtype t (disj ts)) [] splits
     |> List.map simplify_conjuncts
 
-let simplify_typ t =
+let simplify_typ t = (* TODO: restore normalize_typ when fixed?? *)
     let arrow = t |> full_dnf |> simplify_full_dnf |> List.map full_branch_type |> disj in
     let non_arrow = diff t arrow_any in
-    let res = cup_o arrow non_arrow |> normalize_typ in
+    let res = cup_o arrow non_arrow (*|> normalize_typ*) in
     assert (equiv res t) ; res
     
 let split_arrow t =

@@ -105,7 +105,7 @@ rule token = parse
 | char as c { LCHAR (c.[1]) }
 | id as s { ID s }
 | type_id as s { TID s }
-| type_var as s { TVAR s }
+| type_var as s { TVAR (String.sub s 1 ((String.length s) - 1)) }
 | eof     { EOF }
 | _ as c  {
   raise (Ast.LexicalError (lexbuf.Lexing.lex_curr_pos,

@@ -462,12 +462,6 @@ and infer_a' (*pos*)_ tenv env a t =
           let gammas =
             arrows |> List.filter_map (fun (si,_) ->
               let arrow_type = mk_arrow (cons (cap_o si vt2)) (cons t) in
-              let arg = (cap_o si vt2) in
-              if (is_empty arg |> not) && (subtype vt1 arrow_type) && (subtype (apply vt1 arg) (apply arrow_type arg) |> not)
-              then begin
-                Format.printf "t:%a@.arrow_needed:%a@.simplified vt1:%a@.vt2:%a@.si:%a@." pp_typ t pp_typ arrow_type pp_typ (simplify_typ vt1) pp_typ vt2 pp_typ si ;
-                failwith "Cduce error :("
-              end ;
               envr |> option_chain [
                 Env_refinement.refine v1 arrow_type ; Env_refinement.refine v2 si
               ]

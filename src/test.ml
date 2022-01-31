@@ -1252,9 +1252,9 @@ let ho4_explicit =
 
 let aliasing_ill = fun f x ->
   let z = if bool then x else x in
-  if f x is Int then y else x
+  if f z is Int then y else x
 
 let aliasing_explicit = fun ((('a -> ~Int) -> 'a -> 'a) & (('a -> Int&'b) -> 'a -> Int&'b) & (('a -> 'b) -> 'a -> 'a|'b)) f x ->
   let z = if bool then x else x in
-  if f x is Int then f x else x
+  if f z is Int then f x else x
   

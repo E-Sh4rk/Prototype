@@ -1202,7 +1202,7 @@ let ho0_explicit = fun  ((True -> 'a) -> Bool -> ( 'a | Bool)) f b -> if b is Tr
 
 
 
-let ho1 = fun f -> fun g -> fun x -> if g x is Int then f (g x) else 0
+let ho_fetish_ill = fun f -> fun g -> fun x -> if g x is Int then f (g x) else 0
 
 (*  expected type:
     ( ('a & Int -> 'b ) -> ( 'c -> 'a & Int) -> 'c -> 'b )
@@ -1210,8 +1210,8 @@ let ho1 = fun f -> fun g -> fun x -> if g x is Int then f (g x) else 0
    &( ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b | 0 )
 *)
 
-let ho1_explicit = fun   ( ( (Any & Int -> 'b ) -> ( 'c -> Any & Int) -> 'c -> 'b )
-                          &( Any -> ('c -> Any \ Int) -> 'c -> 0 )
+let ho_fetish_explicit = fun   ( ( ('a & Int -> 'b ) -> ( 'c -> 'a & Int) -> 'c -> 'b )
+                          &( Any -> ('c -> 'a \ Int) -> 'c -> 0 )
                           &( ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b | 0 ) 
                          ) f g x -> if g x is Int then f (g x) else 0
 

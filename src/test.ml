@@ -1178,10 +1178,6 @@ let test = fun x ->
  *         higher order parameters        *
  *                                        *
  ******************************************)
-
-atom alph
-atom bet
-atom gamm
   
 let lnot = fun (x : Bool) -> if x is True then false else true   
 
@@ -1202,7 +1198,7 @@ let ho0 = fun f -> fun b -> if b is True then f b else lnot b
    & ( Any ->  False -> True )
  *)                          
                           
-let ho0_explicit = fun  ((True -> Alph) -> Bool -> ( Alph | Bool)) f b -> if b is True then f b else lnot b
+let ho0_explicit = fun  ((True -> 'a) -> Bool -> ( 'a | Bool)) f b -> if b is True then f b else lnot b
 
 
 
@@ -1214,9 +1210,9 @@ let ho1 = fun f -> fun g -> fun x -> if g x is Int then f (g x) else 0
    &( ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b | 0 )
 *)
 
-let ho1_explicit = fun   ( ( (Any & Int -> Bet ) -> ( Gamm -> Any & Int) -> Gamm -> Bet )
-                          &( Any -> (Gamm -> Any \ Int) -> Gamm -> 0 )
-                          &( (Alph -> Bet) -> (Gamm -> Alph) -> Gamm -> Bet | 0 ) 
+let ho1_explicit = fun   ( ( (Any & Int -> 'b ) -> ( 'c -> Any & Int) -> 'c -> 'b )
+                          &( Any -> ('c -> Any \ Int) -> 'c -> 0 )
+                          &( ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b | 0 ) 
                          ) f g x -> if g x is Int then f (g x) else 0
 
 let ho2 = fun f -> fun x -> if x is Int then (f x) + x else lnot x
@@ -1254,7 +1250,7 @@ let ho4 = fun f -> fun b ->
 
 
 let ho4_explicit =
-  fun ( (Any -> False -> (True,42)) & ( ((True -> Int)&(Int -> Alph)) -> True -> (False,Alph)) ) f b ->
+  fun ( (Any -> False -> (True,42)) & ( ((True -> Int)&(Int -> 'a)) -> True -> (False,'a)) ) f b ->
      ((lnot b), (if b is True then f(succ (f b)) else 42))              
 
 

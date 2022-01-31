@@ -1200,7 +1200,7 @@ let ho0 = fun f -> fun b -> if b is True then f b else lnot b
                           
 let ho0_explicit = fun  ((True -> 'a) -> Bool -> ( 'a | Bool)) f b -> if b is True then f b else lnot b
 
-
+let ho0_moreexpl = fun  (((True -> 'a) -> True -> 'a) & (Any -> False -> True)) f b -> if b is True then f b else lnot b
 
 let ho_fetish_ill = fun f -> fun g -> fun x -> if g x is Int then f (g x) else 0
 

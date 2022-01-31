@@ -957,6 +957,7 @@ let two_steps_not2 =
     then (fst (f x)) + x
     else x
 
+let bad = fun x -> if x is Int then x + 1 else (42 3)
 
 (*************************************
 
@@ -1172,7 +1173,6 @@ let test = fun x ->
      &(Int -> Int )
 *)
 
-
 (******************************************
  *                                        *
  *         higher order parameters        *
@@ -1216,7 +1216,7 @@ let ho_fetish_explicit = fun   ( ( ('a & Int -> 'b ) -> ( 'c -> 'a & Int) -> 'c 
                          ) f g x -> if g x is Int then f (g x) else 0
 
 let ho2 = fun f -> fun x -> if x is Int then (f x) + x else lnot x
-                          
+
 (* expected type: (Int -> Int) -> (Int | Bool) -> (Int | Bool)
    more precise: (Int -> Int) -> Int -> Int) & (Any -> Bool -> Bool)
    even more:    (Int -> Int) -> Int -> Int) & (Any -> (True -> False) & (False -> True))
@@ -1225,8 +1225,7 @@ let ho2 = fun f -> fun x -> if x is Int then (f x) + x else lnot x
 let ho2_explicit = fun ( (Int -> Int) -> (Int | Bool) -> (Int | Bool)) f x -> if x is Int then (f x) + x else lnot x
 
 let ho2_moreexpl = fun ( ( (Int -> Int) -> Int -> Int) & (Any -> (True -> False) & (False -> True)) ) f x -> if x is Int then (f x) + x else lnot x
-
-                          
+       
 let ho1 = fun f -> fun b ->
      ((lnot b), (if b is True then succ (f b) else 42))              
 
@@ -1234,11 +1233,10 @@ let ho1 = fun f -> fun b ->
     (Any -> False -> (True,42))     
    &((True -> Int) -> True -> (False,Int))
  *)
-                   
+        
 let ho1_explicit =
   fun ( (Any -> False -> (True,42)) & ((True -> Int) -> True -> (False,Int)) ) f b ->
      ((lnot b), (if b is True then succ (f b) else 42))              
-
 
 let ho4 = fun f -> fun b ->
      ((lnot b), (if b is True then f (succ (f b)) else 42))              
@@ -1248,11 +1246,6 @@ let ho4 = fun f -> fun b ->
    &( ((True -> Int)&(Int ->'a)) -> True -> (False,'a))
  *)
 
-
 let ho4_explicit =
   fun ( (Any -> False -> (True,42)) & ( ((True -> Int)&(Int -> 'a)) -> True -> (False,'a)) ) f b ->
      ((lnot b), (if b is True then f(succ (f b)) else 42))              
-
-
-     
-let bad = fun x -> if x is Int then x + 1 else (42 3)

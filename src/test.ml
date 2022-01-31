@@ -1249,3 +1249,12 @@ let ho4 = fun f -> fun b ->
 let ho4_explicit =
   fun ( (Any -> False -> (True,42)) & ( ((True -> Int)&(Int -> 'a)) -> True -> (False,'a)) ) f b ->
      ((lnot b), (if b is True then f(succ (f b)) else 42))              
+
+let aliasing_ill = fun f x ->
+  let z = if bool then x else x in
+  if f x is Int then y else x
+
+let aliasing_explicit = fun ((('a -> ~Int) -> 'a -> 'a) & (('a -> Int&'b) -> 'a -> Int&'b) & (('a -> 'b) -> 'a -> 'a|'b)) f x ->
+  let z = if bool then x else x in
+  if f x is Int then f x else x
+  

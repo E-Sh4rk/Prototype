@@ -248,7 +248,6 @@ let rec infer' tenv env e t =
     log "@,@[<v 1>BIND for variable %a" Variable.pp v ;
     let pos = Variable.get_locations v in
     let splits = VarAnnot.splits env va in
-    let dom_a = disj splits in
     let res =
       if splits = []
       then begin (* BindArgSkip *)
@@ -256,6 +255,12 @@ let rec infer' tenv env e t =
         let (e, gammas, changes) = infer' tenv env e t in
         (Bind (VarAnnot.empty, v, empty_annots_a a, e), gammas, changes)
       end else begin
+        let dom_a = disj splits in
+        let dom_a = (* NOTE: Not in the paper. Used to forward type information for explicitely typed lambdas with multiple arguments *)
+          if e = Var v
+          then cap_o dom_a t
+          else dom_a
+        in
         let (a, gammas_a, changes) = infer_a' pos tenv env a dom_a in
         if gammas_a = []
         then begin (* BindArgUntyp *)
@@ -277,8 +282,6 @@ let rec infer' tenv env e t =
         end else begin (* Bind *)
           log "@,The definition has been successfully annotated." ;
           let s = typeof_a_nofail pos tenv env a in
-          (* if subtype s dom_a |> not
-          then Format.printf "%a@.%s@." pp_a a (actual_expected s dom_a) ;*)
           assert (subtype s dom_a) ;
           let splits = partition s splits in
           log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;

@@ -233,7 +233,7 @@ let typeof_a_nofail pos tenv env a =
 
 (*type infer_res = e * (Env_refinement.t list) * bool (* Changes? *)*)
 
-let rec infer' tenv env e t =
+let rec infer_legacy' tenv env e t =
   let envr = Env_refinement.empty env in
   match e with
   | Var v -> (e, [Env_refinement.refine_existing v t envr] |> filter_options, false)
@@ -245,7 +245,7 @@ let rec infer' tenv env e t =
       if splits = []
       then begin (* BindArgSkip *)
         log "@,Skipping definition." ;
-        let (e, gammas, changes) = infer' tenv env e t in
+        let (e, gammas, changes) = infer_legacy' tenv env e t in
         (Bind (VarAnnot.empty, v, empty_annots_a a, e), gammas, changes)
       end else begin
         let dom_a = disj splits in
@@ -254,11 +254,11 @@ let rec infer' tenv env e t =
           then cap_o dom_a t
           else dom_a
         in
-        let (a, gammas_a, changes) = infer_a' pos tenv env a dom_a in
+        let (a, gammas_a, changes) = infer_legacy_a' pos tenv env a dom_a in
         if gammas_a = []
         then begin (* BindArgUntyp *)
           log "@,Skipping definition." ;
-          let (e, gammas, changes) = infer' tenv env e t in
+          let (e, gammas, changes) = infer_legacy' tenv env e t in
           (Bind (VarAnnot.empty, v, a (* Should be empty already *), e), gammas, changes (* true *) (* Optimisation *))
         end else if List.exists (fun envr -> Env_refinement.is_empty envr |> not) gammas_a
         then begin (* BindArgRefEnv *)
@@ -271,7 +271,7 @@ let rec infer' tenv env e t =
           (Bind (va, v, a, e), gammas, false (* We made no change to the annotations yet *))
         end else if changes then begin (* BindArgRefAnns *)
           log "@,The definition need a new iteration." ;
-          infer' tenv env (Bind (va, v, a, e)) t
+          infer_legacy' tenv env (Bind (va, v, a, e)) t
         end else begin (* Bind *)
           log "@,The definition has been successfully annotated." ;
           let s = typeof_a_nofail pos tenv env a in
@@ -280,7 +280,7 @@ let rec infer' tenv env e t =
           log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
           let res =
             splits |> List.map (fun s ->
-              let (e, gammas, changes) = infer' tenv (Env.add v s env) e t in
+              let (e, gammas, changes) = infer_legacy' tenv (Env.add v s env) e t in
               let changes =
                 if List.length gammas >= 1 && List.for_all Env_refinement.is_empty gammas
                 then changes (* The current annotation will not change *)
@@ -301,7 +301,7 @@ let rec infer' tenv env e t =
     in
     log "@]@,END BIND for variable %a" Variable.pp v ; res
 
-and infer_a' (*pos*)_ tenv env a t =
+and infer_legacy_a' (*pos*)_ tenv env a t =
   let envr = Env_refinement.empty env in
   let type_lambda va lt v e t ~maxdom =
     log "@,@[<v 1>LAMBDA for variable %a with t=%a" Variable.pp v pp_typ t ;
@@ -322,7 +322,7 @@ and infer_a' (*pos*)_ tenv env a t =
           log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
           let res =
             splits |> List.map (fun si ->
-              let (e, gammas, changes) = infer' tenv (Env.add v si env) e (apply_opt t si) in
+              let (e, gammas, changes) = infer_legacy' tenv (Env.add v si env) e (apply_opt t si) in
               let changes =
                 if List.length gammas >= 1 && List.for_all Env_refinement.is_empty gammas
                 then changes (* The current annotation will not change *)
@@ -487,18 +487,46 @@ and infer_a' (*pos*)_ tenv env a t =
     type_lambda va lt v e t ~maxdom:(domain s)
   end
 
-let rec infer_iterated tenv e =
-  match infer' tenv Env.empty e any with
+let rec infer_legacy_iterated tenv e =
+  match infer_legacy' tenv Env.empty e any with
   | (_, [], _) -> raise (Ill_typed ([], "Annotations inference failed."))
   | (e, _, false) -> e
-  | (e, _, true) -> infer_iterated tenv e
+  | (e, _, true) -> infer_legacy_iterated tenv e
 
-let infer tenv env e =
+let infer_legacy tenv env e =
   let fv = fv_e e in
   let e = VarSet.fold (fun v acc ->
     Bind (VarAnnot.initial, v, Abstract (var_type [] v env), acc)
   ) fv e in
-  let e = infer_iterated tenv e in
+  let e = infer_legacy_iterated tenv e in
+  log "@." ; e
+
+let typeof_simple_legacy tenv env e =
+  let e = infer_legacy tenv env e in
+  typeof tenv Env.empty e |> simplify_typ
+
+(* ========== NEW SYSTEM (LAZY) ========== *)
+
+(*let rec infer_a' (*pos*)_ (*tenv*)_ (*env*)_ (*a*)_ (*t*)_ = failwith "TODO"*)
+
+let (* and *) infer' (*tenv*)_ (*env*)_ (*e*)_ (*t*)_ = failwith "TODO"
+
+let rec infer_iterated tenv env e t =
+  match infer' tenv env e t with
+  | (e, [env'], true) when Env_refinement.is_empty env' -> infer_iterated tenv env e t
+  | (e, gammas, b) -> (e, gammas, b)
+
+let infer tenv env e =
+  (* TODO: fill the initial annotations differently *)
+  let fv = fv_e e in
+  let e = VarSet.fold (fun v acc ->
+    Bind (VarAnnot.initial, v, Abstract (var_type [] v env), acc)
+  ) fv e in
+  let e =
+    match infer_iterated tenv Env.empty e any with
+    | (_, [] , _) -> raise (Ill_typed ([], "Annotations inference failed."))
+    | (e, _, _) -> e
+  in
   log "@." ; e
 
 let typeof_simple tenv env e =

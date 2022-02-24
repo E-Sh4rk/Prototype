@@ -33,7 +33,7 @@ let type_check_program
       let time1 = Unix.gettimeofday () in
       assert (VarSet.subset (fv_e nf_expr) (Env.domain env |> VarSet.of_list)) ;
       try
-        let typ = Checker.typeof_simple tenv env nf_expr in
+        let typ = Checker.typeof_simple_legacy tenv env nf_expr in
         let time2 = Unix.gettimeofday () in
         let msc_time = (time1 -. time0 ) *. 1000. in
         let typ_time = (time2 -. time1) *. 1000. in

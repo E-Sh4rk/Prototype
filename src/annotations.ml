@@ -52,7 +52,17 @@ module VarAnnot = struct
     then va
     else (env, typ)::va
 
-  let restrict env =
+  let restrict env anns =
+    let dom = Env.domain env |> Variable.VarSet.of_list in
+    anns |>
+    List.filter (fun (aenv, _) ->
+      Env.domain aenv |> Variable.VarSet.of_list |> Variable.VarSet.inter dom |>
+      Variable.VarSet.for_all (fun v ->
+        let t1 = Env.find v env in
+        let t2 = Env.find v aenv in
+        Cduce.is_empty t1 || (Cduce.cap t1 t2 |> Cduce.is_empty |> not)
+        )
+      ) |>
     List.map (fun (gamma, t) -> (Env.cap env gamma, t))
 
   let cup va1 va2 =

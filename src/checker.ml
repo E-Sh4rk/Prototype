@@ -210,11 +210,6 @@ let restrict_annots gamma =
   (function Bind (va, v, a, e) -> Bind (VarAnnot.restrict gamma va, v, a, e) | e -> e)
   (function Lambda (va, t, v, e) -> Lambda (VarAnnot.restrict gamma va, t, v, e) | a -> a)
 
-(*let merge_annots_a default a_s =
-  try merge_annots_a a_s with Not_found -> empty_annots_a default*)
-let merge_annots_e default es =
-  try merge_annots_e es with Not_found -> empty_annots_e default
-
 let extract x gammas =
   let vas =
     gammas |> List.map (fun envr ->
@@ -297,7 +292,7 @@ let rec infer' tenv env e t =
             ) in
           let (vas, es, gammass, changess) = split4 res in
           let va = VarAnnot.union vas in
-          let e = merge_annots_e e es in
+          let e = merge_annots_e es in
           let gammas = List.flatten gammass in
           let changes = List.exists identity changess in
           (Bind (va, v, a, e), gammas, changes)
@@ -338,7 +333,7 @@ and infer_a' (*pos*)_ tenv env a t =
             ) in
           let (vas, es, gammass, changess) = split4 res in
           let va = VarAnnot.union vas in
-          let e = merge_annots_e e es in
+          let e = merge_annots_e es in
           let gammas = List.flatten gammass in
           let changes = List.exists identity changess in
           if subtype (domain t) (VarAnnot.full_domain va)

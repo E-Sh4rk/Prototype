@@ -205,17 +205,25 @@ let empty_annots_e =
   (function Bind (_, v, a, e) -> Bind (VarAnnot.empty, v, a, e) | e -> e)
   (function Lambda (_, t, v, e) -> Lambda (VarAnnot.empty, t, v, e) | a -> a)
 
-let restrict_annots gamma =
+let restrict_annots_a gamma =
+  map_a
+  (function Bind (va, v, a, e) -> Bind (VarAnnot.restrict gamma va, v, a, e) | e -> e)
+  (function Lambda (va, t, v, e) -> Lambda (VarAnnot.restrict gamma va, t, v, e) | a -> a)  
+
+let restrict_annots_e gamma =
   map_e
   (function Bind (va, v, a, e) -> Bind (VarAnnot.restrict gamma va, v, a, e) | e -> e)
   (function Lambda (va, t, v, e) -> Lambda (VarAnnot.restrict gamma va, t, v, e) | a -> a)
 
 let extract x gammas =
   let vas =
-    gammas |> List.map (fun envr ->
-      VarAnnot.singleton
-        (Env_refinement.rm x envr |> Env_refinement.to_env)
-        (Env_refinement.find x envr)
+    gammas |> List.filter_map (fun envr ->
+      if Env_refinement.mem x envr
+      then
+        Some (VarAnnot.singleton
+          (Env_refinement.rm x envr |> Env_refinement.to_env)
+          (Env_refinement.find x envr))
+      else None
     ) in
   let gammas =
     gammas |> List.map (fun envr ->
@@ -266,7 +274,7 @@ let rec infer_legacy' tenv env e t =
           let gammas =
             if List.exists Env_refinement.is_empty gammas_a
             then gammas_a else envr::gammas_a in
-          let e = restrict_annots env e in
+          let e = restrict_annots_e env e in
           let va = VarAnnot.restrict env va in
           (Bind (va, v, a, e), gammas, false (* We made no change to the annotations yet *))
         end else if changes then begin (* BindArgRefAnns *)
@@ -507,11 +515,34 @@ let typeof_simple_legacy tenv env e =
 
 (* ========== NEW SYSTEM (LAZY) ========== *)
 
-(*let rec infer_a' (*pos*)_ (*tenv*)_ (*env*)_ (*a*)_ (*t*)_ = failwith "TODO"*)
+let rec infer_a' (*pos*)_ tenv env a t =
+  ignore tenv ; ignore env ; ignore a ; ignore t ;
+  failwith "TODO"
 
-let (* and *) infer' (*tenv*)_ (*env*)_ (*e*)_ (*t*)_ = failwith "TODO"
+and infer' tenv env e t =
+  ignore infer_a' ; ignore tenv ; ignore env ; ignore e ; ignore t ;
+  let envr = Env_refinement.empty env in
+  match e with
+  | Var v -> (e, [Env_refinement.refine v t envr] |> filter_options, false)
+  | Bind (va, v, a, e) ->
+    log "@,@[<v 1>BIND for variable %a" Variable.pp v ;
+    (*let pos = Variable.get_locations v in*)
+    let splits = VarAnnot.splits env va in
+    let res =
+      if splits = []
+      then begin (* BindArgSkip *)
+        log "@,Skipping definition." ;
+        let (e, gammas, changes) = infer_iterated tenv env e t in
+        let (va, gammas) = extract v gammas in
+        let changes = changes || (VarAnnot.is_empty va |> not) in
+        (Bind (va, v, restrict_annots_a env a, e), gammas, changes)
+      end else begin
+        failwith "TODO"
+      end
+    in
+    log "@]@,END BIND for variable %a" Variable.pp v ; res
 
-let rec infer_iterated tenv env e t =
+and infer_iterated tenv env e t =
   match infer' tenv env e t with
   | (e, [env'], true) when Env_refinement.is_empty env' -> infer_iterated tenv env e t
   | (e, gammas, b) -> (e, gammas, b)

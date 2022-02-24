@@ -4,7 +4,6 @@ type t = Cduce.typ VarMap.t
 
 let empty = VarMap.empty
 let is_empty =  VarMap.is_empty
-let contains_empty = VarMap.exists (fun _ t -> Cduce.is_empty t)
 let singleton = VarMap.singleton
 
 let add = VarMap.add
@@ -17,8 +16,12 @@ let rm = VarMap.remove
 
 let find = VarMap.find
 
-let strengthen v t env =
+let strengthen_existing v t env =
   let t = Cduce.cap_o t (find v env) in
+  add v t env
+
+let strengthen v t env =
+  let t = try Cduce.cap_o t (find v env) with Not_found -> Cduce.any in
   add v t env
 
 let cap =

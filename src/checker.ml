@@ -145,19 +145,19 @@ let refine_a tenv env a t =
     |> List.filter_map (
       fun (t1, t2) ->
         env |>
-        option_chain [Env_refinement.refine v1 t1 ; Env_refinement.refine v2 t2]
+        option_chain [Env_refinement.refine_existing v1 t1 ; Env_refinement.refine_existing v2 t2]
     )
-  | Projection (Fst, v) -> [Env_refinement.refine v (mk_times (cons t) any_node) env] |> filter_options
-  | Projection (Snd, v) -> [Env_refinement.refine v (mk_times any_node (cons t)) env] |> filter_options
+  | Projection (Fst, v) -> [Env_refinement.refine_existing v (mk_times (cons t) any_node) env] |> filter_options
+  | Projection (Snd, v) -> [Env_refinement.refine_existing v (mk_times any_node (cons t)) env] |> filter_options
   | Projection (Field label, v) ->
-    [Env_refinement.refine v (mk_record true [label, cons t]) env] |> filter_options
+    [Env_refinement.refine_existing v (mk_record true [label, cons t]) env] |> filter_options
   | RecordUpdate (v, label, None) ->
     let t = cap_o t (record_any_without label) in
     split_record t
     |> List.filter_map (
       fun ti ->
           let ti = remove_field_info ti label in
-          Env_refinement.refine v ti env
+          Env_refinement.refine_existing v ti env
     )
   | RecordUpdate (v, label, Some x) ->
     split_record t
@@ -166,7 +166,7 @@ let refine_a tenv env a t =
         let field_type = get_field_assuming_not_absent ti label in
         let ti = remove_field_info ti label in
         env |>
-        option_chain [Env_refinement.refine v ti ; Env_refinement.refine x field_type]
+        option_chain [Env_refinement.refine_existing v ti ; Env_refinement.refine_existing x field_type]
       )
   | App (v1, v2) ->
     let t1 = Env_refinement.find v1 env in
@@ -174,17 +174,17 @@ let refine_a tenv env a t =
     |> List.filter_map (
       fun (t1, t2) ->
         env |>
-        option_chain [Env_refinement.refine v1 t1 ; Env_refinement.refine v2 t2]
+        option_chain [Env_refinement.refine_existing v1 t1 ; Env_refinement.refine_existing v2 t2]
     )
   | Ite (v, s, x1, x2) ->
-    [ env |> option_chain [Env_refinement.refine v s       ; Env_refinement.refine x1 t] ;
-      env |> option_chain [Env_refinement.refine v (neg s) ; Env_refinement.refine x2 t] ]
+    [ env |> option_chain [Env_refinement.refine_existing v s       ; Env_refinement.refine_existing x1 t] ;
+      env |> option_chain [Env_refinement.refine_existing v (neg s) ; Env_refinement.refine_existing x2 t] ]
     |> filter_options
   | Lambda _ ->
     if disjoint arrow_any t then [] else [env]
   | Let (v1, v2) ->
     [ env |>
-    option_chain [Env_refinement.refine v1 any ; Env_refinement.refine v2 t]]
+    option_chain [Env_refinement.refine_existing v1 any ; Env_refinement.refine_existing v2 t]]
     |> filter_options
 
 let propagate tenv x a gammas =
@@ -236,7 +236,7 @@ let typeof_a_nofail pos tenv env a =
 let rec infer' tenv env e t =
   let envr = Env_refinement.empty env in
   match e with
-  | Var v -> (e, [Env_refinement.refine v t envr] |> filter_options, false)
+  | Var v -> (e, [Env_refinement.refine_existing v t envr] |> filter_options, false)
   | Bind (va, v, a, e) ->
     log "@,@[<v 1>BIND for variable %a" Variable.pp v ;
     let pos = Variable.get_locations v in
@@ -360,7 +360,7 @@ and infer_a' (*pos*)_ tenv env a t =
           split_pair t
           |> List.filter_map (fun (ti,si) ->
             envr |>
-            option_chain [Env_refinement.refine v1 ti ; Env_refinement.refine v2 si]
+            option_chain [Env_refinement.refine_existing v1 ti ; Env_refinement.refine_existing v2 si]
           )
         in
         (a, gammas, false)
@@ -380,7 +380,7 @@ and infer_a' (*pos*)_ tenv env a t =
           split_pair (cap_o vt t)
           |> List.filter_map (fun (ti,si) ->
             let t = mk_times (cons ti) (cons si) in
-            Env_refinement.refine v t envr
+            Env_refinement.refine_existing v t envr
           )
         in
         (a, gammas, false)
@@ -394,7 +394,7 @@ and infer_a' (*pos*)_ tenv env a t =
         let gammas =
           split_record (cap_o vt t)
           |> List.filter_map (fun ti ->
-            Env_refinement.refine v ti envr
+            Env_refinement.refine_existing v ti envr
           )
         in
         (a, gammas, false)
@@ -409,7 +409,7 @@ and infer_a' (*pos*)_ tenv env a t =
           split_record t
           |> List.filter_map (fun ti ->
             let ti = remove_field_info ti label in
-            Env_refinement.refine v ti envr
+            Env_refinement.refine_existing v ti envr
           )
         in
         (a, gammas, false)
@@ -427,7 +427,7 @@ and infer_a' (*pos*)_ tenv env a t =
             let si = get_field ti label in
             let ti = remove_field_info ti label in
             envr |>
-            option_chain [Env_refinement.refine v ti ; Env_refinement.refine f si ]
+            option_chain [Env_refinement.refine_existing v ti ; Env_refinement.refine_existing f si ]
           )
         in
         (a, gammas, false)
@@ -438,8 +438,8 @@ and infer_a' (*pos*)_ tenv env a t =
       if is_empty vt then (a, [envr], false)
       else
         let gammas =
-          [ envr |> option_chain [Env_refinement.refine v s       ; Env_refinement.refine v1 t] ;
-            envr |> option_chain [Env_refinement.refine v (neg s) ; Env_refinement.refine v2 t] ]
+          [ envr |> option_chain [Env_refinement.refine_existing v s       ; Env_refinement.refine_existing v1 t] ;
+            envr |> option_chain [Env_refinement.refine_existing v (neg s) ; Env_refinement.refine_existing v2 t] ]
           |> filter_options
         in
         (a, gammas, false)
@@ -459,21 +459,21 @@ and infer_a' (*pos*)_ tenv env a t =
             arrows |> List.filter_map (fun (si,_) ->
               let arrow_type = mk_arrow (cons (cap_o si vt2)) (cons t) in
               envr |> option_chain [
-                Env_refinement.refine v1 arrow_type ; Env_refinement.refine v2 si
+                Env_refinement.refine_existing v1 arrow_type ; Env_refinement.refine_existing v2 si
               ]
             ) in
           (a, gammas, false)
         | lst -> (* AppL *)
           let gammas =
             lst |> List.filter_map (fun arrows ->
-              Env_refinement.refine v1 (branch_type arrows) envr
+              Env_refinement.refine_existing v1 (branch_type arrows) envr
             ) in
           (a, gammas, false)
     end else (a, [], false)
   | Let (v1, v2) ->
     let gammas =
       [envr |> option_chain
-        [Env_refinement.refine v1 any ; Env_refinement.refine v2 t ]]
+        [Env_refinement.refine_existing v1 any ; Env_refinement.refine_existing v2 t ]]
       |> filter_options in
       (a, gammas, false)
   | Lambda (va, (Ast.ADomain s as lt), v, e) ->

@@ -5,6 +5,7 @@ type t
 val empty : Env.t -> t
 val is_empty : t -> bool
 
+val refine_existing : Variable.t -> typ -> t -> t option
 val refine : Variable.t -> typ -> t -> t option
 val strengthen : Variable.t -> typ -> t -> t
 val rm : Variable.t -> t -> t

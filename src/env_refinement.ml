@@ -19,18 +19,27 @@ let find v (b, r) =
   else Env.find v b
 
 let strengthen v t (b,r) =
-  if Env.mem v r then (b, Env.strengthen v t r)
-  else begin
+  if Env.mem v r then (b, Env.strengthen_existing v t r)
+  else if Env.mem v b then begin
     let ot = Env.find v b in
     if Cduce.subtype ot t then (b, r)
     else (b, Env.add v (Cduce.cap_o t ot) r)
-  end
-let refine v t (b,r) =
+  end else (b, Env.add v t r)
+
+let refine_existing v t (b,r) =
   try
     let ot = find v (b,r) in
     if (Cduce.is_empty ot |> not) && Cduce.disjoint t ot then None
     else Some (strengthen v t (b,r))
   with Not_found -> None
+
+let refine v t (b,r) =
+  if mem v (b,r) then
+    let ot = find v (b,r) in
+    if (Cduce.is_empty ot |> not) && Cduce.disjoint t ot then None
+    else Some (strengthen v t (b,r))
+  else
+    Some (strengthen v t (b, r))
 
 let rm v (b,r) = (Env.rm v b, Env.rm v r)
 

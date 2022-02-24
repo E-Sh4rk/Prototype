@@ -160,7 +160,7 @@ let filter_expr_map vals em =
 
 exception IsVar of Variable.t
 
-let convert_to_msc ast =
+let convert_to_msc ~legacy ast =
   let aux expr_var_map ast =
     let rec to_defs_and_a expr_var_map ast =
       let (_, e) = ast in
@@ -185,7 +185,7 @@ let convert_to_msc ast =
           filter_expr_map (defs |> List.map fst |> VarSet.of_list) in
         let (defs, defs') = (List.rev defs, List.rev defs') in
         let e = defs_and_x_to_e defs' x in
-        (defs, expr_var_map, Lambda (VarAnnot.initial, t, v, e))
+        (defs, expr_var_map, Lambda (VarAnnot.initial_lambda ~legacy, t, v, e))
       | Ast.Ite (e, t, e1, e2) ->
         let (defs, expr_var_map, x) = to_defs_and_x expr_var_map e in
         let (defs1, expr_var_map, x1) = to_defs_and_x expr_var_map e1 in
@@ -233,7 +233,7 @@ let convert_to_msc ast =
       defs |>
       List.fold_left (
         fun nf (v, d) ->
-        Bind (VarAnnot.initial, v, d, nf)
+        Bind (VarAnnot.initial_binding ~legacy, v, d, nf)
       ) (Var x)
     in
     

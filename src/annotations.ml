@@ -31,7 +31,8 @@ module VarAnnot = struct
   type t = (Env.t * Cduce.typ) list
   let empty = []
   let any = [Env.empty, Cduce.any]
-  let initial = any
+  let initial_lambda ~legacy = if legacy then any else any
+  let initial_binding ~legacy = if legacy then any else empty
   let is_empty va = va = []
 
   let singleton env t = [(env, t)]

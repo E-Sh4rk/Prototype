@@ -496,7 +496,7 @@ let rec infer_legacy_iterated tenv e =
 let infer_legacy tenv env e =
   let fv = fv_e e in
   let e = VarSet.fold (fun v acc ->
-    Bind (VarAnnot.initial, v, Abstract (var_type [] v env), acc)
+    Bind (VarAnnot.initial_binding ~legacy:true, v, Abstract (var_type [] v env), acc)
   ) fv e in
   let e = infer_legacy_iterated tenv e in
   log "@." ; e
@@ -517,10 +517,9 @@ let rec infer_iterated tenv env e t =
   | (e, gammas, b) -> (e, gammas, b)
 
 let infer tenv env e =
-  (* TODO: fill the initial annotations differently *)
   let fv = fv_e e in
   let e = VarSet.fold (fun v acc ->
-    Bind (VarAnnot.initial, v, Abstract (var_type [] v env), acc)
+    Bind (VarAnnot.initial_binding ~legacy:false, v, Abstract (var_type [] v env), acc)
   ) fv e in
   let e =
     match infer_iterated tenv Env.empty e any with

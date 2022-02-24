@@ -6,7 +6,8 @@ module VarAnnot : sig
   type t
   val empty : t
   val any : t
-  val initial : t
+  val initial_lambda : legacy:bool -> t
+  val initial_binding : legacy:bool -> t
   val is_empty : t -> bool
   val singleton : Env.t -> Cduce.typ -> t
   val full_domain : t -> Cduce.typ

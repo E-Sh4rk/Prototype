@@ -526,7 +526,7 @@ and infer' tenv env e t =
   | Var v -> (e, [Env_refinement.refine v t envr] |> filter_options, false)
   | Bind (va, v, a, e) ->
     log "@,@[<v 1>BIND for variable %a" Variable.pp v ;
-    (*let pos = Variable.get_locations v in*)
+    let pos = Variable.get_locations v in
     let splits = VarAnnot.splits env va in
     let res =
       if splits = []
@@ -537,14 +537,31 @@ and infer' tenv env e t =
         let changes = changes || (VarAnnot.is_empty va |> not) in
         (Bind (va, v, restrict_annots_a env a, e), gammas, changes)
       end else begin
-        failwith "TODO"
+        let dom_a = disj splits in
+        let (a, gammas_a, changes) = infer_a_iterated pos tenv env a dom_a in
+        if gammas_a = []
+          then begin (* BindArgUntyp *)
+            log "@,Untypable definition..." ;
+            (Bind (VarAnnot.empty, v, a (* Should be empty already *), empty_annots_e e),
+            [], true)
+          end else begin
+            ignore changes ;
+            failwith "TODO"
+          end
       end
     in
     log "@]@,END BIND for variable %a" Variable.pp v ; res
 
+and infer_a_iterated pos tenv env a t =
+    match infer_a' pos tenv env a t with
+    | (e, [env'], true) when Env_refinement.is_empty env' ->
+      infer_a_iterated pos tenv env e t
+    | (e, gammas, b) -> (e, gammas, b)
+
 and infer_iterated tenv env e t =
   match infer' tenv env e t with
-  | (e, [env'], true) when Env_refinement.is_empty env' -> infer_iterated tenv env e t
+  | (e, [env'], true) when Env_refinement.is_empty env' ->
+    infer_iterated tenv env e t
   | (e, gammas, b) -> (e, gammas, b)
 
 let infer tenv env e =

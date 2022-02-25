@@ -549,10 +549,34 @@ and infer' tenv env e t =
               log "@,The definition need refinements (going up)." ;
               let e = restrict_annots_e env e in
               let va = VarAnnot.restrict env va in
-              (Bind (va, v, a, e), gammas_a, changes)
+              (Bind (va, v, a, e), gammas_a, true)
           end else begin
-            ignore changes ;
-            failwith "TODO"
+            log "@,The definition has been successfully annotated." ;
+            let s = typeof_a_nofail pos tenv env a in
+            assert (subtype s dom_a) ;
+            let splits = partition s splits in
+            log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
+            let to_propagate =
+              if List.length splits > 1
+              then
+                splits |>
+                List.map (fun si -> refine_a tenv envr a si) |>
+                List.concat
+              else [envr]
+            in
+            if to_propagate = [] || List.exists (fun envr -> Env_refinement.is_empty envr |> not) to_propagate
+            then begin (* BindPropagateSplit *)
+              let va =
+                List.map (fun si -> VarAnnot.singleton env si) splits |>
+                VarAnnot.union in
+              let e = restrict_annots_e env e in
+              (Bind (va, v, a, e), to_propagate, true)
+            end else begin (* Bind *)
+              (*let (e, gammas, changes') = infer_iterated tenv env e t in
+              let changes = changes || changes' in*)
+              ignore changes ;
+              failwith "TODO"
+            end
           end
       end
     in

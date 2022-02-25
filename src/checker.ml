@@ -532,13 +532,13 @@ and infer' tenv env e t =
       if splits = []
       then begin (* BindArgSkip *)
         log "@,Skipping definition." ;
-        let (e, gammas, changes) = infer_iterated tenv env e t in
+        let (e, gammas) = infer_iterated tenv env e t in
         let (va, gammas) = extract v gammas in
-        let changes = changes || (VarAnnot.is_empty va |> not) in
+        let changes = VarAnnot.is_empty va |> not in
         (Bind (va, v, restrict_annots_a env a, e), gammas, changes)
       end else begin
         let dom_a = disj splits in
-        let (a, gammas_a, changes) = infer_a_iterated pos tenv env a dom_a in
+        let (a, gammas_a) = infer_a_iterated pos tenv env a dom_a in
         if gammas_a = []
           then begin (* BindArgUntyp *)
             log "@,Untypable definition..." ;
@@ -572,10 +572,20 @@ and infer' tenv env e t =
               let e = restrict_annots_e env e in
               (Bind (va, v, a, e), to_propagate, true)
             end else begin (* Bind *)
-              (*let (e, gammas, changes') = infer_iterated tenv env e t in
-              let changes = changes || changes' in*)
-              ignore changes ;
-              failwith "TODO"
+              let res =
+                splits |> List.map (fun si ->
+                  let (e, gammas) = infer_iterated tenv (Env.add v si env) e t in
+                  let changes =
+                    gammas = [] || List.exists (fun envr -> Env_refinement.is_empty envr |> not) gammas in
+                  let (va, gammas) = extract v gammas in
+                  (va, e, gammas, changes)
+              ) in
+              let (vas, es, gammass, changess) = split4 res in
+              let va = VarAnnot.union vas in
+              let e = merge_annots_e es in
+              let gammas = List.flatten gammass in
+              let changes = List.exists identity changess in
+              (Bind (va, v, a, e), gammas, changes)
             end
           end
       end
@@ -586,13 +596,13 @@ and infer_a_iterated pos tenv env a t =
     match infer_a' pos tenv env a t with
     | (e, [env'], true) when Env_refinement.is_empty env' ->
       infer_a_iterated pos tenv env e t
-    | (e, gammas, b) -> (e, gammas, b)
+    | (e, gammas, _) -> (e, gammas)
 
 and infer_iterated tenv env e t =
   match infer' tenv env e t with
   | (e, [env'], true) when Env_refinement.is_empty env' ->
     infer_iterated tenv env e t
-  | (e, gammas, b) -> (e, gammas, b)
+  | (e, gammas, _) -> (e, gammas)
 
 let infer tenv env e =
   let fv = fv_e e in
@@ -601,8 +611,8 @@ let infer tenv env e =
   ) fv e in
   let e =
     match infer_iterated tenv Env.empty e any with
-    | (_, [] , _) -> raise (Ill_typed ([], "Annotations inference failed."))
-    | (e, _, _) -> e
+    | (_, []) -> raise (Ill_typed ([], "Annotations inference failed."))
+    | (e, _) -> e
   in
   log "@." ; e
 

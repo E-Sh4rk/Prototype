@@ -517,10 +517,49 @@ let typeof_simple_legacy tenv env e =
 
 let rec infer_a' (*pos*)_ tenv env a t =
   ignore tenv ; ignore env ; ignore a ; ignore t ;
+  let envr = Env_refinement.empty env in
+  let type_lambda va lt v e t ~maxdom =
+    log "@,@[<v 1>LAMBDA for variable %a with t=%a" Variable.pp v pp_typ t ;
+    let t = cap_o t arrow_any in
+    let res =
+      match dnf t |> simplify_dnf with
+      | [arrows] -> (* Abs *)
+        (* NOTE: Here we ignore the negative part, though we should check there is no negative part.
+        But it would require a better simplification of union of arrow types to make negative parts disappear. *)
+        let splits = (VarAnnot.splits env va)@(List.map fst arrows) in
+        let splits = List.map (fun s -> cap_o s maxdom) splits in
+        let splits = partition_for_full_domain splits in
+        log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
+        let res =
+          splits |> List.map (fun si ->
+            let (e, gammas) = infer_iterated tenv (Env.add v si env) e (apply_opt t si) in
+            let changes =
+              gammas = [] || List.exists (fun envr -> Env_refinement.is_empty envr |> not) gammas in
+            let (va, gammas) = extract v gammas in
+            (va, e, gammas, changes)
+          ) in
+        let (vas, es, gammass, changess) = split4 res in
+        let va = VarAnnot.union vas in
+        let e = merge_annots_e es in
+        let gammas = List.flatten gammass in
+        let gammas =
+          if List.exists Env_refinement.is_empty gammas
+          then gammas else envr::gammas in
+        let changes = List.exists identity changess in
+        if VarAnnot.is_empty va |> not && subtype (domain t) (VarAnnot.full_domain va)
+        then (Lambda (va, lt, v, e), gammas, changes)
+        else (* AbsUntypable *)
+          (Lambda (VarAnnot.empty, lt, v, empty_annots_e e), [], false (* Optimisation *))
+      | lst -> (* AbsUntypable *)
+        if lst <> [] then Format.printf "Warning: An AbsUnion rule would be needed..." ;
+        (Lambda (VarAnnot.empty, lt, v, empty_annots_e e), [], false (* Optimisation *))
+      in
+      log "@]@,END LAMBDA for variable %a" Variable.pp v ; res
+  in
+  ignore type_lambda ;
   failwith "TODO"
 
 and infer' tenv env e t =
-  ignore infer_a' ; ignore tenv ; ignore env ; ignore e ; ignore t ;
   let envr = Env_refinement.empty env in
   match e with
   | Var v -> (e, [Env_refinement.refine v t envr] |> filter_options, false)
@@ -566,6 +605,7 @@ and infer' tenv env e t =
             in
             if to_propagate = [] || List.exists (fun envr -> Env_refinement.is_empty envr |> not) to_propagate
             then begin (* BindPropagateSplit *)
+              log "@,... but first some constraints must be propagated." ;
               let va =
                 List.map (fun si -> VarAnnot.singleton env si) splits |>
                 VarAnnot.union in

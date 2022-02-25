@@ -156,7 +156,7 @@ let records_ok =
   destruct record
 
 (* Must fail because we do not know whether x has a field a *)
-let records_fail2 =
+let records2_fail =
   fun ({..} -> Any) x ->
     if {x with a=0} is {a=Int ..} then x.a else 0
 
@@ -173,13 +173,13 @@ let records_ok1 =
    This should fail since  x\a is of type  {b=Int a=?Empty ..}
    which is a subtype of {b=Int ..} = {b=Int a=?Any ..}
 *)
-let records_fail1 =
+let records1_fail =
   fun ({b = Int ..} -> Int) x ->
     if x\a is {b=Int ..} then x.c else 0
 
 
 (*  This should also fail for the same reasons as above *)
-let records_fail1bis =
+let records1bis_fail =
   fun ({b = Int ..} -> Int) x ->
     if x\a is {b=Int, a=?Empty ..} then x.c else 0
 
@@ -895,6 +895,11 @@ let how_to_type_that_harder =
   let snd_ = fun x -> (fun y -> y) in
   (snd_ true ( snd_ 42 3) ) + (snd_ "ok"  3)
 
+let how_to_type_that_harder_explicit =
+  let snd_ = fun x -> (fun (y : Int) -> y) in
+  (snd_ true ( snd_ 42 3) ) + (snd_ "ok"  3)
+
+  
 (* function types for parameters cannot be inferred *)
 
 let negate_fail = fun f -> (fun x -> lnot (f x))
@@ -1260,12 +1265,28 @@ let aliasing_explicit = fun ((('a -> ~Int) -> 'a -> 'a) & (('a -> Int&'b) -> 'a 
 
 (*****************************************
 *                                        *
-*    Test for lazy implementation        * 
+*     Tests for lazy implementation      *
+* ( examples that should work with a  )  *
+* (lazy typing of the bind expressions)  * 
 *                                        *
 ******************************************)
   
-let foo1_wrong = fun f -> f 3                                
+let foo_highord1_wrong = fun f -> f 3                                
 
-
-let foo2_wrong = fun f -> (f 3 , f true)                           
+let foo_highord2_wrong = fun f -> (f 3 , f true)                           
                            
+let foo_highord3_wrong = fun f -> f (f 3)                           
+
+let foo_highord4_wrong = fun f -> (f f) 3                           
+
+let foo_highord5_wrong = fun f -> (f (f 3) , f true)                           
+
+let foo_highord6_wrong = fun f -> (f (f 3) , f f true)                           
+
+(* Does the following function type with the lazy approach? *)
+(* to type it in the "popl22" system it suffices to add     *)
+(* the annotation y : Int and then it works                 *)                                
+ 
+let how_to_type_that_harder =
+  let snd_ = fun x -> (fun y -> y) in
+  (snd_ true ( snd_ 42 3) ) + (snd_ "ok"  3)                                   

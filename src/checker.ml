@@ -276,7 +276,7 @@ let rec infer_legacy' tenv env e t =
             then gammas_a else envr::gammas_a in
           let e = restrict_annots_e env e in
           let va = VarAnnot.restrict env va in
-          (Bind (va, v, a, e), gammas, false (* We made no change to the annotations yet *))
+          (Bind (va, v, a, e), gammas, changes)
         end else if changes then begin (* BindArgRefAnns *)
           log "@,The definition need a new iteration." ;
           infer_legacy' tenv env (Bind (va, v, a, e)) t
@@ -544,6 +544,12 @@ and infer' tenv env e t =
             log "@,Untypable definition..." ;
             (Bind (VarAnnot.empty, v, a (* Should be empty already *), empty_annots_e e),
             [], true)
+          end else if List.exists (fun envr -> Env_refinement.is_empty envr |> not) gammas_a
+          then begin (* BindArgRefEnv *)
+              log "@,The definition need refinements (going up)." ;
+              let e = restrict_annots_e env e in
+              let va = VarAnnot.restrict env va in
+              (Bind (va, v, a, e), gammas_a, changes)
           end else begin
             ignore changes ;
             failwith "TODO"

@@ -1257,4 +1257,15 @@ let aliasing_ill = fun f x ->
 let aliasing_explicit = fun ((('a -> ~Int) -> 'a -> 'a) & (('a -> Int&'b) -> 'a -> Int&'b) & (('a -> 'b) -> 'a -> 'a|'b)) f x ->
   let z = if bool then x else x in
   if f z is Int then f z else x
+
+(*****************************************
+*                                        *
+*    Test for lazy implementation        * 
+*                                        *
+******************************************)
   
+let foo1_wrong = fun f -> f 3                                
+
+
+let foo2_wrong = fun f -> (f 3 , f true)                           
+                           

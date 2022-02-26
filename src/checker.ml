@@ -460,7 +460,6 @@ and infer_legacy_a' (*pos*)_ tenv env a t =
       then (a, [envr], false)
       else
         let vt1 = cap_o vt1 arrow_any in
-        (* NOTE: In the paper, the rule AppR does not interstect vt1 with arrow_any *)
         match dnf vt1 |> simplify_dnf with
         | [arrows] -> (* AppR *)
           let gammas =
@@ -629,34 +628,48 @@ let rec infer_a' (*pos*)_ tenv env a t =
       in
       (a, gammas, false)
     end
-  (* ----- TODO Below ----- *)
   | App (v1, v2) ->
-    if Env.mem v1 env && Env.mem v2 env then begin
-      let vt1 = Env.find v1 env in
-      let vt2 = Env.find v2 env in
-      if is_empty vt1 || (is_empty vt2 && subtype vt1 arrow_any)
-      then (a, [envr], false)
-      else
+    if Env.mem v1 env && is_empty (Env.find v1 env)
+    then (a, [Env_refinement.refine v2 any envr] |> filter_options, false)
+    else if Env.mem v2 env && is_empty (Env.find v2 env)
+    then (a, [Env_refinement.refine v1 arrow_any envr] |> filter_options, false)
+    else begin
+      if Env.mem v1 env && Env.mem v2 env then begin
+        let vt1 = Env.find v1 env in
+        let vt2 = Env.find v2 env in
         let vt1 = cap_o vt1 arrow_any in
-        (* NOTE: In the paper, the rule AppR does not interstect vt1 with arrow_any *)
         match dnf vt1 |> simplify_dnf with
-        | [arrows] -> (* AppR *)
+        | [arrows] when subtype vt2 (arrows |> List.map fst |> disj) -> (* AppSplitR *)
           let gammas =
             arrows |> List.filter_map (fun (si,_) ->
               let arrow_type = mk_arrow (cons (cap_o si vt2)) (cons t) in
               envr |> option_chain [
-                Env_refinement.refine_existing v1 arrow_type ; Env_refinement.refine_existing v2 si
+                Env_refinement.refine v1 arrow_type ; Env_refinement.refine v2 si
               ]
             ) in
           (a, gammas, false)
-        | lst -> (* AppL *)
+        | [arrows] -> (* AppWrongDom *)
+          let dom = arrows |> List.map fst |> disj in
+          let arrow_type = mk_arrow (cons vt2) (cons t) in
+          let gammas =
+            [Env_refinement.refine v1 arrow_type envr ; Env_refinement.refine v2 dom envr]
+            |> filter_options
+          in
+          (a, gammas, false)
+        | lst -> (* AppSplitL *)
           let gammas =
             lst |> List.filter_map (fun arrows ->
-              Env_refinement.refine_existing v1 (branch_type arrows) envr
+              Env_refinement.refine v1 (branch_type arrows) envr
             ) in
           (a, gammas, false)
-    end else (a, [], false)
-  (* ----- TODO Above ----- *)
+      end else begin (* App *)
+        let gammas = [envr |> option_chain
+          [Env_refinement.refine v1 arrow_any ; Env_refinement.refine v2 any]]
+          |> filter_options
+        in
+        (a, gammas, false)
+      end
+    end
   | Let (v1, v2) ->
     let gammas =
       [envr |> option_chain

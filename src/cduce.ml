@@ -202,7 +202,6 @@ let domain t =
 
 let apply t args =
   let t = CD.Types.Arrow.get t in
-  if is_empty args then empty else (* TODO: Temporary Cduce fix... *)
   CD.Types.Arrow.apply t args
 
 let dnf t =

@@ -21,6 +21,8 @@ let print_ill_typed (pos, str) =
 let print_result str =
   Format.fprintf !std_fmt "%s@?" str
 
+  (* TODO: Improve lazy system so that it works with: *)
+  (* let bad = fun x -> if x is Int then x else (42 3) *)
 let type_check_program
   (program:Ast.parser_program) (pr:string -> unit) pr_logs pr_ill_typed =
   let test_def (tenv,varm,env) (name,parsed_expr) =
@@ -29,11 +31,13 @@ let type_check_program
       let var = Variable.create (Some name) in
       let annot_expr = Ast.parser_expr_to_annot_expr tenv empty_vtenv varm parsed_expr in
       let time0 = Unix.gettimeofday () in
-      let nf_expr = convert_to_msc ~legacy:true annot_expr in
+      (*let nf_expr = convert_to_msc ~legacy:false annot_expr in*)
+      let nf_expr_legacy = convert_to_msc ~legacy:true annot_expr in
       let time1 = Unix.gettimeofday () in
-      assert (VarSet.subset (fv_e nf_expr) (Env.domain env |> VarSet.of_list)) ;
+      (*assert (VarSet.subset (fv_e nf_expr) (Env.domain env |> VarSet.of_list)) ;*)
       try
-        let typ = Checker.typeof_simple_legacy tenv env nf_expr in
+        (*let typ = Checker.typeof_simple tenv env nf_expr in*)
+        let typ = Checker.typeof_simple_legacy tenv env nf_expr_legacy in
         let time2 = Unix.gettimeofday () in
         let msc_time = (time1 -. time0 ) *. 1000. in
         let typ_time = (time2 -. time1) *. 1000. in
@@ -45,6 +49,11 @@ let type_check_program
         pr_logs () ; (varm, env)
       with Checker.Ill_typed (pos, str) ->
         (*Format.printf "%a@." pp_e nf_expr ;*)
+        (*Utils.log_enabled := false ;
+        (try
+          Checker.typeof_simple_legacy tenv env nf_expr_legacy |> ignore ;
+          failwith "Was typable with POPL22 system..."
+        with Checker.Ill_typed _ -> ()) ;*)
         pr_ill_typed (pos, str); (varm,env)
       end
     in

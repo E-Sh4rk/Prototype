@@ -289,7 +289,12 @@ let simplify_typ t =
     let non_arrow = diff t arrow_any in
     let res = cup_o arrow non_arrow (*|> normalize_typ*) in
     assert (equiv res t) ; res
-    
+
+let remove_negative_arrows t =
+    let pos_arrow = t |> dnf |> List.map branch_type |> disj in
+    let non_arrow = diff t arrow_any in
+    cup_o pos_arrow non_arrow
+
 let split_arrow t =
   dnf t
   |> List.map branch_type

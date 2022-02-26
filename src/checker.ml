@@ -516,7 +516,6 @@ let typeof_simple_legacy tenv env e =
 (* ========== NEW SYSTEM (LAZY) ========== *)
 
 let rec infer_a' (*pos*)_ tenv env a t =
-  ignore tenv ; ignore env ; ignore a ; ignore t ;
   let envr = Env_refinement.empty env in
   let type_lambda va lt v e t ~maxdom =
     log "@,@[<v 1>LAMBDA for variable %a with t=%a" Variable.pp v pp_typ t ;
@@ -556,8 +555,124 @@ let rec infer_a' (*pos*)_ tenv env a t =
       in
       log "@]@,END LAMBDA for variable %a" Variable.pp v ; res
   in
-  ignore type_lambda ;
-  failwith "TODO"
+  begin match a with
+  | Abstract s when subtype s t -> (a, [envr], false)
+  | Abstract _ -> (a, [], false)
+  | Const c when subtype (typeof_const_atom tenv c) t -> (a, [envr], false)
+  | Const _ -> (a, [], false)
+  | Pair (v1, v2) ->
+    if Env.mem v1 env && Env.mem v2 env &&
+      (is_empty (Env.find v1 env) || is_empty (Env.find v2 env))
+    then (a, [envr], false)
+    else begin
+      let t = cap_o t pair_any in
+      let gammas =
+        split_pair t
+        |> List.filter_map (fun (ti,si) ->
+          envr |>
+          option_chain [Env_refinement.refine v1 ti ; Env_refinement.refine v2 si]
+        )
+      in
+      (a, gammas, false)
+    end
+  | Projection (typ, v) ->
+    let t =
+      match typ with
+      | Fst -> mk_times (cons t) any_node
+      | Snd -> mk_times any_node (cons t)
+      | Field label -> mk_record true [label, cons t]
+    in
+    let gammas = [Env_refinement.refine v t envr] |> filter_options in
+    (a, gammas, false)
+  (* ----- TODO Below ----- *)
+  | RecordUpdate (v, label, None) ->
+    if Env.mem v env then begin
+      let vt = Env.find v env in
+      if is_empty vt then (a, [envr], false)
+      else
+        let t = cap_o (record_any_without label) t in
+        let gammas =
+          split_record t
+          |> List.filter_map (fun ti ->
+            let ti = remove_field_info ti label in
+            Env_refinement.refine_existing v ti envr
+          )
+        in
+        (a, gammas, false)
+    end else (a, [], false)
+  | RecordUpdate (v, label, Some f) ->
+    if Env.mem v env && Env.mem f env then begin
+      let vt = Env.find v env in
+      let ft = Env.find f env in
+      if is_empty vt || is_empty ft then (a, [envr], false)
+      else
+        let t = cap_o (mk_record true [label, cons ft]) t in
+        let gammas =
+          split_record t
+          |> List.filter_map (fun ti ->
+            let si = get_field ti label in
+            let ti = remove_field_info ti label in
+            envr |>
+            option_chain [Env_refinement.refine_existing v ti ; Env_refinement.refine_existing f si ]
+          )
+        in
+        (a, gammas, false)
+    end else (a, [], false)
+  | Ite (v, s, v1, v2) ->
+    if Env.mem v env then begin
+      let vt = Env.find v env in
+      if is_empty vt then (a, [envr], false)
+      else
+        let gammas =
+          [ envr |> option_chain [Env_refinement.refine_existing v s       ; Env_refinement.refine_existing v1 t] ;
+            envr |> option_chain [Env_refinement.refine_existing v (neg s) ; Env_refinement.refine_existing v2 t] ]
+          |> filter_options
+        in
+        (a, gammas, false)
+    end else (a, [], false)
+  | App (v1, v2) ->
+    if Env.mem v1 env && Env.mem v2 env then begin
+      let vt1 = Env.find v1 env in
+      let vt2 = Env.find v2 env in
+      if is_empty vt1 || (is_empty vt2 && subtype vt1 arrow_any)
+      then (a, [envr], false)
+      else
+        let vt1 = cap_o vt1 arrow_any in
+        (* NOTE: In the paper, the rule AppR does not interstect vt1 with arrow_any *)
+        match dnf vt1 |> simplify_dnf with
+        | [arrows] -> (* AppR *)
+          let gammas =
+            arrows |> List.filter_map (fun (si,_) ->
+              let arrow_type = mk_arrow (cons (cap_o si vt2)) (cons t) in
+              envr |> option_chain [
+                Env_refinement.refine_existing v1 arrow_type ; Env_refinement.refine_existing v2 si
+              ]
+            ) in
+          (a, gammas, false)
+        | lst -> (* AppL *)
+          let gammas =
+            lst |> List.filter_map (fun arrows ->
+              Env_refinement.refine_existing v1 (branch_type arrows) envr
+            ) in
+          (a, gammas, false)
+    end else (a, [], false)
+  (* ----- TODO Above ----- *)
+  | Let (v1, v2) ->
+    let gammas =
+      [envr |> option_chain
+        [Env_refinement.refine v1 any ; Env_refinement.refine v2 t ]]
+      |> filter_options in
+      (a, gammas, false)
+  | Lambda (va, (Ast.ADomain s as lt), v, e) ->
+    let t = cap_o t (mk_arrow (cons s) any_node) in
+    type_lambda va lt v e t ~maxdom:s
+  | Lambda (va, (Ast.Unnanoted as lt), v, e) ->
+    let t = cap_o t arrow_any in
+    type_lambda va lt v e t ~maxdom:any
+  | Lambda (va, (Ast.AArrow s as lt), v, e) ->
+    let t = cap_o t s in
+    type_lambda va lt v e t ~maxdom:(domain s)
+  end
 
 and infer' tenv env e t =
   let envr = Env_refinement.empty env in

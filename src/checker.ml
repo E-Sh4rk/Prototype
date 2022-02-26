@@ -514,6 +514,9 @@ let typeof_simple_legacy tenv env e =
 
 (* ========== NEW SYSTEM (LAZY) ========== *)
 
+let are_current_env gammas =
+  gammas <> [] && List.for_all Env_refinement.is_empty gammas
+
 let rec infer_a' (*pos*)_ tenv env a t =
   let envr = Env_refinement.empty env in
   let type_lambda va lt v e t ~maxdom =
@@ -531,8 +534,7 @@ let rec infer_a' (*pos*)_ tenv env a t =
         let res =
           splits |> List.map (fun si ->
             let (e, gammas) = infer_iterated tenv (Env.add v si env) e (apply_opt t si) in
-            let changes =
-              gammas = [] || List.exists (fun envr -> Env_refinement.is_empty envr |> not) gammas in
+            let changes = are_current_env gammas |> not in
             let (va, gammas) = extract v gammas in
             (va, e, gammas, changes)
           ) in
@@ -707,68 +709,67 @@ and infer' tenv env e t =
         let dom_a = disj splits in
         let (a, gammas_a) = infer_a_iterated pos tenv env a dom_a in
         if gammas_a = []
-          then begin (* BindArgUntyp *)
-            log "@,Untypable definition..." ;
-            (Bind (VarAnnot.empty, v, a (* Should be empty already *), empty_annots_e e),
-            [], true)
-          end else if List.exists (fun envr -> Env_refinement.is_empty envr |> not) gammas_a
-          then begin (* BindArgRefEnv *)
-              log "@,The definition need refinements (going up)." ;
-              let e = restrict_annots_e env e in
-              let va = VarAnnot.restrict env va in
-              (Bind (va, v, a, e), gammas_a, true)
-          end else begin
-            log "@,The definition has been successfully annotated." ;
-            let s = typeof_a_nofail pos tenv env a in
-            assert (subtype s dom_a) ;
-            let splits = partition s splits in
-            log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
-            let to_propagate =
-              if List.length splits > 1
-              then
-                splits |>
-                List.map (fun si -> refine_a tenv envr a si) |>
-                List.concat
-              else [envr]
-            in
-            if to_propagate = [] || List.exists (fun envr -> Env_refinement.is_empty envr |> not) to_propagate
-            then begin (* BindPropagateSplit *)
-              log "@,... but first some constraints must be propagated." ;
-              let va =
-                List.map (fun si -> VarAnnot.singleton env si) splits |>
-                VarAnnot.union in
-              let e = restrict_annots_e env e in
-              (Bind (va, v, a, e), to_propagate, true)
-            end else begin (* Bind *)
-              let res =
-                splits |> List.map (fun si ->
-                  let (e, gammas) = infer_iterated tenv (Env.add v si env) e t in
-                  let changes =
-                    gammas = [] || List.exists (fun envr -> Env_refinement.is_empty envr |> not) gammas in
-                  let (va, gammas) = extract v gammas in
-                  (va, e, gammas, changes)
-              ) in
-              let (vas, es, gammass, changess) = split4 res in
-              let va = VarAnnot.union vas in
-              let e = merge_annots_e es in
-              let gammas = List.flatten gammass in
-              let changes = List.exists identity changess in
-              (Bind (va, v, a, e), gammas, changes)
-            end
+        then begin (* BindArgUntyp *)
+          log "@,Untypable definition..." ;
+          (Bind (VarAnnot.empty, v, a (* Should be empty already *), empty_annots_e e),
+          [], true)
+        end else if are_current_env gammas_a |> not
+        then begin (* BindArgRefEnv *)
+            log "@,The definition need refinements (going up)." ;
+            let e = restrict_annots_e env e in
+            let va = VarAnnot.restrict env va in
+            (Bind (va, v, a, e), gammas_a, true)
+        end else begin
+          log "@,The definition has been successfully annotated." ;
+          let s = typeof_a_nofail pos tenv env a in
+          assert (subtype s dom_a) ;
+          let splits = partition s splits in
+          log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
+          let to_propagate =
+            if List.length splits > 1
+            then
+              splits |>
+              List.map (fun si -> refine_a tenv envr a si) |>
+              List.concat
+            else [envr]
+          in
+          if are_current_env to_propagate |> not
+          then begin (* BindPropagateSplit *)
+            log "@,... but first some constraints must be propagated." ;
+            let va =
+              List.map (fun si -> VarAnnot.singleton env si) splits |>
+              VarAnnot.union in
+            let e = restrict_annots_e env e in
+            (Bind (va, v, a, e), to_propagate, true)
+          end else begin (* Bind *)
+            let res =
+              splits |> List.map (fun si ->
+                let (e, gammas) = infer_iterated tenv (Env.add v si env) e t in
+                let changes = are_current_env gammas |> not in
+                let (va, gammas) = extract v gammas in
+                (va, e, gammas, changes)
+            ) in
+            let (vas, es, gammass, changess) = split4 res in
+            let va = VarAnnot.union vas in
+            let e = merge_annots_e es in
+            let gammas = List.flatten gammass in
+            let changes = List.exists identity changess in
+            (Bind (va, v, a, e), gammas, changes)
           end
+        end
       end
     in
     log "@]@,END BIND for variable %a" Variable.pp v ; res
 
 and infer_a_iterated pos tenv env a t =
     match infer_a' pos tenv env a t with
-    | (e, [env'], true) when Env_refinement.is_empty env' ->
-      infer_a_iterated pos tenv env e t
-    | (e, gammas, _) -> (e, gammas)
+    | (a, gammas, true) when are_current_env gammas ->
+      infer_a_iterated pos tenv env a t
+    | (a, gammas, _) -> (a, gammas)
 
 and infer_iterated tenv env e t =
   match infer' tenv env e t with
-  | (e, [env'], true) when Env_refinement.is_empty env' ->
+  | (e, gammas, true) when are_current_env gammas ->
     infer_iterated tenv env e t
   | (e, gammas, _) -> (e, gammas)
 

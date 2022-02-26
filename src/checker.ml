@@ -608,19 +608,28 @@ let rec infer_a' (*pos*)_ tenv env a t =
       in
       (a, gammas, false)
     end
-  (* ----- TODO Below ----- *)
   | Ite (v, s, v1, v2) ->
-    if Env.mem v env then begin
+    if Env.mem v env
+    then begin
       let vt = Env.find v env in
-      if is_empty vt then (a, [envr], false)
-      else
-        let gammas =
-          [ envr |> option_chain [Env_refinement.refine_existing v s       ; Env_refinement.refine_existing v1 t] ;
-            envr |> option_chain [Env_refinement.refine_existing v (neg s) ; Env_refinement.refine_existing v2 t] ]
-          |> filter_options
-        in
-        (a, gammas, false)
-    end else (a, [], false)
+      let gammas =
+        if is_empty vt then [envr]
+        else if subtype vt s
+        then [Env_refinement.refine v1 t envr] |> filter_options
+        else if subtype vt (neg s)
+        then [Env_refinement.refine v2 t envr] |> filter_options
+        else [Env_refinement.refine v s envr ; Env_refinement.refine v (neg s) envr]
+             |> filter_options
+      in
+      (a, gammas, false)
+    end else begin
+      let gammas =
+        [Env_refinement.refine v s envr ; Env_refinement.refine v (neg s) envr]
+        |> filter_options
+      in
+      (a, gammas, false)
+    end
+  (* ----- TODO Below ----- *)
   | App (v1, v2) ->
     if Env.mem v1 env && Env.mem v2 env then begin
       let vt1 = Env.find v1 env in

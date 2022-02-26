@@ -435,7 +435,7 @@ and infer_legacy_a' (*pos*)_ tenv env a t =
             let si = get_field ti label in
             let ti = remove_field_info ti label in
             envr |>
-            option_chain [Env_refinement.refine_existing v ti ; Env_refinement.refine_existing f si ]
+            option_chain [Env_refinement.refine_existing v ti ; Env_refinement.refine_existing f si]
           )
         in
         (a, gammas, false)
@@ -561,9 +561,10 @@ let rec infer_a' (*pos*)_ tenv env a t =
   | Const c when subtype (typeof_const_atom tenv c) t -> (a, [envr], false)
   | Const _ -> (a, [], false)
   | Pair (v1, v2) ->
-    if Env.mem v1 env && Env.mem v2 env &&
-      (is_empty (Env.find v1 env) || is_empty (Env.find v2 env))
-    then (a, [envr], false)
+    if Env.mem v1 env && is_empty (Env.find v1 env)
+    then (a, [Env_refinement.refine v2 any envr] |> filter_options, false)
+    else if Env.mem v2 env && is_empty (Env.find v2 env)
+    then (a, [Env_refinement.refine v1 any envr] |> filter_options, false)
     else begin
       let t = cap_o t pair_any in
       let gammas =
@@ -584,40 +585,30 @@ let rec infer_a' (*pos*)_ tenv env a t =
     in
     let gammas = [Env_refinement.refine v t envr] |> filter_options in
     (a, gammas, false)
-  (* ----- TODO Below ----- *)
   | RecordUpdate (v, label, None) ->
-    if Env.mem v env then begin
-      let vt = Env.find v env in
-      if is_empty vt then (a, [envr], false)
-      else
-        let t = cap_o (record_any_without label) t in
-        let gammas =
-          split_record t
-          |> List.filter_map (fun ti ->
-            let ti = remove_field_info ti label in
-            Env_refinement.refine_existing v ti envr
-          )
-        in
-        (a, gammas, false)
-    end else (a, [], false)
+    let t = cap_o (record_any_without label) t in
+    let t = remove_field_info t label in
+    let gammas = [Env_refinement.refine v t envr] |> filter_options in
+    (a, gammas, false)
   | RecordUpdate (v, label, Some f) ->
-    if Env.mem v env && Env.mem f env then begin
-      let vt = Env.find v env in
-      let ft = Env.find f env in
-      if is_empty vt || is_empty ft then (a, [envr], false)
-      else
-        let t = cap_o (mk_record true [label, cons ft]) t in
-        let gammas =
-          split_record t
-          |> List.filter_map (fun ti ->
-            let si = get_field ti label in
-            let ti = remove_field_info ti label in
-            envr |>
-            option_chain [Env_refinement.refine_existing v ti ; Env_refinement.refine_existing f si ]
-          )
-        in
-        (a, gammas, false)
-    end else (a, [], false)
+    if Env.mem v env && is_empty (Env.find v env)
+    then (a, [Env_refinement.refine f any envr] |> filter_options, false)
+    else if Env.mem f env && is_empty (Env.find f env)
+    then (a, [Env_refinement.refine v record_any envr] |> filter_options, false)
+    else begin
+      let t = cap_o (record_any_with label) t in
+      let gammas =
+        split_record t
+        |> List.filter_map (fun ti ->
+          let si = get_field ti label in
+          let ti = remove_field_info ti label in
+          envr |>
+          option_chain [Env_refinement.refine v ti ; Env_refinement.refine f si]
+        )
+      in
+      (a, gammas, false)
+    end
+  (* ----- TODO Below ----- *)
   | Ite (v, s, v1, v2) ->
     if Env.mem v env then begin
       let vt = Env.find v env in

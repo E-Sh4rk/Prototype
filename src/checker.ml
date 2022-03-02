@@ -119,6 +119,7 @@ and typeof tenv env e =
   | Var v -> var_type (Variable.get_locations v) v env
   | Bind (va, v, a, e) ->
     let splits = VarAnnot.splits env va in
+    (* Format.printf "%a: %a@." Variable.pp v (Utils.pp_list Cduce.pp_typ) splits ;*)
     if splits = []
     then typeof tenv env e
     else begin

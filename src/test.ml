@@ -1303,3 +1303,5 @@ let not_so_bad = fun x ->
 
  let really_bad = fun x -> if x is Int then x + 1 else (42 3) 
 
+let bad_again = fun x -> fun y ->
+  if y is Int then y+1 else x+1

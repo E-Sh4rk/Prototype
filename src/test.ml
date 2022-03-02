@@ -962,7 +962,7 @@ let two_steps_not2 =
     then (fst (f x)) + x
     else x
 
-let bad = fun x -> if x is Int then x + 1 else (42 3)
+
 
 (*************************************
 
@@ -1290,3 +1290,16 @@ let foo_highord6_wrong = fun f -> (f (f 3) , f f true)
 let how_to_type_that_harder =
   let snd_ = fun x -> (fun y -> y) in
   (snd_ true ( snd_ 42 3) ) + (snd_ "ok"  3)                                   
+
+  
+(* trying some form of aliasing: what this function
+   test is whether its argument is of type Int     *)
+  
+let not_so_bad = fun x ->
+  if (if x is 42 then x else x) is Int then x + 1 else 3                               
+
+
+ (* this function works with the old system but not with the new one *)
+
+ let really_bad = fun x -> if x is Int then x + 1 else (42 3) 
+

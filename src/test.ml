@@ -34,7 +34,7 @@ let is_bool = fun x -> if x is Bool then true else false
 **************************************************)   
 
 
-debug let lnot = fun (a : Any) ->
+let lnot = fun (a : Any) ->
   if a is True then false else true
 
 let lor = fun (a : Any) -> fun (b : Any) ->

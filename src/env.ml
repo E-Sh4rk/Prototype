@@ -12,6 +12,9 @@ let domain vm = VarMap.bindings vm |> List.map fst
 
 let mem = VarMap.mem
 
+let mem_strict v t =
+  VarMap.mem v t && Cduce.has_absent (VarMap.find v t) |> not
+
 let rm = VarMap.remove
 
 let find = VarMap.find

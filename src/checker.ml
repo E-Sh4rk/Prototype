@@ -22,7 +22,7 @@ let unbound_variable pos v =
   raise (Ill_typed (pos, "Unbound variable "^(Variable.show v)^"."))
 
 let var_type pos v env =
-  if Env.mem v env then Env.find v env else unbound_variable pos v
+  if Env.mem_strict v env then Env.find v env else unbound_variable pos v
 
 let typeof_const_atom tenv c =
   match c with
@@ -110,7 +110,7 @@ let rec typeof_a pos tenv env a =
       "The inferred type for the abstraction is too weak. "^(actual_expected inferred_t t)))
   | Lambda (va, Unnanoted, v, e) -> type_lambda env va v e
   | Let (v1, v2) ->
-    if Env.mem v1 env
+    if Env.mem_strict v1 env
     then var_type pos v2 env
     else raise (Ill_typed (pos, "Unable to type the definition."))
 
@@ -123,18 +123,20 @@ and typeof tenv env e =
     if splits = []
     then typeof tenv env e
     else begin
-      let pos = Variable.get_locations v in
-      let s = typeof_a pos tenv env a in
-      if disj splits |> equiv s
-      (* NOTE: it is still sound if we only test 'subtype' instad of 'equiv',
-        but for now I prefer to match the paper. *)
-      then
-        splits |> List.map (fun t ->
-          let env = Env.add v t env in
-          typeof tenv env e
-        ) |> disj |> simplify_typ
-      else raise (Ill_typed (pos,
-        "Invalid splits (does not cover the initial domain). "^(splits_domain splits s)))
+      let d = disj splits in
+      if has_absent d then typeof tenv env e (* TODO: old convention *)
+      else begin
+        let pos = Variable.get_locations v in
+        let s = typeof_a pos tenv env a in
+        if subtype s d
+        then
+          splits |> List.map (fun t ->
+            let env = Env.add v t env in
+            typeof tenv env e
+          ) |> disj |> simplify_typ
+        else raise (Ill_typed (pos,
+          "Invalid splits (does not cover the initial domain). "^(splits_domain splits s)))
+      end
     end
 
 let refine_a tenv env a t =

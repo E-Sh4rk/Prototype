@@ -10,6 +10,7 @@ val strengthen_existing : Variable.t -> typ -> t -> t
 val strengthen : Variable.t -> typ -> t -> t
 val domain : t -> Variable.t list
 val mem : Variable.t -> t -> bool
+val mem_strict : Variable.t -> t -> bool
 val find : Variable.t -> t -> typ
 val rm : Variable.t -> t -> t
 val cap : t -> t -> t

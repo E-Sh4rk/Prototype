@@ -530,7 +530,7 @@ let rec infer_a' pos tenv env a t =
       | [arrows] -> (* Abs *)
         (* NOTE: Here we ignore the negative part, though we should check there is no negative part.
         But it would require a better simplification of union of arrow types to make negative parts disappear. *)
-        let splits = (VarAnnot.splits env va)@(List.map fst arrows) in
+        let splits = (VarAnnot.splits_or any env va)@(List.map fst arrows) in
         let splits = List.map (fun s -> cap_o s maxdom) splits in
         let splits = partition_for_full_domain splits in
         log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;

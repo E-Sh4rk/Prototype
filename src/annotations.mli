@@ -13,6 +13,7 @@ module VarAnnot : sig
   val full_domain : t -> Cduce.typ
   val size : t -> int
   val splits : Env.t -> t -> Cduce.typ list
+  val splits_or : Cduce.typ -> Env.t -> t -> Cduce.typ list
   val add_split : Env.t -> Cduce.typ -> t -> t
   val restrict : Env.t -> t -> t
   val cup : t -> t -> t

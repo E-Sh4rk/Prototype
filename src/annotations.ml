@@ -31,7 +31,7 @@ module VarAnnot = struct
   type t = (Env.t * Cduce.typ) list
   let empty = []
   let any = [Env.empty, Cduce.any]
-  let initial_lambda ~legacy = if legacy then any else any (* TODO *)
+  let initial_lambda ~legacy = if legacy then any else empty
   let initial_binding ~legacy = if legacy then any else empty
   let is_empty va = va = []
 
@@ -46,6 +46,10 @@ module VarAnnot = struct
     List.filter (fun (env',_) -> Env.leq env env') va
     |> List.map snd
     (*|> Utils.remove_duplicates Cduce.equiv*)
+
+  let splits_or d env va =
+    let res = splits env va in
+    if res = [] then [d] else res
 
   let add_split env typ va =
     let splits = splits env va in

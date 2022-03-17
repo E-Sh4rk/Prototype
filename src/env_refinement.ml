@@ -39,7 +39,8 @@ let refine v t (b,r) =
     if (Cduce.is_empty ot |> not) && Cduce.disjoint t ot then None
     else Some (strengthen v t (b,r))
   else
-    Some (strengthen v t (b, r))
+    (*Some (strengthen v t (b, r))*)
+    assert false
 
 let rm v (b,r) = (Env.rm v b, Env.rm v r)
 

@@ -40,6 +40,7 @@ let type_check_program
         with Checker.Ill_typed _ -> None
       in
       try
+        (*Format.printf "%a@." pp_e nf_expr ;*)
         let typ = Checker.typeof_simple tenv env nf_expr in
         let time2 = Unix.gettimeofday () in
         let msc_time = (time1 -. time0 ) *. 1000. in

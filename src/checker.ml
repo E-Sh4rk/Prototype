@@ -547,6 +547,7 @@ let rec infer_a' pos tenv env a t =
         log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
         let res =
           splits |> List.map (fun si ->
+            assert (has_absent si |> not) ;
             let (e, gammas) = infer_iterated tenv (Env.add v si env) e (apply_opt t si) in
             let changes = are_current_env gammas |> not in
             let (va, gammas) = extract v gammas in
@@ -742,6 +743,7 @@ and infer' tenv env e t =
           end else begin
             log "@,The definition has been successfully annotated." ;
             let s = typeof_a_or_absent pos tenv env a in
+            (*Format.printf "%s@." (actual_expected s dom_a) ;*)
             assert (subtype s dom_a) ;
             let splits = partition s splits in
             log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;

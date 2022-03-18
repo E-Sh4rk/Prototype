@@ -664,7 +664,7 @@ let rec infer_a' pos tenv env a t =
               ]
             ) in
           (a, gammas, false)
-        | [arrows] -> (* AppWrongDom *)
+        | [arrows] when has_absent vt2 |> not -> (* AppWrongDom *)
           let dom = arrows |> List.map fst |> disj in
           let arrow_type = mk_arrow (cons vt2) (cons t) in
           let gammas =

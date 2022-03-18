@@ -32,6 +32,7 @@ let typeof_const_atom tenv c =
 let rec typeof_a ~legacy pos tenv env a =
   let type_lambda env va v e =
     let splits = VarAnnot.splits env va in
+    (* log "Lambda %a: %a@." Variable.pp v (Utils.pp_list Cduce.pp_typ) splits ; *)
     if splits = []
     then raise (Ill_typed (pos, "Cannot infer domain of this abstraction."))
     else begin
@@ -120,7 +121,7 @@ and typeof ~legacy tenv env e =
   | Bind (va, v, a, e) ->
     let pos = Variable.get_locations v in
     let splits = VarAnnot.splits env va in
-    (* Format.printf "%a: %a@." Variable.pp v (Utils.pp_list Cduce.pp_typ) splits ; *)
+    (* log "Bind %a: %a@." Variable.pp v (Utils.pp_list Cduce.pp_typ) splits ; *)
     if splits = []
     then (
       if legacy then typeof ~legacy tenv env e
@@ -653,8 +654,7 @@ let rec infer_a' pos tenv env a t =
       else begin
         let vt1 = Env.find v1 env in
         let vt2 = Env.find v2 env in
-        let vt1 = cap_o vt1 arrow_any in
-        match dnf vt1 |> simplify_dnf with
+        match dnf (cap_o vt1 arrow_any) |> simplify_dnf with
         | [arrows] when subtype vt2 (arrows |> List.map fst |> disj) -> (* AppSplitR *)
           let gammas =
             arrows |> List.filter_map (fun (si,_) ->
@@ -664,7 +664,7 @@ let rec infer_a' pos tenv env a t =
               ]
             ) in
           (a, gammas, false)
-        | [arrows] when has_absent vt2 |> not -> (* AppWrongDom *)
+        | [arrows] when (has_absent vt1 || has_absent vt2) |> not -> (* AppWrongDom *)
           let dom = arrows |> List.map fst |> disj in
           let arrow_type = mk_arrow (cons vt2) (cons t) in
           let gammas =

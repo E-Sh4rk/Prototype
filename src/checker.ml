@@ -668,7 +668,10 @@ let rec infer_a' pos tenv env a t =
           let dom = arrows |> List.map fst |> disj in
           let arrow_type = mk_arrow (cons vt2) (cons t) in
           let gammas =
-            [Env_refinement.refine v1 arrow_type envr ; Env_refinement.refine v2 dom envr]
+            [Env_refinement.refine v1 arrow_type envr
+            (* TODO: this can actually make the final type less precise.
+            See example "typeable_in_racket". *) ;
+             Env_refinement.refine v2 dom envr]
             |> filter_options
           in
           (a, gammas, false)

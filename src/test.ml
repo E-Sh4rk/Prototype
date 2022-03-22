@@ -1287,9 +1287,13 @@ let foo_highord6_wrong = fun f -> (f (f 3) , f f true)
 (* to type it in the "popl22" system it suffices to add     *)
 (* the annotation y : Int and then it works                 *)                                
  
-let how_to_type_that_harder =
+let how_to_type_that_harder1 =
   let snd_ = fun x -> (fun y -> y) in
   (snd_ true ( snd_ 42 3) ) + (snd_ "ok"  3)                                   
+
+let how_to_type_that_harder2 =
+  let snd_ = fun x -> (fun y -> y) in
+  (snd_ "ok"  3) + (snd_ true ( snd_ 42 3) )                                   
 
   
 (* trying some form of aliasing: what this function

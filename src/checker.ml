@@ -566,9 +566,26 @@ let rec infer_a' pos tenv env a t =
         then (Lambda (va, lt, v, e), gammas, changes)
         else (* AbsUntypable *)
           (Lambda (VarAnnot.empty, lt, v, empty_annots_e e), [], false (* Optimisation *))
-      | lst -> (* AbsUntypable *)
-        if lst <> [] then Format.printf "Warning: An AbsUnion rule would be needed..." ;
-        (Lambda (VarAnnot.empty, lt, v, empty_annots_e e), [], false (* Optimisation *))
+      | lst ->
+        let (sis, gammass) =
+          lst |> List.map (fun si ->
+            let si = branch_type si in
+            let (_, gammas) = infer_a_iterated pos tenv env a si in
+            (si, gammas)
+            )
+            |> List.filter (fun (_,gammas) -> gammas <> [])
+            |> List.split in
+          let gammas = List.flatten gammass in
+          if gammas = []
+          then (* AbsUntypable *)
+            (Lambda (VarAnnot.empty, lt, v, empty_annots_e e), [], false (* Optimisation *))
+          else if are_current_env gammas
+          then (* AbsUnion *)
+            let t = conj sis in
+            let (a, gammas) = infer_a_iterated pos tenv env a t in
+            (a, gammas, false)
+          else (* AbsUnionPropagate *)
+            (a, gammas, false)
       in
       log "@]@,END LAMBDA for variable %a" Variable.pp v ; res
   in

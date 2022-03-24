@@ -558,9 +558,6 @@ let rec infer_a' pos tenv env a t =
         let va = VarAnnot.union vas in
         let e = merge_annots_e es in
         let gammas = List.flatten gammass in
-        let gammas =
-          if List.exists Env_refinement.is_empty gammas
-          then gammas else envr::gammas in
         let changes = List.exists identity changess in
         if VarAnnot.is_empty va |> not && subtype (domain t) (VarAnnot.full_domain va)
         then (Lambda (va, lt, v, e), gammas, changes)

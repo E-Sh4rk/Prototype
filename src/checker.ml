@@ -153,6 +153,8 @@ and typeof tenv env anns e =
         "Invalid splits (does not cover the initial domain). "^(splits_domain splits s)))
     end
 
+(* ===== Refine ===== *)
+
 let refine_a tenv env a t =
   if has_absent t then [env]
   else match a with
@@ -205,6 +207,43 @@ let refine_a tenv env a t =
     option_chain [Env_refinement.refine v1 any ; Env_refinement.refine v2 t]]
     |> filter_options
 
-let infer _ _ _ _ = failwith "TODO"
+(* ===== Infer ===== *)
 
-let typeof_simple _ _ _ = failwith "TODO"
+let are_current_env gammas =
+  gammas <> [] && List.for_all Env_refinement.is_empty gammas
+
+let rec infer_a' pos tenv env anns a t =
+  ignore (pos, tenv, env, anns, a, t, infer', infer_a_iterated) ;
+  failwith "TODO"
+
+and infer' tenv env anns e t =
+  ignore (tenv, env, anns, e, t, infer_a', infer_a_iterated) ;
+  failwith "TODO"
+
+and infer_a_iterated pos tenv env anns a t =
+  match infer_a' pos tenv env anns a t with
+  | (anns, gammas, true) when are_current_env gammas ->
+    infer_a_iterated pos tenv env anns a t
+  | (anns, gammas, _) -> (anns, gammas)
+
+and infer_iterated tenv env anns e t =
+  match infer' tenv env anns e t with
+  | (anns, gammas, true) when are_current_env gammas ->
+    infer_iterated tenv env anns e t
+  | (anns, gammas, _) -> (anns, gammas)
+
+let infer tenv env e =
+  let fv = fv_e e in
+  let e = VarSet.fold (fun v acc ->
+    Bind (Old_annotations.VarAnnot.empty, v, Abstract (var_type [] v env), acc)
+  ) fv e in
+  let anns =
+    match infer_iterated tenv Env.empty No_annot e any with
+    | (_, []) -> raise (Ill_typed ([], "Annotations inference failed."))
+    | (anns, _) -> anns
+  in
+  log "@." ; anns
+
+let typeof_simple tenv env e =
+  let anns = infer tenv env e in
+  typeof tenv Env.empty anns e |> simplify_typ

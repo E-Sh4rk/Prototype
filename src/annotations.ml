@@ -46,6 +46,8 @@ module SplitAnnot = struct
       | [] -> No_annot
       | [(_, annots)] -> annots
       | _ -> assert false
+
+    let destruct (T t) = t
 end
 
 type annot_a = SplitAnnot.t annot_a'

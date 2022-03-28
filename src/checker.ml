@@ -209,6 +209,16 @@ let refine_a tenv env a t =
 
 (* ===== Infer ===== *)
 
+let typeof_a_or_absent pos tenv env anns a =
+  try typeof_a pos tenv env anns a
+  with Ill_typed _ -> absent
+
+let project v =
+  List.map (Env_refinement.find v)
+
+let eliminate v =
+  List.map (Env_refinement.rm v)
+
 let are_current_env gammas =
   gammas <> [] && List.for_all Env_refinement.is_empty gammas
 
@@ -217,8 +227,99 @@ let rec infer_a' pos tenv env anns a t =
   failwith "TODO"
 
 and infer' tenv env anns e t =
-  ignore (tenv, env, anns, e, t, infer_a', infer_a_iterated) ;
-  failwith "TODO"
+  let envr = Env_refinement.empty env in
+  if has_absent t
+  then begin (* Option *)
+    let t = cap_o any t in
+    let (anns, gammas, changes) = infer' tenv env anns e t in
+    let gammas =
+      if List.exists Env_refinement.is_empty gammas
+      then gammas else envr::gammas in
+    (anns, gammas, changes)
+  end else begin
+    match e with
+    | Var v -> (No_annot, [Env_refinement.refine v t envr] |> filter_options, false)
+    | Bind (_, v, a, e) ->
+      log "@,@[<v 1>BIND for variable %a" Variable.pp v ;
+      let pos = Variable.get_locations v in
+      match anns with
+      | No_annot -> (* BindDefault *)
+        let anns = Annot (No_annot_a, SplitAnnot.create [(any_or_absent, No_annot)]) in
+        infer' tenv env anns e t
+      | Annot (anns_a, va) ->
+        let splits = SplitAnnot.splits va in
+        let res =
+          match splits with
+          | [s] when has_absent s -> (* BindArgSkip *)
+            log "@,Skipping definition." ;
+            let env = Env.add v s env in
+            let (anns, gammas) = infer_iterated tenv env (SplitAnnot.apply va s) e t in
+            let changes = are_current_env gammas |> not in
+            let splits = project v gammas |> partition in
+            let va = List.map (fun s -> (s, anns)) splits |> SplitAnnot.create in
+            (Annot (anns_a, va), eliminate v gammas, changes)
+          | splits ->
+            let dom_a = disj splits in
+            let (anns_a, gammas_a) = infer_a_iterated pos tenv env anns_a a dom_a in
+            if gammas_a = []
+            then begin (* BindArgUntyp *)
+              log "@,Untypable definition..." ;
+              (No_annot, [], true)
+            end else if are_current_env gammas_a |> not
+            then begin (* BindArgRefEnv *)
+                log "@,The definition need refinements (going up)." ;
+                (Annot (anns_a, va), gammas_a, true)
+            end else begin
+              log "@,The definition has been successfully annotated." ;
+              let s = typeof_a_or_absent pos tenv env anns_a a in
+              (*Format.printf "%s@." (actual_expected s dom_a) ;*)
+              assert (subtype s dom_a) ;
+              let splits = splits |> List.map (cap_o s)
+                |> List.filter (fun t -> is_empty t |> not) in
+              log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
+              let to_propagate =
+                if List.length splits > 1
+                then
+                  splits |>
+                  List.map (fun si -> refine_a tenv envr a si) |>
+                  List.concat
+                else [envr]
+              in
+              if are_current_env to_propagate |> not
+              then begin (* BindPropagateSplit *)
+                log "@,... but first some constraints must be propagated." ;
+                let va =
+                  List.map (fun si -> (si, SplitAnnot.apply va si)) splits |>
+                  SplitAnnot.create in
+                (Annot (anns_a, va), to_propagate, true)
+              end else begin 
+                if is_empty s then begin (* BindDefEmpty *)
+                  let env = Env.add v empty env in
+                  let (anns, gammas) = infer_iterated tenv env (SplitAnnot.apply va empty) e t in
+                  let va = SplitAnnot.create [(empty, anns)] in
+                  let changes = are_current_env gammas |> not in
+                  (Annot (anns_a, va), eliminate v gammas, changes)
+                end else begin (* Bind *)
+                  let res =
+                    splits |> List.map (fun si ->
+                      let env = Env.add v si env in
+                      let (anns, gammas) = infer_iterated tenv env (SplitAnnot.apply va si) e t in
+                      let changes = are_current_env gammas |> not in
+                      let splits = project v gammas |> partition in
+                      let va = List.map (fun s -> (s, anns)) splits in
+                      (va, eliminate v gammas, changes)
+                  ) in
+                  let (vas, gammass, changess) = split3 res in
+                  let va = vas |> List.concat |> SplitAnnot.create in
+                  let gammas = List.flatten gammass in
+                  let changes = List.exists identity changess in
+                  (Annot (anns_a, va), gammas, changes)
+                end
+              end
+            end
+        in
+        log "@]@,END BIND for variable %a" Variable.pp v ; res
+    end
 
 and infer_a_iterated pos tenv env anns a t =
   match infer_a' pos tenv env anns a t with

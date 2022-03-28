@@ -1,0 +1,21 @@
+
+val partition : Cduce.typ list -> Cduce.typ list
+
+type 'a annot_a' =
+    | No_annot_a
+    | Annot_a of 'a
+
+type 'a annot' =
+    | No_annot
+    | Annot of ('a annot_a' * 'a)
+
+module SplitAnnot : sig
+    type t
+    val create : (Cduce.typ * (t annot')) list -> t
+    val splits : t -> Cduce.typ list
+    val dom : t -> Cduce.typ
+    val apply : t -> Cduce.typ -> t annot'
+end
+
+type annot_a = SplitAnnot.t annot_a'
+type annot = SplitAnnot.t annot'

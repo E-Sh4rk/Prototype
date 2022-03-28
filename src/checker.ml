@@ -274,31 +274,31 @@ and infer' tenv env anns e t =
               let s = typeof_a_or_absent pos tenv env anns_a a in
               (*Format.printf "%s@." (actual_expected s dom_a) ;*)
               assert (subtype s dom_a) ;
-              let splits = splits |> List.map (cap_o s)
-                |> List.filter (fun t -> is_empty t |> not) in
-              log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
-              let to_propagate =
-                if List.length splits > 1
-                then
-                  splits |>
-                  List.map (fun si -> refine_a tenv envr a si) |>
-                  List.concat
-                else [envr]
-              in
-              if are_current_env to_propagate |> not
-              then begin (* BindPropagateSplit *)
-                log "@,... but first some constraints must be propagated." ;
-                let va =
-                  List.map (fun si -> (si, SplitAnnot.apply va si)) splits |>
-                  SplitAnnot.create in
-                (Annot (anns_a, va), to_propagate, true)
-              end else begin 
-                if is_empty s then begin (* BindDefEmpty *)
-                  let env = Env.add v empty env in
-                  let (anns, gammas) = infer_iterated tenv env (SplitAnnot.apply va empty) e t in
-                  let va = SplitAnnot.create [(empty, anns)] in
-                  let changes = are_current_env gammas |> not in
-                  (Annot (anns_a, va), eliminate v gammas, changes)
+              if is_empty s then begin (* BindDefEmpty *)
+                let env = Env.add v empty env in
+                let (anns, gammas) = infer_iterated tenv env (SplitAnnot.apply va empty) e t in
+                let va = SplitAnnot.create [(empty, anns)] in
+                let changes = are_current_env gammas |> not in
+                (Annot (anns_a, va), eliminate v gammas, changes)
+              end else begin
+                let splits = splits |> List.map (cap_o s)
+                  |> List.filter (fun t -> is_empty t |> not) in
+                log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
+                let to_propagate =
+                  if List.length splits > 1
+                  then
+                    splits |>
+                    List.map (fun si -> refine_a tenv envr a si) |>
+                    List.concat
+                  else [envr]
+                in
+                if are_current_env to_propagate |> not
+                then begin (* BindPropagateSplit *)
+                  log "@,... but first some constraints must be propagated." ;
+                  let va =
+                    List.map (fun si -> (si, SplitAnnot.apply va si)) splits |>
+                    SplitAnnot.create in
+                  (Annot (anns_a, va), to_propagate, true)
                 end else begin (* Bind *)
                   let res =
                     splits |> List.map (fun si ->

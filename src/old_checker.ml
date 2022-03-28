@@ -1,9 +1,9 @@
 open Cduce
 open Msc
 open Types_additions
-open Annotations
 open Variable
 open Utils
+module VarAnnot = Old_annotations.VarAnnot
 (* TODO: Improve error messages
    (when failing due to all branches having failed, print errors of the branches) *)
 (* TODO: Better inference of the domain of functionnal arguments
@@ -31,7 +31,7 @@ let typeof_const_atom tenv c =
 
 let rec typeof_a ~legacy pos tenv env a =
   let type_lambda env va v e =
-    let splits = VarAnnot.splits env va in
+    let splits = Old_annotations.VarAnnot.splits env va in
     (* log "Lambda %a: %a@." Variable.pp v (Utils.pp_list Cduce.pp_typ) splits ; *)
     if splits = []
     then raise (Ill_typed (pos, "Cannot infer domain of this abstraction."))
@@ -295,7 +295,7 @@ let rec infer_legacy' tenv env e t =
           log "@,The definition has been successfully annotated." ;
           let s = typeof_a_nofail pos tenv env a in
           assert (subtype s dom_a) ;
-          let splits = partition s splits in
+          let splits = Old_annotations.partition s splits in
           log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
           let res =
             splits |> List.map (fun s ->
@@ -337,7 +337,7 @@ and infer_legacy_a' (*pos*)_ tenv env a t =
         else
           let splits = splits1@splits2 in
           let splits = List.map (fun s -> cap_o s maxdom) splits in
-          let splits = partition_for_full_domain splits in
+          let splits = Old_annotations.partition_for_full_domain splits in
           log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
           let res =
             splits |> List.map (fun si ->
@@ -544,7 +544,7 @@ let rec infer_a' pos tenv env a t =
         But it would require a better simplification of union of arrow types to make negative parts disappear. *)
         let splits = (VarAnnot.splits_or any env va)@(List.map fst arrows) in
         let splits = List.map (fun s -> cap_o s maxdom) splits in
-        let splits = partition_for_full_domain splits in
+        let splits = Old_annotations.partition_for_full_domain splits in
         log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
         let res =
           splits |> List.map (fun si ->
@@ -762,7 +762,7 @@ and infer' tenv env e t =
             let s = typeof_a_or_absent pos tenv env a in
             (*Format.printf "%s@." (actual_expected s dom_a) ;*)
             assert (subtype s dom_a) ;
-            let splits = partition s splits in
+            let splits = Old_annotations.partition s splits in
             log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
             let to_propagate =
               if List.length splits > 1

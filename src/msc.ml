@@ -1,5 +1,5 @@
 open Variable
-open Annotations
+open Old_annotations
 module ExprMap = Ast.ExprMap
 
 type a =

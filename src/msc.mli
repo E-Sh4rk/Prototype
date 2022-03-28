@@ -1,5 +1,5 @@
 open Variable
-open Annotations
+open Old_annotations
 
 type a =
   | Abstract of Cduce.typ

@@ -443,13 +443,10 @@ and infer' tenv env anns e t =
           | splits ->
             let dom_a = disj splits in
             let (anns_a, gammas_a) = infer_a_iterated pos tenv env anns_a a dom_a in
-            if gammas_a = []
-            then begin (* BindArgUntyp *)
-              log "@,Untypable definition..." ;
-              (No_annot, [], false)
-            end else if are_current_env gammas_a |> not
+            if are_current_env gammas_a |> not
             then begin (* BindArgRefEnv *)
-              log "@,The definition need refinements (going up)." ;
+              if gammas_a = [] then log "@,Untypable definition..."
+              else log "@,The definition need refinements (going up)." ;
               (Annot (anns_a, va), gammas_a, false)
             end else begin
               log "@,The definition has been successfully annotated." ;

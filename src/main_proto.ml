@@ -31,17 +31,16 @@ let type_check_program
       let var = Variable.create (Some name) in
       let annot_expr = Ast.parser_expr_to_annot_expr tenv empty_vtenv varm parsed_expr in
       let time0 = Unix.gettimeofday () in
-      let nf_expr = convert_to_msc ~legacy:false annot_expr in
-      let nf_expr_legacy = convert_to_msc ~legacy:true annot_expr in
+      let nf_expr = convert_to_msc ~legacy:true annot_expr in
       let time1 = Unix.gettimeofday () in
-      (*assert (VarSet.subset (fv_e nf_expr) (Env.domain env |> VarSet.of_list)) ;*)
+      assert (VarSet.subset (fv_e nf_expr) (Env.domain env |> VarSet.of_list)) ;
       let typ_legacy =
-        try Some (Old_checker.typeof_simple_legacy tenv env nf_expr_legacy)
+        try Some (Old_checker.typeof_simple_legacy tenv env nf_expr)
         with Old_checker.Ill_typed _ -> None
       in
       try
         (*Format.printf "%a@." pp_e nf_expr ;*)
-        let typ = Old_checker.typeof_simple tenv env nf_expr in
+        let typ = Checker.typeof_simple tenv env nf_expr in
         let time2 = Unix.gettimeofday () in
         let msc_time = (time1 -. time0 ) *. 1000. in
         let typ_time = (time2 -. time1) *. 1000. in
@@ -59,7 +58,7 @@ let type_check_program
             (Cduce.string_of_type t)
         end ;
         pr_logs () ; (varm, env)
-      with Old_checker.Ill_typed (pos, str) ->
+      with Checker.Ill_typed (pos, str) ->
         (*Format.printf "%a@." pp_e nf_expr ;*)
         pr_ill_typed (pos, str);
         begin match typ_legacy with

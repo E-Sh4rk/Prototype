@@ -408,24 +408,24 @@ let rec infer_a' pos tenv env anns a t =
     end
   end
 
-and infer' tenv env anns e t =
+and infer' tenv env anns e' t =
   let envr = Env_refinement.empty env in
   if has_absent t
   then begin (* Option *)
     let t = cap_o any t in
-    let (anns, gammas, changes) = infer' tenv env anns e t in
+    let (anns, gammas, changes) = infer' tenv env anns e' t in
     let gammas =
       if List.exists Env_refinement.is_empty gammas
       then gammas else envr::gammas in
     (anns, gammas, changes)
   end else begin
-    match e with
+    match e' with
     | Var v -> (No_annot, [Env_refinement.refine v t envr] |> filter_options, false)
     | Bind (_, v, a, e) ->
       match anns with
       | No_annot -> (* BindDefault *)
         let anns = Annot (No_annot_a, SplitAnnot.create [(any_or_absent, No_annot)]) in
-        infer' tenv env anns e t
+        infer' tenv env anns e' t
       | Annot (anns_a, va) ->
         log "@,@[<v 1>BIND for variable %a" Variable.pp v ;
         let pos = Variable.get_locations v in

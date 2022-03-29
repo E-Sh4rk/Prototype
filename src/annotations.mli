@@ -20,3 +20,8 @@ end
 
 type annot_a = SplitAnnot.t annot_a'
 type annot = SplitAnnot.t annot'
+
+val pp_annot_a : Format.formatter -> annot_a -> unit
+val pp_annot : Format.formatter -> annot -> unit
+val show_annot_a : annot_a -> string
+val show_annot : annot -> string

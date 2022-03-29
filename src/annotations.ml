@@ -26,13 +26,16 @@ let rec check_disjointness ts =
 type 'a annot_a' =
   | No_annot_a
   | Annot_a of 'a
+  [@@deriving show]
 
 type 'a annot' =
   | No_annot
   | Annot of ('a annot_a' * 'a)
+  [@@deriving show]
 
 module SplitAnnot = struct
     type t = T of (Cduce.typ * (t annot')) list
+    [@@deriving show]
     let create lst =
       assert (lst |> List.map fst |> check_disjointness) ;
       T lst
@@ -51,4 +54,6 @@ module SplitAnnot = struct
 end
 
 type annot_a = SplitAnnot.t annot_a'
+[@@deriving show]
 type annot = SplitAnnot.t annot'
+[@@deriving show]

@@ -223,8 +223,190 @@ let are_current_env gammas =
   gammas <> [] && List.for_all Env_refinement.is_empty gammas
 
 let rec infer_a' pos tenv env anns a t =
-  ignore (pos, tenv, env, anns, a, t, infer', infer_a_iterated) ;
-  failwith "TODO"
+  let envr = Env_refinement.empty env in
+  let type_lambda v e t ~maxdom =
+    match anns with
+    | No_annot_a -> (* AbsDefault *)
+      let anns = Annot_a (SplitAnnot.create [(any, No_annot)]) in
+      infer_a' pos tenv env anns a t
+    | Annot_a va ->
+      log "@,@[<v 1>LAMBDA for variable %a with t=%a" Variable.pp v pp_typ t ;
+      let t = cap_o t arrow_any in
+      let res =
+        match dnf t |> simplify_dnf with
+        | [arrows] -> (* Abs *)
+          (* NOTE: Here we ignore the negative part, though we should check there is no negative part.
+          But it would require a better simplification of union of arrow types to make negative parts disappear. *)
+          let splits = (SplitAnnot.splits va)@(List.map fst arrows) in
+          let splits = List.map (fun s -> cap_o s maxdom) splits |> partition in
+          log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
+          let res =
+            splits |> List.map (fun si ->
+              assert (has_absent si |> not) ;
+              let env = Env.add v si env in
+              let (anns, gammas) = infer_iterated tenv env (SplitAnnot.apply va si) e (apply_opt t si) in
+              let changes = are_current_env gammas |> not in
+              let splits = project v gammas |> partition in
+              let va = List.map (fun s -> (s, anns)) splits in
+              (va, eliminate v gammas, changes)
+            ) in
+          let (vas, gammass, changess) = split3 res in
+          let va = vas |> List.concat |> SplitAnnot.create in
+          let gammas = List.flatten gammass in
+          let changes = List.exists identity changess in
+          if subtype (domain t) (SplitAnnot.dom va)
+          then (Annot_a va, gammas, changes)
+          else (* AbsUntypable *)
+            (No_annot_a, [], false)
+        | lst ->
+          let (sis, gammass) =
+            lst |> List.map (fun si ->
+              let si = branch_type si in
+              let (_, gammas) = infer_a_iterated pos tenv env anns a si in
+              (si, gammas)
+              )
+              |> List.filter (fun (_,gammas) -> gammas <> [])
+              |> List.split in
+          let gammas = List.flatten gammass in
+          if are_current_env gammas
+          then (* AbsUnion *)
+            let t = conj sis in
+            let (anns, gammas) = infer_a_iterated pos tenv env anns a t in
+            (anns, gammas, false)
+          else (* AbsUnionPropagate *)
+            (anns, gammas, false)
+        in
+        log "@]@,END LAMBDA for variable %a" Variable.pp v ; res
+  in
+  if has_absent t
+  then begin (* Option *)
+    let t = cap_o any t in
+    let (anns, gammas, changes) = infer_a' pos tenv env anns a t in
+    let gammas =
+      if List.exists Env_refinement.is_empty gammas
+      then gammas else envr::gammas in
+    (anns, gammas, changes)
+  end else begin
+    begin match a with
+    | Abstract s when subtype s t -> (No_annot_a, [envr], false)
+    | Abstract _ -> (No_annot_a, [], false)
+    | Const c when subtype (typeof_const_atom tenv c) t -> (No_annot_a, [envr], false)
+    | Const _ -> (No_annot_a, [], false)
+    | Pair (v1, v2) ->
+      if is_empty (Env.find v1 env)
+      then (No_annot_a, [Env_refinement.refine v2 any envr] |> filter_options, false)
+      else if is_empty (Env.find v2 env)
+      then (No_annot_a, [Env_refinement.refine v1 any envr] |> filter_options, false)
+      else begin
+        let t = cap_o t pair_any in
+        let gammas =
+          split_pair t
+          |> List.filter_map (fun (ti,si) ->
+            envr |>
+            option_chain [Env_refinement.refine v1 ti ; Env_refinement.refine v2 si]
+          )
+        in
+        (No_annot_a, gammas, false)
+      end
+    | Projection (typ, v) ->
+      let t =
+        match typ with
+        | Fst -> mk_times (cons t) any_node
+        | Snd -> mk_times any_node (cons t)
+        | Field label -> mk_record true [label, cons t]
+      in
+      let gammas = [Env_refinement.refine v t envr] |> filter_options in
+      (No_annot_a, gammas, false)
+    | RecordUpdate (v, label, None) ->
+      let t = cap_o (record_any_without label) t in
+      let t = remove_field_info t label in
+      let gammas = [Env_refinement.refine v t envr] |> filter_options in
+      (No_annot_a, gammas, false)
+    | RecordUpdate (v, label, Some f) ->
+      if is_empty (Env.find v env)
+      then (No_annot_a, [Env_refinement.refine f any envr] |> filter_options, false)
+      else if is_empty (Env.find f env)
+      then (No_annot_a, [Env_refinement.refine v record_any envr] |> filter_options, false)
+      else begin
+        let t = cap_o (record_any_with label) t in
+        let gammas =
+          split_record t
+          |> List.filter_map (fun ti ->
+            let si = get_field ti label in
+            let ti = remove_field_info ti label in
+            envr |>
+            option_chain [Env_refinement.refine v ti ; Env_refinement.refine f si]
+          )
+        in
+        (No_annot_a, gammas, false)
+      end
+    | Ite (v, s, v1, v2) ->
+      let vt = Env.find v env in
+      let gammas =
+        if is_empty vt then [envr]
+        else if subtype vt s
+        then [Env_refinement.refine v1 t envr] |> filter_options
+        else if subtype vt (neg s)
+        then [Env_refinement.refine v2 t envr] |> filter_options
+        else [Env_refinement.refine v s envr ; Env_refinement.refine v (neg s) envr]
+            |> filter_options
+      in
+      (No_annot_a, gammas, false)
+    | App (v1, v2) ->
+      if is_empty (Env.find v1 env)
+      then (No_annot_a, [Env_refinement.refine v2 any envr] |> filter_options, false)
+      else if is_empty (Env.find v2 env)
+      then (No_annot_a, [Env_refinement.refine v1 arrow_any envr] |> filter_options, false)
+      else begin
+        let vt1 = Env.find v1 env in
+        let vt2 = Env.find v2 env in
+        match dnf (cap_o vt1 arrow_any) |> simplify_dnf with
+        | [arrows] when subtype vt2 (arrows |> List.map fst |> disj) -> (* AppSplitR *)
+          let gammas =
+            arrows |> List.filter_map (fun (si,_) ->
+              let arrow_type = mk_arrow (cons (cap_o si vt2)) (cons t) in
+              envr |> option_chain [
+                Env_refinement.refine v1 arrow_type ; Env_refinement.refine v2 si
+              ]
+            ) in
+          (No_annot_a, gammas, false)
+        | [arrows] when (has_absent vt1 || has_absent vt2) |> not -> (* AppWrongDom *)
+          let dom = arrows |> List.map fst |> disj in
+          let arrow_type = mk_arrow (cons vt2) (cons t) in
+          let gammas =
+            [Env_refinement.refine v1 arrow_type envr
+            (* TODO: this can actually make the final type less precise.
+            See example "typeable_in_racket". *) ;
+             Env_refinement.refine v2 dom envr]
+            |> filter_options
+          in
+          (No_annot_a, gammas, false)
+        | lst -> (* AppSplitL *)
+          let gammas =
+            lst |> List.filter_map (fun arrows ->
+              envr |> option_chain [
+                Env_refinement.refine v1 (branch_type arrows) ; Env_refinement.refine v2 any
+              ]
+            ) in
+          (No_annot_a, gammas, false)
+      end
+    | Let (v1, v2) ->
+      let gammas =
+        [envr |> option_chain
+          [Env_refinement.refine v1 any ; Env_refinement.refine v2 t ]]
+        |> filter_options in
+        (No_annot_a, gammas, false)
+    | Lambda (_, Ast.ADomain s, v, e) ->
+      let t = cap_o t (mk_arrow (cons s) any_node) in
+      type_lambda v e t ~maxdom:s
+    | Lambda (_, Ast.Unnanoted, v, e) ->
+      let t = cap_o t arrow_any in
+      type_lambda v e t ~maxdom:any
+    | Lambda (_, Ast.AArrow s, v, e) ->
+      let t = cap_o t s in
+      type_lambda v e t ~maxdom:(domain s)
+    end
+  end
 
 and infer' tenv env anns e t =
   let envr = Env_refinement.empty env in
@@ -240,13 +422,13 @@ and infer' tenv env anns e t =
     match e with
     | Var v -> (No_annot, [Env_refinement.refine v t envr] |> filter_options, false)
     | Bind (_, v, a, e) ->
-      log "@,@[<v 1>BIND for variable %a" Variable.pp v ;
-      let pos = Variable.get_locations v in
       match anns with
       | No_annot -> (* BindDefault *)
         let anns = Annot (No_annot_a, SplitAnnot.create [(any_or_absent, No_annot)]) in
         infer' tenv env anns e t
       | Annot (anns_a, va) ->
+        log "@,@[<v 1>BIND for variable %a" Variable.pp v ;
+        let pos = Variable.get_locations v in
         let splits = SplitAnnot.splits va in
         let res =
           match splits with
@@ -264,11 +446,11 @@ and infer' tenv env anns e t =
             if gammas_a = []
             then begin (* BindArgUntyp *)
               log "@,Untypable definition..." ;
-              (No_annot, [], true)
+              (No_annot, [], false)
             end else if are_current_env gammas_a |> not
             then begin (* BindArgRefEnv *)
-                log "@,The definition need refinements (going up)." ;
-                (Annot (anns_a, va), gammas_a, true)
+              log "@,The definition need refinements (going up)." ;
+              (Annot (anns_a, va), gammas_a, false)
             end else begin
               log "@,The definition has been successfully annotated." ;
               let s = typeof_a_or_absent pos tenv env anns_a a in
@@ -298,7 +480,7 @@ and infer' tenv env anns e t =
                   let va =
                     List.map (fun si -> (si, SplitAnnot.apply va si)) splits |>
                     SplitAnnot.create in
-                  (Annot (anns_a, va), to_propagate, true)
+                  (Annot (anns_a, va), to_propagate, false)
                 end else begin (* Bind *)
                   let res =
                     splits |> List.map (fun si ->

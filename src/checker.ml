@@ -520,10 +520,10 @@ let infer tenv env e =
   let anns =
     match infer_iterated tenv Env.empty No_annot e any with
     | (_, []) -> raise (Ill_typed ([], "Annotations inference failed."))
-    | (anns, _) -> anns
+    | (anns, _) -> (e, anns)
   in
   log "@." ; anns
 
 let typeof_simple tenv env e =
-  let anns = infer tenv env e in
+  let (e, anns) = infer tenv env e in
   typeof tenv Env.empty anns e |> simplify_typ

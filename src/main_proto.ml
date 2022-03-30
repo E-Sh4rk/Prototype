@@ -89,6 +89,7 @@ let type_check_program
 
 
 let main f =
+  Printexc.record_backtrace true;
   try
     let ast =
       match f with

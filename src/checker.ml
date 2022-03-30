@@ -451,7 +451,7 @@ and infer' tenv env anns e' t =
             end else begin
               log "@,The definition has been successfully annotated." ;
               let s = typeof_a_or_absent pos tenv env anns_a a in
-              (*Format.printf "%s@." (actual_expected s dom_a) ;*)
+              (*if subtype s dom_a |> not then Format.printf "%s@." (actual_expected s dom_a) ;*)
               assert (subtype s dom_a) ;
               if is_empty s then begin (* BindDefEmpty *)
                 let env = Env.add v empty env in

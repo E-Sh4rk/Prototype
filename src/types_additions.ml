@@ -295,10 +295,6 @@ let remove_negative_arrows t =
     let non_arrow = diff t arrow_any in
     cup_o pos_arrow non_arrow
 
-let split_arrow t =
-  dnf t
-  |> List.map branch_type
-
 let is_test_type t =
     let is_non_trivial_arrow t =
         let arrow_part = cap_o t arrow_any in

@@ -234,7 +234,7 @@ let rec infer_a' pos tenv env anns a t =
       let t = cap_o t arrow_any in
       let res =
         match dnf t |> simplify_dnf with
-        | [arrows] -> (* Abs *)
+        | [arrows] when subtype (branch_type arrows) t -> (* Abs *)
           (* NOTE: Here we ignore the negative part, though we should check there is no negative part.
           But it would require a better simplification of union of arrow types to make negative parts disappear. *)
           let splits = (SplitAnnot.splits va)@(List.map fst arrows) in
@@ -259,21 +259,28 @@ let rec infer_a' pos tenv env anns a t =
           else (* AbsUntypable *)
             (No_annot_a, [], false)
         | lst ->
+          log "@,This is an union. Trying to type each branch separately..." ;
           let (sis, gammass) =
             lst |> List.map (fun si ->
-              let si = branch_type si in
-              let (_, gammas) = infer_a_iterated pos tenv env anns a si in
-              (si, gammas)
+              si |> List.map (fun (t1, t2) ->
+                  let si = mk_arrow (cons t1) (cons t2) in
+                  let (_, gammas) = infer_a_iterated pos tenv env anns a si in
+                  (si, gammas)
+                )
               )
+              |> List.flatten
               |> List.filter (fun (_,gammas) -> gammas <> [])
               |> List.split in
           let gammas = List.flatten gammass in
           if are_current_env gammas
-          then (* AbsUnion *)
-            let t = conj sis in
-            let (anns, gammas) = infer_a_iterated pos tenv env anns a t in
-            (anns, gammas, false)
-          else (* AbsUnionPropagate *)
+          then begin (* AbsUnion *)
+            let t' = conj sis in
+            if subtype t' t then begin
+              let (anns, gammas) = infer_a_iterated pos tenv env anns a t' in
+              (anns, gammas, false)
+            end else (* AbsUntypable *)
+              (No_annot_a, [], false)
+          end else (* AbsUnionPropagate *)
             (anns, gammas, false)
         in
         log "@]@,END LAMBDA for variable %a" Variable.pp v ; res
@@ -454,6 +461,7 @@ and infer' tenv env anns e' t =
               (*if subtype s dom_a |> not then Format.printf "%s@." (actual_expected s dom_a) ;*)
               assert (subtype s dom_a) ;
               if is_empty s then begin (* BindDefEmpty *)
+                log "@,It has an empty type." ;
                 let env = Env.add v empty env in
                 let (anns, gammas) = infer_iterated tenv env (SplitAnnot.apply va empty) e t in
                 let va = SplitAnnot.create [(empty, anns)] in

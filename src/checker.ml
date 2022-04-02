@@ -257,7 +257,7 @@ let rec infer_a' pos tenv env anns a t =
           if subtype (domain t) (SplitAnnot.dom va)
           then (Annot_a va, gammas, changes)
           else (* AbsUntypable *)
-            (No_annot_a, [], false)
+            (Annot_a (SplitAnnot.create []), [], false)
         | lst ->
           log "@,This is an union. Trying to type each branch separately..." ;
           let (sis, gammass) =
@@ -279,7 +279,7 @@ let rec infer_a' pos tenv env anns a t =
               let (anns, gammas) = infer_a_iterated pos tenv env anns a t' in
               (anns, gammas, false)
             end else (* AbsUntypable *)
-              (No_annot_a, [], false)
+              (Annot_a (SplitAnnot.create []), [], false)
           end else (* AbsUnionPropagate *)
             (anns, gammas, false)
         in

@@ -5,6 +5,7 @@ module LabelMap = CD.Ident.LabelMap
 
 type typ = CD.Types.t
 type node = CD.Types.Node.t
+type var = CD.Var.t
 
 let register s = 
   let module U = Encodings.Utf8 in
@@ -50,10 +51,6 @@ let to_label str = CD.Ident.Label.mk_ascii str
 let from_label lbl = CD.Ident.Label.get_ascii lbl
 
 (* ----- *)
-
-let mk_var name =
-    let var = CD.Var.mk name in
-    CD.Types.var var
 
 let mk_atom ascii_name =
     ascii_name |> CD.AtomSet.V.mk_ascii |> CD.AtomSet.atom |> CD.Types.atom
@@ -114,6 +111,8 @@ let single_string str =
     fun acc c ->
       CD.Types.times (single_char c |> cons) (cons acc)
   ) nil_typ rev_str
+
+let var_typ = CD.Types.var
 
 (*
 let list_of alpha =
@@ -214,3 +213,10 @@ let full_dnf t =
     let nvs = List.map (CD.Types.var) nvs in
     ((pvs, nvs), expl)
   )
+
+let mk_var name = CD.Var.mk name
+let vars = CD.Types.Subst.vars
+let min_typ =
+  CD.Types.Subst.min_type
+let max_typ =
+  CD.Types.Subst.max_type

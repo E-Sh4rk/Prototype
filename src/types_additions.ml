@@ -83,7 +83,7 @@ let derecurse_types env venv defs =
         | TVar v ->
             begin try Typepat.mk_type (Hashtbl.find venv v)
             with Not_found ->
-                let t = mk_var v in
+                let t = mk_var v |> var_typ in
                 Hashtbl.add venv v t ;
                 Typepat.mk_type t end
         | TBase tb -> Typepat.mk_type (type_base_to_typ tb)
@@ -402,3 +402,22 @@ let remove_field_info t label =
     let t = remove_field t label in
     let singleton = mk_record false [label, any_or_absent_node] in
     merge_records t singleton
+
+(* Operations on vars *)
+
+let joker_v = mk_var "*"
+let joker = joker_v |> var_typ
+
+let floor t =
+    let vs =
+        vars t |>
+        CD.Var.Set.remove joker_v
+    in
+    min_typ vs t
+
+let ceil t =
+    let vs =
+        vars t |>
+        CD.Var.Set.remove joker_v
+    in
+    max_typ vs t

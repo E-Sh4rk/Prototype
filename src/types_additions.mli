@@ -90,3 +90,11 @@ val split_record : typ -> typ list
 val remove_field_info : typ -> string -> typ
 (** [remove_field_info t label] removes all the information
     about the field label in the record t. *)
+
+(* Operations on vars *)
+
+val joker : typ
+
+val floor : typ -> typ
+
+val ceil : typ -> typ

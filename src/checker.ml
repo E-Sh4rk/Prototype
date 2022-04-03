@@ -469,8 +469,7 @@ and infer' tenv env anns e' t =
                 let changes = are_current_env gammas |> not in
                 (Annot (anns_a, va), eliminate v gammas, changes)
               end else begin
-                let splits = splits |> List.map (fun sk -> ceil sk |> cap_o s)
-                  |> List.filter (fun t -> is_empty t |> not) in
+                let splits = splits |> List.map (fun sk -> ceil sk |> cap_o s) |> partition in
                 log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
                 let to_propagate =
                   if List.length splits > 1

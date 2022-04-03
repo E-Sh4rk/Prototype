@@ -237,9 +237,7 @@ let rec infer_a' pos tenv env anns a t =
       let res =
         match dnf t |> simplify_dnf with
         | [arrows] when subtype (branch_type arrows) t -> (* Abs *)
-          (* NOTE: Here we ignore the negative part, though we should check there is no negative part.
-          But it would require a better simplification of union of arrow types to make negative parts disappear. *)
-          let splits = (SplitAnnot.splits va)@(List.map fst arrows) in
+          let splits = (SplitAnnot.splits va)@(List.map (fun (si,_) -> ceil si) arrows) in
           let splits = List.map (fun s -> cap_o s maxdom) splits |> partition in
           log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
           let res =
@@ -256,7 +254,7 @@ let rec infer_a' pos tenv env anns a t =
           let va = vas |> List.concat |> SplitAnnot.create in
           let gammas = List.flatten gammass in
           let changes = List.exists identity changess in
-          if subtype (domain t) (SplitAnnot.dom va)
+          if subtype (domain t |> floor) (SplitAnnot.dom va)
           then (Annot_a va, gammas, changes)
           else (* AbsUntypable *)
             (Annot_a (SplitAnnot.create []), [], false)

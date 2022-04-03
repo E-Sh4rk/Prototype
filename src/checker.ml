@@ -364,37 +364,32 @@ let rec infer_a' pos tenv env anns a t =
       (No_annot_a, gammas, false)
     | App (v1, v2) ->
       begin match anns with
-      | No_annot_a -> infer_a' pos tenv env (Various (VTyp any_or_absent)) a t
+      | No_annot_a -> (* AppDefault *)
+        infer_a' pos tenv env (Various (VTyp any_or_absent)) a t
       | Annot_a _ -> assert false
-      | Various (VTyp _) -> (* TODO *)
+      | Various (VTyp t') ->
         if is_empty (Env.find v1 env)
-        then (No_annot_a, [Env_refinement.refine v2 any envr] |> filter_options, false)
+        then (anns, [Env_refinement.refine v2 any envr] |> filter_options, false)
         else if is_empty (Env.find v2 env)
-        then (No_annot_a, [Env_refinement.refine v1 arrow_any envr] |> filter_options, false)
+        then (anns, [Env_refinement.refine v1 arrow_any envr] |> filter_options, false)
         else begin
           let vt1 = Env.find v1 env in
           let vt2 = Env.find v2 env in
+          let defined = (has_absent vt1 || has_absent vt2) |> not in
+          let left_done = defined &&
+            (subtype t' t || subtype vt1 (mk_arrow (cons vt2) (cons t))) in
           match dnf (cap_o vt1 arrow_any) |> simplify_dnf with
-          | [arrows] when subtype vt2 (arrows |> List.map fst |> disj) -> (* AppSplitR *)
+          | [arrows] when left_done -> (* AppR *)
+            let s = triangle_exact vt1 t in
             let gammas =
               arrows |> List.filter_map (fun (si,_) ->
-                let arrow_type = mk_arrow (cons (cap_o si vt2)) (cons t) in
-                envr |> option_chain [
-                  Env_refinement.refine v1 arrow_type ; Env_refinement.refine v2 si
-                ]
+                Env_refinement.refine v2 (cap_o si s) envr
               ) in
-            (No_annot_a, gammas, false)
-          | [arrows] when (has_absent vt1 || has_absent vt2) |> not -> (* AppWrongDom *)
-            let dom = arrows |> List.map fst |> disj in
-            let arrow_type = mk_arrow (cons vt2) (cons t) in
-            let gammas =
-              [Env_refinement.refine v1 arrow_type envr
-              (* TODO: this can actually make the final type less precise.
-              See example "typeable_in_racket". *) ;
-              Env_refinement.refine v2 dom envr]
-              |> filter_options
-            in
-            (No_annot_a, gammas, false)
+            (anns, gammas, false)
+          | [_] when defined -> (* AppRefineL *)
+            let arrow_type = mk_arrow (cons (cap vt2 joker)) (cons t) in
+            let gammas = [Env_refinement.refine v1 arrow_type envr] |> filter_options in
+            (Various (VTyp t), gammas, false)
           | lst -> (* AppSplitL *)
             let gammas =
               lst |> List.filter_map (fun arrows ->
@@ -402,7 +397,7 @@ let rec infer_a' pos tenv env anns a t =
                   Env_refinement.refine v1 (branch_type arrows) ; Env_refinement.refine v2 any
                 ]
               ) in
-            (No_annot_a, gammas, false)
+            (anns, gammas, false)
         end
       end
     | Let (v1, v2) ->

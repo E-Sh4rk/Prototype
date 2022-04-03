@@ -47,8 +47,11 @@ module SplitAnnot = struct
       | [] -> No_annot
       | [(_, annots)] -> annots
       | _ -> assert (Cduce.is_empty typ) ; No_annot
-
     let destruct (T t) = t
+    let floor (T t) =
+      T (List.map (fun (t,anns) -> (Types_additions.floor t, anns)) t)
+    let ceil (T t) =
+      T (List.map (fun (t,anns) -> (Types_additions.ceil t, anns)) t)
 end
 
 type annot_a = SplitAnnot.t annot_a'

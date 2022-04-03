@@ -16,6 +16,8 @@ module SplitAnnot : sig
     val dom : t -> Cduce.typ
     val apply : t -> Cduce.typ -> t annot'
     val destruct : t -> (Cduce.typ * (t annot')) list
+    val floor : t -> t
+    val ceil : t -> t
 end
 
 type annot_a = SplitAnnot.t annot_a'

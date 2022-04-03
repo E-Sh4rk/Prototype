@@ -455,12 +455,12 @@ and infer' tenv env anns e' t =
             then begin (* BindArgRefEnv *)
               if gammas_a = [] then log "@,Untypable definition..."
               else log "@,The definition need refinements (going up)." ;
-              (Annot (anns_a, va), gammas_a, false)
+              (Annot (anns_a, SplitAnnot.ceil va), gammas_a, false)
             end else begin
               log "@,The definition has been successfully annotated." ;
               let s = typeof_a_or_absent pos tenv env anns_a a in
               (*if subtype s dom_a |> not then Format.printf "%s@." (actual_expected s dom_a) ;*)
-              assert (subtype s dom_a) ;
+              assert (subtype s (ceil dom_a)) ;
               if is_empty s then begin (* BindDefEmpty *)
                 log "@,It has an empty type." ;
                 let env = Env.add v empty env in
@@ -469,7 +469,7 @@ and infer' tenv env anns e' t =
                 let changes = are_current_env gammas |> not in
                 (Annot (anns_a, va), eliminate v gammas, changes)
               end else begin
-                let splits = splits |> List.map (cap_o s)
+                let splits = splits |> List.map (fun sk -> ceil sk |> cap_o s)
                   |> List.filter (fun t -> is_empty t |> not) in
                 log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
                 let to_propagate =

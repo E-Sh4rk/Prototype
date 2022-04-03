@@ -1,8 +1,12 @@
 
 val partition : Cduce.typ list -> Cduce.typ list
 
+type various =
+    | VTyp of Cduce.typ
+
 type 'a annot_a' =
     | No_annot_a
+    | Various of various
     | Annot_a of 'a
 
 type 'a annot' =

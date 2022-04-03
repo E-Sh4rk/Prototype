@@ -29,7 +29,8 @@ let get_annots pos v anns =
 
 let get_annots_a pos v anns =
   match anns with
-  | No_annot_a -> raise (Ill_typed (pos, "No annotation for variable "^(Variable.show v)^"."))
+  | No_annot_a | Various _ ->
+    raise (Ill_typed (pos, "No annotation for variable "^(Variable.show v)^"."))
   | Annot_a anns -> anns
 
 (* ===== Typeof ===== *)
@@ -229,6 +230,7 @@ let rec infer_a' pos tenv env anns a t =
     | No_annot_a -> (* AbsDefault *)
       let anns = Annot_a (SplitAnnot.create [(any, No_annot)]) in
       infer_a' pos tenv env anns a t
+    | Various _ -> assert false
     | Annot_a va ->
       log "@,@[<v 1>LAMBDA for variable %a with t=%a" Variable.pp v pp_typ t ;
       let t = cap_o t arrow_any in
@@ -295,9 +297,10 @@ let rec infer_a' pos tenv env anns a t =
     (anns, gammas, changes)
   end else begin
     begin match a with
-    | Abstract s when subtype s t -> (No_annot_a, [envr], false)
+    | Abstract s when subtype s (ceil t) -> (No_annot_a, [envr], false)
     | Abstract _ -> (No_annot_a, [], false)
-    | Const c when subtype (typeof_const_atom tenv c) t -> (No_annot_a, [envr], false)
+    | Const c when subtype (typeof_const_atom tenv c) (ceil t) ->
+      (No_annot_a, [envr], false)
     | Const _ -> (No_annot_a, [], false)
     | Pair (v1, v2) ->
       if is_empty (Env.find v1 env)
@@ -360,42 +363,47 @@ let rec infer_a' pos tenv env anns a t =
       in
       (No_annot_a, gammas, false)
     | App (v1, v2) ->
-      if is_empty (Env.find v1 env)
-      then (No_annot_a, [Env_refinement.refine v2 any envr] |> filter_options, false)
-      else if is_empty (Env.find v2 env)
-      then (No_annot_a, [Env_refinement.refine v1 arrow_any envr] |> filter_options, false)
-      else begin
-        let vt1 = Env.find v1 env in
-        let vt2 = Env.find v2 env in
-        match dnf (cap_o vt1 arrow_any) |> simplify_dnf with
-        | [arrows] when subtype vt2 (arrows |> List.map fst |> disj) -> (* AppSplitR *)
-          let gammas =
-            arrows |> List.filter_map (fun (si,_) ->
-              let arrow_type = mk_arrow (cons (cap_o si vt2)) (cons t) in
-              envr |> option_chain [
-                Env_refinement.refine v1 arrow_type ; Env_refinement.refine v2 si
-              ]
-            ) in
-          (No_annot_a, gammas, false)
-        | [arrows] when (has_absent vt1 || has_absent vt2) |> not -> (* AppWrongDom *)
-          let dom = arrows |> List.map fst |> disj in
-          let arrow_type = mk_arrow (cons vt2) (cons t) in
-          let gammas =
-            [Env_refinement.refine v1 arrow_type envr
-            (* TODO: this can actually make the final type less precise.
-            See example "typeable_in_racket". *) ;
-             Env_refinement.refine v2 dom envr]
-            |> filter_options
-          in
-          (No_annot_a, gammas, false)
-        | lst -> (* AppSplitL *)
-          let gammas =
-            lst |> List.filter_map (fun arrows ->
-              envr |> option_chain [
-                Env_refinement.refine v1 (branch_type arrows) ; Env_refinement.refine v2 any
-              ]
-            ) in
-          (No_annot_a, gammas, false)
+      begin match anns with
+      | No_annot_a -> infer_a' pos tenv env (Various (VTyp any_or_absent)) a t
+      | Annot_a _ -> assert false
+      | Various (VTyp _) -> (* TODO *)
+        if is_empty (Env.find v1 env)
+        then (No_annot_a, [Env_refinement.refine v2 any envr] |> filter_options, false)
+        else if is_empty (Env.find v2 env)
+        then (No_annot_a, [Env_refinement.refine v1 arrow_any envr] |> filter_options, false)
+        else begin
+          let vt1 = Env.find v1 env in
+          let vt2 = Env.find v2 env in
+          match dnf (cap_o vt1 arrow_any) |> simplify_dnf with
+          | [arrows] when subtype vt2 (arrows |> List.map fst |> disj) -> (* AppSplitR *)
+            let gammas =
+              arrows |> List.filter_map (fun (si,_) ->
+                let arrow_type = mk_arrow (cons (cap_o si vt2)) (cons t) in
+                envr |> option_chain [
+                  Env_refinement.refine v1 arrow_type ; Env_refinement.refine v2 si
+                ]
+              ) in
+            (No_annot_a, gammas, false)
+          | [arrows] when (has_absent vt1 || has_absent vt2) |> not -> (* AppWrongDom *)
+            let dom = arrows |> List.map fst |> disj in
+            let arrow_type = mk_arrow (cons vt2) (cons t) in
+            let gammas =
+              [Env_refinement.refine v1 arrow_type envr
+              (* TODO: this can actually make the final type less precise.
+              See example "typeable_in_racket". *) ;
+              Env_refinement.refine v2 dom envr]
+              |> filter_options
+            in
+            (No_annot_a, gammas, false)
+          | lst -> (* AppSplitL *)
+            let gammas =
+              lst |> List.filter_map (fun arrows ->
+                envr |> option_chain [
+                  Env_refinement.refine v1 (branch_type arrows) ; Env_refinement.refine v2 any
+                ]
+              ) in
+            (No_annot_a, gammas, false)
+        end
       end
     | Let (v1, v2) ->
       let gammas =

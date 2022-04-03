@@ -23,15 +23,20 @@ let rec check_disjointness ts =
     List.for_all (fun t' -> Cduce.disjoint t t') ts
     && check_disjointness ts
 
+type various =
+    | VTyp of Cduce.typ
+    [@@deriving show]
+
 type 'a annot_a' =
-  | No_annot_a
-  | Annot_a of 'a
-  [@@deriving show]
+    | No_annot_a
+    | Various of various
+    | Annot_a of 'a
+    [@@deriving show]
 
 type 'a annot' =
-  | No_annot
-  | Annot of ('a annot_a' * 'a)
-  [@@deriving show]
+    | No_annot
+    | Annot of ('a annot_a' * 'a)
+    [@@deriving show]
 
 module SplitAnnot = struct
     type t = T of (Cduce.typ * (t annot')) list

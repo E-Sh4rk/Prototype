@@ -93,7 +93,7 @@ val remove_field_info : typ -> string -> typ
 
 (* Operations on vars *)
 
-val joker : typ
+val joker : unit -> typ
 
 val floor : typ -> typ
 

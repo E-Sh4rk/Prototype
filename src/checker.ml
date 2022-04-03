@@ -385,7 +385,7 @@ let rec infer_a' pos tenv env anns a t =
               ) in
             (anns, gammas, false)
           | [_] when defined -> (* AppRefineL *)
-            let arrow_type = mk_arrow (cons (cap vt2 joker)) (cons t) in
+            let arrow_type = mk_arrow (cons (cap vt2 (joker ()))) (cons t) in
             let gammas = [Env_refinement.refine v1 arrow_type envr] |> filter_options in
             (Various (VTyp t), gammas, false)
           | lst -> (* AppSplitL *)

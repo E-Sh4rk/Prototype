@@ -405,8 +405,9 @@ let remove_field_info t label =
 
 (* Operations on vars *)
 
+(* TODO: Shouldn't we create a new joker var each time? *)
 let joker_v = mk_var "*"
-let joker = joker_v |> var_typ
+let joker () = joker_v |> var_typ
 
 let floor t =
     let vs =

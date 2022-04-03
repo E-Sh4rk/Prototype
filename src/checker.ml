@@ -237,7 +237,7 @@ let rec infer_a' pos tenv env anns a t =
       let res =
         match dnf t |> simplify_dnf with
         | [arrows] when subtype (branch_type arrows) t -> (* Abs *)
-          let splits = (SplitAnnot.splits va)@(List.map (fun (si,_) -> ceil si) arrows) in
+          let splits = (SplitAnnot.ceil va |> SplitAnnot.splits)@(List.map (fun (si,_) -> ceil si) arrows) in
           let splits = List.map (fun s -> cap_o s maxdom) splits |> partition in
           log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
           let res =

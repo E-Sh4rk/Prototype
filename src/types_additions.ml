@@ -405,20 +405,17 @@ let remove_field_info t label =
 
 (* Operations on vars *)
 
-(* TODO: Shouldn't we create a new joker var each time? *)
-let joker_v = mk_var "*"
-let joker () = joker_v |> var_typ
-
+let reserved_name_for_joker = "*"
+let joker () = mk_var reserved_name_for_joker |> var_typ
 let floor t =
     let vs =
-        vars t |>
-        CD.Var.Set.remove joker_v
+        vars t |> List.filter
+        (fun v -> String.equal (var_name v) reserved_name_for_joker |> not)
     in
     min_typ vs t
-
 let ceil t =
     let vs =
-        vars t |>
-        CD.Var.Set.remove joker_v
+        vars t |> List.filter
+        (fun v -> String.equal (var_name v) reserved_name_for_joker |> not)
     in
     max_typ vs t

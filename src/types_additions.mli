@@ -93,6 +93,8 @@ val remove_field_info : typ -> string -> typ
 
 (* Operations on vars *)
 
+val reserved_name_for_joker : string
+
 val joker : unit -> typ
 
 val floor : typ -> typ

@@ -48,7 +48,7 @@ module SplitAnnot = struct
     let dom t =
       splits t |> Types_additions.disj
     let apply (T t) typ =
-      match t |> List.filter (fun (t',_) -> Cduce.subtype typ (Types_additions.ceil t')) with
+      match t |> List.filter (fun (t',_) -> Cduce.subtype typ t') with
       | [] -> No_annot
       | [(_, annots)] -> annots
       | _ -> assert (Cduce.is_empty typ) ; No_annot

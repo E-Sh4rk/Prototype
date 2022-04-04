@@ -79,6 +79,7 @@ val full_dnf : typ -> ((typ list * typ list) * ((node * node) list * (node * nod
 
 val mk_var : string -> var
 val vars : typ -> var list
+val var_name : var -> string
 val min_typ : var list -> typ -> typ
 val max_typ : var list -> typ -> typ
 

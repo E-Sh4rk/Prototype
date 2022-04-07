@@ -222,6 +222,12 @@ let eliminate v =
 let are_current_env gammas =
   gammas <> [] && List.for_all Env_refinement.is_empty gammas
 
+let add_current_env envr gammas =
+  if List.exists Env_refinement.is_empty gammas
+  then gammas else envr::gammas
+
+let merge_annots_a _ _ = failwith "TODO"
+
 let rec infer_a' pos tenv env anns a t =
   let envr = Env_refinement.empty env in
   let type_lambda v e t ~maxdom =
@@ -233,8 +239,10 @@ let rec infer_a' pos tenv env anns a t =
       log "@,@[<v 1>LAMBDA for variable %a with t=%a" Variable.pp v pp_typ t ;
       let t = cap_o t arrow_any in
       let res =
-        match dnf t |> simplify_dnf with
-        | [arrows] when subtype (branch_type arrows) t -> (* Abs *)
+        match dnf t |> simplify_dnf |> List.filter (fun arrows -> subtype (branch_type arrows) t) (* AbsNeg *) with
+        | [] -> (* AbsUntypable *)
+          (Annot_a (SplitAnnot.create []), [], false)
+        | [arrows] -> (* Abs *) (* TODO *)
           (* NOTE: Here we ignore the negative part, though we should check there is no negative part.
           But it would require a better simplification of union of arrow types to make negative parts disappear. *)
           let splits = (SplitAnnot.splits va)@(List.map fst arrows) in
@@ -258,30 +266,17 @@ let rec infer_a' pos tenv env anns a t =
           then (Annot_a va, gammas, changes)
           else (* AbsUntypable *)
             (Annot_a (SplitAnnot.create []), [], false)
-        | lst ->
-          log "@,This is an union. Trying to type each branch separately..." ;
-          let (sis, gammass) =
-            lst |> List.map (fun si ->
-              si |> List.map (fun (t1, t2) ->
-                  let si = mk_arrow (cons t1) (cons t2) in
-                  let (_, gammas) = infer_a_iterated pos tenv env anns a si in
-                  (si, gammas)
-                )
-              )
-              |> List.flatten
-              |> List.filter (fun (_,gammas) -> gammas <> [])
-              |> List.split in
-          let gammas = List.flatten gammass in
-          if are_current_env gammas
-          then begin (* AbsUnion *)
-            let t' = conj sis in
-            if subtype t' t then begin
-              let (anns, gammas) = infer_a_iterated pos tenv env anns a t' in
-              (anns, gammas, false)
-            end else (* AbsUntypable *)
-              (Annot_a (SplitAnnot.create []), [], false)
-          end else (* AbsUnionPropagate *)
-            (anns, gammas, false)
+        | arrow::lst ->
+          log "@,This is an union. Trying to type each conjunct separately..." ;
+          let (anns', gammas') = infer_a_iterated pos tenv env anns a (branch_type arrow) in
+          if gammas' = [] || are_current_env gammas'
+          then (* AbsUnion *)
+            let ts = List.map branch_type lst |> disj in
+            let (anns'', gammas'') =
+              infer_a_iterated pos tenv env (merge_annots_a anns anns') a ts in
+            (merge_annots_a anns' anns'', gammas'@gammas'', false)
+          else (* AbsUnionPropagate *)
+            (merge_annots_a anns anns', add_current_env envr gammas', false)
         in
         log "@]@,END LAMBDA for variable %a" Variable.pp v ; res
   in
@@ -289,9 +284,7 @@ let rec infer_a' pos tenv env anns a t =
   then begin (* Option *)
     let t = cap_o any t in
     let (anns, gammas, changes) = infer_a' pos tenv env anns a t in
-    let gammas =
-      if subtype any t |> not || List.exists Env_refinement.is_empty gammas
-      then gammas else envr::gammas in
+    let gammas = if subtype any t then add_current_env envr gammas else gammas in
     (anns, gammas, changes)
   end else begin
     begin match a with
@@ -421,9 +414,7 @@ and infer' tenv env anns e' t =
   then begin (* Option *)
     let t = cap_o any t in
     let (anns, gammas, changes) = infer' tenv env anns e' t in
-    let gammas =
-      if subtype any t |> not || List.exists Env_refinement.is_empty gammas
-      then gammas else envr::gammas in
+    let gammas = if subtype any t then add_current_env envr gammas else gammas in
     (anns, gammas, changes)
   end else begin
     match e' with

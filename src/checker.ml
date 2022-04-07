@@ -139,8 +139,8 @@ and typeof tenv env anns e =
     else begin
       let d = disj splits in
       let s =
-        if has_absent d
-        then absent
+        if subtype any_or_absent d
+        then any_or_absent
         else typeof_a pos tenv env anns_a a
       in
       if subtype s d
@@ -209,9 +209,9 @@ let refine_a tenv env a t =
 
 (* ===== Infer ===== *)
 
-let typeof_a_or_absent pos tenv env anns a =
+let try_typeof_a pos tenv env anns a =
   try typeof_a pos tenv env anns a
-  with Ill_typed _ -> absent
+  with Ill_typed _ -> any_or_absent
 
 let project v =
   List.map (Env_refinement.find v)
@@ -290,7 +290,7 @@ let rec infer_a' pos tenv env anns a t =
     let t = cap_o any t in
     let (anns, gammas, changes) = infer_a' pos tenv env anns a t in
     let gammas =
-      if List.exists Env_refinement.is_empty gammas
+      if subtype any t |> not || List.exists Env_refinement.is_empty gammas
       then gammas else envr::gammas in
     (anns, gammas, changes)
   end else begin
@@ -422,7 +422,7 @@ and infer' tenv env anns e' t =
     let t = cap_o any t in
     let (anns, gammas, changes) = infer' tenv env anns e' t in
     let gammas =
-      if List.exists Env_refinement.is_empty gammas
+      if subtype any t |> not || List.exists Env_refinement.is_empty gammas
       then gammas else envr::gammas in
     (anns, gammas, changes)
   end else begin
@@ -439,7 +439,7 @@ and infer' tenv env anns e' t =
         let splits = SplitAnnot.splits va in
         let res =
           match splits with
-          | [s] when has_absent s -> (* BindArgSkip *)
+          | [s] when subtype any_or_absent s -> (* BindDefSkip *)
             log "@,Skipping definition." ;
             let env = Env.add v s env in
             let (anns, gammas) = infer_iterated tenv env (SplitAnnot.apply va s) e t in
@@ -451,13 +451,13 @@ and infer' tenv env anns e' t =
             let dom_a = disj splits in
             let (anns_a, gammas_a) = infer_a_iterated pos tenv env anns_a a dom_a in
             if are_current_env gammas_a |> not
-            then begin (* BindArgRefEnv *)
+            then begin (* BindDefRefEnv *)
               if gammas_a = [] then log "@,Untypable definition..."
               else log "@,The definition need refinements (going up)." ;
               (Annot (anns_a, va), gammas_a, false)
             end else begin
               log "@,The definition has been successfully annotated." ;
-              let s = typeof_a_or_absent pos tenv env anns_a a in
+              let s = try_typeof_a pos tenv env anns_a a in
               (*if subtype s dom_a |> not then Format.printf "%s@." (actual_expected s dom_a) ;*)
               assert (subtype s dom_a) ;
               if is_empty s then begin (* BindDefEmpty *)
@@ -472,7 +472,7 @@ and infer' tenv env anns e' t =
                   |> List.filter (fun t -> is_empty t |> not) in
                 log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
                 let to_propagate =
-                  if List.length splits > 1
+                  if subtype s any && List.length splits > 1
                   then
                     splits |>
                     List.map (fun si -> refine_a tenv envr a si) |>

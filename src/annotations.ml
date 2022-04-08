@@ -53,7 +53,8 @@ end
 
 let merge_annots_a anns1 anns2 =
   match anns1, anns2 with
-  | No_annot_a, anns | anns, No_annot_a -> anns
+  | No_annot_a, No_annot_a -> No_annot_a
+  | No_annot_a, _ | _, No_annot_a -> assert false
   | Annot_a va1, Annot_a va2 ->
     let splits = (SplitAnnot.splits va1)@(SplitAnnot.splits va2) |> partition in
     let dom = SplitAnnot.dom va2 in

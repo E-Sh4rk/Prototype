@@ -226,7 +226,7 @@ let add_current_env envr gammas =
   if List.exists Env_refinement.is_empty gammas
   then gammas else envr::gammas
 
-let merge_annots_a _ _ = failwith "TODO"
+let merge_annots_a = Annotations.merge_annots_a
 
 let rec infer_a' pos tenv env anns a t =
   let envr = Env_refinement.empty env in

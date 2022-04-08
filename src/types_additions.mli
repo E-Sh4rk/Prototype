@@ -57,8 +57,6 @@ val has_atom : type_env -> string -> bool
 val conj : typ list -> typ
 val disj : typ list -> typ
 
-val apply_opt : typ -> typ -> typ
-
 val remove_negative_arrows : typ -> typ
 
 val simplify_dnf : (typ * typ) list list -> (typ * typ) list list

@@ -291,7 +291,8 @@ and infer_legacy_a' (*pos*)_ tenv env a t =
           log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
           let res =
             splits |> List.map (fun si ->
-              let (e, gammas, changes) = infer_legacy' tenv (Env.add v si env) e (apply_opt t si) in
+              let t = List.filter (fun (sj,_) -> subtype si sj) arrows |> List.map snd |> conj in
+              let (e, gammas, changes) = infer_legacy' tenv (Env.add v si env) e t in
               let changes =
                 if List.length gammas >= 1 && List.for_all Env_refinement.is_empty gammas
                 then changes (* The current annotation will not change *)
@@ -499,7 +500,8 @@ let rec infer_a' pos tenv env a t =
         let res =
           splits |> List.map (fun si ->
             assert (has_absent si |> not) ;
-            let (e, gammas) = infer_iterated tenv (Env.add v si env) e (apply_opt t si) in
+            let t = List.filter (fun (sj,_) -> subtype si sj) arrows |> List.map snd |> conj in
+            let (e, gammas) = infer_iterated tenv (Env.add v si env) e t in
             let changes = are_current_env gammas |> not in
             let (va, gammas) = extract v gammas in
             (va, e, gammas, changes)

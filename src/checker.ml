@@ -243,8 +243,6 @@ let rec infer_a' pos tenv env anns a t =
         | [] -> (* AbsUntypable *)
           (Annot_a (SplitAnnot.create []), [], false)
         | [arrows] -> (* Abs *) (* TODO *)
-          (* NOTE: Here we ignore the negative part, though we should check there is no negative part.
-          But it would require a better simplification of union of arrow types to make negative parts disappear. *)
           let splits = (SplitAnnot.splits va)@(List.map fst arrows) in
           let splits = List.map (fun s -> cap_o s maxdom) splits |> partition in
           log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
@@ -252,7 +250,8 @@ let rec infer_a' pos tenv env anns a t =
             splits |> List.map (fun si ->
               assert (has_absent si |> not) ;
               let env = Env.add v si env in
-              let (anns, gammas) = infer_iterated tenv env (SplitAnnot.apply va si) e (apply_opt t si) in
+              let t = List.filter (fun (sj,_) -> subtype si sj) arrows |> List.map snd |> conj in
+              let (anns, gammas) = infer_iterated tenv env (SplitAnnot.apply va si) e t in
               let changes = are_current_env gammas |> not in
               let splits = project v gammas |> partition in
               let va = List.map (fun s -> (s, anns)) splits in

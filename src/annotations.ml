@@ -59,6 +59,22 @@ module SplitAnnot = struct
       T (List.map (fun (t,anns) -> (Types_additions.ceil t, anns)) t)
 end
 
+let merge_annots_a anns1 anns2 =
+  match anns1, anns2 with
+  | No_annot_a, No_annot_a -> No_annot_a
+  | No_annot_a, _ | _, No_annot_a -> assert false
+  | Annot_a va1, Annot_a va2 ->
+    let splits = (SplitAnnot.splits va1)@(SplitAnnot.splits va2) |> partition in
+    let dom = SplitAnnot.dom va2 in
+    let lst = List.map (fun s ->
+      let a =
+        if Cduce.subtype s dom
+        then SplitAnnot.apply va2 s
+        else SplitAnnot.apply va1 s
+      in (s, a)
+    ) splits in
+    Annot_a (SplitAnnot.create lst)
+
 type annot_a = SplitAnnot.t annot_a'
 [@@deriving show]
 type annot = SplitAnnot.t annot'

@@ -140,8 +140,8 @@ and typeof tenv env anns e =
     else begin
       let d = disj splits in
       let s =
-        if has_absent d
-        then absent
+        if subtype any_or_absent d
+        then any_or_absent
         else typeof_a pos tenv env anns_a a
       in
       if subtype s d
@@ -210,9 +210,9 @@ let refine_a tenv env a t =
 
 (* ===== Infer ===== *)
 
-let typeof_a_or_absent pos tenv env anns a =
+let try_typeof_a pos tenv env anns a =
   try typeof_a pos tenv env anns a
-  with Ill_typed _ -> absent
+  with Ill_typed _ -> any_or_absent
 
 let project v =
   List.map (Env_refinement.find v)
@@ -222,6 +222,12 @@ let eliminate v =
 
 let are_current_env gammas =
   gammas <> [] && List.for_all Env_refinement.is_empty gammas
+
+let add_current_env envr gammas =
+  if List.exists Env_refinement.is_empty gammas
+  then gammas else envr::gammas
+
+let merge_annots_a = Annotations.merge_annots_a
 
 let rec infer_a' pos tenv env anns a t =
   let envr = Env_refinement.empty env in
@@ -235,10 +241,10 @@ let rec infer_a' pos tenv env anns a t =
       log "@,@[<v 1>LAMBDA for variable %a with t=%a" Variable.pp v pp_typ t ;
       let t = cap_o t arrow_any in
       let res =
-        match dnf t |> simplify_dnf with
-        | [arrows] when subtype (branch_type arrows) t -> (* Abs *)
-          (* NOTE: Here we ignore the negative part, though we should check there is no negative part.
-          But it would require a better simplification of union of arrow types to make negative parts disappear. *)
+        match dnf t |> simplify_dnf |> List.filter (fun arrows -> subtype (branch_type arrows) t) (* AbsNeg *) with
+        | [] -> (* AbsUntypable *)
+          (Annot_a (SplitAnnot.create []), [], false)
+        | [arrows] -> (* Abs *) (* TODO *)
           let splits = (SplitAnnot.splits va)@(List.map fst arrows) in
           let splits = List.map (fun s -> cap_o s maxdom) splits |> partition in
           log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
@@ -246,7 +252,8 @@ let rec infer_a' pos tenv env anns a t =
             splits |> List.map (fun si ->
               assert (has_absent si |> not) ;
               let env = Env.add v si env in
-              let (anns, gammas) = infer_iterated tenv env (SplitAnnot.apply va si) e (apply_opt t si) in
+              let t = List.filter (fun (sj,_) -> subtype si sj) arrows |> List.map snd |> conj in
+              let (anns, gammas) = infer_iterated tenv env (SplitAnnot.apply va si) e t in
               let changes = are_current_env gammas |> not in
               let splits = project v gammas |> partition in
               let va = List.map (fun s -> (s, anns)) splits in
@@ -260,30 +267,17 @@ let rec infer_a' pos tenv env anns a t =
           then (Annot_a va, gammas, changes)
           else (* AbsUntypable *)
             (Annot_a (SplitAnnot.create []), [], false)
-        | lst ->
-          log "@,This is an union. Trying to type each branch separately..." ;
-          let (sis, gammass) =
-            lst |> List.map (fun si ->
-              si |> List.map (fun (t1, t2) ->
-                  let si = mk_arrow (cons t1) (cons t2) in
-                  let (_, gammas) = infer_a_iterated pos tenv env anns a si in
-                  (si, gammas)
-                )
-              )
-              |> List.flatten
-              |> List.filter (fun (_,gammas) -> gammas <> [])
-              |> List.split in
-          let gammas = List.flatten gammass in
-          if are_current_env gammas
-          then begin (* AbsUnion *)
-            let t' = conj sis in
-            if subtype t' t then begin
-              let (anns, gammas) = infer_a_iterated pos tenv env anns a t' in
-              (anns, gammas, false)
-            end else (* AbsUntypable *)
-              (Annot_a (SplitAnnot.create []), [], false)
-          end else (* AbsUnionPropagate *)
-            (anns, gammas, false)
+        | arrow::lst ->
+          log "@,This is an union. Trying to type each conjunct separately..." ;
+          let (anns', gammas') = infer_a_iterated pos tenv env anns a (branch_type arrow) in
+          if gammas' = [] || are_current_env gammas'
+          then (* AbsUnion *)
+            let ts = List.map branch_type lst |> disj in
+            let (anns'', gammas'') =
+              infer_a_iterated pos tenv env (merge_annots_a anns anns') a ts in
+            (merge_annots_a anns' anns'', gammas'@gammas'', false)
+          else (* AbsUnionPropagate *)
+            (merge_annots_a anns anns', add_current_env envr gammas', false)
         in
         log "@]@,END LAMBDA for variable %a" Variable.pp v ; res
   in
@@ -291,9 +285,7 @@ let rec infer_a' pos tenv env anns a t =
   then begin (* Option *)
     let t = cap_o any t in
     let (anns, gammas, changes) = infer_a' pos tenv env anns a t in
-    let gammas =
-      if List.exists Env_refinement.is_empty gammas
-      then gammas else envr::gammas in
+    let gammas = if subtype any t then add_current_env envr gammas else gammas in
     (anns, gammas, changes)
   end else begin
     begin match a with
@@ -423,9 +415,7 @@ and infer' tenv env anns e' t =
   then begin (* Option *)
     let t = cap_o any t in
     let (anns, gammas, changes) = infer' tenv env anns e' t in
-    let gammas =
-      if List.exists Env_refinement.is_empty gammas
-      then gammas else envr::gammas in
+    let gammas = if subtype any t then add_current_env envr gammas else gammas in
     (anns, gammas, changes)
   end else begin
     match e' with
@@ -441,7 +431,7 @@ and infer' tenv env anns e' t =
         let splits = SplitAnnot.splits va in
         let res =
           match splits with
-          | [s] when has_absent s -> (* BindArgSkip *)
+          | [s] when subtype any_or_absent s -> (* BindDefSkip *)
             log "@,Skipping definition." ;
             let env = Env.add v s env in
             let (anns, gammas) = infer_iterated tenv env (SplitAnnot.apply va s) e t in
@@ -453,13 +443,13 @@ and infer' tenv env anns e' t =
             let dom_a = disj splits in
             let (anns_a, gammas_a) = infer_a_iterated pos tenv env anns_a a dom_a in
             if are_current_env gammas_a |> not
-            then begin (* BindArgRefEnv *)
+            then begin (* BindDefRefEnv *)
               if gammas_a = [] then log "@,Untypable definition..."
               else log "@,The definition need refinements (going up)." ;
               (Annot (anns_a, va), gammas_a, false)
             end else begin
               log "@,The definition has been successfully annotated." ;
-              let s = typeof_a_or_absent pos tenv env anns_a a in
+              let s = try_typeof_a pos tenv env anns_a a in
               (*if subtype s dom_a |> not then Format.printf "%s@." (actual_expected s dom_a) ;*)
               assert (subtype s dom_a) ;
               if is_empty s then begin (* BindDefEmpty *)
@@ -474,7 +464,7 @@ and infer' tenv env anns e' t =
                   |> List.filter (fun t -> is_empty t |> not) in
                 log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
                 let to_propagate =
-                  if List.length splits > 1
+                  if subtype s any && List.length splits > 1
                   then
                     splits |>
                     List.map (fun si -> refine_a tenv envr a si) |>

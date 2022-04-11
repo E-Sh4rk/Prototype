@@ -237,7 +237,9 @@ let rec infer_a' pos tenv env anns a t =
       let res =
         match dnf t |> simplify_dnf with
         | [arrows] when subtype (branch_type arrows) t -> (* Abs *)
-          let splits = (SplitAnnot.ceil va |> SplitAnnot.splits)@(List.map (fun (si,_) -> ceil si) arrows) in
+          (* NOTE: Here we ignore the negative part, though we should check there is no negative part.
+          But it would require a better simplification of union of arrow types to make negative parts disappear. *)
+          let splits = (SplitAnnot.splits va)@(List.map fst arrows) in
           let splits = List.map (fun s -> cap_o s maxdom) splits |> partition in
           log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
           let res =
@@ -254,7 +256,7 @@ let rec infer_a' pos tenv env anns a t =
           let va = vas |> List.concat |> SplitAnnot.create in
           let gammas = List.flatten gammass in
           let changes = List.exists identity changess in
-          if subtype (domain t |> floor) (SplitAnnot.dom va)
+          if subtype (domain t) (SplitAnnot.dom va)
           then (Annot_a va, gammas, changes)
           else (* AbsUntypable *)
             (Annot_a (SplitAnnot.create []), [], false)
@@ -295,10 +297,9 @@ let rec infer_a' pos tenv env anns a t =
     (anns, gammas, changes)
   end else begin
     begin match a with
-    | Abstract s when subtype s (ceil t) -> (No_annot_a, [envr], false)
+    | Abstract s when subtype s t -> (No_annot_a, [envr], false)
     | Abstract _ -> (No_annot_a, [], false)
-    | Const c when subtype (typeof_const_atom tenv c) (ceil t) ->
-      (No_annot_a, [envr], false)
+    | Const c when subtype (typeof_const_atom tenv c) t -> (No_annot_a, [envr], false)
     | Const _ -> (No_annot_a, [], false)
     | Pair (v1, v2) ->
       if is_empty (Env.find v1 env)
@@ -387,7 +388,7 @@ let rec infer_a' pos tenv env anns a t =
           | [_] when defined -> (* AppRefineL *)
             let arrow_type = mk_arrow (cons (cap vt2 (joker ()))) (cons t) in
             let gammas = [Env_refinement.refine v1 arrow_type envr] |> filter_options in
-            (Various (VTyp t), gammas, false)
+            (Various (VTyp (cap_o t t')), gammas, false)
           | lst -> (* AppSplitL *)
             let gammas =
               lst |> List.filter_map (fun arrows ->
@@ -455,12 +456,12 @@ and infer' tenv env anns e' t =
             then begin (* BindArgRefEnv *)
               if gammas_a = [] then log "@,Untypable definition..."
               else log "@,The definition need refinements (going up)." ;
-              (Annot (anns_a, SplitAnnot.ceil va), gammas_a, false)
+              (Annot (anns_a, va), gammas_a, false)
             end else begin
               log "@,The definition has been successfully annotated." ;
               let s = typeof_a_or_absent pos tenv env anns_a a in
               (*if subtype s dom_a |> not then Format.printf "%s@." (actual_expected s dom_a) ;*)
-              assert (subtype s (ceil dom_a)) ;
+              assert (subtype s dom_a) ;
               if is_empty s then begin (* BindDefEmpty *)
                 log "@,It has an empty type." ;
                 let env = Env.add v empty env in
@@ -469,7 +470,8 @@ and infer' tenv env anns e' t =
                 let changes = are_current_env gammas |> not in
                 (Annot (anns_a, va), eliminate v gammas, changes)
               end else begin
-                let splits = splits |> List.map (fun sk -> ceil sk |> cap_o s) |> partition in
+                let splits = splits |> List.map (cap_o s)
+                  |> List.filter (fun t -> is_empty t |> not) in
                 log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
                 let to_propagate =
                   if List.length splits > 1

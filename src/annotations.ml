@@ -53,10 +53,10 @@ module SplitAnnot = struct
       | [(_, annots)] -> annots
       | _ -> assert (Cduce.is_empty typ) ; No_annot
     let destruct (T t) = t
-    let floor (T t) =
+    (*let floor (T t) =
       T (List.map (fun (t,anns) -> (Types_additions.floor t, anns)) t)
     let ceil (T t) =
-      T (List.map (fun (t,anns) -> (Types_additions.ceil t, anns)) t)
+      T (List.map (fun (t,anns) -> (Types_additions.ceil t, anns)) t)*)
 end
 
 let merge_annots_a anns1 anns2 =
@@ -76,6 +76,24 @@ let merge_annots_a anns1 anns2 =
       in (s, a)
     ) splits in
     Annot_a (SplitAnnot.create lst)
+
+let rec map_annot_a f anns =
+  match anns with
+  | No_annot_a -> No_annot_a
+  | Various v -> Various v
+  | Annot_a va -> Annot_a (map_sa f va)
+and map_annot f anns =
+  match anns with
+  | No_annot -> No_annot
+  | Annot (anns_a, va) -> Annot (map_annot_a f anns_a, map_sa f va)
+and map_sa f va =
+  let lst = SplitAnnot.destruct va in
+  lst |> List.map
+    (fun (t, anns) -> (f t, map_annot f anns))
+  |> SplitAnnot.create
+
+let subst_annot_a s = map_annot_a (Cduce.substitute s)
+let subst_annot s = map_annot (Cduce.substitute s)
 
 type annot_a = SplitAnnot.t annot_a'
 [@@deriving show]

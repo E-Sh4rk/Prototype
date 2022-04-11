@@ -20,14 +20,18 @@ module SplitAnnot : sig
     val dom : t -> Cduce.typ
     val apply : t -> Cduce.typ -> t annot'
     val destruct : t -> (Cduce.typ * (t annot')) list
-    val floor : t -> t
-    val ceil : t -> t
+    (*val floor : t -> t
+    val ceil : t -> t*)
 end
 
 type annot_a = SplitAnnot.t annot_a'
 type annot = SplitAnnot.t annot'
 
 val merge_annots_a : annot_a -> annot_a -> annot_a
+val map_annot_a : (Cduce.typ -> Cduce.typ) -> annot_a -> annot_a
+val map_annot : (Cduce.typ -> Cduce.typ) -> annot -> annot
+val subst_annot_a : Cduce.subst -> annot_a -> annot_a
+val subst_annot : Cduce.subst -> annot -> annot
 
 val pp_annot_a : Format.formatter -> annot_a -> unit
 val pp_annot : Format.formatter -> annot -> unit

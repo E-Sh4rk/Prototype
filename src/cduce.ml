@@ -6,6 +6,7 @@ module LabelMap = CD.Ident.LabelMap
 type typ = CD.Types.t
 type node = CD.Types.Node.t
 type var = CD.Var.t
+type subst = CD.Types.Subst.t
 
 let register s = 
   let module U = Encodings.Utf8 in
@@ -221,3 +222,5 @@ let min_typ =
   CD.Types.Subst.min_type
 let max_typ =
   CD.Types.Subst.max_type
+let substitute = CD.Types.Subst.apply
+let mk_subst = CD.Types.Subst.from_list

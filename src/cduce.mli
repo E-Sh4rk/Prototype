@@ -4,6 +4,7 @@ module CD = Cduce_types
 type typ = CD.Types.t
 type node = CD.Types.Node.t
 type var = CD.Var.t
+type subst = CD.Types.Subst.t
 
 val pp_typ : Format.formatter -> typ -> unit
 val show_typ : typ -> string
@@ -82,6 +83,8 @@ val vars : typ -> var list
 val var_name : var -> string
 val min_typ : var list -> typ -> typ
 val max_typ : var list -> typ -> typ
+val substitute : subst -> typ -> typ
+val mk_subst : (var * typ) list -> subst
 
 val is_empty : typ -> bool
 val non_empty: typ -> bool

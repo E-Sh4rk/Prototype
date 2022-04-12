@@ -418,3 +418,28 @@ let ceil t =
         (fun v -> String.equal (var_name v) reserved_name_for_joker |> not)
     in
     max_typ vs t
+
+let decompose_branches lst =
+    let joker_of_branch (a,_) =
+        if is_empty a then None
+        else
+            let js =
+                jokers a |>
+                List.filter (fun j -> subtype a (var_typ j))
+            in
+            match js with
+            | [] -> None
+            | [j] -> Some j
+            | _ -> assert false
+    in
+    let rec aux lst =
+        match lst with
+        | [] -> ([], [])
+        | (a,b)::lst -> begin
+            let (js, njs) = aux lst in
+            match joker_of_branch (a,b) with
+            | None -> (js, (a,b)::njs)
+            | Some j -> ((substitute (mk_subst [j,any]) a,b)::js, njs)
+        end
+    in
+    aux lst

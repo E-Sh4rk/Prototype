@@ -229,6 +229,10 @@ let add_current_env envr gammas =
 
 let merge_annots_a = Annotations.merge_annots_a
 
+let subst_jokers t subs_t =
+  let s = jokers t |> List.map (fun j -> (j,subs_t)) |> mk_subst in
+  substitute s t
+
 let rec infer_a' pos tenv env anns a t =
   let envr = Env_refinement.empty env in
   let type_lambda v e t ~maxdom =
@@ -331,9 +335,11 @@ let rec infer_a' pos tenv env anns a t =
     (anns, gammas, changes)
   end else begin
     begin match a with
-    | Abstract s when subtype s t -> (No_annot_a, [envr], false)
+    | Abstract s when subtype s (subst_jokers t empty) ->
+      (No_annot_a, [envr], false)
     | Abstract _ -> (No_annot_a, [], false)
-    | Const c when subtype (typeof_const_atom tenv c) t -> (No_annot_a, [envr], false)
+    | Const c when subtype (typeof_const_atom tenv c) (subst_jokers t empty) ->
+      (No_annot_a, [envr], false)
     | Const _ -> (No_annot_a, [], false)
     | Pair (v1, v2) ->
       if is_empty (Env.find v1 env)

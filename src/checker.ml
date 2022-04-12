@@ -252,29 +252,40 @@ let rec infer_a' pos tenv env anns a t =
           match dnf t |> simplify_dnf |> List.filter (fun arrows -> subtype (branch_type arrows) t) (* AbsNeg *) with
           | [] -> (* AbsUntypable *)
             (Annot_a (SplitAnnot.create []), [], false)
-          | [arrows] -> (* Abs *)
-            let splits = splits@(List.map fst arrows) in
-            let splits = List.map (fun s -> cap_o s maxdom) splits |> partition in
-            log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
-            let res =
-              splits |> List.map (fun si ->
-                assert (has_absent si |> not) ;
-                let env = Env.add v si env in
-                let t = List.filter (fun (sj,_) -> subtype si sj) arrows |> List.map snd |> conj in
-                let (anns, gammas) = infer_iterated tenv env (SplitAnnot.apply va si) e t in
-                let changes = are_current_env gammas |> not in
-                let splits = project v gammas |> partition in
-                let va = List.map (fun s -> (s, anns)) splits in
-                (va, eliminate v gammas, changes)
-              ) in
-            let (vas, gammass, changess) = split3 res in
-            let va = vas |> List.concat |> SplitAnnot.create in
-            let gammas = List.flatten gammass in
-            let changes = List.exists identity changess in
-            if subtype (domain t) (SplitAnnot.dom va)
-            then (Annot_a va, gammas, changes)
-            else (* AbsUntypable *)
-              (Annot_a (SplitAnnot.create []), [], false)
+          | [arrows] ->
+            begin match decompose_branches arrows with
+            | (_::jas, arrows) ->
+              let ts = jas@arrows |> branch_type in
+              let (anns, gammas) = infer_a_iterated pos tenv env anns a ts in
+              if are_current_env gammas
+              then (* AbsResJoker *)
+                failwith "TODO"
+              else (* AbsResJokerPropagate *)
+                (anns, gammas, false)
+            | ([], arrows) -> (* Abs *)
+              let splits = splits@(List.map fst arrows) in
+              let splits = List.map (fun s -> cap_o s maxdom) splits |> partition in
+              log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
+              let res =
+                splits |> List.map (fun si ->
+                  assert (has_absent si |> not) ;
+                  let env = Env.add v si env in
+                  let t = List.filter (fun (sj,_) -> subtype si sj) arrows |> List.map snd |> conj in
+                  let (anns, gammas) = infer_iterated tenv env (SplitAnnot.apply va si) e t in
+                  let changes = are_current_env gammas |> not in
+                  let splits = project v gammas |> partition in
+                  let va = List.map (fun s -> (s, anns)) splits in
+                  (va, eliminate v gammas, changes)
+                ) in
+              let (vas, gammass, changess) = split3 res in
+              let va = vas |> List.concat |> SplitAnnot.create in
+              let gammas = List.flatten gammass in
+              let changes = List.exists identity changess in
+              if subtype (domain t) (SplitAnnot.dom va)
+              then (Annot_a va, gammas, changes)
+              else (* AbsUntypable *)
+                (Annot_a (SplitAnnot.create []), [], false)
+            end
           | arrow::lst ->
             log "@,This is an union. Trying to type each conjunct separately..." ;
             let (anns', gammas') = infer_a_iterated pos tenv env anns a (branch_type arrow) in

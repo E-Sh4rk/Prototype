@@ -242,7 +242,7 @@ let rec infer_a' pos tenv env anns a t =
         match dnf t |> simplify_dnf |> List.filter (fun arrows -> subtype (branch_type arrows) t) (* AbsNeg *) with
         | [] -> (* AbsUntypable *)
           (Annot_a (SplitAnnot.create []), [], false)
-        | [arrows] -> (* Abs *) (* TODO *)
+        | [arrows] -> (* Abs *)
           let splits = (SplitAnnot.splits va)@(List.map fst arrows) in
           let splits = List.map (fun s -> cap_o s maxdom) splits |> partition in
           log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;

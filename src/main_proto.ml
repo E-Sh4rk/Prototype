@@ -34,10 +34,13 @@ let type_check_program
       let nf_expr = convert_to_msc ~legacy:true annot_expr in
       let time1 = Unix.gettimeofday () in
       assert (VarSet.subset (fv_e nf_expr) (Env.domain env |> VarSet.of_list)) ;
+      let tmp_log = !Utils.log_enabled in
+      Utils.log_enabled := false ;
       let typ_legacy =
         try Some (Old_checker.typeof_simple_legacy tenv env nf_expr)
         with Old_checker.Ill_typed _ -> None
       in
+      Utils.log_enabled := tmp_log ;
       try
         (*Format.printf "%a@." pp_e nf_expr ;*)
         let typ = Checker.typeof_simple tenv env nf_expr in

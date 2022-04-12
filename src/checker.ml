@@ -254,12 +254,34 @@ let rec infer_a' pos tenv env anns a t =
             (Annot_a (SplitAnnot.create []), [], false)
           | [arrows] ->
             begin match decompose_branches arrows with
-            | (_::jas, arrows) ->
+            | (ja::jas, arrows) ->
               let ts = jas@arrows |> branch_type in
               let (anns, gammas) = infer_a_iterated pos tenv env anns a ts in
               if are_current_env gammas
               then (* AbsResJoker *)
-                failwith "TODO"
+                let va = match anns with Annot_a va -> va | _ -> assert false in
+                let (u,w) = unjokerize_branch ja in
+                let splits =
+                  (diff u (SplitAnnot.dom va))::(SplitAnnot.splits va)
+                  |> List.map (cap_o u)
+                  |> List.filter (fun t -> is_empty t |> not)
+                in
+                let res =
+                  splits |> List.map (fun si ->
+                    assert (has_absent si |> not) ;
+                    let env = Env.add v si env in
+                    let (anns, gammas) = infer_iterated tenv env (SplitAnnot.apply va si) e w in
+                    let changes = are_current_env gammas |> not in
+                    let splits = project v gammas |> partition in
+                    let va = List.map (fun s -> (s, anns)) splits in
+                    (va, eliminate v gammas, changes)
+                  ) in
+                let (vas, gammass, changess) = split3 res in
+                let va = vas |> List.concat |> SplitAnnot.create in
+                let anns = merge_annots_a anns (Annot_a va) in
+                let gammas = List.flatten gammass |> add_current_env envr in
+                let changes = List.exists identity changess in
+                (anns, gammas, changes)
               else (* AbsResJokerPropagate *)
                 (anns, gammas, false)
             | ([], arrows) -> (* Abs *)

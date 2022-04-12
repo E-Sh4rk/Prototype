@@ -492,8 +492,6 @@ and infer' tenv env anns e' t =
             end else begin
               log "@,The definition has been successfully annotated." ;
               let s = try_typeof_a pos tenv env anns_a a in
-              (*if subtype s dom_a |> not then Format.printf "%s@." (actual_expected s dom_a) ;*)
-              assert (subtype s dom_a) ;
               let jokers = splits |> List.map jokers |> List.concat |> var_set in
               if List.length jokers >= 1
               then (* BindDefJoker *)
@@ -508,6 +506,8 @@ and infer' tenv env anns e' t =
                 let changes = are_current_env gammas |> not in
                 (Annot (anns_a, va), eliminate v gammas, changes)
               end else begin
+                (*if subtype s dom_a |> not then Format.printf "%s@." (actual_expected s dom_a) ;*)
+                assert (subtype s dom_a) ;
                 let splits = splits |> List.map (cap_o s)
                   |> List.filter (fun t -> is_empty t |> not) in
                 log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;

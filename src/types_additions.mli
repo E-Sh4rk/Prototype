@@ -99,3 +99,5 @@ val joker : unit -> typ
 val floor : typ -> typ
 val ceil : typ -> typ
 val jokers : typ -> var list
+
+val share_jokerized_arrows : typ list -> typ list

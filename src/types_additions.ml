@@ -446,3 +446,15 @@ let unjokerize_branch (a,b) =
     match joker_of_branch (a,b) with
     | None -> assert false
     | Some j -> (substitute (mk_subst [j,any]) a,b)
+
+let extract_jokerized_arrows t =
+    dnf t |> List.map decompose_branches |> List.map fst
+    |> List.concat
+
+let add_jokerized_arrows arrows t =
+    let non_arrow = diff t arrow_any in
+    cup_o non_arrow (cap_o t (branch_type arrows))
+
+let share_jokerized_arrows lst =
+    let arrows = lst |> List.map extract_jokerized_arrows |> List.concat in
+    List.map (add_jokerized_arrows arrows) lst

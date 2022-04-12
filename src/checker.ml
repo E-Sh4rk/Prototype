@@ -485,7 +485,7 @@ and infer' tenv env anns e' t =
             let env = Env.add v s env in
             let (anns, gammas) = infer_iterated tenv env (SplitAnnot.apply va s) e t in
             let changes = are_current_env gammas |> not in
-            let splits = project v gammas |> partition in
+            let splits = project v gammas |> share_jokerized_arrows |> partition in
             let va = List.map (fun s -> (s, anns)) splits |> SplitAnnot.create in
             (Annot (anns_a, va), eliminate v gammas, changes)
           | splits ->
@@ -541,7 +541,7 @@ and infer' tenv env anns e' t =
                       let env = Env.add v si env in
                       let (anns, gammas) = infer_iterated tenv env (SplitAnnot.apply va si) e t in
                       let changes = are_current_env gammas |> not in
-                      let splits = project v gammas |> partition in
+                      let splits = project v gammas |> share_jokerized_arrows |> partition in
                       let va = List.map (fun s -> (s, anns)) splits in
                       (va, eliminate v gammas, changes)
                   ) in

@@ -30,8 +30,10 @@ type annot = SplitAnnot.t annot'
 val merge_annots_a : annot_a -> annot_a -> annot_a
 val map_annot_a : (Cduce.typ -> Cduce.typ) -> annot_a -> annot_a
 val map_annot : (Cduce.typ -> Cduce.typ) -> annot -> annot
+val map_sa : (Cduce.typ -> Cduce.typ) -> SplitAnnot.t -> SplitAnnot.t
 val subst_annot_a : Cduce.subst -> annot_a -> annot_a
 val subst_annot : Cduce.subst -> annot -> annot
+val subst_sa : Cduce.subst -> SplitAnnot.t -> SplitAnnot.t
 
 val pp_annot_a : Format.formatter -> annot_a -> unit
 val pp_annot : Format.formatter -> annot -> unit

@@ -94,6 +94,7 @@ and map_sa f va =
 
 let subst_annot_a s = map_annot_a (Cduce.substitute s)
 let subst_annot s = map_annot (Cduce.substitute s)
+let subst_sa s = map_sa (Cduce.substitute s)
 
 type annot_a = SplitAnnot.t annot_a'
 [@@deriving show]

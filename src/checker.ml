@@ -452,7 +452,13 @@ and infer' tenv env anns e' t =
               let s = try_typeof_a pos tenv env anns_a a in
               (*if subtype s dom_a |> not then Format.printf "%s@." (actual_expected s dom_a) ;*)
               assert (subtype s dom_a) ;
-              if is_empty s then begin (* BindDefEmpty *)
+              let jokers = splits |> List.map jokers |> List.concat |> var_set in
+              if List.length jokers >= 1
+              then (* BindDefJoker *)
+                let subst = List.map (fun j -> (j, empty)) jokers |> mk_subst in
+                let va = subst_sa subst va in
+                infer' tenv env (Annot (anns_a, va)) e' t
+              else if is_empty s then begin (* BindDefEmpty *)
                 log "@,It has an empty type." ;
                 let env = Env.add v empty env in
                 let (anns, gammas) = infer_iterated tenv env (SplitAnnot.apply va empty) e t in

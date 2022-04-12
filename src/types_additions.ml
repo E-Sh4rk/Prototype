@@ -404,6 +404,8 @@ let remove_field_info t label =
 
 let reserved_name_for_joker = "*"
 let joker () = mk_var reserved_name_for_joker |> var_typ
+let jokers t =
+    vars t |> List.filter (fun v -> String.equal (var_name v) reserved_name_for_joker)
 let floor t =
     let vs =
         vars t |> List.filter

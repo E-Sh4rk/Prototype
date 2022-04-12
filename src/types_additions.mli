@@ -94,7 +94,6 @@ val remove_field_info : typ -> string -> typ
 val reserved_name_for_joker : string
 
 val joker : unit -> typ
-
 val floor : typ -> typ
-
 val ceil : typ -> typ
+val jokers : typ -> var list

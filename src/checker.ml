@@ -477,6 +477,7 @@ and infer' tenv env anns e' t =
         log "@,@[<v 1>BIND for variable %a" Variable.pp v ;
         let pos = Variable.get_locations v in
         let splits = SplitAnnot.splits va in
+        log "@,Initial splits: %a" (Utils.pp_list Cduce.pp_typ) splits ;
         let res =
           match splits with
           | [s] when subtype any_or_absent s -> (* BindDefSkip *)
@@ -498,13 +499,15 @@ and infer' tenv env anns e' t =
             end else begin
               log "@,The definition has been successfully annotated." ;
               let s = try_typeof_a pos tenv env anns_a a in
+              log "@,Type of the definition: %a" Cduce.pp_typ s ;
               let jokers = splits |> List.map jokers |> List.concat |> var_set in
               if List.length jokers >= 1
-              then (* BindDefJoker *)
+              then begin (* BindDefJoker *)
+                log "@,Splits contain jokers. They have been removed from the annotations." ;
                 let subst = List.map (fun j -> (j, empty)) jokers |> mk_subst in
                 let va = subst_sa subst va in
                 infer' tenv env (Annot (anns_a, va)) e' t
-              else if is_empty s then begin (* BindDefEmpty *)
+              end else if is_empty s then begin (* BindDefEmpty *)
                 log "@,It has an empty type." ;
                 let env = Env.add v empty env in
                 let (anns, gammas) = infer_iterated tenv env (SplitAnnot.apply va empty) e t in
@@ -512,8 +515,6 @@ and infer' tenv env anns e' t =
                 let changes = are_current_env gammas |> not in
                 (Annot (anns_a, va), eliminate v gammas, changes)
               end else begin
-                (*log "@,Initial splits: %a" (Utils.pp_list Cduce.pp_typ) splits ;
-                log "@,Type of the definition: %a" Cduce.pp_typ s ;*)
                 (*if subtype s dom_a |> not then Format.printf "%s@." (actual_expected s dom_a) ;*)
                 assert (subtype s dom_a) ;
                 let splits = splits |> List.map (cap_o s)

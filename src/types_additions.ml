@@ -442,10 +442,10 @@ let decompose_branches lst =
         end
     in
     aux lst
-let unjokerize_branch (a,b) =
+let unjokerize_branch (a,b) t =
     match joker_of_branch (a,b) with
     | None -> assert false
-    | Some j -> (substitute (mk_subst [j,any]) a,b)
+    | Some j -> (substitute (mk_subst [j,t]) a,b)
 
 let extract_jokerized_arrows t =
     dnf t |> List.map decompose_branches |> List.map fst

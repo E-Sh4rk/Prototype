@@ -246,7 +246,7 @@ let rec infer_a' pos tenv env anns a t =
       let jokers = splits |> List.map jokers |> List.concat |> var_set in
       if List.length jokers >= 1
       then (* AbsArgJoker *)
-        let subst = List.map (fun j -> (j, any)) jokers |> mk_subst in
+        let subst = List.map (fun j -> (j, maxdom)) jokers |> mk_subst in
         let va = subst_sa subst va in
         infer_a' pos tenv env (Annot_a va) a t
       else begin
@@ -264,8 +264,7 @@ let rec infer_a' pos tenv env anns a t =
               if are_current_env gammas
               then (* AbsResJoker *)
                 let va = match anns with Annot_a va -> va | _ -> assert false in
-                let (u,w) = unjokerize_branch ja in
-                let u = cap_o u maxdom in
+                let (u,w) = unjokerize_branch ja maxdom in
                 let splits =
                   (diff u (SplitAnnot.dom va))::(SplitAnnot.splits va)
                   |> List.map (cap_o u)

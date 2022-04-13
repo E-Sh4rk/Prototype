@@ -64,7 +64,7 @@ val simplify_typ : typ -> typ
 
 val branch_type : (typ*typ) list -> typ
 val decompose_branches : (typ*typ) list -> ((typ*typ) list) (* Jokerized branches *) * ((typ*typ) list)
-val unjokerize_branch : (typ*typ) -> (typ*typ)
+val unjokerize_branch : (typ*typ) -> typ -> (typ*typ)
 
 val is_test_type : typ -> bool
 

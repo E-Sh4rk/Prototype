@@ -265,6 +265,7 @@ let rec infer_a' pos tenv env anns a t =
               then (* AbsResJoker *)
                 let va = match anns with Annot_a va -> va | _ -> assert false in
                 let (u,w) = unjokerize_branch ja in
+                let u = cap_o u maxdom in
                 let splits =
                   (diff u (SplitAnnot.dom va))::(SplitAnnot.splits va)
                   |> List.map (cap_o u)

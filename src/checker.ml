@@ -334,11 +334,12 @@ let rec infer_a' pos tenv env anns a t =
     let gammas = if subtype any t then add_current_env envr gammas else gammas in
     (anns, gammas, changes)
   end else begin
+    let max_t = subst_jokers t empty in  
     begin match a with
-    | Abstract s when subtype s (subst_jokers t empty) ->
+    | Abstract s when subtype s max_t ->
       (No_annot_a, [envr], false)
     | Abstract _ -> (No_annot_a, [], false)
-    | Const c when subtype (typeof_const_atom tenv c) (subst_jokers t empty) ->
+    | Const c when subtype (typeof_const_atom tenv c) max_t ->
       (No_annot_a, [envr], false)
     | Const _ -> (No_annot_a, [], false)
     | Pair (v1, v2) ->
@@ -445,15 +446,16 @@ let rec infer_a' pos tenv env anns a t =
           [Env_refinement.refine v1 any ; Env_refinement.refine v2 t ]]
         |> filter_options in
         (No_annot_a, gammas, false)
-    | Lambda (_, Ast.ADomain s, v, e) ->
+    | Lambda (_, Ast.ADomain s, v, e) when subtype (domain max_t) s ->
       let t = cap_o t (mk_arrow (cons s) any_node) in
       type_lambda v e t ~maxdom:s
     | Lambda (_, Ast.Unnanoted, v, e) ->
       let t = cap_o t arrow_any in
       type_lambda v e t ~maxdom:any
-    | Lambda (_, Ast.AArrow s, v, e) ->
+    | Lambda (_, Ast.AArrow s, v, e) when subtype s max_t ->
       let t = cap_o t s in
       type_lambda v e t ~maxdom:(domain s)
+    | Lambda _ -> (No_annot_a, [], false)
     end
   end
 

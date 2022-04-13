@@ -322,6 +322,7 @@ let square_approx f out =
     cap_o (domain f) (disj res)
 
 let square_exact f out =
+    assert (is_empty out |> not) ;
     let res = dnf f |> List.map begin
         fun lst ->
             let remove_included_branchs lst =
@@ -349,13 +350,14 @@ let square_split f out =
             (t, res)
     end
 
+(* TODO: Optimize... *)
 let triangle_exact f out =
     let res = dnf f |> List.map begin
         fun lst ->
-            let remove_disjoint_branchs lst =
+            (*let remove_disjoint_branchs lst =
                 let is_not_disjoint (_, o) = disjoint o out |> not in
                 List.filter is_not_disjoint lst
-            in
+            in*)
             let rec possible_inputs current_set lst =
                 let t = List.map snd current_set in
                 if subtype (conj t) out then [conj (List.map fst current_set)]
@@ -364,7 +366,7 @@ let triangle_exact f out =
                     List.flatten (List.map aux (take_one lst))
                 end
             in
-            disj (possible_inputs [] (remove_disjoint_branchs lst))
+            disj (possible_inputs [] ((*remove_disjoint_branchs*)lst))
     end in
     conj res
 

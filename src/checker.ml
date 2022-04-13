@@ -255,6 +255,7 @@ let rec infer_a' pos tenv env anns a t =
         let res =
           match dnf t |> simplify_dnf |> List.filter (fun arrows -> subtype (branch_type arrows) t) (* AbsNeg *) with
           | [] -> (* AbsUntypable *)
+            log "@,Untypable lambda (empty union wanted)." ;
             (Annot_a (SplitAnnot.create []), [], false)
           | [arrows] ->
             begin match decompose_branches arrows with
@@ -309,8 +310,11 @@ let rec infer_a' pos tenv env anns a t =
               let changes = List.exists identity changess in
               if subtype (domain t) (SplitAnnot.dom va)
               then (Annot_a va, gammas, changes)
-              else (* AbsUntypable *)
+              else begin (* AbsUntypable *)
+                log "@,Untypable lambda (domain is not fully covered): %s"
+                  (actual_expected (SplitAnnot.dom va) (domain t)) ;
                 (Annot_a (SplitAnnot.create []), [], false)
+              end
             end
           | arrow::lst ->
             log "@,This is an union. Trying to type each conjunct separately..." ;

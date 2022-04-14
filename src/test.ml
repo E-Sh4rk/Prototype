@@ -1309,3 +1309,13 @@ let not_so_bad = fun x ->
 
 let bad_again = fun x -> fun y ->
   if y is Int then y+1 else x+1
+
+
+(*****************************************
+*                                        *
+*     Examples needing substitutions     *
+*                                        *
+******************************************)
+
+let ignore_first_arg x =
+  succ ((fun y -> fun z -> z) 42 x)

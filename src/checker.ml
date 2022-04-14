@@ -246,7 +246,9 @@ let rec infer_a' pos tenv env anns a t =
       let jokers = splits |> List.map jokers |> List.concat |> var_set in
       if List.length jokers >= 1
       then (* AbsArgJoker *)
-        let subst = List.map (fun j -> (j, maxdom)) jokers |> mk_subst in
+        let subst = List.map (fun j -> (j, any)) jokers |> mk_subst in
+        (* TODO: substitute the nested annotations with empty instead,
+        and just substitue any for this one AND add a split to fill the domain of t (if not already filled)... *)
         let va = subst_sa subst va in
         infer_a' pos tenv env (Annot_a va) a t
       else begin
@@ -308,6 +310,7 @@ let rec infer_a' pos tenv env anns a t =
               let va = vas |> List.concat |> SplitAnnot.create in
               let gammas = List.flatten gammass in
               let changes = List.exists identity changess in
+              (* TODO: For the following check, substitue jokers of the domain of va with empty *)
               if subtype (domain t) (SplitAnnot.dom va)
               then (Annot_a va, gammas, changes)
               else begin (* AbsUntypable *)

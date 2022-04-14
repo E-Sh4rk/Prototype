@@ -235,7 +235,7 @@ let subst_jokers t subs_t =
 
 let rec infer_a' pos tenv env anns a t =
   let envr = Env_refinement.empty env in
-  let type_lambda v e t ~maxdom =
+  let type_lambda v e t ~maxdom ~fixeddom =
     match anns with
     | No_annot_a -> (* AbsDefault *)
       let anns = Annot_a (SplitAnnot.create [(any, No_annot)]) in
@@ -246,9 +246,8 @@ let rec infer_a' pos tenv env anns a t =
       let jokers = splits |> List.map jokers |> List.concat |> var_set in
       if List.length jokers >= 1
       then (* AbsArgJoker *)
-        let subst = List.map (fun j -> (j, any)) jokers |> mk_subst in
-        (* TODO: substitute the nested annotations with empty instead,
-        and just substitue any for this one AND add a split to fill the domain of t (if not already filled)... *)
+        let s = if fixeddom then empty else any in
+        let subst = List.map (fun j -> (j, s)) jokers |> mk_subst in
         let va = subst_sa subst va in
         infer_a' pos tenv env (Annot_a va) a t
       else begin
@@ -261,13 +260,13 @@ let rec infer_a' pos tenv env anns a t =
             (Annot_a (SplitAnnot.create []), [], false)
           | [arrows] ->
             begin match decompose_branches arrows with
-            | (ja::jas, arrows) ->
+            | ((u,w)::jas, arrows) ->
               let ts = jas@arrows |> branch_type in
               let (anns, gammas) = infer_a_iterated pos tenv env anns a ts in
               if are_current_env gammas
               then (* AbsResJoker *)
                 let va = match anns with Annot_a va -> va | _ -> assert false in
-                let (u,w) = unjokerize_branch ja maxdom in
+                let u = substitute_jokers u maxdom in
                 let splits =
                   (diff u (SplitAnnot.dom va))::(SplitAnnot.splits va)
                   |> List.map (cap_o u)
@@ -310,8 +309,9 @@ let rec infer_a' pos tenv env anns a t =
               let va = vas |> List.concat |> SplitAnnot.create in
               let gammas = List.flatten gammass in
               let changes = List.exists identity changess in
-              (* TODO: For the following check, substitue jokers of the domain of va with empty *)
-              if subtype (domain t) (SplitAnnot.dom va)
+              let covered = SplitAnnot.dom va in
+              let covered = if fixeddom then substitute_jokers covered empty else covered in
+              if subtype (domain t) covered
               then (Annot_a va, gammas, changes)
               else begin (* AbsUntypable *)
                 log "@,Untypable lambda (domain is not fully covered): %s"
@@ -455,13 +455,13 @@ let rec infer_a' pos tenv env anns a t =
         (No_annot_a, gammas, false)
     | Lambda (_, Ast.ADomain s, v, e) when subtype (domain max_t) s ->
       let t = cap_o t (mk_arrow (cons s) any_node) in
-      type_lambda v e t ~maxdom:s
+      type_lambda v e t ~maxdom:s ~fixeddom:true
     | Lambda (_, Ast.Unnanoted, v, e) ->
       let t = cap_o t arrow_any in
-      type_lambda v e t ~maxdom:any
+      type_lambda v e t ~maxdom:any ~fixeddom:false
     | Lambda (_, Ast.AArrow s, v, e) when subtype s max_t ->
       let t = cap_o t s in
-      type_lambda v e t ~maxdom:(domain s)
+      type_lambda v e t ~maxdom:(domain s) ~fixeddom:true
     | Lambda _ -> (No_annot_a, [], false)
     end
   end

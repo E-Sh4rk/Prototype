@@ -421,6 +421,10 @@ let ceil t =
     in
     max_typ vs t
 
+let substitute_jokers t t_subs =
+    let subst = jokers t |> List.map (fun j -> (j,t_subs)) |> mk_subst in
+    substitute subst t
+
 let required_part_of_branch (a,b) =
     if is_empty a then Some (a, b)
     else
@@ -451,9 +455,6 @@ let decompose_branches lst =
         end
     in
     aux lst
-let unjokerize_branch (a,b) t =
-    let subst = jokers a |> List.map (fun j -> (j,t)) |> mk_subst in
-    (substitute subst a,b)
 
 let extract_jokerized_arrows t =
     dnf t |> List.map decompose_branches |> List.map fst

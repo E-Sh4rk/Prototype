@@ -421,33 +421,39 @@ let ceil t =
     in
     max_typ vs t
 
-let joker_of_branch (a,_) =
-    if is_empty a then None
+let required_part_of_branch (a,b) =
+    if is_empty a then Some (a, b)
     else
-        let js =
-            jokers a |>
-            List.filter (fun j -> subtype a (var_typ j))
-        in
-        match js with
-        | [] -> None
-        | [j] -> Some j
-        | _ -> assert false
+        let js = jokers a in
+        let subst = js |> List.map (fun j -> (j, empty)) |> mk_subst in
+        let a = substitute subst a in
+        if is_empty a then None else Some (a,b)
+
+let decompose_branch (a,b) =
+    match required_part_of_branch (a,b) with
+    | None -> (Some (a,b), None)
+    | Some (a',_) ->
+        let a = diff a a' in
+        let res = if is_empty a then None else Some (a,b) in
+        (res, Some (a', b))
+
 let decompose_branches lst =
     let rec aux lst =
         match lst with
         | [] -> ([], [])
         | b::lst -> begin
             let (js, njs) = aux lst in
-            match joker_of_branch b with
-            | None -> (js, b::njs)
-            | Some _ -> (b::js, njs)
+            match decompose_branch b with
+            | None, None -> (js, njs)
+            | None, Some b -> (js, b::njs)
+            | Some b, None -> (b::js, njs)
+            | Some b1, Some b2 -> (b1::js, b2::njs)
         end
     in
     aux lst
 let unjokerize_branch (a,b) t =
-    match joker_of_branch (a,b) with
-    | None -> assert false
-    | Some j -> (substitute (mk_subst [j,t]) a,b)
+    let subst = jokers a |> List.map (fun j -> (j,t)) |> mk_subst in
+    (substitute subst a,b)
 
 let extract_jokerized_arrows t =
     dnf t |> List.map decompose_branches |> List.map fst

@@ -172,8 +172,10 @@ let has_atom (_, atoms) name =
 
 (* Operations on types *)
 
-let conj ts = List.fold_left cap_o any ts
-let disj ts = List.fold_left cup_o empty ts
+let conj ts = List.fold_left cap any ts
+let disj ts = List.fold_left cup empty ts
+let conj_o ts = List.fold_left cap_o any ts
+let disj_o ts = List.fold_left cup_o empty ts
 
 let branch_type lst =
     if lst = [] then arrow_any
@@ -191,7 +193,7 @@ let full_branch_type ((pvs, nvs), (ps, ns)) =
     let ns = ns |>
         List.map (fun (a, b) -> mk_arrow a b |> neg) |> conj in
     let t = [pvs;nvs;ps;ns] |> conj in
-    cap_o arrow_any t
+    cap arrow_any t
 
 let rec take_one lst =
     match lst with
@@ -204,9 +206,9 @@ let rec regroup_conjuncts conjuncts =
     | [] -> ((l,r), [])
     | (l',r')::lst ->
         if equiv l l'
-        then aux (l, cap_o r r') lst
+        then aux (l, cap r r') lst
         else if equiv r r'
-        then aux (cup_o l l', r) lst
+        then aux (cup l l', r) lst
         else
             let ((l,r),lst) = aux (l,r) lst in
             ((l,r), (l',r')::lst)
@@ -302,17 +304,17 @@ let simplify_full_dnf dnf =
 let simplify_typ t =
     let arrow = t |> full_dnf |> simplify_full_dnf |> List.map full_branch_type |> disj in
     let non_arrow = diff t arrow_any in
-    let res = cup_o arrow non_arrow (*|> normalize_typ*) in
+    let res = cup arrow non_arrow (*|> normalize_typ*) in
     assert (equiv res t) ; res
 
 let remove_negative_arrows t =
     let pos_arrow = t |> dnf |> List.map branch_type |> disj in
     let non_arrow = diff t arrow_any in
-    cup_o pos_arrow non_arrow
+    cup pos_arrow non_arrow
 
 let is_test_type t =
     let is_non_trivial_arrow t =
-        let arrow_part = cap_o t arrow_any in
+        let arrow_part = cap t arrow_any in
         (is_empty arrow_part || subtype arrow_any arrow_part) |> not
     in
     let memo = Hashtbl.create 10 in
@@ -333,11 +335,11 @@ let is_test_type t =
 let square_approx f out =
     let res = dnf f |> List.map begin
         fun lst ->
-            let is_impossible (_,t) = is_empty (cap_o out t) in
+            let is_impossible (_,t) = is_empty (cap out t) in
             let impossibles = List.filter is_impossible lst |> List.map fst in
             neg (disj impossibles)
     end in
-    cap_o (domain f) (disj res)
+    cap (domain f) (disj res)
 
 let square_exact f out =
     assert (is_empty out |> not) ;
@@ -357,7 +359,7 @@ let square_exact f out =
             in
             conj (List.map neg (impossible_inputs [] (remove_included_branchs lst)))
     end in
-    cap_o (domain f) (disj res)
+    cap (domain f) (disj res)
 
 let square_split f out =
     dnf f |>
@@ -480,7 +482,7 @@ let extract_jokerized_arrows t =
 
 let add_jokerized_arrows arrows t =
     let non_arrow = diff t arrow_any in
-    cup_o non_arrow (cap_o t (branch_type arrows))
+    cup non_arrow (cap t (branch_type arrows))
 
 let share_jokerized_arrows lst =
     let arrows = lst |> List.map extract_jokerized_arrows |> List.concat in

@@ -63,7 +63,7 @@ let rec typeof_a pos tenv env anns a =
         let env = Env.add v t env in
         let res = typeof tenv env anns e in
         mk_arrow (cons t) (cons res)
-      ) |> conj |> simplify_typ
+      ) |> conj_o |> simplify_typ
     end
   in
   match a with
@@ -149,7 +149,7 @@ and typeof tenv env anns e =
     if splits = []
     then raise (Ill_typed (pos, "Empty annotation for variable "^(Variable.show v)^"."))
     else begin
-      let d = disj splits in
+      let d = disj_o splits in
       let s =
         if subtype any_or_absent d
         then any_or_absent
@@ -160,7 +160,7 @@ and typeof tenv env anns e =
         SplitAnnot.destruct va |> List.map (fun (t, anns) ->
           let env = Env.add v t env in
           typeof tenv env anns e
-        ) |> disj |> simplify_typ
+        ) |> disj_o |> simplify_typ
       else raise (Ill_typed (pos,
         "Invalid splits (does not cover the initial domain). "^(splits_domain splits s)))
     end
@@ -312,7 +312,7 @@ let rec infer_a' pos tenv env anns a t =
                 splits |> List.map (fun si ->
                   assert (has_absent si |> not) ;
                   let env = Env.add v si env in
-                  let t = List.filter (fun (sj,_) -> subtype si sj) arrows |> List.map snd |> conj in
+                  let t = List.filter (fun (sj,_) -> subtype si sj) arrows |> List.map snd |> conj_o in
                   let (anns, gammas) = infer_iterated tenv env (SplitAnnot.apply va si) e t in
                   let changes = are_current_env gammas |> not in
                   let splits = project v gammas |> partition in
@@ -338,7 +338,7 @@ let rec infer_a' pos tenv env anns a t =
             let (anns', gammas') = infer_a_iterated pos tenv env anns a (branch_type arrow) in
             if gammas' = [] || are_current_env gammas'
             then (* AbsUnion *)
-              let ts = List.map branch_type lst |> disj in
+              let ts = List.map branch_type lst |> disj_o in
               let (anns'', gammas'') =
                 infer_a_iterated pos tenv env (merge_annots_a anns anns') a ts in
               (merge_annots_a anns' anns'', gammas'@gammas'', false)
@@ -512,7 +512,7 @@ and infer' tenv env anns e' t =
             let va = List.map (fun s -> (s, anns)) splits |> SplitAnnot.create in
             (Annot (anns_a, va), eliminate v gammas, changes)
           | splits ->
-            let dom_a = disj splits in
+            let dom_a = disj_o splits in
             let (anns_a, gammas_a) = infer_a_iterated pos tenv env anns_a a dom_a in
             if are_current_env gammas_a |> not
             then begin (* BindDefRefEnv *)

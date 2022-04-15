@@ -40,7 +40,7 @@ let rec typeof_a ~legacy pos tenv env a =
         let env = Env.add v t env in
         let res = typeof ~legacy tenv env e in
         mk_arrow (cons t) (cons res)
-      ) |> conj |> simplify_typ
+      ) |> conj_o |> simplify_typ
     end
   in
   match a with
@@ -128,7 +128,7 @@ and typeof ~legacy tenv env e =
       else raise (Ill_typed (pos, "No split for this binding."))
     )
     else begin
-      let d = disj splits in
+      let d = disj_o splits in
       if has_absent d
       then (
         if legacy then assert false
@@ -144,7 +144,7 @@ and typeof ~legacy tenv env e =
           splits |> List.map (fun t ->
             let env = Env.add v t env in
             typeof ~legacy tenv env e
-          ) |> disj |> simplify_typ
+          ) |> disj_o |> simplify_typ
         else raise (Ill_typed (pos,
           "Invalid splits (does not cover the initial domain). "^(splits_domain splits s)))
       end
@@ -217,7 +217,7 @@ let rec infer_legacy' tenv env e t =
         let (e, gammas, changes) = infer_legacy' tenv env e t in
         (Bind (VarAnnot.empty, v, empty_annots_a a, e), gammas, changes)
       end else begin
-        let dom_a = disj splits in
+        let dom_a = disj_o splits in
         let dom_a = (* NOTE: Not in the paper. Used to forward type information for explicitely typed lambdas with multiple arguments *)
           if e = Var v
           then cap_o dom_a t
@@ -282,7 +282,7 @@ and infer_legacy_a' (*pos*)_ tenv env a t =
         But it would require a better simplification of union of arrow types to make negative parts disappear. *)
         let splits1 = VarAnnot.splits env va in
         let splits2 = List.map fst arrows in
-        if splits1 = [] || (subtype (disj splits2) (disj splits1) |> not)
+        if splits1 = [] || (subtype (disj_o splits2) (disj_o splits1) |> not)
         then (Lambda (VarAnnot.empty, lt, v, empty_annots_e e), [], false (* Optimisation *))
         else
           let splits = splits1@splits2 in
@@ -291,7 +291,7 @@ and infer_legacy_a' (*pos*)_ tenv env a t =
           log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
           let res =
             splits |> List.map (fun si ->
-              let t = List.filter (fun (sj,_) -> subtype si sj) arrows |> List.map snd |> conj in
+              let t = List.filter (fun (sj,_) -> subtype si sj) arrows |> List.map snd |> conj_o in
               let (e, gammas, changes) = infer_legacy' tenv (Env.add v si env) e t in
               let changes =
                 if List.length gammas >= 1 && List.for_all Env_refinement.is_empty gammas
@@ -500,7 +500,7 @@ let rec infer_a' pos tenv env a t =
         let res =
           splits |> List.map (fun si ->
             assert (has_absent si |> not) ;
-            let t = List.filter (fun (sj,_) -> subtype si sj) arrows |> List.map snd |> conj in
+            let t = List.filter (fun (sj,_) -> subtype si sj) arrows |> List.map snd |> conj_o in
             let (e, gammas) = infer_iterated tenv (Env.add v si env) e t in
             let changes = are_current_env gammas |> not in
             let (va, gammas) = extract v gammas in
@@ -530,7 +530,7 @@ let rec infer_a' pos tenv env a t =
             (Lambda (VarAnnot.empty, lt, v, empty_annots_e e), [], false (* Optimisation *))
           else if are_current_env gammas
           then (* AbsUnion *)
-            let t = conj sis in
+            let t = conj_o sis in
             let (a, gammas) = infer_a_iterated pos tenv env a t in
             (a, gammas, false)
           else (* AbsUnionPropagate *)
@@ -621,7 +621,7 @@ let rec infer_a' pos tenv env a t =
         let vt1 = Env.find v1 env in
         let vt2 = Env.find v2 env in
         match dnf (cap_o vt1 arrow_any) |> simplify_dnf with
-        | [arrows] when subtype vt2 (arrows |> List.map fst |> disj) -> (* AppSplitR *)
+        | [arrows] when subtype vt2 (arrows |> List.map fst |> disj_o) -> (* AppSplitR *)
           let gammas =
             arrows |> List.filter_map (fun (si,_) ->
               let arrow_type = mk_arrow (cons (cap_o si vt2)) (cons t) in
@@ -631,7 +631,7 @@ let rec infer_a' pos tenv env a t =
             ) in
           (a, gammas, false)
         | [arrows] when (has_absent vt1 || has_absent vt2) |> not -> (* AppWrongDom *)
-          let dom = arrows |> List.map fst |> disj in
+          let dom = arrows |> List.map fst |> disj_o in
           let arrow_type = mk_arrow (cons vt2) (cons t) in
           let gammas =
             [Env_refinement.refine v1 arrow_type envr
@@ -688,7 +688,7 @@ and infer' tenv env e t =
       let res =
         if List.for_all has_absent splits
         then (* BindArgSkip *)
-          let s = disj splits in
+          let s = disj_o splits in
           log "@,Skipping definition." ;
           let env = Env.add v s env in
           let (e, gammas) = infer_iterated tenv env e t in
@@ -696,7 +696,7 @@ and infer' tenv env e t =
           let (va, gammas) = extract v gammas in
           (Bind (va, v, restrict_annots_a env a, e), gammas, changes)
         else begin
-          let dom_a = disj splits in
+          let dom_a = disj_o splits in
           let (a, gammas_a) = infer_a_iterated pos tenv env a dom_a in
           if gammas_a = []
           then begin (* BindArgUntyp *)

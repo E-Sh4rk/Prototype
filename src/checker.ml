@@ -265,7 +265,8 @@ let rec infer_a' pos tenv env anns a t =
         log "@,@[<v 1>LAMBDA for variable %a with t=%a" Variable.pp v pp_typ t ;
         let t = cap_o t arrow_any in
         let res =
-          match dnf t |> simplify_dnf |> List.filter (fun arrows -> subtype (branch_type arrows) t) (* AbsNeg *) with
+          match dnf t |> simplify_dnf |>
+            List.filter (fun arrows -> subtype (branch_type arrows) t) (* AbsNeg *) with
           | [] -> (* AbsUntypable *)
             log "@,Untypable lambda (empty union wanted)." ;
             (Annot_a (SplitAnnot.create []), [], false)

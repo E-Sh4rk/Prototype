@@ -66,10 +66,15 @@ let rec remove_duplicates equiv lst =
   | [] -> []
   | e::lst -> e::(remove e lst |> remove_duplicates equiv)
 
+let pp_long_list pp_elt fmt lst =
+  Format.fprintf fmt "[@,@[<v 1>" ;
+  List.iter (fun elt -> Format.fprintf fmt " %a ;@ " pp_elt elt) lst ;
+  Format.fprintf fmt "@]]"
+
 let pp_list pp_elt fmt lst =
-  Format.fprintf fmt "[" ;
-  List.iter (fun elt -> Format.fprintf fmt " %a ;" pp_elt elt) lst ;
-  Format.fprintf fmt " ]"
+  Format.fprintf fmt "[ " ;
+  List.iter (fun elt -> Format.fprintf fmt "%a ; " pp_elt elt) lst ;
+  Format.fprintf fmt "]"
 
   let assert_with b msg =
     if not b then failwith msg

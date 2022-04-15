@@ -9,9 +9,20 @@ exception Ill_typed of Position.t list * string
 
 (* ===== Auxiliary functions ===== *)
 
+let pp_splits = Utils.pp_list Cduce.pp_typ
+
+(*let pp_splits fmt splits =
+  let pp_int fmt = Format.fprintf fmt "%i" in
+  let nb =
+    splits |> List.map (fun t ->
+      dnf t |> List.fold_left (fun acc arrows -> acc + (List.length arrows)) 0
+    )
+    in
+  (pp_list pp_int) fmt nb*)
+
 let splits_domain splits domain =
   Format.asprintf "Splits: %a - Domain: %a"
-    (Utils.pp_list Cduce.pp_typ) splits Cduce.pp_typ domain
+    pp_splits splits Cduce.pp_typ domain
 
 let actual_expected act exp =
   Format.asprintf "Actual: %a - Expected: %a" pp_typ act pp_typ exp
@@ -44,7 +55,7 @@ let rec typeof_a pos tenv env anns a =
   let type_lambda env v e =
     let va = get_annots_a pos v anns in
     let splits = SplitAnnot.splits va in
-    (* log "Lambda %a: %a@." Variable.pp v (Utils.pp_list Cduce.pp_typ) splits ; *)
+    (* log "Lambda %a: %a@." Variable.pp v pp_splits splits ; *)
     if splits = []
     then raise (Ill_typed (pos, "Empty annotation for variable "^(Variable.show v)^"."))
     else begin
@@ -134,7 +145,7 @@ and typeof tenv env anns e =
     let pos = Variable.get_locations v in
     let (anns_a, va) = get_annots pos v anns in
     let splits = SplitAnnot.splits va in
-    (* log "Bind %a: %a@." Variable.pp v (Utils.pp_list Cduce.pp_typ) splits ; *)
+    (* log "Bind %a: %a@." Variable.pp v pp_splits splits ; *)
     if splits = []
     then raise (Ill_typed (pos, "Empty annotation for variable "^(Variable.show v)^"."))
     else begin
@@ -292,9 +303,10 @@ let rec infer_a' pos tenv env anns a t =
                 (anns, gammas, false)
               end
             | ([], arrows) -> (* Abs *)
+              log "@,Initial splits: %a" pp_splits splits ;
               let splits = splits@(List.map fst arrows) in
               let splits = List.map (fun s -> cap_o s maxdom) splits |> partition in
-              log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
+              log "@,Using the following split: %a" pp_splits splits ;
               let res =
                 splits |> List.map (fun si ->
                   assert (has_absent si |> not) ;
@@ -487,7 +499,7 @@ and infer' tenv env anns e' t =
         log "@,@[<v 1>BIND for variable %a" Variable.pp v ;
         let pos = Variable.get_locations v in
         let splits = SplitAnnot.splits va in
-        log "@,Initial splits: %a" (Utils.pp_list Cduce.pp_typ) splits ;
+        log "@,Initial splits: %a" pp_splits splits ;
         let res =
           match splits with
           | [s] when subtype any_or_absent s -> (* BindDefSkip *)
@@ -529,7 +541,7 @@ and infer' tenv env anns e' t =
                 assert (subtype s dom_a) ;
                 let splits = splits |> List.map (cap_o s)
                   |> List.filter (fun t -> is_empty t |> not) in
-                log "@,Using the following split: %a" (Utils.pp_list Cduce.pp_typ) splits ;
+                log "@,Using the following split: %a" pp_splits splits ;
                 let to_propagate =
                   if subtype s any && List.length splits > 1
                   then

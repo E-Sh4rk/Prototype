@@ -45,6 +45,7 @@ let cup_o t1 t2 = if subtype t1 t2 then t2
 else if subtype t2 t1 then t1 else CD.Types.cup t1 t2
 let cap_o t1 t2 = if subtype t1 t2 then t1
 else if subtype t2 t1 then t2 else CD.Types.cap t1 t2
+let diff_o t1 t2 = cap_o t1 (neg t2)
 
 (* ----- *)
 

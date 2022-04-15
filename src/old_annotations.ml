@@ -20,10 +20,10 @@ let partition t lst =
   if Cduce.is_empty t then [Cduce.empty]
   else
     let lst = List.map (Cduce.cap_o t) lst in
-    partition_aux (t::lst) Cduce.is_empty Cduce.disjoint Cduce.cap_o Cduce.diff
+    partition_aux (t::lst) Cduce.is_empty Cduce.disjoint Cduce.cap_o Cduce.diff_o
 
 let partition_for_full_domain lst =
-  match partition_aux lst Cduce.is_empty Cduce.disjoint Cduce.cap_o Cduce.diff with
+  match partition_aux lst Cduce.is_empty Cduce.disjoint Cduce.cap_o Cduce.diff_o with
   | [] -> [Cduce.empty]
   | lst -> lst
 

@@ -280,7 +280,7 @@ let rec infer_a' pos tenv env anns a t =
                 let va = match anns with Annot_a va -> va | _ -> assert false in
                 let u = substitute_jokers u maxdom in
                 let splits =
-                  (diff u (SplitAnnot.dom va))::(SplitAnnot.splits va)
+                  (diff_o u (SplitAnnot.dom va))::(SplitAnnot.splits va)
                   |> List.map (cap_o u)
                   |> List.filter (fun t -> is_empty t |> not)
                 in

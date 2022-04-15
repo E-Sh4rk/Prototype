@@ -10,7 +10,7 @@ let partition lst =
     | t::lst ->
       let s = List.fold_left inter t lst in
       let lst = (t::lst)
-      |> List.map (fun t -> Cduce.diff t s)
+      |> List.map (fun t -> Cduce.diff_o t s)
       |> aux
       in
       s::lst

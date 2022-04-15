@@ -35,13 +35,13 @@ val single_char : char -> typ
 val single_string : string -> typ
 val var_typ : var -> typ
 
+val neg : typ -> typ
 val cup : typ -> typ -> typ
 val cap : typ -> typ -> typ
+val diff : typ -> typ -> typ
 val cup_o : typ -> typ -> typ
 val cap_o : typ -> typ -> typ
-
-val diff : typ -> typ -> typ
-val neg : typ -> typ
+val diff_o : typ -> typ -> typ
 
 val mk_atom : string -> typ
 val mk_new_typ: unit -> node

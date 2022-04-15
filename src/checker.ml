@@ -277,7 +277,7 @@ let rec infer_a' pos tenv env anns a t =
                     assert (has_absent si |> not) ;
                     let env = Env.add v si env in
                     let (anns, gammas) = infer_iterated tenv env (SplitAnnot.apply va si) e w in
-                    let changes = are_current_env gammas |> not in
+                    let changes = (gammas = [] || are_current_env gammas) |> not in
                     let splits = project v gammas |> partition in
                     let va = List.map (fun s -> (s, anns)) splits in
                     (va, eliminate v gammas, changes)
@@ -288,8 +288,9 @@ let rec infer_a' pos tenv env anns a t =
                 let gammas = List.flatten gammass |> add_current_env envr in
                 let changes = List.exists identity changess in
                 (anns, gammas, changes)
-              else (* AbsResJokerPropagate *)
+              else begin (* AbsResJokerPropagate *)
                 (anns, gammas, false)
+              end
             | ([], arrows) -> (* Abs *)
               let splits = splits@(List.map fst arrows) in
               let splits = List.map (fun s -> cap_o s maxdom) splits |> partition in

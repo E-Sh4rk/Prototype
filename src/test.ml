@@ -1205,10 +1205,11 @@ let ho_fetish_ill = fun f -> fun g -> fun x -> if g x is Int then f (g x) else 0
    &( ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b | 0 )
 *)
 
-let ho_fetish_explicit = fun   ( ( ('a & Int -> 'b ) -> ( 'c -> 'a & Int) -> 'c -> 'b )
+(*let ho_fetish_explicit = fun   ( ( ('a & Int -> 'b ) -> ( 'c -> 'a & Int) -> 'c -> 'b )
                           &( Any -> ('c -> 'a \ Int) -> 'c -> 0 )
                           &( ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b | 0 ) 
                          ) f g x -> if g x is Int then f (g x) else 0
+*)
 
 let ho2 = fun f -> fun x -> if x is Int then (f x) + x else lnot x
 
@@ -1249,9 +1250,9 @@ let aliasing_ill = fun f x ->
   let z = if bool then x else x in
   if f z is Int then f z else x
 
-let aliasing_explicit = fun ((('a -> ~Int) -> 'a -> 'a) & (('a -> Int&'b) -> 'a -> Int&'b) & (('a -> 'b) -> 'a -> 'a|'b)) f x ->
+(*let aliasing_explicit = fun ((('a -> ~Int) -> 'a -> 'a) & (('a -> Int&'b) -> 'a -> Int&'b) & (('a -> 'b) -> 'a -> 'a|'b)) f x ->
   let z = if bool then x else x in
-  if f z is Int then f z else x
+  if f z is Int then f z else x*)
 
 (*****************************************
 *                                        *

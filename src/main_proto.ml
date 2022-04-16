@@ -21,8 +21,7 @@ let print_ill_typed (pos, str) =
 let print_result str =
   Format.fprintf !std_fmt "%s@?" str
 
-  (* TODO: Improve lazy system so that it works with: *)
-  (* let bad = fun x -> if x is Int then x else (42 3) *)
+  (* TODO: Fix performance issues with ho_fetish_explicit and aliasing_explicit *)
 let type_check_program
   (program:Ast.parser_program) (pr:string -> unit) pr_logs pr_ill_typed =
   let test_def (tenv,varm,env) (name,parsed_expr) =

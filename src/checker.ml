@@ -11,14 +11,14 @@ exception Ill_typed of Position.t list * string
 
 let pp_splits = Utils.pp_list Cduce.pp_typ
 
-(*let pp_splits fmt splits =
+(*let count_conjuncts t =
+  let f (_, (p,n)) = (List.length p) + (List.length n) in
+  Cduce.full_dnf t |> List.map f
+let sum_conjuncts t =
+  count_conjuncts t |> List.fold_left (fun acc i -> acc+i) 0
+let pp_splits fmt splits =
   let pp_int fmt = Format.fprintf fmt "%i" in
-  let nb =
-    splits |> List.map (fun t ->
-      dnf t |> List.fold_left (fun acc arrows -> acc + (List.length arrows)) 0
-    )
-    in
-  (pp_list pp_int) fmt nb*)
+  (pp_list pp_int) fmt (List.map sum_conjuncts splits)*)
 
 let splits_domain splits domain =
   Format.asprintf "Splits: %a - Domain: %a"

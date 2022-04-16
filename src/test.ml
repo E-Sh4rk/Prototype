@@ -1294,9 +1294,9 @@ let not_so_bad = fun x ->
   if (if x is 42 then x else x) is Int then x + 1 else 3                               
 
 
- (* this function works with the old system but not with the new one *)
+(* this function works with the old system but not with the new one *)
 
- let really_bad = fun x -> if x is Int then x + 1 else (42 3) 
+let really_bad = fun x -> if x is Int then x + 1 else (42 3)
 
 let bad_again = fun x -> fun y ->
   if y is Int then y+1 else x+1

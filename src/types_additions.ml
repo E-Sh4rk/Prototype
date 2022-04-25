@@ -380,7 +380,7 @@ let triangle_exact f out =
             in*)
             let rec possible_inputs current_set lst =
                 let t = List.map snd current_set in
-                if subtype (conj t) out then [conj (List.map fst current_set)]
+                if t <> [] && subtype (conj t) out then [conj (List.map fst current_set)]
                 else begin
                     let aux (e,lst) = possible_inputs (e::current_set) lst in
                     List.flatten (List.map aux (take_one lst))

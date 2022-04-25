@@ -484,6 +484,7 @@ let rec infer_a' pos tenv env anns a t =
               arrows |> List.filter_map (fun (si,_) ->
                 Env_refinement.refine v2 (cap_o si s) envr
               ) in
+            (*let gammas = [Env_refinement.refine v2 s envr] |> filter_options in*)
             (anns, gammas, false)
           | [_] when defined -> (* AppRefineL *)
             let arrow_type = mk_arrow (cons (cap vt2 (joker ()))) (cons t) in

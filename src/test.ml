@@ -1199,6 +1199,23 @@ let ho0_moreexpl = fun  (((True -> 'a) -> True -> 'a) & (Any -> False -> True)) 
 
 let ho_fetish_ill = fun f -> fun g -> fun x -> if g x is Int then f (g x) else 0
 
+(* obtained monomorphic type:
+  
+   (Any \ (Int -> Any) -> ((Any -> Any \ Int) & (Any -> Any)) -> Any -> 0) &
+   ((Int -> Any) -> (Any -> Any) -> Any -> Any)
+
+not very precise. I would like
+
+   ( Any \ (Int -> Any) -> ( Any -> Any \ Int) -> Any -> 0) &
+   ((Int -> True) -> (Any -> Int) -> Any -> True) &                                       
+   ((Int -> False) -> (Any -> Any) -> Any -> False | 0)
+
+ *)
+let ho_fetish_explicit = fun (   ( Any  -> ( Any -> Any \ Int) -> Any -> 0)
+                               & ((Int -> True) -> (Any -> Int) -> Any -> True)                                       
+                               & ((Int -> True) -> (Any -> Any) -> Any -> (True | 0))
+                             ) f g x -> if g x is Int then f (g x) else 0
+    
 (*  expected type:
     ( ('a & Int -> 'b ) -> ( 'c -> 'a & Int) -> 'c -> 'b )
    &( Any -> ('c -> 'a \ Int) -> 'c -> 0 )

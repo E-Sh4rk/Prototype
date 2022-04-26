@@ -1226,8 +1226,15 @@ let ho_fetish_explicit = fun (   ( Any  -> ( Any -> Any \ Int) -> Any -> 0)
                           &( Any -> ('c -> 'a \ Int) -> 'c -> 0 )
                           &( ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b | 0 ) 
                          ) f g x -> if g x is Int then f (g x) else 0
-*)
+ *)
 
+                                      
+let ho_fetish_explicit_mono = fun  (  ( (Int -> b ) -> ( c -> Int) -> c -> b )
+                                    & ( Any -> (c -> Any \ Int) -> c -> 0 )
+                                    & ( (a -> b) -> (c -> a) -> c -> b | 0 ) 
+                                   ) f g x -> if g x is Int then f (g x) else 0
+
+                                        
 let ho2 = fun f -> fun x -> if x is Int then (f x) + x else lnot x
 
 (* expected type: (Int -> Int) -> (Int | Bool) -> (Int | Bool)

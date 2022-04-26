@@ -1222,7 +1222,8 @@ let ho_fetish_explicit = fun (   ( Any  -> ( Any -> Any \ Int) -> Any -> 0)
    &( ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b | 0 )
 *)
 
-(*let ho_fetish_explicit = fun   ( ( ('a & Int -> 'b ) -> ( 'c -> 'a & Int) -> 'c -> 'b )
+(*let ho_fetish_explicit_poly =
+              fun   ( ( ('a & Int -> 'b ) -> ( 'c -> 'a & Int) -> 'c -> 'b )
                           &( Any -> ('c -> 'a \ Int) -> 'c -> 0 )
                           &( ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b | 0 ) 
                          ) f g x -> if g x is Int then f (g x) else 0
@@ -1305,7 +1306,12 @@ let foo_highord4_wrong = fun f -> (f f) 3
 
 let foo_highord5_wrong = fun f -> (f (f 3) , f true)                           
 
-let foo_highord6_wrong = fun f -> (f (f 3) , f f true)                           
+let foo_highord6_wrong = fun f -> (f (f 3) , f f true)
+
+
+(* simple examples of higher order functions *)
+
+let simple_ho =  fun f x y b -> if b is ~True then f x else f y                 
 
 (* Does the following function type with the lazy approach? *)
 (* to type it in the "popl22" system it suffices to add     *)
@@ -1341,5 +1347,13 @@ let bad_again = fun x -> fun y ->
 *                                        *
 ******************************************)
 
-let ignore_first_arg x =
+let ignore_first_arg_1 x =
   succ ((fun y -> fun z -> z) 42 x)
+
+let ignore_first_arg_2 x =
+  succ ((fun y -> fun z -> z) x 42)
+
+let ignore_first_arg_3 x =
+  succ ((fun y -> fun z -> z) (x 42) 42)
+
+    

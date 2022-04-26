@@ -1229,9 +1229,9 @@ let ho_fetish_explicit = fun (   ( Any  -> ( Any -> Any \ Int) -> Any -> 0)
  *)
 
                                       
-let ho_fetish_explicit_mono = fun  (  ( (Int -> b ) -> ( c -> Int) -> c -> b )
-                                    & ( Any -> (c -> Any \ Int) -> c -> 0 )
-                                    & ( (a -> b) -> (c -> a) -> c -> b | 0 ) 
+let ho_fetish_explicit_mono = fun  (  ( (Int -> B ) -> ( C -> Int) -> C -> B )
+                                    & ( Any -> (C -> Any \ Int) -> C -> 0 )
+                                    & ( (A -> B) -> (C -> A) -> C -> B | 0 ) 
                                    ) f g x -> if g x is Int then f (g x) else 0
 
                                         

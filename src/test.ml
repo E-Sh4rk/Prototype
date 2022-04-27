@@ -1229,11 +1229,11 @@ let ho_fetish_explicit = fun (   ( Any  -> ( Any -> Any \ Int) -> Any -> 0)
                          ) f g x -> if g x is Int then f (g x) else 0
  *)
                                       
-let ho_fetish_expl_uncurry = fun   ( ( (('a & Int -> 'b ), ( 'c -> 'a & Int)) -> 'c -> 'b )
+(*let ho_fetish_expl_uncurry = fun   ( ( (('a & Int -> 'b ), ( 'c -> 'a & Int)) -> 'c -> 'b )
                           &( (Any , ('c -> 'a \ Int)) -> 'c -> 0 )
                           &( (('a -> 'b), ('c -> 'a)) -> 'c -> 'b | 0 ) 
                          ) f x -> if (snd f) x is Int then (fst f) ((snd f) x) else 0
-
+*)
                                       
 let ho_fetish_explicit_mono = fun  (  ( (Int -> B ) -> ( C -> Int) -> C -> B )
                                     & ( Any -> (C -> Any \ Int) -> C -> 0 )

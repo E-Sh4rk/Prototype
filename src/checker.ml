@@ -536,7 +536,7 @@ and infer' tenv env anns e' t =
         let anns = Annot (No_annot_a, SplitAnnot.create [(any_or_absent, No_annot)]) in
         infer' tenv env anns e' t
       | Annot (anns_a, va) ->
-        log "@,@[<v 1>BIND for variable %a" Variable.pp v ;
+        log "@,@[<v 1>BIND for variable %a with t=%a" Variable.pp v pp_typ t ;
         let pos = Variable.get_locations v in
         let splits = SplitAnnot.splits va in
         log "@,Initial splits: %a" pp_splits splits ;

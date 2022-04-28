@@ -1356,4 +1356,15 @@ let ignore_first_arg_2 x =
 let ignore_first_arg_3 x =
   succ ((fun y -> fun z -> z) (x 42) 42)
 
-    
+(*
+
+first two fail but should not
+
+let foo y = fst ((fun x -> ((fun y -> x)(42))) y)
+
+let foo y = fst ((fun x -> ((fun y -> x)(x))) y)
+
+this loops while should fail
+let foo y = fst ((fun x -> ((fun y -> x)(x+42))) y)
+              
+ *)

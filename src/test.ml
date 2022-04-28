@@ -1365,7 +1365,11 @@ let twisted_3 y z = succ(fst(snd(fst ((fun x -> fst (z x)) z y))))
 
 
 let foo y = fst ((fun x ->  x) y)
+              
+let foo_eta1 y = (fun z -> (fst z)) ((fun x ->  x) y)
 
+let foo_eta2 y = (fun z -> (fst ((fun w -> z) y)) ) ((fun x ->  x) y)
+                  
 
 (*
 

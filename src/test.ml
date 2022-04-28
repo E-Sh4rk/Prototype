@@ -1356,9 +1356,15 @@ let ignore_first_arg_2 x =
 let ignore_first_arg_3 x =
   succ ((fun y -> fun z -> z) (x 42) 42)
 
-let foo y = fst ((fun x -> x) y)
+let twisted_1 y z = succ(snd(fst ((fun x -> z x) (z y))))
+
+let twisted_2 y z = succ(snd(fst ((fun x -> z x) z y)))
+
+let twisted_3 y z = succ(fst(snd(fst ((fun x -> fst (z x)) z y))))                   
 
 
+
+let foo y = fst ((fun x ->  x) y)
 
 
 (*
@@ -1374,4 +1380,7 @@ let foo y = fst ((fun x -> ((fun y -> x)(x+42))) y)
 
 let foo ( y : (Any,Any)) = fst ((fun x -> ((fun y -> x)(x+42))) y)              
 
-*)
+ *)
+          
+                   
+

@@ -28,6 +28,4 @@ setup.log
 # Local OPAM switch
 _opam/
 
-#Extra
-src/html/prototype_js.js
 

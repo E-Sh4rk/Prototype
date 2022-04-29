@@ -1370,7 +1370,10 @@ let foo_eta1 y = (fun z -> (fst z)) ((fun x ->  x) y)
 
 let foo_eta2 y = (fun z -> (fst ((fun w -> z) y)) ) ((fun x ->  x) y)
                   
-(* first two fail but should not *)
+(* TODO: these two fail but should not. It is due to the fact that an annotation for the application (fun y -> x)(42),
+in a "jokerized" branch assuming that the result must be a pair, is merged with the "main" branch
+(the makes no assumption on the return type) and thus replaces its annotations,
+making it incorrect with the assumptions of the main branch. *)
 
 (*let foo y = fst ((fun x -> ((fun y -> x)(42))) y)*)
 

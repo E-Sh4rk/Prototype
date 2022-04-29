@@ -1370,21 +1370,20 @@ let foo_eta1 y = (fun z -> (fst z)) ((fun x ->  x) y)
 
 let foo_eta2 y = (fun z -> (fst ((fun w -> z) y)) ) ((fun x ->  x) y)
                   
+(* first two fail but should not *)
 
+(*let foo y = fst ((fun x -> ((fun y -> x)(42))) y)*)
+
+(*let foo y = fst ((fun x -> ((fun y -> x)(x))) y)*)
+
+(* TODO: these two loop while they should fail. This is due to the fact that while typing the body of lamba x,
+    succ is asked to be refined. It goes up but does not refine it as it is constant, but then by going back
+    to the typing of lambda x, it retries the same refinement again and again
+    (in this case it seems to be due to the fact that there are two versions of the jokerized constraint on lambda x,
+    and when one ask the refinement, the other forget the branch because untypable, and the roles are exchanged the next time) *)
 (*
-
-first two fail but should not
-
-let foo y = fst ((fun x -> ((fun y -> x)(42))) y)
-
-let foo y = fst ((fun x -> ((fun y -> x)(x))) y)
-
-these two loop while they should fail
-let foo y = fst ((fun x -> ((fun y -> x)(x+42))) y)
+let succ = <Int->Int>
+let foo y = fst ((fun x -> ((fun y -> x)(succ x))) y)
 
 let foo ( y : (Any,Any)) = fst ((fun x -> ((fun y -> x)(x+42))) y)              
-
  *)
-          
-                   
-

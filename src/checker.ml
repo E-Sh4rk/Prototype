@@ -168,7 +168,8 @@ and typeof tenv env anns e =
 (* ===== Refine ===== *)
 
 let refine_a tenv env a t =
-  if has_absent t then [env]
+  assert (has_absent t |> not) ;
+  if is_empty t then []
   else match a with
   | Abstract s -> if disjoint s t then [] else [env]
   | Const c -> if disjoint (typeof_const_atom tenv c) t then [] else [env]
@@ -209,9 +210,12 @@ let refine_a tenv env a t =
         option_chain [Env_refinement.refine v1 t1 ; Env_refinement.refine v2 t2]
     )
   | Ite (v, s, x1, x2) ->
-    [ env |> option_chain [Env_refinement.refine v s       ; Env_refinement.refine x1 t] ;
-      env |> option_chain [Env_refinement.refine v (neg s) ; Env_refinement.refine x2 t] ]
-    |> filter_options
+    let vt = Env_refinement.find v env in
+    if is_empty vt then []
+    else
+      [ env |> option_chain [Env_refinement.refine v s       ; Env_refinement.refine x1 t] ;
+        env |> option_chain [Env_refinement.refine v (neg s) ; Env_refinement.refine x2 t] ]
+      |> filter_options
   | Lambda _ ->
     if disjoint arrow_any t then [] else [env]
   | Let (v1, v2) ->

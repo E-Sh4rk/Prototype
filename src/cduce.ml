@@ -222,6 +222,7 @@ let full_dnf t =
 
 let mk_var name = CD.Var.mk name
 let vars = CD.Types.Subst.vars
+let top_vars = CD.Types.Subst.top_vars
 let var_name = CD.Var.name
 let var_set = CD.Var.Set.from_list
 let substitute = CD.Types.Subst.apply

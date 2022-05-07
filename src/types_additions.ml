@@ -424,19 +424,30 @@ let remove_field_info t label =
 
 (* Operations on vars *)
 
-let reserved_name_for_joker = "*"
-let joker () = mk_var reserved_name_for_joker |> var_typ
-let jokers t =
-    vars t |> List.filter (fun v -> String.equal (var_name v) reserved_name_for_joker)
+type joker_kind = Min | Max
+let reserved_name_for_joker t =
+    match t with
+    | Min -> "-"
+    | Max -> "+"
 
-let substitute_jokers t t_subs =
-    let subst = jokers t |> List.map (fun j -> (j,t_subs)) |> mk_subst in
+let joker k = mk_var (reserved_name_for_joker k) |> var_typ
+let jokers k t =
+    vars t |> List.filter (fun v -> String.equal (var_name v) (reserved_name_for_joker k))
+let top_jokers k t =
+    top_vars t |> List.filter (fun v -> String.equal (var_name v) (reserved_name_for_joker k))
+
+let substitute_jokers k t t_subs =
+    let subst = jokers k t |> List.map (fun j -> (j,t_subs)) |> mk_subst in
+    substitute subst t
+
+let substitute_top_jokers k t t_subs =
+    let subst = top_jokers k t |> List.map (fun j -> (j,t_subs)) |> mk_subst in
     substitute subst t
 
 let required_part_of_branch (a,b) =
     if is_empty a then Some (a, b)
     else
-        let js = jokers a in
+        let js = top_jokers Max a in
         let subst = js |> List.map (fun j -> (j, empty)) |> mk_subst in
         let a = substitute subst a in
         if is_empty a then None else Some (a,b)

@@ -94,10 +94,14 @@ val remove_field_info : typ -> string -> typ
 
 (* Operations on vars *)
 
-val reserved_name_for_joker : string
+type joker_kind = Min | Max
+val reserved_name_for_joker : joker_kind -> string
 
-val joker : unit -> typ
-val jokers : typ -> var list
+val joker : joker_kind -> typ
+val jokers : joker_kind -> typ -> var list
+val top_jokers : joker_kind -> typ -> var list
 
-val substitute_jokers : typ -> typ -> typ
+val substitute_jokers : joker_kind -> typ -> typ -> typ
+val substitute_top_jokers : joker_kind -> typ -> typ -> typ
+
 val share_jokerized_arrows : typ list -> typ list

@@ -250,10 +250,6 @@ let add_current_env envr gammas =
 
 let merge_annots_a = Annotations.merge_annots_a
 
-let subst_jokers t subs_t =
-  let s = jokers t |> List.map (fun j -> (j,subs_t)) |> mk_subst in
-  substitute s t
-
 let rec infer_a' pos tenv env anns a t =
   let envr = Env_refinement.empty env in
   let type_lambda v e t ~maxdom ~fixeddom =
@@ -264,7 +260,7 @@ let rec infer_a' pos tenv env anns a t =
     | Various _ -> assert false
     | Annot_a va ->
       let splits = SplitAnnot.splits va in
-      let jokers = splits |> List.map jokers |> List.concat |> var_set in
+      let jokers = splits |> List.map (jokers Max) |> List.concat |> var_set in
       if List.length jokers >= 1
       then (* AbsArgJoker *)
         let s = if fixeddom then empty else any in
@@ -288,7 +284,7 @@ let rec infer_a' pos tenv env anns a t =
               if are_current_env gammas
               then (* AbsResJoker *)
                 let va = match anns with Annot_a va -> va | _ -> assert false in
-                let u = substitute_jokers u maxdom in
+                let u = substitute_jokers Max u maxdom in
                 let splits =
                   (diff_o u (SplitAnnot.dom va))::(SplitAnnot.splits va)
                   |> List.map (cap_o u)
@@ -334,7 +330,7 @@ let rec infer_a' pos tenv env anns a t =
               let gammas = List.flatten gammass in
               let changes = List.exists identity changess in
               let covered = SplitAnnot.dom va in
-              let covered = if fixeddom then substitute_jokers covered empty else covered in
+              let covered = if fixeddom then substitute_jokers Max covered empty else covered in
               if subtype (domain t) covered
               then (Annot_a va, gammas, changes)
               else begin (* AbsUntypable *)
@@ -365,7 +361,7 @@ let rec infer_a' pos tenv env anns a t =
     let gammas = if subtype any t then add_current_env envr gammas else gammas in
     (anns, gammas, changes)
   end else begin
-    let max_t = subst_jokers t empty in  
+    let max_t = substitute_jokers Max t empty in  
     begin match a with
     | Abstract s when subtype s max_t ->
       (No_annot_a, [envr], false)
@@ -497,7 +493,7 @@ let rec infer_a' pos tenv env anns a t =
             (*let gammas = [Env_refinement.refine v2 s envr] |> filter_options in*)
             (anns, gammas, false)
           | [_] when defined -> (* AppRefineL *)
-            let arrow_type = mk_arrow (cons (cap vt2 (joker ()))) (cons t) in
+            let arrow_type = mk_arrow (cons (cap vt2 (joker Max))) (cons t) in
             let gammas = [Env_refinement.refine v1 arrow_type envr] |> filter_options in
             (Various (VTyp (cap_o t t')), gammas, false)
           | lst -> (* AppSplitL *)
@@ -572,7 +568,7 @@ and infer' tenv env anns e' t =
               log "@,The definition has been successfully annotated." ;
               let s = try_typeof_a pos tenv env anns_a a in
               log "@,Type of the definition: %a" Cduce.pp_typ s ;
-              let jokers = splits |> List.map jokers |> List.concat |> var_set in
+              let jokers = splits |> List.map (jokers Max) |> List.concat |> var_set in
               if List.length jokers >= 1
               then begin (* BindDefJoker *)
                 log "@,Splits contain jokers. They have been removed from the annotations." ;

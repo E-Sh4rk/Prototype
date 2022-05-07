@@ -167,24 +167,27 @@ and typeof tenv env anns e =
 
 (* ===== Refine ===== *)
 
-let refine_a tenv env a t =
+let refine_a ~sufficient tenv env a t =
   assert (has_absent t |> not) ;
-  if is_empty t then []
-  else match a with
-  | Abstract s -> if disjoint s t then [] else [env]
-  | Const c -> if disjoint (typeof_const_atom tenv c) t then [] else [env]
-  | Pair (v1, v2) ->
+  if is_empty t && not sufficient then []
+  else if subtype any t && sufficient then [env]
+  else match a, sufficient with
+  | Abstract s, false -> if disjoint s t then [] else [env]
+  | Abstract s, true -> if subtype s t then [env] else []
+  | Const c, false -> if disjoint (typeof_const_atom tenv c) t then [] else [env]
+  | Const c, true -> if subtype (typeof_const_atom tenv c) t then [env] else []
+  | Pair (v1, v2), _ ->
     split_pair t
     |> List.filter_map (
       fun (t1, t2) ->
         env |>
         option_chain [Env_refinement.refine v1 t1 ; Env_refinement.refine v2 t2]
     )
-  | Projection (Fst, v) -> [Env_refinement.refine v (mk_times (cons t) any_node) env] |> filter_options
-  | Projection (Snd, v) -> [Env_refinement.refine v (mk_times any_node (cons t)) env] |> filter_options
-  | Projection (Field label, v) ->
+  | Projection (Fst, v), _ -> [Env_refinement.refine v (mk_times (cons t) any_node) env] |> filter_options
+  | Projection (Snd, v), _ -> [Env_refinement.refine v (mk_times any_node (cons t)) env] |> filter_options
+  | Projection (Field label, v), _ ->
     [Env_refinement.refine v (mk_record true [label, cons t]) env] |> filter_options
-  | RecordUpdate (v, label, None) ->
+  | RecordUpdate (v, label, None), _ ->
     let t = cap_o t (record_any_without label) in
     split_record t
     |> List.filter_map (
@@ -192,7 +195,7 @@ let refine_a tenv env a t =
           let ti = remove_field_info ti label in
           Env_refinement.refine v ti env
     )
-  | RecordUpdate (v, label, Some x) ->
+  | RecordUpdate (v, label, Some x), _ ->
     split_record t
     |> List.filter_map (
       fun ti ->
@@ -201,24 +204,27 @@ let refine_a tenv env a t =
         env |>
         option_chain [Env_refinement.refine v ti ; Env_refinement.refine x field_type]
       )
-  | App (v1, v2) ->
+  | App (v1, v2), _ ->
     let t1 = Env_refinement.find v1 env in
-    square_split t1 t
+    (if sufficient then triangle_split t1 t else square_split t1 t)
     |> List.filter_map (
       fun (t1, t2) ->
         env |>
         option_chain [Env_refinement.refine v1 t1 ; Env_refinement.refine v2 t2]
     )
-  | Ite (v, s, x1, x2) ->
+  | Ite (v, s, x1, x2), _ ->
     let vt = Env_refinement.find v env in
-    if is_empty vt then []
+    if is_empty vt
+    then (if sufficient then [env] else [])
     else
       [ env |> option_chain [Env_refinement.refine v s       ; Env_refinement.refine x1 t] ;
         env |> option_chain [Env_refinement.refine v (neg s) ; Env_refinement.refine x2 t] ]
       |> filter_options
-  | Lambda _ ->
+  | Lambda _, false ->
     if disjoint arrow_any t then [] else [env]
-  | Let (v1, v2) ->
+  | Lambda _, true ->
+    if subtype arrow_any t then [env] else []
+  | Let (v1, v2), _ ->
     [ env |>
     option_chain [Env_refinement.refine v1 any ; Env_refinement.refine v2 t]]
     |> filter_options
@@ -590,7 +596,7 @@ and infer' tenv env anns e' t =
                   if subtype s any && List.length splits > 1
                   then
                     splits |>
-                    List.map (fun si -> refine_a tenv envr a si) |>
+                    List.map (fun si -> refine_a ~sufficient:false tenv envr a si) |>
                     List.concat
                   else [envr]
                 in

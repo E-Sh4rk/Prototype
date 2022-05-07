@@ -428,18 +428,6 @@ let reserved_name_for_joker = "*"
 let joker () = mk_var reserved_name_for_joker |> var_typ
 let jokers t =
     vars t |> List.filter (fun v -> String.equal (var_name v) reserved_name_for_joker)
-let floor t =
-    let vs =
-        vars t |> List.filter
-        (fun v -> String.equal (var_name v) reserved_name_for_joker |> not)
-    in
-    min_typ vs t
-let ceil t =
-    let vs =
-        vars t |> List.filter
-        (fun v -> String.equal (var_name v) reserved_name_for_joker |> not)
-    in
-    max_typ vs t
 
 let substitute_jokers t t_subs =
     let subst = jokers t |> List.map (fun j -> (j,t_subs)) |> mk_subst in

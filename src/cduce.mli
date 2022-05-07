@@ -82,8 +82,6 @@ val mk_var : string -> var
 val vars : typ -> var list
 val var_name : var -> string
 val var_set : var list -> var list
-val min_typ : var list -> typ -> typ
-val max_typ : var list -> typ -> typ
 val substitute : subst -> typ -> typ
 val mk_subst : (var * typ) list -> subst
 

@@ -224,9 +224,5 @@ let mk_var name = CD.Var.mk name
 let vars = CD.Types.Subst.vars
 let var_name = CD.Var.name
 let var_set = CD.Var.Set.from_list
-let min_typ =
-  CD.Types.Subst.min_type
-let max_typ =
-  CD.Types.Subst.max_type
 let substitute = CD.Types.Subst.apply
 let mk_subst = CD.Types.Subst.from_list

@@ -3,7 +3,7 @@ open Msc
 open Types_additions
 open Variable
 open Utils
-open Annotations
+open Partitioned_annotations
 
 exception Ill_typed of Position.t list * string
 
@@ -248,7 +248,7 @@ let add_current_env envr gammas =
   if List.exists Env_refinement.is_empty gammas
   then gammas else envr::gammas
 
-let merge_annots_a = Annotations.merge_annots_a
+let merge_annots_a = Partitioned_annotations.merge_annots_a
 
 let rec infer_a' pos tenv env anns a t =
   let envr = Env_refinement.empty env in

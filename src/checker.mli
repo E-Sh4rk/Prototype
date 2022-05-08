@@ -1,7 +1,7 @@
 open Msc
 open Types_additions
 open Cduce
-open Annotations
+open Partitioned_annotations
 
 exception Ill_typed of Position.t list * string
 

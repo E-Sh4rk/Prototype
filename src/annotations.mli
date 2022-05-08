@@ -1,39 +1,36 @@
-
-val partition : Cduce.typ list -> Cduce.typ list
-
-type various =
-    | VTyp of Cduce.typ
-
 type 'a annot_a' =
-    | No_annot_a
-    | Various of various
-    | Annot_a of 'a
+    | EmptyAtomA
+    | UntypAtomA
+    | AppA of Cduce.typ * bool
+    | LambdaA of 'a
 
-type 'a annot' =
-    | No_annot
-    | Annot of ('a annot_a' * 'a)
+type ('a, 'b) annot' =
+    | EmptyA
+    | UntypA
+    | BindA of ('a annot_a' * 'b)
 
-module SplitAnnot : sig
+module rec LambdaSA : sig
     type t
-    val create : (Cduce.typ * (t annot')) list -> t
+    val empty : unit -> t
+    val destruct : t -> Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ)
+    val add : t -> Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ) -> t
+    val construct : (Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ)) list -> t
+    val map_top : (Cduce.typ -> Cduce.typ) -> t -> t
+    val enrich : t -> (Cduce.typ * Cduce.typ) list -> t
+end
+and BindSA : sig
+    type t
+    val empty : unit -> t
+    val destruct : t -> Cduce.typ * (t,BindSA.t) annot'
+    val add : t -> Cduce.typ * (t,BindSA.t) annot' -> t
+    val construct : (Cduce.typ * (t,BindSA.t) annot') list -> t
+    val map_top : (Cduce.typ -> Cduce.typ) -> t -> t
     val splits : t -> Cduce.typ list
     val dom : t -> Cduce.typ
-    val apply : t -> Cduce.typ -> t annot'
-    val destruct : t -> (Cduce.typ * (t annot')) list
-    (*val floor : t -> t
-    val ceil : t -> t*)
 end
 
-type annot_a = SplitAnnot.t annot_a'
-type annot = SplitAnnot.t annot'
-
-val merge_annots_a : annot_a -> annot_a -> annot_a
-val map_annot_a : (Cduce.typ -> Cduce.typ) -> annot_a -> annot_a
-val map_annot : (Cduce.typ -> Cduce.typ) -> annot -> annot
-val map_sa : (Cduce.typ -> Cduce.typ) -> SplitAnnot.t -> SplitAnnot.t
-val subst_annot_a : Cduce.subst -> annot_a -> annot_a
-val subst_annot : Cduce.subst -> annot -> annot
-val subst_sa : Cduce.subst -> SplitAnnot.t -> SplitAnnot.t
+type annot_a = LambdaSA.t annot_a'
+type annot = (LambdaSA.t, BindSA.t) annot'
 
 val pp_annot_a : Format.formatter -> annot_a -> unit
 val pp_annot : Format.formatter -> annot -> unit

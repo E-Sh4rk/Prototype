@@ -58,9 +58,9 @@ end
 and BindSA : sig
   type t
   val empty : unit -> t
-  val destruct : t -> (Cduce.typ * (t,BindSA.t) annot') list
-  val add : t -> Cduce.typ * (t,BindSA.t) annot' -> t
-  val construct : (Cduce.typ * (t,BindSA.t) annot') list -> t
+  val destruct : t -> (Cduce.typ * (LambdaSA.t, t) annot') list
+  val add : t -> Cduce.typ * (LambdaSA.t, t) annot' -> t
+  val construct : (Cduce.typ * (LambdaSA.t, t) annot') list -> t
   val map_top : (Cduce.typ -> Cduce.typ) -> t -> t
   val splits : t -> Cduce.typ list
   val dom : t -> Cduce.typ
@@ -69,12 +69,22 @@ end = struct
   type t = T of (Cduce.typ * (LambdaSA.t, t) annot') list
   [@@deriving show]
   let empty () = T []
-  let destruct = failwith "TODO"
-  let add = failwith "TODO"
-  let construct = failwith "TODO"
-  let map_top = failwith "TODO"
-  let splits = failwith "TODO"
-  let dom = failwith "TODO"
+  let destruct (T lst) = lst
+  let add (T lst) (s, a) =
+    if List.exists (fun (s', a') ->
+      annot_equals_approx a a' && Cduce.equiv s s') lst
+    then T lst
+    else T ((s, a)::lst)
+  let construct lst =
+    List.fold_left add (empty ()) lst
+  let map_top f (T lst) =
+    lst |> List.map (fun (s, a) -> (f s, a))
+    (* |> construct*)
+    |> (fun res -> T res)
+  let splits (T lst) =
+    List.map fst lst
+  let dom t =
+    splits t |> Types_additions.disj
 end
 
 type annot_a = LambdaSA.t annot_a'

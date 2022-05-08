@@ -44,15 +44,6 @@ let leq env1 env2 =
 
 let equiv env1 env2 = leq env1 env2 && leq env2 env1
 
-let disjoint env1 env2 =
-  let dom1 = domain env1 |> VarSet.of_list in
-  let dom2 = domain env2 |> VarSet.of_list in
-  VarSet.exists (fun v ->
-    if VarMap.mem v env1 && VarMap.mem v env2
-    then VarMap.find v env2 |> Cduce.disjoint (VarMap.find v env1)
-    else false
-  ) (VarSet.union dom1 dom2)
-
 let pp fmt env =
   VarMap.bindings env
   |> List.iter (fun (v, t) ->

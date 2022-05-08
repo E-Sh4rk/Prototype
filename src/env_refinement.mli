@@ -18,6 +18,11 @@ val find : Variable.t -> t -> typ
 
 val to_env : t -> Env.t
 
+val equiv : t -> t -> bool
+(* Assumes that the base environment is the same. *)
+(* Use Env_refinement.to_env and Env.equiv if it is not the case. *)
+val leq : t -> t -> bool
+
 val show : t -> string
 val pp : Format.formatter -> t -> unit
 val pp_filtered : string list -> Format.formatter -> t -> unit

@@ -21,7 +21,7 @@ let print_ill_typed (pos, str) =
 let print_result str =
   Format.fprintf !std_fmt "%s@?" str
 
-  (* TODO: Fix performance issues with ho_fetish_explicit and aliasing_explicit *)
+(* TODO: Fix performance issues with ho_fetish_explicit and aliasing_explicit *)
 let type_check_program
   (program:Ast.parser_program) (pr:string -> unit) pr_logs pr_ill_typed =
   let test_def (tenv,varm,env) (name,parsed_expr) =
@@ -42,7 +42,7 @@ let type_check_program
       Utils.log_enabled := tmp_log ;
       try
         (*Format.printf "%a@." pp_e nf_expr ;*)
-        let typ = Checker.typeof_simple tenv env nf_expr in
+        let typ = Partitioned_checker.typeof_simple tenv env nf_expr in
         let time2 = Unix.gettimeofday () in
         let msc_time = (time1 -. time0 ) *. 1000. in
         let typ_time = (time2 -. time1) *. 1000. in
@@ -60,7 +60,7 @@ let type_check_program
             (Cduce.string_of_type t)
         end ;
         pr_logs () ; (varm, env)
-      with Checker.Ill_typed (pos, str) ->
+      with Partitioned_checker.Ill_typed (pos, str) ->
         (*Format.printf "%a@." pp_e nf_expr ;*)
         pr_ill_typed (pos, str);
         begin match typ_legacy with

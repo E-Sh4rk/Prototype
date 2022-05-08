@@ -52,6 +52,9 @@ let to_env (b,r) =
       Env.add x t b
     ) b (Env.domain r)
 
+let leq (_,r1) (_,r2) = Env.leq r1 r2
+let equiv env1 env2 = leq env1 env2 && leq env2 env1
+
 let show (_,r) = Env.show r
 let pp fmt (_,r) = Env.pp fmt r
 let pp_filtered lst fmt (_,r) = Env.pp_filtered lst fmt r

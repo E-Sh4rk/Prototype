@@ -19,7 +19,6 @@ val filter : (Variable.t -> typ -> bool) -> t -> t
 
 val equiv : t -> t -> bool
 val leq : t -> t -> bool
-val disjoint : t -> t -> bool
 
 val show : t -> string
 val pp : Format.formatter -> t -> unit

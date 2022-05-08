@@ -150,7 +150,7 @@ and typeof ~legacy tenv env e =
       end
     end
 
-let refine_a = Checker.refine_a
+let refine_a = Partitioned_checker.refine_a
 
 let propagate tenv x a gammas =
   gammas |>

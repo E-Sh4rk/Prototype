@@ -12,16 +12,16 @@ type ('a, 'b) annot' =
 module rec LambdaSA : sig
     type t
     val empty : unit -> t
-    val destruct : t -> Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ)
+    val destruct : t -> (Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ)) list
     val add : t -> Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ) -> t
     val construct : (Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ)) list -> t
-    val map_top : (Cduce.typ -> Cduce.typ) -> t -> t
+    val map_top : (Cduce.typ -> Cduce.typ) -> (Cduce.typ -> Cduce.typ) -> t -> t
     val enrich : t -> (Cduce.typ * Cduce.typ) list -> t
 end
 and BindSA : sig
     type t
     val empty : unit -> t
-    val destruct : t -> Cduce.typ * (t,BindSA.t) annot'
+    val destruct : t -> (Cduce.typ * (t,BindSA.t) annot') list
     val add : t -> Cduce.typ * (t,BindSA.t) annot' -> t
     val construct : (Cduce.typ * (t,BindSA.t) annot') list -> t
     val map_top : (Cduce.typ -> Cduce.typ) -> t -> t

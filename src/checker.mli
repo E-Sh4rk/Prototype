@@ -14,3 +14,4 @@ val refine_a : sufficient:bool -> type_env ->
 
 val regroup : Variable.t -> (Env_refinement.t * 'a) list ->
     (Env_refinement.t * (Cduce.typ * 'a) list) list
+val try_typeof_a : Position.t list -> type_env -> Env.t -> annot_a -> a -> typ

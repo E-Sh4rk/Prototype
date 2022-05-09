@@ -7,14 +7,12 @@ type 'a annot_a' =
 
 type ('a, 'b) annot' =
   | EmptyA
-  | UntypA
   | BindA of ('a annot_a' * 'b)
   [@@deriving show]
 
 let annot_equals_approx a1 a2 =
   match a1, a2 with
   | EmptyA, EmptyA -> true
-  | UntypA, UntypA -> true
   | _, _ -> false
 
 module rec LambdaSA : sig

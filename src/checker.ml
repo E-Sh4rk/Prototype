@@ -36,7 +36,6 @@ let var_type pos v env =
 let get_bind_annots pos v anns =
   match anns with
   | EmptyA -> raise (Ill_typed (pos, "No annotation for variable "^(Variable.show v)^"."))
-  | UntypA -> raise (Ill_typed (pos, "Untypable annotation for variable "^(Variable.show v)^"."))
   | BindA anns -> anns
 
 let get_lambda_annots pos v anns =
@@ -46,6 +45,11 @@ let get_lambda_annots pos v anns =
   | AppA _ -> raise (Ill_typed (pos, "Unrelevant annotation for variable "^(Variable.show v)^"."))
   | LambdaA anns -> anns
 
+let treat_untypable_annot_a pos anns =
+  match anns with
+  | UntypAtomA -> raise (Ill_typed (pos, "Untypable annotation."))
+  | _ -> ()
+
 (* ===== TYPEOF ===== *)
 
 let typeof_const_atom tenv c =
@@ -54,6 +58,7 @@ let typeof_const_atom tenv c =
   | c -> Ast.const_to_typ c
 
 let rec typeof_a pos tenv env anns a =
+  treat_untypable_annot_a pos anns ;
   let type_lambda env v e =
     let va = get_lambda_annots pos v anns in
     let splits = LambdaSA.splits va in
@@ -248,3 +253,7 @@ let regroup v res =
     ) in
     (gamma, anns)
   )
+
+let try_typeof_a pos tenv env anns a =
+  try typeof_a pos tenv env anns a
+  with Ill_typed _ -> any_or_absent

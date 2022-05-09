@@ -6,7 +6,6 @@ type 'a annot_a' =
 
 type ('a, 'b) annot' =
     | EmptyA
-    | UntypA
     | BindA of ('a annot_a' * 'b)
 
 module rec LambdaSA : sig

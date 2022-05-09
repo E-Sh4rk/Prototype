@@ -51,7 +51,11 @@ end = struct
     |> Types_additions.conj in
     let annot (s',t') =
       let t' = Cduce.mk_arrow (Cduce.cons s') (Cduce.cons t') in
-      if Cduce.subtype t t' then None else Some (s', (EmptyA, t'))
+      if Cduce.subtype t t' then None
+      else
+        let s' = Types_additions.substitute_top_jokers Types_additions.Max s' Cduce.any in
+        let t' = Types_additions.substitute_top_jokers Types_additions.Min t' Cduce.any in
+        Some (s', (EmptyA, t'))
     in
     let new_anns = List.filter_map annot ts in
     List.fold_left add (T lst) new_anns

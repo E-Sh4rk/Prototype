@@ -11,15 +11,6 @@ exception Ill_typed of Position.t list * string
 
 let pp_splits = Utils.pp_list Cduce.pp_typ
 
-(*let count_conjuncts t =
-  let f (_, (p,n)) = (List.length p) + (List.length n) in
-  Cduce.full_dnf t |> List.map f
-let sum_conjuncts t =
-  count_conjuncts t |> List.fold_left (fun acc i -> acc+i) 0
-let pp_splits fmt splits =
-  let pp_int fmt = Format.fprintf fmt "%i" in
-  (pp_list pp_int) fmt (List.map sum_conjuncts splits)*)
-
 let splits_domain splits domain =
   Format.asprintf "Splits: %a - Domain: %a"
     pp_splits splits Cduce.pp_typ domain
@@ -165,71 +156,8 @@ and typeof tenv env anns e =
         "Invalid splits (does not cover the initial domain). "^(splits_domain splits s)))
     end
 
-(* ===== Refine ===== *)
-
-let refine_a ~sufficient tenv env a t =
-  assert (has_absent t |> not) ;
-  if is_empty t && not sufficient then []
-  else if subtype any t && sufficient then [env]
-  else match a, sufficient with
-  | Abstract s, false -> if disjoint s t then [] else [env]
-  | Abstract s, true -> if subtype s t then [env] else []
-  | Const c, false -> if disjoint (typeof_const_atom tenv c) t then [] else [env]
-  | Const c, true -> if subtype (typeof_const_atom tenv c) t then [env] else []
-  | Pair (v1, v2), _ ->
-    split_pair t
-    |> List.filter_map (
-      fun (t1, t2) ->
-        env |>
-        option_chain [Env_refinement.refine v1 t1 ; Env_refinement.refine v2 t2]
-    )
-  | Projection (Fst, v), _ -> [Env_refinement.refine v (mk_times (cons t) any_node) env] |> filter_options
-  | Projection (Snd, v), _ -> [Env_refinement.refine v (mk_times any_node (cons t)) env] |> filter_options
-  | Projection (Field label, v), _ ->
-    [Env_refinement.refine v (mk_record true [label, cons t]) env] |> filter_options
-  | RecordUpdate (v, label, None), _ ->
-    let t = cap_o t (record_any_without label) in
-    split_record t
-    |> List.filter_map (
-      fun ti ->
-          let ti = remove_field_info ti label in
-          Env_refinement.refine v ti env
-    )
-  | RecordUpdate (v, label, Some x), _ ->
-    split_record t
-    |> List.filter_map (
-      fun ti ->
-        let field_type = get_field_assuming_not_absent ti label in
-        let ti = remove_field_info ti label in
-        env |>
-        option_chain [Env_refinement.refine v ti ; Env_refinement.refine x field_type]
-      )
-  | App (v1, v2), _ ->
-    let t1 = Env_refinement.find v1 env in
-    (if sufficient then triangle_split t1 t else square_split t1 t)
-    |> List.filter_map (
-      fun (t1, t2) ->
-        env |>
-        option_chain [Env_refinement.refine v1 t1 ; Env_refinement.refine v2 t2]
-    )
-  | Ite (v, s, x1, x2), _ ->
-    let vt = Env_refinement.find v env in
-    if is_empty vt
-    then (if sufficient then [env] else [])
-    else
-      [ env |> option_chain [Env_refinement.refine v s       ; Env_refinement.refine x1 t] ;
-        env |> option_chain [Env_refinement.refine v (neg s) ; Env_refinement.refine x2 t] ]
-      |> filter_options
-  | Lambda _, false ->
-    if disjoint arrow_any t then [] else [env]
-  | Lambda _, true ->
-    if subtype arrow_any t then [env] else []
-  | Let (v1, v2), _ ->
-    [ env |>
-    option_chain [Env_refinement.refine v1 any ; Env_refinement.refine v2 t]]
-    |> filter_options
-
 (* ===== Infer ===== *)
+let refine_a = Checker.refine_a
 
 let try_typeof_a pos tenv env anns a =
   try typeof_a pos tenv env anns a

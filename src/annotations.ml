@@ -25,6 +25,8 @@ module rec LambdaSA : sig
   val construct : (Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ)) list -> t
   val map_top : (Cduce.typ -> Cduce.typ) -> (Cduce.typ -> Cduce.typ) -> t -> t
   val enrich : t -> (Cduce.typ * Cduce.typ) list -> t
+  val splits : t -> Cduce.typ list
+  val dom : t -> Cduce.typ
   val pp : Format.formatter -> t -> unit
 end = struct
   type t = T of (Cduce.typ * ((t, BindSA.t) annot' * Cduce.typ)) list
@@ -53,6 +55,10 @@ end = struct
     in
     let new_anns = List.filter_map annot ts in
     List.fold_left add (T lst) new_anns
+  let splits (T lst) =
+    List.map fst lst
+  let dom t =
+    splits t |> Types_additions.disj
 end
 
 and BindSA : sig

@@ -117,7 +117,7 @@ end = struct
   let splits (T lst) =
     List.map fst lst
   let dom t =
-    splits t |> Types_additions.disj
+    splits t |> Types_additions.share_jokerized_arrows |> Types_additions.disj
 end
 
 type annot_a = LambdaSA.t annot_a'

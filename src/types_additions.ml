@@ -487,10 +487,11 @@ let extract_jokerized_arrows t =
     dnf t |> List.map decompose_branches |> List.map fst
     |> List.concat
 
-let add_jokerized_arrows arrows t =
+let add_joker_branch t joker =
     let non_arrow = diff t arrow_any in
-    cup non_arrow (cap t (branch_type arrows))
+    cup non_arrow (cap_o t (branch_type joker))
 
 let share_jokerized_arrows lst =
-    let arrows = lst |> List.map extract_jokerized_arrows |> List.concat in
-    List.map (add_jokerized_arrows arrows) lst
+    let jokers = lst |> List.map extract_jokerized_arrows in
+    lst |> List.map
+        (fun t -> List.fold_left add_joker_branch t jokers)

@@ -288,7 +288,6 @@ let rec infer_a' pos tenv env anns a t =
     failwith "TODO"
   end
 
-(* TODO: share_jokerized_arrows *)
 and infer' tenv env anns e' t =
   let envr = Env_refinement.empty env in
   assert (has_absent t |> not) ;

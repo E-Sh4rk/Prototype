@@ -427,7 +427,7 @@ and infer_a_iterated pos tenv env anns a t =
   | (res, true) ->
     begin match exactly_current_env res with
     | None -> res
-    | Some anns -> infer_a_iterated pos tenv env anns a t
+    | Some anns -> infer_a_iterated pos tenv env anns a (worst t)
     end
   | (res, _) -> res
 
@@ -436,7 +436,7 @@ and infer_iterated tenv env anns e t =
   | (res, true) ->
     begin match exactly_current_env res with
     | None -> res
-    | Some anns -> infer_iterated tenv env anns e t
+    | Some anns -> infer_iterated tenv env anns e t (* t should not contain jokers *)
     end
   | (res, _) -> res
 

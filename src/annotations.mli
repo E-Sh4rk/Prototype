@@ -26,6 +26,7 @@ and BindSA : sig
     val add : t -> Cduce.typ * (LambdaSA.t, t) annot' -> t
     val construct : (Cduce.typ * (LambdaSA.t, t) annot') list -> t
     val map_top : (Cduce.typ -> Cduce.typ) -> t -> t
+    val choose : t -> Cduce.typ -> t
     val splits : t -> Cduce.typ list
     val dom : t -> Cduce.typ
 end

@@ -440,6 +440,10 @@ let substitute_jokers k t t_subs =
     let subst = jokers k t |> List.map (fun j -> (j,t_subs)) |> mk_subst in
     substitute subst t
 
+let substitute_all_jokers t t_subs =
+    let t = substitute_jokers Min t t_subs in
+    substitute_jokers Max t t_subs
+
 let optimal t =
     let t = substitute_jokers Min t empty in
     substitute_jokers Max t any

@@ -102,6 +102,7 @@ val jokers : joker_kind -> typ -> var list
 val top_jokers : joker_kind -> typ -> var list
 
 val substitute_jokers : joker_kind -> typ -> typ -> typ
+val substitute_all_jokers : typ -> typ -> typ
 val optimal : typ -> typ
 val worst : typ -> typ
 val substitute_top_jokers : joker_kind -> typ -> typ -> typ

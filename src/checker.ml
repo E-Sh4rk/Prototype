@@ -272,8 +272,37 @@ let filter_res =
 let rec infer_a' pos tenv env anns a t =
   let envr = Env_refinement.empty env in
   let type_lambda v e t ~init_branch ~new_branches_maxdom =
-    ignore (v, e, t, init_branch, new_branches_maxdom) ;
-    failwith "TODO"
+    ignore (v, e, t, new_branches_maxdom) ;
+    match anns with
+    | EmptyAtomA ->
+      let splits = if init_branch then [(any, (EmptyA, any, false))] else [] in
+      let anns = LambdaA (LambdaSA.construct splits) in
+      infer_a' pos tenv env anns a t
+    | UntypAtomA -> assert false
+    | AppA _ -> assert false
+    | LambdaA va ->
+      if subtype arrow_any t
+      then begin
+        let splits = LambdaSA.destruct va in
+        log "@,Using the following split: %a" pp_splits (List.map fst splits) ;
+        let res =
+          splits |> List.map (fun (s, (anns, t, b)) ->
+            assert (has_absent s |> not) ;
+            let s = if b then worst s else substitute_all_jokers s any in
+            let env = Env.add v s env in
+            let res = infer_iterated tenv env anns e t in
+            let changes = exactly_current_env res = None in
+            let res = List.map (fun (gamma, anns) -> (gamma, (anns, t, b))) res in
+            (res, changes)
+          ) in
+          let (ress, changess) = List.split res in
+          let changes = List.exists identity changess in
+          let res = List.flatten ress |> regroup v |> List.map (
+            fun (gamma, anns_a) -> (gamma, LambdaA (LambdaSA.construct anns_a))
+          ) in
+          (res, changes)
+      end else (* AbsConstr *)
+        failwith "TODO"
   in
   if has_absent t
   then begin (* Option *)
@@ -281,22 +310,24 @@ let rec infer_a' pos tenv env anns a t =
     let (res, changes) = infer_a' pos tenv env anns a t in
     let res =
       if subtype any t && List.for_all (fun (gamma,_) -> Env_refinement.is_empty gamma |> not) res
-      then (envr, UntypAtomA)::res else res in
+      then (envr, UntypAtomA)::res else res
+    in
     (res, changes)
   end else begin
     let worst_t = worst t in
-    match a with
-    | Lambda (_, Ast.ADomain s, v, e) ->
+    match a, anns with
+    | _, UntypAtomA -> ([], false)
+    | Lambda (_, Ast.ADomain s, v, e), _ ->
       let t = cap_o t (mk_arrow (cons s) any_node) in
       type_lambda v e t ~init_branch:false ~new_branches_maxdom:s
-    | Lambda (_, Ast.Unnanoted, v, e) ->
+    | Lambda (_, Ast.Unnanoted, v, e), _ ->
       let t = cap_o t arrow_any in
       type_lambda v e t ~init_branch:true ~new_branches_maxdom:any
-    | Lambda (_, Ast.AArrow s, v, e) when subtype s worst_t ->
+    | Lambda (_, Ast.AArrow s, v, e), _ when subtype s worst_t ->
       let t = cap_o s arrow_any in
       type_lambda v e t ~init_branch:false ~new_branches_maxdom:empty
-    | Lambda _ -> ([], false)
-    | _ -> failwith "TODO"
+    | Lambda _, _ -> ([], false)
+    | _, _ -> failwith "TODO"
   end
 
 and infer' tenv env anns e' t =

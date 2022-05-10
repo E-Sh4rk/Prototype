@@ -28,7 +28,7 @@ let option_chain fs e =
   List.fold_left (fun acc f -> match acc with None -> None | Some e -> f e) (Some e) fs
   
 let identity x = x
-let filter_options elt = List.filter_map identity elt
+let filter_options x = List.filter_map identity x
 
 let rec split3 lst =
   match lst with

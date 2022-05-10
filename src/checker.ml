@@ -257,3 +257,74 @@ let regroup v res =
 let try_typeof_a pos tenv env anns a =
   try typeof_a pos tenv env anns a
   with Ill_typed _ -> any_or_absent
+
+let only_current_env lst =
+  match lst with
+  | [(gamma, anns)] when Env_refinement.is_empty gamma -> Some anns
+  | _ -> None
+
+let filter_res =
+  List.filter_map (function (None, _) -> None | (Some gamma, anns) -> Some (gamma, anns))
+
+let rec infer_a' pos tenv env anns a t =
+  let envr = Env_refinement.empty env in
+  let type_lambda v e t ~maxdom ~fixeddom =
+    ignore (v, e, t, maxdom, fixeddom) ;
+    failwith "TODO"
+  in
+  if has_absent t
+  then begin (* Option *)
+    let t = cap_o any t in
+    let (res, changes) = infer_a' pos tenv env anns a t in
+    let res =
+      if subtype any t && List.for_all (fun (gamma,_) -> Env_refinement.is_empty gamma |> not) res
+      then (envr, UntypAtomA)::res else res in
+    (res, changes)
+  end else begin
+    ignore (type_lambda, regroup) ;
+    failwith "TODO"
+  end
+
+and infer' tenv env anns e' t =
+  let envr = Env_refinement.empty env in
+  assert (has_absent t |> not) ;
+  match e' with
+  | Var v -> ([(Env_refinement.refine v t envr, EmptyA)] |> filter_res, false)
+  | Bind (_, v, a, e) ->
+    ignore (tenv, anns, v, a, e, infer_a_iterated, regroup, try_typeof_a) ;
+    failwith "TODO"
+
+and infer_a_iterated pos tenv env anns a t =
+  match infer_a' pos tenv env anns a t with
+  | (res, true) ->
+    begin match only_current_env res with
+    | None -> res
+    | Some anns -> infer_a_iterated pos tenv env anns a t
+    end
+  | (res, _) -> res
+
+and infer_iterated tenv env anns e t =
+  match infer' tenv env anns e t with
+  | (res, true) ->
+    begin match only_current_env res with
+    | None -> res
+    | Some anns -> infer_iterated tenv env anns e t
+    end
+  | (res, _) -> res
+
+let infer tenv env e =
+  let fv = fv_e e in
+  let e = VarSet.fold (fun v acc ->
+    Bind (Old_annotations.VarAnnot.empty, v, Abstract (var_type [] v env), acc)
+  ) fv e in
+  let anns =
+    match infer_iterated tenv Env.empty EmptyA e any with
+    | [] -> raise (Ill_typed ([], "Annotations inference failed."))
+    | [(_, anns)] -> (e, anns)
+    | _ -> assert false
+  in
+  log "@." ; anns
+
+let typeof_simple tenv env e =
+  let (e, anns) = infer tenv env e in
+  typeof tenv Env.empty anns e |> simplify_typ

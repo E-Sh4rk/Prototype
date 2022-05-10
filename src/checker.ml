@@ -66,7 +66,7 @@ let rec typeof_a pos tenv env anns a =
     if splits = []
     then raise (Ill_typed (pos, "Empty annotation for variable "^(Variable.show v)^"."))
     else begin
-      LambdaSA.destruct va |> List.map (fun (t, (anns, _)) ->
+      LambdaSA.destruct va |> List.map (fun (t, (anns, _, _)) ->
         let env = Env.add v t env in
         let res = typeof tenv env anns e in
         mk_arrow (cons t) (cons res)
@@ -271,8 +271,8 @@ let filter_res =
 
 let rec infer_a' pos tenv env anns a t =
   let envr = Env_refinement.empty env in
-  let type_lambda v e t ~maxdom ~fixeddom =
-    ignore (v, e, t, maxdom, fixeddom) ;
+  let type_lambda v e t ~init_branch ~new_branches_maxdom =
+    ignore (v, e, t, init_branch, new_branches_maxdom) ;
     failwith "TODO"
   in
   if has_absent t
@@ -284,8 +284,19 @@ let rec infer_a' pos tenv env anns a t =
       then (envr, UntypAtomA)::res else res in
     (res, changes)
   end else begin
-    ignore (type_lambda, regroup) ;
-    failwith "TODO"
+    let worst_t = worst t in
+    match a with
+    | Lambda (_, Ast.ADomain s, v, e) ->
+      let t = cap_o t (mk_arrow (cons s) any_node) in
+      type_lambda v e t ~init_branch:false ~new_branches_maxdom:s
+    | Lambda (_, Ast.Unnanoted, v, e) ->
+      let t = cap_o t arrow_any in
+      type_lambda v e t ~init_branch:true ~new_branches_maxdom:any
+    | Lambda (_, Ast.AArrow s, v, e) when subtype s worst_t ->
+      let t = cap_o s arrow_any in
+      type_lambda v e t ~init_branch:false ~new_branches_maxdom:empty
+    | Lambda _ -> ([], false)
+    | _ -> failwith "TODO"
   end
 
 and infer' tenv env anns e' t =

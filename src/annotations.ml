@@ -10,40 +10,46 @@ type ('a, 'b) annot' =
   | BindA of ('a annot_a' * 'b)
   [@@deriving show]
 
-let annot_equals_approx a1 a2 =
+(*let annot_equals_approx a1 a2 =
   match a1, a2 with
   | EmptyA, EmptyA -> true
-  | _, _ -> false
+  | _, _ -> false*)
 
 module rec LambdaSA : sig
   type t
   val empty : unit -> t
-  val destruct : t -> (Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ)) list
-  val add : t -> Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ) -> t
-  val construct : (Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ)) list -> t
+  val destruct : t -> (Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ * bool)) list
+  val add : t -> Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ * bool) -> t
+  val construct : (Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ * bool)) list -> t
   val map_top : (Cduce.typ -> Cduce.typ) -> (Cduce.typ -> Cduce.typ) -> t -> t
   val enrich : t -> (Cduce.typ * Cduce.typ) list -> t
   val splits : t -> Cduce.typ list
   val dom : t -> Cduce.typ
   val pp : Format.formatter -> t -> unit
 end = struct
-  type t = T of (Cduce.typ * ((t, BindSA.t) annot' * Cduce.typ)) list
+  type t = T of (Cduce.typ * ((t, BindSA.t) annot' * Cduce.typ * bool)) list
   [@@deriving show]
   let empty () = T []
   let destruct (T lst) = lst
-  let add (T lst) (s, (a, t)) =
-    if List.exists (fun (s', (a', t')) ->
-      annot_equals_approx a a' && Cduce.equiv s s' && Cduce.equiv t t') lst
+  let add (T lst) (s, (a, t, b)) =
+    if List.exists (fun (s', (_, t', b')) ->
+      (* Optimisation *) (*annot_equals_approx a a' &&*)
+      b=b' && Cduce.equiv s s' && Cduce.equiv t t') lst
     then T lst
-    else T ((s, (a, t))::lst)
+    else T ((s, (a, t, b))::lst)
   let construct lst =
     List.fold_left add (empty ()) lst
   let map_top f1 f2 (T lst) =
-    lst |> List.map (fun (s, (a,t)) -> (f1 s, (a, f2 t)))
+    lst |> List.map (fun (s, (a,t,b)) -> (f1 s, (a, f2 t, b)))
     (* |> construct*)
     |> (fun res -> T res)
   let enrich (T lst) ts =
-    let t = List.map (fun (s, (_,t)) ->
+    let t = List.map (fun (s, (_,t,_)) ->
+      (* NOTE: we should only consider branches with b=true as the others
+         are not guaranteed. But it would duplicate most of the branches...
+         and the faulty scenarios shouldn't happen.
+         The paper always consider annotations to have b=false
+         and consider them here anyway. *)
       Cduce.mk_arrow (Cduce.cons s) (Cduce.cons t)
     ) lst
     |> Types_additions.conj in
@@ -51,9 +57,10 @@ end = struct
       let t' = Cduce.mk_arrow (Cduce.cons s') (Cduce.cons t') in
       if Cduce.subtype t t' then None
       else
+        let req = (Types_additions.top_jokers Types_additions.Max s') = [] in
         let s' = Types_additions.substitute_top_jokers Types_additions.Max s' Cduce.any in
         let t' = Types_additions.substitute_top_jokers Types_additions.Min t' Cduce.any in
-        Some (s', (EmptyA, t'))
+        Some (s', (EmptyA, t', req))
     in
     let new_anns = List.filter_map annot ts in
     List.fold_left add (T lst) new_anns
@@ -80,8 +87,8 @@ end = struct
   let empty () = T []
   let destruct (T lst) = lst
   let add (T lst) (s, a) =
-    if List.exists (fun (s', a') ->
-      annot_equals_approx a a' && Cduce.equiv s s') lst
+    if List.exists (fun (s', _) ->
+      (* Optimisation *) (*annot_equals_approx a a' &&*) Cduce.equiv s s') lst
     then T lst
     else T ((s, a)::lst)
   let construct lst =

@@ -258,10 +258,13 @@ let try_typeof_a pos tenv env anns a =
   try typeof_a pos tenv env anns a
   with Ill_typed _ -> any_or_absent
 
-let only_current_env lst =
+let exactly_current_env lst =
   match lst with
   | [(gamma, anns)] when Env_refinement.is_empty gamma -> Some anns
   | _ -> None
+
+let exactly_current_env_gammas gammas =
+  gammas <> [] && List.for_all Env_refinement.is_empty gammas
 
 let filter_res =
   List.filter_map (function (None, _) -> None | (Some gamma, anns) -> Some (gamma, anns))
@@ -285,19 +288,103 @@ let rec infer_a' pos tenv env anns a t =
     failwith "TODO"
   end
 
+(* TODO: share_jokerized_arrows *)
 and infer' tenv env anns e' t =
   let envr = Env_refinement.empty env in
   assert (has_absent t |> not) ;
   match e' with
   | Var v -> ([(Env_refinement.refine v t envr, EmptyA)] |> filter_res, false)
   | Bind (_, v, a, e) ->
-    ignore (tenv, anns, v, a, e, infer_a_iterated, regroup, try_typeof_a) ;
-    failwith "TODO"
+    match anns with
+    | EmptyA -> (* BindDefault *)
+      let anns = BindA (EmptyAtomA, BindSA.construct [(any_or_absent, EmptyA)]) in
+      infer' tenv env anns e' t
+    | BindA (anns_a, va) ->
+      log "@,@[<v 1>BIND for variable %a with t=%a" Variable.pp v pp_typ t ;
+      let pos = Variable.get_locations v in
+      log "@,Initial splits: %a" pp_splits (BindSA.splits va) ;
+      let dom_a = BindSA.dom va in
+      let va = BindSA.map_top worst va in
+      let res =
+        match BindSA.destruct va with
+        | [(s, anns)] when subtype any_or_absent s -> (* BindDefSkip *)
+          log "@,Skipping definition." ;
+          let env = Env.add v s env in
+          let res = infer_iterated tenv env anns e t in
+          let changes = exactly_current_env res = None in
+          let res = regroup v res |> List.map (
+            fun (gamma, anns) -> (gamma, BindA (anns_a, BindSA.construct anns))
+          ) in
+          (res, changes)
+        | _ ->
+          let res_a = infer_a_iterated pos tenv env anns_a a dom_a in
+          begin match exactly_current_env res_a with
+          | None -> (* BindDefRefEnv *)
+            if res_a = [] then log "@,Untypable definition..."
+            else log "@,The definition need refinements (going up)." ;
+            let res = res_a |> List.map (
+              fun (gamma, anns_a) -> (gamma, BindA (anns_a, va))
+            ) in
+            (res, false)
+          | Some anns_a ->
+            log "@,The definition has been successfully annotated." ;
+            let s = try_typeof_a pos tenv env anns_a a in
+            log "@,Type of the definition: %a" Cduce.pp_typ s ;
+            (*if subtype s dom_a |> not then Format.printf "%s@." (actual_expected s dom_a) ;*)
+            assert (subtype s dom_a) ;
+            let splits = BindSA.choose va s |> BindSA.map_top (cap_o s) |> BindSA.destruct in
+            log "@,Using the following split: %a" pp_splits (List.map fst splits) ;
+            let rec propagate lst treated =
+              match lst with
+              | [] -> (treated, None)
+              | (s,anns)::lst ->
+                let necessary = refine_a ~sufficient:false tenv envr a s in
+                if exactly_current_env_gammas necessary
+                then propagate lst ((s,anns)::treated)
+                else
+                  let sufficient = refine_a ~sufficient:true tenv envr a (neg s) in
+                  (lst@treated, Some ((s,anns), necessary, sufficient))
+            in
+            let (splits, propagate) =
+              if subtype s any && List.length splits > 1
+              then propagate splits []
+              else (splits, None)
+            in
+            begin match propagate with
+            | Some ((s,anns), necessary, sufficient) -> (* BindPropagateSplit *)
+              log "@,... but first some constraints must be propagated." ;
+              let res1 = necessary |> List.map (fun gamma ->
+                let anns = (s,anns)::splits |> BindSA.construct in
+                (gamma, BindA (anns_a, anns))
+              ) in
+              let res2 = sufficient |> List.map (fun gamma ->
+                let anns = splits |> BindSA.construct in
+                (gamma, BindA (anns_a, anns))
+              ) in
+              (res1@res2, false)
+            | None -> (* Bind *)
+              let res =
+                splits |> List.map (fun (s, anns) ->
+                  let env = Env.add v s env in
+                  let res = infer_iterated tenv env anns e t in
+                  let changes = exactly_current_env res = None in
+                  (res, changes)
+              ) in
+              let (ress, changess) = List.split res in
+              let changes = List.exists identity changess in
+              let res = List.flatten ress |> regroup v |> List.map (
+                fun (gamma, anns) -> (gamma, BindA (anns_a, BindSA.construct anns))
+              ) in
+              (res, changes)
+            end
+          end
+      in
+      log "@]@,END BIND for variable %a" Variable.pp v ; res
 
 and infer_a_iterated pos tenv env anns a t =
   match infer_a' pos tenv env anns a t with
   | (res, true) ->
-    begin match only_current_env res with
+    begin match exactly_current_env res with
     | None -> res
     | Some anns -> infer_a_iterated pos tenv env anns a t
     end
@@ -306,7 +393,7 @@ and infer_a_iterated pos tenv env anns a t =
 and infer_iterated tenv env anns e t =
   match infer' tenv env anns e t with
   | (res, true) ->
-    begin match only_current_env res with
+    begin match exactly_current_env res with
     | None -> res
     | Some anns -> infer_iterated tenv env anns e t
     end

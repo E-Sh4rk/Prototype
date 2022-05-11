@@ -391,6 +391,20 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a t =
             ) |> filter_res_a
         end
       in (res, false)
+    | Ite (v, s, v1, v2), _ ->
+      let vt = Env.find v env in
+      let res =
+        if is_empty vt then [(envr, EmptyAtomA)]
+        else if subtype vt s
+        then [(Env_refinement.refine v1 t envr, EmptyAtomA)] |> filter_res
+        else if subtype vt (neg s)
+        then [(Env_refinement.refine v2 t envr, EmptyAtomA)] |> filter_res
+        else [(Env_refinement.refine v s envr, EmptyAtomA) ;
+              (Env_refinement.refine v (neg s) envr, EmptyAtomA)]
+            |> filter_res
+      in
+      (res, false)
+    | App _, _ -> failwith "TODO"
     | Let (v1, v2), _ ->
       let res =
         [(envr |> option_chain
@@ -411,7 +425,6 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a t =
       let t = cap_o s arrow_any in
       type_lambda v e t va ~new_branches_maxdom:empty
     | Lambda _, _ -> ([], false)
-    | _, _ -> failwith "TODO"
   end
 
 and infer' tenv env anns e' t =

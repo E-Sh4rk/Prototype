@@ -22,7 +22,7 @@ module rec LambdaSA : sig
   val add : t -> Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ * bool) -> t
   val construct : (Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ * bool)) list -> t
   val map_top : (Cduce.typ -> Cduce.typ) -> (Cduce.typ -> Cduce.typ) -> t -> t
-  val enrich : t -> (Cduce.typ * Cduce.typ) list -> t
+  val enrich : new_branches_maxdom:Cduce.typ -> t -> (Cduce.typ * Cduce.typ) list -> t
   val splits : t -> Cduce.typ list
   val dom : t -> Cduce.typ
   val pp : Format.formatter -> t -> unit
@@ -43,7 +43,7 @@ end = struct
     lst |> List.map (fun (s, (a,t,b)) -> (f1 s, (a, f2 t, b)))
     (* |> construct*)
     |> (fun res -> T res)
-  let enrich (T lst) ts =
+  let enrich ~new_branches_maxdom (T lst) ts =
     let t = List.map (fun (s, (_,t,_)) ->
       (* NOTE: we should only consider branches with b=true as the others
          are not guaranteed. But it would duplicate most of the branches...
@@ -54,6 +54,7 @@ end = struct
     ) lst
     |> Types_additions.conj in
     let annot (s',t') =
+      let s' = Cduce.cap_o s' new_branches_maxdom in
       let t' = Cduce.mk_arrow (Cduce.cons s') (Cduce.cons t') in
       if Cduce.subtype t t' then None
       else

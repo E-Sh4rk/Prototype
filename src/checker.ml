@@ -324,6 +324,18 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a t =
     let worst_t = worst t in
     match a, anns with
     | _, UntypAtomA -> ([], false)
+    | Abstract s, _ when subtype s worst_t ->
+      ([(envr, EmptyAtomA)], false)
+    | Abstract _, _ -> ([], false)
+    | Const c, _ when subtype (typeof_const_atom tenv c) t ->
+      ([(envr, EmptyAtomA)], false)
+    | Const _, _ -> ([], false)
+    | Let (v1, v2), _ ->
+      let res =
+        [(envr |> option_chain
+          [Env_refinement.refine v1 any ; Env_refinement.refine v2 t ], EmptyAtomA)]
+        |> filter_res in
+      (res, false)
     | Lambda (_, ua, _, _), EmptyAtomA ->
       let splits = if ua = Ast.Unnanoted then [(any, (EmptyA, any, false))] else [] in
       let anns = LambdaA (LambdaSA.construct splits) in

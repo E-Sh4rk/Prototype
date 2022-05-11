@@ -330,6 +330,67 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a t =
     | Const c, _ when subtype (typeof_const_atom tenv c) t ->
       ([(envr, EmptyAtomA)], false)
     | Const _, _ -> ([], false)
+    | Pair (v1, v2), _ ->
+      let vt1 = Env.find v1 env in
+      let vt2 = Env.find v2 env in
+      let res =
+        if has_absent vt1 || has_absent vt2
+        then
+          [(envr |> option_chain
+            [Env_refinement.refine v1 any ; Env_refinement.refine v2 any], EmptyAtomA)]
+          |> filter_res_a
+        else begin
+          let s = mk_times (cons vt1) (cons vt2) in
+          if subtype s t
+          then [(envr, EmptyAtomA)]
+          else
+            let t = cap_o t s in
+            split_pair t
+            |> List.map (fun (ti,si) ->
+              (envr |> option_chain
+              [Env_refinement.refine v1 ti ; Env_refinement.refine v2 si], EmptyAtomA)
+            ) |> filter_res_a
+        end
+      in (res, false)
+    | Projection (typ, v), _ ->
+      let t =
+        match typ with
+        | Fst -> mk_times (cons t) any_node
+        | Snd -> mk_times any_node (cons t)
+        | Field label -> mk_record true [label, cons t]
+      in
+      let res = [(Env_refinement.refine v t envr, EmptyAtomA)] |> filter_res_a in
+      (res, false)
+    | RecordUpdate (v, label, None), _ ->
+      let t = cap_o (record_any_without label) t in
+      let t = remove_field_info t label in
+      let res = [(Env_refinement.refine v t envr, EmptyAtomA)] |> filter_res_a in
+      (res, false)
+    | RecordUpdate (v, label, Some f), _ ->
+      let vt = Env.find v env in
+      let ft = Env.find f env in
+      let res =
+        if subtype vt record_any |> not || has_absent ft
+        then
+          [(envr |> option_chain
+            [Env_refinement.refine v record_any ; Env_refinement.refine f any], EmptyAtomA)]
+          |> filter_res_a
+        else begin
+          let right_record = mk_record false [label, cons ft] in
+          let s = merge_records vt right_record in
+          if subtype s t
+          then [(envr, EmptyAtomA)]
+          else
+            let t = cap_o t s in
+            split_record t
+            |> List.map (fun ti ->
+              let si = get_field ti label in
+              let ti = remove_field_info ti label in
+              (envr |> option_chain
+              [Env_refinement.refine v ti ; Env_refinement.refine f si], EmptyAtomA)
+            ) |> filter_res_a
+        end
+      in (res, false)
     | Let (v1, v2), _ ->
       let res =
         [(envr |> option_chain

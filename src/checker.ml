@@ -528,7 +528,7 @@ and infer' tenv env anns e' t =
               else (splits, None)
             in
             begin match propagate with
-            | Some ((s,anns), necessary, sufficient) -> (* BindPropagateSplit *)
+            | Some ((s,anns), necessary, sufficient) -> (* BindPropagate *)
               log "@,... but first some constraints must be propagated." ;
               let res1 = necessary |> List.map (fun gamma ->
                 let anns = (s,anns)::splits |> BindSA.construct in
@@ -538,7 +538,7 @@ and infer' tenv env anns e' t =
                 let anns = splits |> BindSA.construct in
                 (gamma, BindA (anns_a, anns))
               ) in
-              (res1@res2, false)
+              (res1@res2, true)
             | None -> (* Bind *)
               let res =
                 splits |> List.map (fun (s, anns) ->

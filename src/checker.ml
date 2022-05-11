@@ -266,6 +266,9 @@ let exactly_current_env lst =
 let exactly_current_env_gammas gammas =
   gammas <> [] && List.for_all Env_refinement.is_empty gammas
 
+let filter_res_a =
+  List.filter_map (function (None, _) -> None | (Some gamma, anns) -> Some (gamma, anns))
+
 let filter_res =
   List.filter_map (function (None, _) -> None | (Some gamma, anns) -> Some (gamma, anns))
 
@@ -334,7 +337,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a t =
       let res =
         [(envr |> option_chain
           [Env_refinement.refine v1 any ; Env_refinement.refine v2 t ], EmptyAtomA)]
-        |> filter_res in
+        |> filter_res_a in
       (res, false)
     | Lambda (_, ua, _, _), EmptyAtomA ->
       let splits = if ua = Ast.Unnanoted then [(any, (EmptyA, any, false))] else [] in

@@ -396,15 +396,53 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a t =
       let res =
         if is_empty vt then [(envr, EmptyAtomA)]
         else if subtype vt s
-        then [(Env_refinement.refine v1 t envr, EmptyAtomA)] |> filter_res
+        then [(Env_refinement.refine v1 t envr, EmptyAtomA)] |> filter_res_a
         else if subtype vt (neg s)
-        then [(Env_refinement.refine v2 t envr, EmptyAtomA)] |> filter_res
+        then [(Env_refinement.refine v2 t envr, EmptyAtomA)] |> filter_res_a
         else [(Env_refinement.refine v s envr, EmptyAtomA) ;
               (Env_refinement.refine v (neg s) envr, EmptyAtomA)]
-            |> filter_res
+            |> filter_res_a
       in
       (res, false)
-    | App _, _ -> failwith "TODO"
+    | App _, EmptyAtomA -> (* AppDefault *)
+      let anns = AppA (any_or_absent, false) in
+      infer_a' pos tenv env anns a t
+    | App (v1, v2), AppA (t',b) ->
+      let vt1 = Env.find v1 env in
+      let vt2 = Env.find v2 env in
+      let res =
+        if is_empty vt1
+        then [(Env_refinement.refine v2 any envr, AppA (t',b))] |> filter_res_a
+        else if is_empty vt2
+        then [(Env_refinement.refine v1 arrow_any envr, AppA (t',b))] |> filter_res_a
+        else begin
+          let can_refine_l = (has_absent vt1 || has_absent vt2) |> not in
+          let can_refine_r = can_refine_l && subtype t' t in
+          let wt1 = mk_arrow (cons vt2) (cons t) in
+          let can_split_r = can_refine_r && subtype vt1 wt1 && not b in
+          match dnf (cap_o vt1 arrow_any) |> simplify_dnf with
+          | [arrows] when can_split_r -> (* AppSplitR *)
+              arrows |> List.map (fun (si,_) ->
+                (Env_refinement.refine v2 si envr, AppA (t',true))
+              ) |> filter_res_a
+          | [_] when can_refine_r -> (* AppRefineR *)
+            let s = triangle_exact vt1 t in
+            [(Env_refinement.refine v2 s envr, AppA (t',b))]
+            |> filter_res_a
+          | [_] when can_refine_l -> (* AppRefineL *)
+            let arrow_type = mk_arrow (cons (cap vt2 (joker Max))) (cons (cap t (joker Min))) in
+            [(Env_refinement.refine v1 arrow_type envr, AppA (cap_o t t',b))]
+            |> filter_res_a
+          | lst -> (* AppSplitL *)
+            lst |> List.map (fun arrows ->
+              (envr |> option_chain [
+                Env_refinement.refine v1 (branch_type arrows) ; Env_refinement.refine v2 any
+              ], AppA (t',b)
+              )
+            ) |> filter_res_a
+        end
+      in (res, false)
+    | App _, _ -> assert false
     | Let (v1, v2), _ ->
       let res =
         [(envr |> option_chain
@@ -424,7 +462,8 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a t =
     | Lambda (_, Ast.AArrow s, v, e), LambdaA va when subtype s worst_t ->
       let t = cap_o s arrow_any in
       type_lambda v e t va ~new_branches_maxdom:empty
-    | Lambda _, _ -> ([], false)
+    | Lambda (_, Ast.AArrow _, _, _), LambdaA _ -> ([], false)
+    | Lambda _, _ -> assert false
   end
 
 and infer' tenv env anns e' t =

@@ -174,10 +174,11 @@ and typeof tenv env anns e =
 
 (* ===== REFINE ===== *)
 
-let refine_a ~sufficient tenv env a t =
-  assert (has_absent t |> not) ;
-  if is_empty t && not sufficient then []
-  else if subtype any t && sufficient then [env]
+let refine_a ~sufficient tenv env a prev_t t =
+  assert (subtype t prev_t) ;
+  assert (has_absent prev_t |> not) ;
+  if not sufficient && is_empty t then []
+  else if sufficient && subtype prev_t t then [env]
   else match a, sufficient with
   | Abstract s, false -> if disjoint s t then [] else [env]
   | Abstract s, true -> if subtype s t then [env] else []
@@ -220,13 +221,9 @@ let refine_a ~sufficient tenv env a t =
         option_chain [Env_refinement.refine v1 t1 ; Env_refinement.refine v2 t2]
     )
   | Ite (v, s, x1, x2), _ ->
-    let vt = Env_refinement.find v env in
-    if is_empty vt
-    then (if sufficient then [env] else [])
-    else
-      [ env |> option_chain [Env_refinement.refine v s       ; Env_refinement.refine x1 t] ;
-        env |> option_chain [Env_refinement.refine v (neg s) ; Env_refinement.refine x2 t] ]
-      |> filter_options
+    [ env |> option_chain [Env_refinement.refine v s       ; Env_refinement.refine x1 t] ;
+      env |> option_chain [Env_refinement.refine v (neg s) ; Env_refinement.refine x2 t] ]
+    |> filter_options
   | Lambda _, false ->
     if disjoint arrow_any t then [] else [env]
   | Lambda _, true ->
@@ -404,13 +401,13 @@ and infer' tenv env anns e' t =
             let rec propagate lst treated =
               match lst with
               | [] -> (treated, None)
-              | (s,anns)::lst ->
-                let necessary = refine_a ~sufficient:false tenv envr a s in
+              | (ns,anns)::lst ->
+                let necessary = refine_a ~sufficient:false tenv envr a s ns in
                 if exactly_current_env_gammas necessary
-                then propagate lst ((s,anns)::treated)
+                then propagate lst ((ns,anns)::treated)
                 else
-                  let sufficient = refine_a ~sufficient:true tenv envr a (neg s) in
-                  (lst@treated, Some ((s,anns), necessary, sufficient))
+                  let sufficient = refine_a ~sufficient:true tenv envr a s (cap_o (neg ns) s) in
+                  (lst@treated, Some ((ns,anns), necessary, sufficient))
             in
             let (splits, propagate) =
               if subtype s any && List.length splits > 1

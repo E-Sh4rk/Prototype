@@ -156,7 +156,7 @@ let propagate tenv x a gammas =
   gammas |>
   List.map (fun gamma ->
     if Env_refinement.has_refinement x gamma
-    then refine_a ~sufficient:false tenv gamma a (Env_refinement.find x gamma)
+    then refine_a ~sufficient:false tenv gamma a any (Env_refinement.find x gamma)
     else [gamma]
   ) |> List.flatten
 
@@ -720,7 +720,7 @@ and infer' tenv env e t =
               if List.length splits > 1
               then
                 splits |>
-                List.map (fun si -> refine_a ~sufficient:false tenv envr a si) |>
+                List.map (fun si -> refine_a ~sufficient:false tenv envr a s si) |>
                 List.concat
               else [envr]
             in

@@ -520,7 +520,7 @@ and infer' tenv env anns e' t =
                   if subtype s any && List.length splits > 1
                   then
                     splits |>
-                    List.map (fun si -> refine_a ~sufficient:false tenv envr a si) |>
+                    List.map (fun si -> refine_a ~sufficient:false tenv envr a s si) |>
                     List.concat
                   else [envr]
                 in

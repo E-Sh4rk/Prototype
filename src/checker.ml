@@ -493,7 +493,7 @@ and infer' tenv env anns e' t =
             fun (gamma, anns) -> (gamma, BindA (anns_a, BindSA.construct anns))
           ) in
           (res, changes)
-        | _ ->
+        | splits ->
           let res_a = infer_a_iterated pos tenv env anns_a a dom_a in
           begin match exactly_current_env res_a with
           | None -> (* BindDefRefEnv *)
@@ -509,27 +509,25 @@ and infer' tenv env anns e' t =
             log "@,Type of the definition: %a" Cduce.pp_typ s ;
             (*if subtype s dom_a |> not then Format.printf "%s@." (actual_expected s dom_a) ;*)
             assert (subtype s dom_a) ;
-            let splits = BindSA.choose va s |> BindSA.map_top (cap_o s) |> BindSA.destruct in
-            log "@,Using the following split: %a" pp_splits (List.map fst splits) ;
             let rec propagate lst treated =
               match lst with
-              | [] -> (treated, None)
+              | [] -> None
               | (ns,anns)::lst ->
-                let necessary = refine_a ~sufficient:false tenv envr a s ns in
+                let necessary = refine_a ~sufficient:false tenv envr a s (cap_o ns s) in
                 if exactly_current_env_gammas necessary
                 then propagate lst ((ns,anns)::treated)
                 else
                   let sufficient = refine_a ~sufficient:true tenv envr a s (cap_o (neg ns) s) in
-                  (lst@treated, Some ((ns,anns), necessary, sufficient))
+                  Some ((ns,anns), lst@treated, necessary, sufficient)
             in
-            let (splits, propagate) =
+            let propagate =
               if subtype s any && List.length splits > 1
               then propagate splits []
-              else (splits, None)
+              else None
             in
             begin match propagate with
-            | Some ((s,anns), necessary, sufficient) -> (* BindPropagate *)
-              log "@,... but first some constraints must be propagated." ;
+            | Some ((s,anns), splits, necessary, sufficient) -> (* BindPropagate *)
+              log "@,Some constraints must be propagated." ;
               let res1 = necessary |> List.map (fun gamma ->
                 let anns = (s,anns)::splits |> BindSA.construct in
                 (gamma, BindA (anns_a, anns))
@@ -540,6 +538,8 @@ and infer' tenv env anns e' t =
               ) in
               (res1@res2, true)
             | None -> (* Bind *)
+              let splits = BindSA.choose va s |> BindSA.map_top (cap_o s) |> BindSA.destruct in
+              log "@,Using the following split: %a" pp_splits (List.map fst splits) ;
               let res =
                 splits |> List.map (fun (s, anns) ->
                   let env = Env.add v s env in

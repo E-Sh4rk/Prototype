@@ -275,6 +275,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
     let t = disj ts in
     if subtype arrow_any t
     then begin
+      log "@,@[<v 1>LAMBDA for variable %a (unconstrained)" Variable.pp v ;
       let splits = LambdaSA.destruct va in
       log "@,Using the following split: %a" pp_splits (List.map fst splits) ;
       let res =
@@ -292,8 +293,10 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
         let res = List.flatten ress |> regroup v |> List.map (
           fun (gamma, anns_a) -> (gamma, LambdaA (LambdaSA.construct anns_a))
         ) in
-        (res, changes)
+      log "@]@,END LAMBDA for variable %a" Variable.pp v ;
+      (res, changes)
     end else begin (* AbsConstr *)
+      log "@,@[<v 1>LAMBDA for variable %a with t=%a" Variable.pp v pp_typ t ;
       let branches =
         ts |> List.map dnf |> List.map (List.filter (fun arrows -> subtype (branch_type arrows) t)) (* Optimisation *)
         |> List.map simplify_dnf |> List.flatten |> List.flatten
@@ -310,6 +313,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
           subtype bt (worst t)
         | _ -> assert false
         ) in
+      log "@]@,END LAMBDA for variable %a" Variable.pp v ;
       (res, false)
     end
   in
@@ -541,8 +545,10 @@ and infer' tenv env anns e' t =
               ) in
               (res1@res2, true)
             | None -> (* Bind *)
-              let splits = BindSA.choose va s |> BindSA.map_top (cap_o s) |> BindSA.destruct in
-              log "@,Using the following split: %a" pp_splits (List.map fst splits) ;
+              let splits = BindSA.choose va s in
+              log "@,Using the following splits: %a" pp_splits (BindSA.splits splits) ;
+              let splits = splits |> BindSA.map_top (cap_o s) |> BindSA.destruct in
+              log "@,Normalizing to: %a" pp_splits (List.map fst splits) ;
               let res =
                 splits |> List.map (fun (s, anns) ->
                   let env = Env.add v s env in

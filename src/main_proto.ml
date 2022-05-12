@@ -55,9 +55,11 @@ let type_check_program
         | None -> Format.ksprintf pr "===== Good news: Was untypable with POPL22 system =====\n" 
         | Some t ->
           if Cduce.subtype typ t |> not
-          then
+          then (
             Format.ksprintf pr "===== Warning: Not better than the type obtained by POPL22 system =====\nType was: %s\n"
             (Cduce.string_of_type t)
+            (*; Format.printf "%a@." pp_e nf_expr*)
+          )
         end ;
         pr_logs () ; (varm, env)
       with Partitioned_checker.Ill_typed (pos, str) ->

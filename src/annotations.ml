@@ -24,7 +24,6 @@ module rec LambdaSA : sig
   val map_top : (Cduce.typ -> Cduce.typ) -> (Cduce.typ -> Cduce.typ) -> t -> t
   val enrich : new_branches_maxdom:Cduce.typ -> t -> (Cduce.typ * Cduce.typ) list -> t
   val splits : t -> Cduce.typ list
-  val dom : t -> Cduce.typ
   val pp : Format.formatter -> t -> unit
 end = struct
   type t = T of (Cduce.typ * ((t, BindSA.t) annot' * Cduce.typ * bool)) list
@@ -67,8 +66,6 @@ end = struct
     List.fold_left add (T lst) new_anns
   let splits (T lst) =
     List.map fst lst
-  let dom t =
-    splits t |> Types_additions.disj
 end
 
 and BindSA : sig
@@ -80,7 +77,6 @@ and BindSA : sig
   val map_top : (Cduce.typ -> Cduce.typ) -> t -> t
   val choose : t -> Cduce.typ -> t
   val splits : t -> Cduce.typ list
-  val dom : t -> Cduce.typ
   val pp : Format.formatter -> t -> unit
 end = struct
   type t = T of (Cduce.typ * (LambdaSA.t, t) annot') list
@@ -124,8 +120,6 @@ end = struct
     T (aux [] lst t)
   let splits (T lst) =
     List.map fst lst
-  let dom t =
-    splits t |> Types_additions.share_jokerized_arrows |> Types_additions.disj
 end
 
 type annot_a = LambdaSA.t annot_a'

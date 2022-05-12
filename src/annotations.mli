@@ -17,7 +17,6 @@ module rec LambdaSA : sig
     val map_top : (Cduce.typ -> Cduce.typ) -> (Cduce.typ -> Cduce.typ) -> t -> t
     val enrich : new_branches_maxdom:Cduce.typ -> t -> (Cduce.typ * Cduce.typ) list -> t
     val splits : t -> Cduce.typ list
-    val dom : t -> Cduce.typ
 end
 and BindSA : sig
     type t
@@ -28,7 +27,6 @@ and BindSA : sig
     val map_top : (Cduce.typ -> Cduce.typ) -> t -> t
     val choose : t -> Cduce.typ -> t
     val splits : t -> Cduce.typ list
-    val dom : t -> Cduce.typ
 end
 
 type annot_a = LambdaSA.t annot_a'

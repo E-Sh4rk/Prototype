@@ -52,7 +52,9 @@ let to_env (b,r) =
       Env.add x t b
     ) b (Env.domain r)
 
-let leq (_,r1) (_,r2) = Env.leq r1 r2
+let leq_ref (_,r1) (_,r2) = Env.leq r1 r2
+let equiv_ref env1 env2 = leq_ref env1 env2 && leq_ref env2 env1
+let leq e1 e2 = Env.leq (to_env e1) (to_env e2)
 let equiv env1 env2 = leq env1 env2 && leq env2 env1
 
 let show (_,r) = Env.show r

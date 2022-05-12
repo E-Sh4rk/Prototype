@@ -18,9 +18,11 @@ val find : Variable.t -> t -> typ
 
 val to_env : t -> Env.t
 
-val equiv : t -> t -> bool
+val equiv_ref : t -> t -> bool
 (* Assumes that the base environment is the same. *)
-(* Use Env_refinement.to_env and Env.equiv if it is not the case. *)
+(* Use the functions equiv and leq if it is not the case. *)
+val leq_ref : t -> t -> bool
+val equiv : t -> t -> bool
 val leq : t -> t -> bool
 
 val show : t -> string

@@ -10,10 +10,10 @@ type ('a, 'b) annot' =
   | BindA of ('a annot_a' * 'b)
   [@@deriving show]
 
-(*let annot_equals_approx a1 a2 =
+let annot_equals_approx a1 a2 =
   match a1, a2 with
   | EmptyA, EmptyA -> true
-  | _, _ -> false*)
+  | _, _ -> false
 
 module rec LambdaSA : sig
   type t
@@ -31,8 +31,8 @@ end = struct
   let empty () = T []
   let destruct (T lst) = lst
   let add (T lst) (s, (a, t, b)) =
-    if List.exists (fun (s', (_, t', b')) ->
-      (* Optimisation *) (*annot_equals_approx a a' &&*)
+    if List.exists (fun (s', (a', t', b')) ->
+      annot_equals_approx a a' &&
       b=b' && Cduce.equiv s s' && Cduce.equiv t t') lst
     then T lst
     else T ((s, (a, t, b))::lst)
@@ -84,8 +84,8 @@ end = struct
   let empty () = T []
   let destruct (T lst) = lst
   let add (T lst) (s, a) =
-    if List.exists (fun (s', _) ->
-      (* Optimisation *) (*annot_equals_approx a a' &&*) Cduce.equiv s s') lst
+    if List.exists (fun (s', a') ->
+      annot_equals_approx a a' && Cduce.equiv s s') lst
     then T lst
     else T ((s, a)::lst)
   let construct lst =

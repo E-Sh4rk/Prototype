@@ -35,14 +35,13 @@ let var_type pos v env =
 
 let get_bind_annots pos v anns =
   match anns with
-  | EmptyA -> raise (Ill_typed (pos, "No annotation for variable "^(Variable.show v)^"."))
+  | EmptyA -> raise (Ill_typed (pos, "Unrelevant annotation for variable "^(Variable.show v)^"."))
   | BindA anns -> anns
 
 let get_lambda_annots pos v anns =
   match anns with
-  | EmptyAtomA -> raise (Ill_typed (pos, "No annotation for variable "^(Variable.show v)^"."))
   | UntypAtomA -> raise (Ill_typed (pos, "Untypable annotation for variable "^(Variable.show v)^"."))
-  | AppA _ -> raise (Ill_typed (pos, "Unrelevant annotation for variable "^(Variable.show v)^"."))
+  | EmptyAtomA | AppA _ -> raise (Ill_typed (pos, "Unrelevant annotation for variable "^(Variable.show v)^"."))
   | LambdaA anns -> anns
 
 let treat_untypable_annot_a pos anns =
@@ -402,9 +401,6 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
             |> filter_res_a
       in
       (res, false)
-    | App _, EmptyAtomA -> (* AppDefault *)
-      let anns = AppA (any_or_absent, false) in
-      infer_a' pos tenv env anns a ts
     | App (v1, v2), AppA (t',b) ->
       let vt1 = Env.find v1 env in
       let vt2 = Env.find v2 env in
@@ -447,10 +443,6 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
           [Env_refinement.refine v1 any ; Env_refinement.refine v2 t ], EmptyAtomA)]
         |> filter_res_a in
       (res, false)
-    | Lambda (_, ua, _, _), EmptyAtomA ->
-      let splits = if ua = Ast.Unnanoted then [(any, (EmptyA, any, false))] else [] in
-      let anns = LambdaA (LambdaSA.construct splits) in
-      infer_a' pos tenv env anns a ts
     | Lambda (_, ua, v, e), LambdaA va when ua = Ast.Unnanoted || no_lambda_ua ->
       let ts = ts |> List.map (cap_o arrow_any) in
       type_lambda v e ts va ~new_branches_maxdom:any
@@ -467,96 +459,92 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
 and infer' tenv env anns e' t =
   let envr = Env_refinement.empty env in
   assert (has_absent t |> not) ;
-  match e' with
-  | Var v -> ([(Env_refinement.refine v t envr, EmptyA)] |> filter_res, false)
-  | Bind (_, v, a, e) ->
-    match anns with
-    | EmptyA -> (* BindDefault *)
-      let anns = BindA (EmptyAtomA, BindSA.construct [(any_or_absent, EmptyA)]) in
-      infer' tenv env anns e' t
-    | BindA (anns_a, va) ->
-      log "@,@[<v 1>BIND for variable %a with t=%a" Variable.pp v pp_typ t ;
-      let pos = Variable.get_locations v in
-      log "@,Initial splits: %a" pp_splits (BindSA.splits va) ;
-      let dom_a = BindSA.splits va in
-      let va = BindSA.map_top worst va in
-      let res =
-        match BindSA.destruct va with
-        | [(s, anns)] when subtype any_or_absent s -> (* BindDefSkip *)
-          log "@,Skipping definition." ;
-          let env = Env.add v s env in
-          let res = infer_iterated tenv env anns e t in
-          let changes = exactly_current_env res = None in
-          let res = regroup v res |> List.map (
-            fun (gamma, anns) -> (gamma, BindA (anns_a, BindSA.construct anns))
+  match e', anns with
+  | Var v, _ -> ([(Env_refinement.refine v t envr, EmptyA)] |> filter_res, false)
+  | Bind (_, v, a, e), BindA (anns_a, va) ->
+    log "@,@[<v 1>BIND for variable %a with t=%a" Variable.pp v pp_typ t ;
+    let pos = Variable.get_locations v in
+    log "@,Initial splits: %a" pp_splits (BindSA.splits va) ;
+    let dom_a = BindSA.splits va in
+    let va = BindSA.map_top worst va in
+    let res =
+      match BindSA.destruct va with
+      | [(s, anns)] when subtype any_or_absent s -> (* BindDefSkip *)
+        log "@,Skipping definition." ;
+        let env = Env.add v s env in
+        let res = infer_iterated tenv env anns e t in
+        let changes = exactly_current_env res = None in
+        let res = regroup v res |> List.map (
+          fun (gamma, anns) -> (gamma, BindA (anns_a, BindSA.construct anns))
+        ) in
+        (res, changes)
+      | splits ->
+        let res_a = infer_a_iterated pos tenv env anns_a a dom_a in
+        begin match exactly_current_env res_a with
+        | None -> (* BindDefRefEnv *)
+          if res_a = [] then log "@,Untypable definition..."
+          else log "@,The definition need refinements (going up)." ;
+          let res = res_a |> List.map (
+            fun (gamma, anns_a) -> (gamma, BindA (anns_a, va))
           ) in
-          (res, changes)
-        | splits ->
-          let res_a = infer_a_iterated pos tenv env anns_a a dom_a in
-          begin match exactly_current_env res_a with
-          | None -> (* BindDefRefEnv *)
-            if res_a = [] then log "@,Untypable definition..."
-            else log "@,The definition need refinements (going up)." ;
-            let res = res_a |> List.map (
-              fun (gamma, anns_a) -> (gamma, BindA (anns_a, va))
+          (res, false)
+        | Some anns_a ->
+          log "@,The definition has been successfully annotated." ;
+          let s = try_typeof_a pos tenv env anns_a a in
+          log "@,Type of the definition: %a" Cduce.pp_typ s ;
+          (*if subtype s dom_a |> not then Format.printf "%s@." (actual_expected s dom_a) ;*)
+          assert (subtype s (List.map fst splits |> disj)) ;
+          let rec propagate lst treated =
+            match lst with
+            | [] -> None
+            | (ns,anns)::lst ->
+              let necessary = refine_a ~sufficient:false tenv envr a s (cap_o ns s) in
+              if exactly_current_env_gammas necessary
+              then propagate lst ((ns,anns)::treated)
+              else
+                let sufficient = refine_a ~sufficient:true tenv envr a s (cap_o (neg ns) s) in
+                Some ((ns,anns), lst@treated, necessary, sufficient)
+          in
+          let propagate =
+            if subtype s any && List.length splits > 1
+            then propagate splits []
+            else None
+          in
+          begin match propagate with
+          | Some ((s,anns), splits, necessary, sufficient) -> (* BindPropagate *)
+            log "@,Some constraints must be propagated." ;
+            let res1 = necessary |> List.map (fun gamma ->
+              let anns = (s,anns)::splits |> BindSA.construct in
+              (gamma, BindA (anns_a, anns))
             ) in
-            (res, false)
-          | Some anns_a ->
-            log "@,The definition has been successfully annotated." ;
-            let s = try_typeof_a pos tenv env anns_a a in
-            log "@,Type of the definition: %a" Cduce.pp_typ s ;
-            (*if subtype s dom_a |> not then Format.printf "%s@." (actual_expected s dom_a) ;*)
-            assert (subtype s (List.map fst splits |> disj)) ;
-            let rec propagate lst treated =
-              match lst with
-              | [] -> None
-              | (ns,anns)::lst ->
-                let necessary = refine_a ~sufficient:false tenv envr a s (cap_o ns s) in
-                if exactly_current_env_gammas necessary
-                then propagate lst ((ns,anns)::treated)
-                else
-                  let sufficient = refine_a ~sufficient:true tenv envr a s (cap_o (neg ns) s) in
-                  Some ((ns,anns), lst@treated, necessary, sufficient)
-            in
-            let propagate =
-              if subtype s any && List.length splits > 1
-              then propagate splits []
-              else None
-            in
-            begin match propagate with
-            | Some ((s,anns), splits, necessary, sufficient) -> (* BindPropagate *)
-              log "@,Some constraints must be propagated." ;
-              let res1 = necessary |> List.map (fun gamma ->
-                let anns = (s,anns)::splits |> BindSA.construct in
-                (gamma, BindA (anns_a, anns))
-              ) in
-              let res2 = sufficient |> List.map (fun gamma ->
-                let anns = splits |> BindSA.construct in
-                (gamma, BindA (anns_a, anns))
-              ) in
-              (res1@res2, true)
-            | None -> (* Bind *)
-              let splits = BindSA.choose va s in
-              log "@,Using the following splits: %a" pp_splits (BindSA.splits splits) ;
-              let splits = splits |> BindSA.map_top (cap_o s) |> BindSA.destruct in
-              log "@,Normalizing to: %a" pp_splits (List.map fst splits) ;
-              let res =
-                splits |> List.map (fun (s, anns) ->
-                  let env = Env.add v s env in
-                  let res = infer_iterated tenv env anns e t in
-                  let changes = exactly_current_env res = None in
-                  (res, changes)
-              ) in
-              let (ress, changess) = List.split res in
-              let changes = List.exists identity changess in
-              let res = List.flatten ress |> regroup v |> List.map (
-                fun (gamma, anns) -> (gamma, BindA (anns_a, BindSA.construct anns))
-              ) in
-              (res, changes)
-            end
+            let res2 = sufficient |> List.map (fun gamma ->
+              let anns = splits |> BindSA.construct in
+              (gamma, BindA (anns_a, anns))
+            ) in
+            (res1@res2, true)
+          | None -> (* Bind *)
+            let splits = BindSA.choose va s in
+            log "@,Using the following splits: %a" pp_splits (BindSA.splits splits) ;
+            let splits = splits |> BindSA.map_top (cap_o s) |> BindSA.destruct in
+            log "@,Normalizing to: %a" pp_splits (List.map fst splits) ;
+            let res =
+              splits |> List.map (fun (s, anns) ->
+                let env = Env.add v s env in
+                let res = infer_iterated tenv env anns e t in
+                let changes = exactly_current_env res = None in
+                (res, changes)
+            ) in
+            let (ress, changess) = List.split res in
+            let changes = List.exists identity changess in
+            let res = List.flatten ress |> regroup v |> List.map (
+              fun (gamma, anns) -> (gamma, BindA (anns_a, BindSA.construct anns))
+            ) in
+            (res, changes)
           end
-      in
-      log "@]@,END BIND for variable %a" Variable.pp v ; res
+        end
+    in
+    log "@]@,END BIND for variable %a" Variable.pp v ; res
+  | Bind _, _ -> assert false
 
 and infer_a_iterated ?(no_lambda_ua=false) pos tenv env anns a ts =
   match infer_a' ~no_lambda_ua pos tenv env anns a ts with
@@ -582,7 +570,7 @@ let infer tenv env e =
     Bind (Old_annotations.VarAnnot.empty, v, Abstract (var_type [] v env), acc)
   ) fv e in
   let anns =
-    match infer_iterated tenv Env.empty EmptyA e any with
+    match infer_iterated tenv Env.empty (initial_annot e) e any with
     | [] -> raise (Ill_typed ([], "Annotations inference failed."))
     | [(_, anns)] -> (e, anns)
     | _ -> assert false

@@ -150,7 +150,7 @@ end = struct
         let req = (Types_additions.top_jokers Types_additions.Max s') = [] in
         let s' = Types_additions.substitute_top_jokers Types_additions.Max s' Cduce.any in
         let t' = Types_additions.substitute_top_jokers Types_additions.Min t' Cduce.any in
-        Some (s', (EmptyA, t', req))
+        Some (s', (EmptyA (* TODO *), t', req))
     in
     let new_anns = List.filter_map annot ts in
     List.fold_left add lst new_anns

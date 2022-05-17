@@ -19,7 +19,8 @@ module rec LambdaSA : sig
     val map_top : (Cduce.typ -> Cduce.typ) -> (Cduce.typ -> Cduce.typ) -> t -> t
     val enrich : new_branches_maxdom:Cduce.typ -> t -> (Cduce.typ * Cduce.typ) list -> t
     val splits : t -> Cduce.typ list
-    val apply : t -> Cduce.typ -> Cduce.typ -> (t,BindSA.t) annot'
+    val apply : t -> Cduce.typ -> Cduce.typ -> bool -> (t,BindSA.t) annot'
+    val normalize : t -> t
     val equals : t -> t -> bool
 end
 and BindSA : sig
@@ -34,6 +35,7 @@ and BindSA : sig
     val choose : t -> Cduce.typ -> t
     val splits : t -> Cduce.typ list
     val apply : t -> Cduce.typ -> (LambdaSA.t, t) annot'
+    val normalize : t -> Cduce.typ -> t
     val equals : t -> t -> bool
 end
 
@@ -47,6 +49,7 @@ val initial_annot_a : Msc.a -> annot_a
 val initial_annot : Msc.e -> annot
 
 val remove_redundance : Cduce.typ list -> Cduce.typ list
+val regroup : ('a -> 'a -> bool) -> ('a * 'b) list -> ('a * ('b list)) list
 
 val pp_annot_a : Format.formatter -> annot_a -> unit
 val pp_annot : Format.formatter -> annot -> unit

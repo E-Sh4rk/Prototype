@@ -1,5 +1,35 @@
 open Msc
 
+let regroup equiv res =
+  let rec add_if_equiv treated lst t o =
+    match lst with
+    | [] -> (t,[o])::treated
+    | (t', os)::lst when equiv t t' ->
+      ((t, o::os)::lst)@treated
+    | elt::lst -> add_if_equiv (elt::treated) lst t o
+  in
+  let aux acc (t, o) =
+    add_if_equiv [] acc t o
+  in
+  List.fold_left aux [] res
+
+let remove_redundance ts =
+  let change = ref false in
+  let aux ts t =
+    let t' = ts |> List.filter (fun t' ->
+      Cduce.subtype t' t && not (Cduce.subtype t t'))
+      |> Types_additions.disj
+    in
+    if Cduce.is_empty t' then t
+    else (change := true ; Cduce.diff t t')
+  in
+  let rec it ts =
+    change := false ;
+    let ts = List.map (aux ts) ts in
+    if !change then it ts else ts
+  in
+  it ts |> Utils.remove_duplicates Cduce.equiv
+
 type 'a annot_a' =
   | EmptyAtomA
   | UntypAtomA
@@ -64,7 +94,8 @@ module rec LambdaSA : sig
   val map_top : (Cduce.typ -> Cduce.typ) -> (Cduce.typ -> Cduce.typ) -> t -> t
   val enrich : new_branches_maxdom:Cduce.typ -> t -> (Cduce.typ * Cduce.typ) list -> t
   val splits : t -> Cduce.typ list
-  val apply : t -> Cduce.typ -> Cduce.typ -> (t,BindSA.t) annot'
+  val apply : t -> Cduce.typ -> Cduce.typ -> bool -> (t,BindSA.t) annot'
+  val normalize : t -> t
   val equals : t -> t -> bool
   val pp : Format.formatter -> t -> unit
 end = struct
@@ -125,14 +156,35 @@ end = struct
     List.fold_left add lst new_anns
   let splits (T (_, lst)) =
     List.map fst lst
-  let apply (T (_, lst)) s t =
-    let anns = lst |> List.filter_map (fun (s', (anns, t', _)) ->
-      if Cduce.subtype s s' && Cduce.equiv t t'
+  let apply_aux lst s =
+    let anns = lst |> List.filter_map (fun (s', (anns, _, _)) ->
+      if Cduce.subtype s s'
       then Some anns else None
     ) in
     match anns with
     | [] -> assert false
     | a1::anns -> List.fold_left (merge_annot merge BindSA.merge) a1 anns
+  let apply (T (_, lst)) s t b =
+    let lst = lst |> List.filter (fun (_, (_, t', b')) ->
+      b = b' && Cduce.equiv t t'
+    ) in
+    apply_aux lst s
+  let normalize (T (node, lst)) =
+    let equiv (t1,b1) (t2,b2) =
+      b1 = b2 && Cduce.equiv t1 t2
+    in
+    let regroup = regroup equiv in
+    let ts = lst
+      |> List.map (fun (s, (anns, t, b)) -> ((t, b), (s, anns)))
+      |> regroup in
+    let lst = ts
+      |> List.map (fun ((t,b), lst) ->
+        let ss = List.map (fun (s,_) -> s) lst |> remove_redundance in
+        let lst = lst |> List.map (fun (s, anns) -> (s, (anns, t, b))) in
+        List.map (fun s -> (s, (apply_aux lst s, t, b))) ss
+      )
+    in
+    T (node, List.flatten lst)
 end
 and BindSA : sig
   type t
@@ -146,6 +198,7 @@ and BindSA : sig
   val choose : t -> Cduce.typ -> t
   val splits : t -> Cduce.typ list
   val apply : t -> Cduce.typ -> (LambdaSA.t, t) annot'
+  val normalize : t -> Cduce.typ -> t
   val equals : t -> t -> bool
   val pp : Format.formatter -> t -> unit
 end = struct
@@ -214,6 +267,11 @@ end = struct
     match anns with
     | [] -> assert false
     | a1::anns -> List.fold_left (merge_annot LambdaSA.merge merge) a1 anns
+  let normalize ((T (node, _)) as anns) s =
+    let ts = splits anns
+      |> List.map (Cduce.cap_o s)
+      |> remove_redundance in
+    T (node, List.map (fun t -> (t, apply anns t)) ts)
 end
 
 type annot_a = LambdaSA.t annot_a'
@@ -229,20 +287,3 @@ let initial_annot = annot_initial LambdaSA.initial BindSA.initial
 
 let merge_annot_a = merge_annot_a LambdaSA.merge
 let merge_annot = merge_annot LambdaSA.merge BindSA.merge
-
-let remove_redundance ts =
-  let change = ref false in
-  let aux ts t =
-    let t' = ts |> List.filter (fun t' ->
-      Cduce.subtype t' t && not (Cduce.subtype t t'))
-      |> Types_additions.disj
-    in
-    if Cduce.is_empty t' then t
-    else (change := true ; Cduce.diff t t')
-  in
-  let rec it ts =
-    change := false ;
-    let ts = List.map (aux ts) ts in
-    if !change then it ts else ts
-  in
-  it ts

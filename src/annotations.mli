@@ -46,6 +46,8 @@ val merge_annot : annot -> annot -> annot
 val initial_annot_a : Msc.a -> annot_a
 val initial_annot : Msc.e -> annot
 
+val remove_redundance : Cduce.typ list -> Cduce.typ list
+
 val pp_annot_a : Format.formatter -> annot_a -> unit
 val pp_annot : Format.formatter -> annot -> unit
 val show_annot_a : annot_a -> string

@@ -229,3 +229,20 @@ let initial_annot = annot_initial LambdaSA.initial BindSA.initial
 
 let merge_annot_a = merge_annot_a LambdaSA.merge
 let merge_annot = merge_annot LambdaSA.merge BindSA.merge
+
+let remove_redundance ts =
+  let change = ref false in
+  let aux ts t =
+    let t' = ts |> List.filter (fun t' ->
+      Cduce.subtype t' t && not (Cduce.subtype t t'))
+      |> Types_additions.disj
+    in
+    if Cduce.is_empty t' then t
+    else (change := true ; Cduce.diff t t')
+  in
+  let rec it ts =
+    change := false ;
+    let ts = List.map (aux ts) ts in
+    if !change then it ts else ts
+  in
+  it ts

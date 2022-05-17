@@ -236,20 +236,19 @@ let refine_a ~sufficient tenv env a prev_t t =
 (* ===== INFER ===== *)
 
 let regroup v res =
-  let gammas = res
-  |> List.map (fun (gamma,_) -> Env_refinement.rm v gamma)
-  |> Utils.remove_duplicates Env_refinement.equiv
+  let rec add_if_equiv treated lst gamma o =
+    match lst with
+    | [] -> (gamma,[o])::treated
+    | (gamma', os)::lst when Env_refinement.equiv_ref gamma gamma' ->
+      ((gamma, o::os)::lst)@treated
+    | elt::lst -> add_if_equiv (elt::treated) lst gamma o
   in
-  gammas |> List.map (fun gamma ->
-    let anns = res |> List.filter_map (fun (gamma', o) ->
-      let vt = Env_refinement.find v gamma' in
-      let gamma' = Env_refinement.rm v gamma' in
-      if Env_refinement.leq gamma gamma'
-      then Some (vt, o)
-      else None
-    ) in
-    (gamma, anns)
-  )
+  let aux acc (gamma, o) =
+    let vt = Env_refinement.find v gamma in
+    let gamma = Env_refinement.rm v gamma in
+    add_if_equiv [] acc gamma (vt, o)
+  in
+  List.fold_left aux [] res
 
 let try_typeof_a pos tenv env anns a =
   try typeof_a pos tenv env anns a

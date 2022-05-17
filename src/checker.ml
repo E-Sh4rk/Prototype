@@ -291,7 +291,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
         ts |> List.map dnf |> List.map (List.filter (fun arrows -> subtype (branch_type arrows) t)) (* Optimisation *)
         |> List.map simplify_dnf |> List.flatten |> List.flatten
            in
-      let va = LambdaSA.enrich ~new_branches_maxdom va branches in
+      let va = LambdaSA.enrich ~new_branches_maxdom (initial_annot e) va branches in
       let res = infer_a_iterated ~no_lambda_ua:true pos tenv env (LambdaA va) a [arrow_any] in
       let res = res |> List.filter (fun (_, anns) ->
         match anns with

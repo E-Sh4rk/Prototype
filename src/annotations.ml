@@ -92,7 +92,8 @@ module rec LambdaSA : sig
   val merge : t -> t -> t
   val construct : (Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ * bool)) list -> t
   val map_top : (Cduce.typ -> Cduce.typ) -> (Cduce.typ -> Cduce.typ) -> t -> t
-  val enrich : new_branches_maxdom:Cduce.typ -> t -> (Cduce.typ * Cduce.typ) list -> t
+  val enrich : new_branches_maxdom:Cduce.typ -> (t,BindSA.t) annot'
+               -> t -> (Cduce.typ * Cduce.typ) list -> t
   val splits : t -> Cduce.typ list
   val apply : t -> Cduce.typ -> Cduce.typ -> bool -> (t,BindSA.t) annot'
   val normalize : t -> t
@@ -131,7 +132,7 @@ end = struct
     lst |> List.map (fun (s, (a,t,b)) -> (f1 s, (a, f2 t, b)))
     (* |> construct*)
     |> (fun res -> T (new_node (), res))
-  let enrich ~new_branches_maxdom lst ts =
+  let enrich ~new_branches_maxdom default_anns lst ts =
     let t =
       destruct lst |>
       List.map (fun (s, (_,t,_)) ->
@@ -150,7 +151,7 @@ end = struct
         let req = (Types_additions.top_jokers Types_additions.Max s') = [] in
         let s' = Types_additions.substitute_top_jokers Types_additions.Max s' Cduce.any in
         let t' = Types_additions.substitute_top_jokers Types_additions.Min t' Cduce.any in
-        Some (s', (EmptyA (* TODO *), t', req))
+        Some (s', (default_anns, t', req))
     in
     let new_anns = List.filter_map annot ts in
     List.fold_left add lst new_anns

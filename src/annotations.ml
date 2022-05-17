@@ -1,3 +1,5 @@
+open Msc
+
 type 'a annot_a' =
   | EmptyAtomA
   | UntypAtomA
@@ -24,9 +26,22 @@ and annot_equals el eb a1 a2 =
     annot_a_equals el a1 a2 && eb b1 b2
   | _, _ -> false
 
+let annot_a_initial il a =
+  match a with
+  | Abstract _ | Const _ | Ite _ | Pair _ | Projection _
+  | RecordUpdate _ | Let _ -> EmptyAtomA
+  | App _ -> AppA (Cduce.any_or_absent, false)
+  | Lambda (_, _, _, e) -> LambdaA (il e)
+
+let annot_initial il ib e =
+  match e with
+  | Var _ -> EmptyA
+  | Bind (_, _, a, e) -> BindA (annot_a_initial il a, ib e)
+
 module rec LambdaSA : sig
   type t
   val empty : unit -> t
+  val initial : Msc.e -> t
   val destruct : t -> (Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ * bool)) list
   val add : t -> Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ * bool) -> t
   val merge : t -> t -> t
@@ -39,7 +54,8 @@ module rec LambdaSA : sig
 end = struct
   type node = { id:int }
   [@@deriving show]
-  (*let initial_node = { id=1 }*)
+  let initial_node = { id=1 }
+  (* NOTE: For simplicity, we consider all the initial annots equal. *)
   let empty_node = { id=0 }
   let new_node =
     let last_id = ref 1 in
@@ -49,6 +65,9 @@ end = struct
   let equals (T (n1,_)) (T (n2,_)) =
     n1.id = n2.id
   let empty () = T (empty_node, [])
+  let rec initial e =
+    let a = annot_initial initial BindSA.initial e in
+    T (initial_node, [(Cduce.any, (a, Cduce.any, false))])
   let destruct (T (_, lst)) = lst
   let add (T (node, lst)) (s, (a, t, b)) =
     if List.exists (fun (s', (a', t', b')) ->
@@ -94,6 +113,7 @@ end
 and BindSA : sig
   type t
   val empty : unit -> t
+  val initial : Msc.e -> t
   val destruct : t -> (Cduce.typ * (LambdaSA.t, t) annot') list
   val add : t -> Cduce.typ * (LambdaSA.t, t) annot' -> t
   val merge : t -> t -> t
@@ -106,7 +126,8 @@ and BindSA : sig
 end = struct
   type node = { id:int }
   [@@deriving show]
-  (*let initial_node = { id=1 }*)
+  let initial_node = { id=1 }
+  (* NOTE: For simplicity, we consider all the initial annots equal. *)
   let empty_node = { id=0 }
   let new_node =
     let last_id = ref 1 in
@@ -116,6 +137,9 @@ end = struct
   let equals (T (n1,_)) (T (n2,_)) =
     n1.id = n2.id
   let empty () = T (empty_node, [])
+  let rec initial e =
+    let a = annot_initial LambdaSA.initial initial e in
+    T (initial_node, [(Cduce.any_or_absent, a)])
   let destruct (T (_, lst)) = lst
   let add (T (node, lst)) (s, a) =
     if List.exists (fun (s', a') ->
@@ -166,6 +190,9 @@ type annot = (LambdaSA.t, BindSA.t) annot'
 
 let equals_annot_a = annot_a_equals LambdaSA.equals
 let equals_annot = annot_equals LambdaSA.equals BindSA.equals
+
+let initial_annot_a = annot_a_initial LambdaSA.initial
+let initial_annot = annot_initial LambdaSA.initial BindSA.initial
 
 let merge_annot_a a1 a2 =
   match a1, a2 with

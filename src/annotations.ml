@@ -38,6 +38,21 @@ let annot_initial il ib e =
   | Var _ -> EmptyA
   | Bind (_, _, a, e) -> BindA (annot_a_initial il a, ib e)
 
+let merge_annot_a ml a1 a2 =
+  match a1, a2 with
+  | UntypAtomA, a | a, UntypAtomA -> a
+  | EmptyAtomA, EmptyAtomA -> EmptyAtomA
+  | AppA (t1, b1), AppA (t2, b2) -> AppA (Cduce.cap_o t1 t2, b1 || b2)
+  | LambdaA a1, LambdaA a2 -> LambdaA (ml a1 a2)
+  | _, _ -> assert false
+
+let merge_annot ml mb a1 a2 =
+  match a1, a2 with
+  | EmptyA, EmptyA -> EmptyA
+  | BindA (a1, b1), BindA (a2, b2) ->
+    BindA (merge_annot_a ml a1 a2, mb b1 b2)
+  | _, _ -> assert false
+
 module rec LambdaSA : sig
   type t
   val empty : unit -> t
@@ -49,6 +64,7 @@ module rec LambdaSA : sig
   val map_top : (Cduce.typ -> Cduce.typ) -> (Cduce.typ -> Cduce.typ) -> t -> t
   val enrich : new_branches_maxdom:Cduce.typ -> t -> (Cduce.typ * Cduce.typ) list -> t
   val splits : t -> Cduce.typ list
+  val apply : t -> Cduce.typ -> Cduce.typ -> (t,BindSA.t) annot'
   val equals : t -> t -> bool
   val pp : Format.formatter -> t -> unit
 end = struct
@@ -109,6 +125,14 @@ end = struct
     List.fold_left add lst new_anns
   let splits (T (_, lst)) =
     List.map fst lst
+  let apply (T (_, lst)) s t =
+    let anns = lst |> List.filter_map (fun (s', (anns, t', _)) ->
+      if Cduce.subtype s s' && Cduce.equiv t t'
+      then Some anns else None
+    ) in
+    match anns with
+    | [] -> assert false
+    | a1::anns -> List.fold_left (merge_annot merge BindSA.merge) a1 anns
 end
 and BindSA : sig
   type t
@@ -121,6 +145,7 @@ and BindSA : sig
   val map_top : (Cduce.typ -> Cduce.typ) -> t -> t
   val choose : t -> Cduce.typ -> t
   val splits : t -> Cduce.typ list
+  val apply : t -> Cduce.typ -> (LambdaSA.t, t) annot'
   val equals : t -> t -> bool
   val pp : Format.formatter -> t -> unit
 end = struct
@@ -181,6 +206,14 @@ end = struct
     T (new_node (), aux [] lst t)
   let splits (T (_, lst)) =
     List.map fst lst
+  let apply (T (_, lst)) t =
+    let anns = lst |> List.filter_map (fun (t', anns) ->
+      if Cduce.subtype t t'
+      then Some anns else None
+    ) in
+    match anns with
+    | [] -> assert false
+    | a1::anns -> List.fold_left (merge_annot LambdaSA.merge merge) a1 anns
 end
 
 type annot_a = LambdaSA.t annot_a'
@@ -194,17 +227,5 @@ let equals_annot = annot_equals LambdaSA.equals BindSA.equals
 let initial_annot_a = annot_a_initial LambdaSA.initial
 let initial_annot = annot_initial LambdaSA.initial BindSA.initial
 
-let merge_annot_a a1 a2 =
-  match a1, a2 with
-  | UntypAtomA, a | a, UntypAtomA -> a
-  | EmptyAtomA, EmptyAtomA -> EmptyAtomA
-  | AppA (t1, b1), AppA (t2, b2) -> AppA (Cduce.cap_o t1 t2, b1 || b2)
-  | LambdaA a1, LambdaA a2 -> LambdaA (LambdaSA.merge a1 a2)
-  | _, _ -> assert false
-
-let merge_annot a1 a2 =
-  match a1, a2 with
-  | EmptyA, EmptyA -> EmptyA
-  | BindA (a1, b1), BindA (a2, b2) ->
-    BindA (merge_annot_a a1 a2, BindSA.merge b1 b2)
-  | _, _ -> assert false
+let merge_annot_a = merge_annot_a LambdaSA.merge
+let merge_annot = merge_annot LambdaSA.merge BindSA.merge

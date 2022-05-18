@@ -26,6 +26,12 @@ let pp_lambda_splits fmt =
   in
   Format.fprintf fmt "%a" (Utils.pp_list pp_lsplit)
 
+let pp_branches fmt =
+  let pp_lsplit fmt (s,t) =
+    Format.fprintf fmt "%a -> %a" pp_typ s pp_typ t
+  in
+  Format.fprintf fmt "%a" (Utils.pp_list pp_lsplit)
+
 let splits_domain splits domain =
   Format.asprintf "Splits: %a - Domain: %a"
     pp_splits splits Cduce.pp_typ domain
@@ -297,10 +303,12 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
       (res, changes)
     end else begin (* AbsConstr *)
       log "@,@[<v 1>LAMBDA for variable %a with t=%a" Variable.pp v pp_typ t ;
+      log "@,Initial splits: %a" pp_lambda_splits (LambdaSA.destruct va) ;
       let branches =
         ts |> List.map dnf |> List.map (List.filter (fun arrows -> subtype (branch_type arrows) t)) (* Optimisation *)
         |> List.map simplify_dnf |> List.flatten |> List.flatten
       in
+      log "@,Branches suggested by t: %a" pp_branches branches ;
       let va = LambdaSA.enrich ~new_branches_maxdom (initial_annot e) va branches in
       let res = infer_a_iterated ~no_lambda_ua:true pos tenv env (LambdaA va) a [arrow_any] in
       let best_t = res |>

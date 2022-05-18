@@ -58,17 +58,18 @@ and annot_equals el eb a1 a2 =
     annot_a_equals el a1 a2 && eb b1 b2
   | _, _ -> false
 
-let annot_a_initial il a =
+let annot_a_initial il iel a =
   match a with
   | Abstract _ | Const _ | Ite _ | Pair _ | Projection _
   | RecordUpdate _ | Let _ -> EmptyAtomA
   | App _ -> AppA (Cduce.any_or_absent, false)
-  | Lambda (_, _, _, e) -> LambdaA (il e)
+  | Lambda (_, Ast.Unnanoted, _, e) -> LambdaA (il e)
+  | Lambda (_, _, _, _) -> LambdaA (iel ())
 
-let annot_initial il ib e =
+let annot_initial il ial ib e =
   match e with
   | Var _ -> EmptyA
-  | Bind (_, _, a, e) -> BindA (annot_a_initial il a, ib e)
+  | Bind (_, _, a, e) -> BindA (annot_a_initial il ial a, ib e)
 
 let merge_annot_a ml a1 a2 =
   match a1, a2 with
@@ -116,7 +117,7 @@ end = struct
     n1.id = n2.id
   let empty () = T (empty_node, [])
   let rec initial e =
-    let a = annot_initial initial BindSA.initial e in
+    let a = annot_initial initial empty BindSA.initial e in
     T (initial_node, [(Cduce.any, (a, Cduce.any, false))])
   let destruct (T (_, lst)) = lst
   let add (T (node, lst)) (s, (a, t, b)) =
@@ -140,6 +141,7 @@ end = struct
     let t =
       destruct lst |>
       List.map (fun (s, (_,t,_)) ->
+      (* TODO: Avoid duplicates by remembering the last type of the lambda. *)
       (* NOTE: we should only consider branches with b=true as the others
          are not guaranteed. But it would duplicate most of the branches...
          (though it is already the case as the codomain of a branch is not updated to its most precise type)
@@ -222,7 +224,7 @@ end = struct
     n1.id = n2.id
   let empty () = T (empty_node, [])
   let rec initial e =
-    let a = annot_initial LambdaSA.initial initial e in
+    let a = annot_initial LambdaSA.initial LambdaSA.empty initial e in
     T (initial_node, [(Cduce.any_or_absent, a)])
   let destruct (T (_, lst)) = lst
   let add (T (node, lst)) (s, a) =
@@ -288,8 +290,8 @@ type annot = (LambdaSA.t, BindSA.t) annot'
 let equals_annot_a = annot_a_equals LambdaSA.equals
 let equals_annot = annot_equals LambdaSA.equals BindSA.equals
 
-let initial_annot_a = annot_a_initial LambdaSA.initial
-let initial_annot = annot_initial LambdaSA.initial BindSA.initial
+let initial_annot_a = annot_a_initial LambdaSA.initial LambdaSA.empty
+let initial_annot = annot_initial LambdaSA.initial LambdaSA.empty BindSA.initial
 
 let merge_annot_a = merge_annot_a LambdaSA.merge
 let merge_annot = merge_annot LambdaSA.merge BindSA.merge

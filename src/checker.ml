@@ -266,12 +266,14 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
     if subtype arrow_any t
     then begin
       log "@,@[<v 1>LAMBDA for variable %a (unconstrained)" Variable.pp v ;
-      let splits = LambdaSA.destruct va in
+      let splits = LambdaSA.map_top (fun s t b ->
+        if b then (worst s, t, b) else (substitute_all_jokers s any, t, b)) va
+        |> LambdaSA.normalize |> LambdaSA.destruct
+      in
       log "@,Using the following split: %a" pp_splits (List.map fst splits) ;
       let res =
         splits |> List.map (fun (s, (anns, t, b)) ->
           assert (has_absent s |> not) ;
-          let s = if b then worst s else substitute_all_jokers s any in
           let env = Env.add v s env in
           let res = infer_iterated tenv env anns e t in
           let changes = exactly_current_env res = None in
@@ -290,21 +292,23 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
       let branches =
         ts |> List.map dnf |> List.map (List.filter (fun arrows -> subtype (branch_type arrows) t)) (* Optimisation *)
         |> List.map simplify_dnf |> List.flatten |> List.flatten
-           in
+      in
       let va = LambdaSA.enrich ~new_branches_maxdom (initial_annot e) va branches in
       let res = infer_a_iterated ~no_lambda_ua:true pos tenv env (LambdaA va) a [arrow_any] in
-      let res = res |> List.filter (fun (_, anns) ->
-        match anns with
-        | LambdaA va ->
-          let splits = LambdaSA.destruct va in
-          let bt =
-            splits |> List.map (fun (s,(_,t,_)) -> mk_arrow (cons s) (cons t)) |> conj
-          in
-          subtype bt (worst t)
-        | _ -> assert false
-        ) in
+      let best_t = res |>
+        List.map (fun (_, anns) ->
+          match anns with
+          | LambdaA va ->
+            LambdaSA.destruct va
+            |> List.map (fun (s,(_,t,_)) -> mk_arrow (cons s) (cons t))
+          |_ -> assert false
+        )
+        |> List.flatten |> conj
+      in
       log "@]@,END LAMBDA for variable %a" Variable.pp v ;
-      (res, false)
+      if subtype best_t t
+      then (res, false)
+      else ([], false)
     end
   in
   if List.exists has_absent ts

@@ -16,7 +16,7 @@ module rec LambdaSA : sig
     val add : t -> Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ * bool) -> t
     val merge : t -> t -> t
     val construct : (Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ * bool)) list -> t
-    val map_top : (Cduce.typ -> Cduce.typ) -> (Cduce.typ -> Cduce.typ) -> t -> t
+    val map_top : (Cduce.typ -> Cduce.typ -> bool -> Cduce.typ * Cduce.typ * bool) -> t -> t
     val enrich : new_branches_maxdom:Cduce.typ -> (t,BindSA.t) annot'
                  -> t -> (Cduce.typ * Cduce.typ) list -> t
     val splits : t -> Cduce.typ list

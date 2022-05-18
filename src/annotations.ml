@@ -91,7 +91,7 @@ module rec LambdaSA : sig
   val add : t -> Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ * bool) -> t
   val merge : t -> t -> t
   val construct : (Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ * bool)) list -> t
-  val map_top : (Cduce.typ -> Cduce.typ) -> (Cduce.typ -> Cduce.typ) -> t -> t
+  val map_top : (Cduce.typ -> Cduce.typ -> bool -> Cduce.typ * Cduce.typ * bool) -> t -> t
   val enrich : new_branches_maxdom:Cduce.typ -> (t,BindSA.t) annot'
                -> t -> (Cduce.typ * Cduce.typ) list -> t
   val splits : t -> Cduce.typ list
@@ -128,8 +128,10 @@ end = struct
     else destruct a2 |> List.fold_left add a1
   let construct lst =
     List.fold_left add (empty ()) lst
-  let map_top f1 f2 (T (_, lst)) =
-    lst |> List.map (fun (s, (a,t,b)) -> (f1 s, (a, f2 t, b)))
+  let map_top f (T (_, lst)) =
+    lst |> List.map (fun (s, (a,t,b)) ->
+      let (s, t, b) = f s t b in
+      (s, (a, t, b)))
     (* |> construct*)
     |> (fun res -> T (new_node (), res))
   let enrich ~new_branches_maxdom default_anns lst ts =

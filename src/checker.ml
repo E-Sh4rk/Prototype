@@ -498,11 +498,13 @@ and infer' tenv env anns e' t =
           log "@,Type of the definition: %a" Cduce.pp_typ s ;
           (*if subtype s dom_a |> not then Format.printf "%s@." (actual_expected s dom_a) ;*)
           assert (subtype s (List.map fst splits |> disj)) ;
+          let va = BindSA.normalize va s in
+          let splits = BindSA.destruct va in
           let rec propagate lst treated =
             match lst with
             | [] -> None
             | (ns,anns)::lst ->
-              let necessary = refine_a ~sufficient:false tenv envr a s (cap_o ns s) in
+              let necessary = refine_a ~sufficient:false tenv envr a s ns in
               if exactly_current_env_gammas necessary
               then propagate lst ((ns,anns)::treated)
               else
@@ -527,10 +529,7 @@ and infer' tenv env anns e' t =
             ) in
             (res1@res2, true)
           | None -> (* Bind *)
-            let splits = BindSA.choose va s in
-            log "@,Using the following splits: %a" pp_splits (BindSA.splits splits) ;
-            let splits = splits |> BindSA.map_top (cap_o s) |> BindSA.destruct in
-            log "@,Normalizing to: %a" pp_splits (List.map fst splits) ;
+            log "@,Using the following splits: %a" pp_splits (List.map fst splits) ;
             let res =
               splits |> List.map (fun (s, anns) ->
                 let env = Env.add v s env in

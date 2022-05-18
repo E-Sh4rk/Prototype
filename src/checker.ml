@@ -20,6 +20,12 @@ let pp_splits fmt splits =
   let pp_int fmt = Format.fprintf fmt "%i" in
   (pp_list pp_int) fmt (List.map sum_conjuncts splits)*)
 
+let pp_lambda_splits fmt =
+  let pp_lsplit fmt (s,(_,t,b)) =
+    Format.fprintf fmt "%a -> %a (%b)" pp_typ s pp_typ t b
+  in
+  Format.fprintf fmt "%a" (Utils.pp_list pp_lsplit)
+
 let splits_domain splits domain =
   Format.asprintf "Splits: %a - Domain: %a"
     pp_splits splits Cduce.pp_typ domain
@@ -266,11 +272,13 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
     if subtype arrow_any t
     then begin
       log "@,@[<v 1>LAMBDA for variable %a (unconstrained)" Variable.pp v ;
-      let splits = LambdaSA.map_top (fun s t b ->
+      log "@,Initial splits: %a" pp_lambda_splits (LambdaSA.destruct va) ;
+      let va = LambdaSA.map_top (fun s t b ->
         if b then (worst s, t, b) else (substitute_all_jokers s any, t, b)) va
-        |> LambdaSA.normalize |> LambdaSA.destruct
+        |> LambdaSA.normalize
       in
-      log "@,Using the following split: %a" pp_splits (List.map fst splits) ;
+      let splits = va |> LambdaSA.destruct in
+      log "@,Using the following splits: %a" pp_lambda_splits (LambdaSA.destruct va) ;
       let res =
         splits |> List.map (fun (s, (anns, t, b)) ->
           assert (has_absent s |> not) ;

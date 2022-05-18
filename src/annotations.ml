@@ -14,6 +14,7 @@ let regroup equiv res =
   List.fold_left aux [] res
 
 let remove_redundance ts =
+  (* Format.printf "Remove redundance: %a@." (Utils.pp_list Cduce.pp_typ) ts ; *)
   let change = ref false in
   let aux ts t =
     let t' = ts |> List.filter (fun t' ->
@@ -29,6 +30,7 @@ let remove_redundance ts =
     if !change then it ts else ts
   in
   it ts |> Utils.remove_duplicates Cduce.equiv
+  (* |> (fun r -> Format.printf "Result: %a@." (Utils.pp_list Cduce.pp_typ) r ; r) *)
 
 type 'a annot_a' =
   | EmptyAtomA
@@ -140,6 +142,7 @@ end = struct
       List.map (fun (s, (_,t,_)) ->
       (* NOTE: we should only consider branches with b=true as the others
          are not guaranteed. But it would duplicate most of the branches...
+         (though it is already the case as the codomain of a branch is not updated to its most precise type)
          and the faulty scenarios shouldn't happen.
          The paper always consider annotations to have b=false
          and consider them here anyway. *)

@@ -294,7 +294,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
           let env = Env.add v s env in
           let res = infer_iterated tenv env anns e t in
           let changes = exactly_current_env res = None in
-          let res = List.map (fun (gamma, anns) -> (gamma, (anns, t, b))) res in
+          let res = List.map (fun (gamma, anns) -> (gamma, (anns, worst t, b))) res in
           (res, changes)
         ) in
         let (ress, changess) = List.split res in

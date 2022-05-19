@@ -54,7 +54,7 @@ let get_lambda_annots pos v anns =
   match anns with
   | UntypAtomA -> raise (Ill_typed (pos, "Untypable annotation for variable "^(Variable.show v)^"."))
   | EmptyAtomA | AppA _ -> raise (Ill_typed (pos, "Unrelevant annotation for variable "^(Variable.show v)^"."))
-  | LambdaA anns -> anns
+  | LambdaA (_, anns) -> anns
 
 let treat_untypable_annot_a pos anns =
   match anns with
@@ -254,8 +254,11 @@ let regroup v res =
   ) |> regroup Env_refinement.equiv_ref
 
 let try_typeof_a pos tenv env anns a =
-  try typeof_a pos tenv env anns a
-  with Ill_typed _ -> any_or_absent
+  let s =
+    try typeof_a pos tenv env anns a
+    with Ill_typed _ -> any_or_absent
+  in
+  (s, annotate_def_with_last_type s anns)
 
 let exactly_current_env lst =
   match lst with
@@ -273,7 +276,7 @@ let filter_res =
 
 let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
   let envr = Env_refinement.empty env in
-  let type_lambda v e ts va ~new_branches_maxdom =
+  let type_lambda v e ts va ~new_branches_maxdom ~former_typ =
     let t = disj ts in
     if subtype arrow_any t
     then begin
@@ -297,7 +300,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
         let (ress, changess) = List.split res in
         let changes = List.exists identity changess in
         let res = List.flatten ress |> regroup v |> List.map (
-          fun (gamma, anns_a) -> (gamma, LambdaA (LambdaSA.construct anns_a))
+          fun (gamma, anns_a) -> (gamma, LambdaA (former_typ, LambdaSA.construct anns_a))
         ) in
       log "@]@,END LAMBDA for variable %a" Variable.pp v ;
       (res, changes)
@@ -309,17 +312,17 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
         |> List.map simplify_dnf |> List.flatten |> List.flatten
       in
       log "@,Branches suggested by t: %a" pp_branches branches ;
-      let va = LambdaSA.enrich ~new_branches_maxdom (initial_annot e) va branches in
-      let res = infer_a_iterated ~no_lambda_ua:true pos tenv env (LambdaA va) a [arrow_any] in
+      let va = LambdaSA.enrich ~new_branches_maxdom ~former_typ (initial_annot e) va branches in
+      let res = infer_a_iterated ~no_lambda_ua:true pos tenv env (LambdaA (former_typ,va)) a [arrow_any] in
       let best_t = res |>
         List.map (fun (_, anns) ->
           match anns with
-          | LambdaA va ->
+          | LambdaA (_, va) ->
             LambdaSA.destruct va
             |> List.map (fun (s,(_,t,_)) -> mk_arrow (cons s) (cons t))
           |_ -> assert false
         )
-        |> List.flatten |> conj
+        |> List.flatten |> conj |> cap former_typ
       in
       log "@]@,END LAMBDA for variable %a" Variable.pp v ;
       if subtype best_t t
@@ -463,15 +466,15 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
           [Env_refinement.refine v1 any ; Env_refinement.refine v2 t ], EmptyAtomA)]
         |> filter_res_a in
       (res, false)
-    | Lambda (_, ua, v, e), LambdaA va when ua = Ast.Unnanoted || no_lambda_ua ->
+    | Lambda (_, ua, v, e), LambdaA (former_typ, va) when ua = Ast.Unnanoted || no_lambda_ua ->
       let ts = ts |> List.map (cap_o arrow_any) in
-      type_lambda v e ts va ~new_branches_maxdom:any
-    | Lambda (_, Ast.ADomain s, v, e), LambdaA va ->
+      type_lambda v e ts va ~new_branches_maxdom:any ~former_typ
+    | Lambda (_, Ast.ADomain s, v, e), LambdaA (former_typ, va) ->
       let ts = ts |> List.map (cap_o (mk_arrow (cons s) any_node)) in
-      type_lambda v e ts va ~new_branches_maxdom:s
-    | Lambda (_, Ast.AArrow s, v, e), LambdaA va when subtype s worst_t ->
+      type_lambda v e ts va ~new_branches_maxdom:s ~former_typ
+    | Lambda (_, Ast.AArrow s, v, e), LambdaA (former_typ, va) when subtype s worst_t ->
       let ts = [cap_o s arrow_any] in
-      type_lambda v e ts va ~new_branches_maxdom:empty
+      type_lambda v e ts va ~new_branches_maxdom:empty ~former_typ
     | Lambda (_, Ast.AArrow _, _, _), LambdaA _ -> ([], false)
     | Lambda _, _ -> assert false
   end
@@ -510,7 +513,7 @@ and infer' tenv env anns e' t =
           (res, false)
         | Some anns_a ->
           log "@,The definition has been successfully annotated." ;
-          let s = try_typeof_a pos tenv env anns_a a in
+          let (s, anns_a) = try_typeof_a pos tenv env anns_a a in
           log "@,Type of the definition: %a" Cduce.pp_typ s ;
           (*if subtype s dom_a |> not then Format.printf "%s@." (actual_expected s dom_a) ;*)
           assert (subtype s (List.map fst splits |> disj)) ;

@@ -36,7 +36,7 @@ type 'a annot_a' =
   | EmptyAtomA
   | UntypAtomA
   | AppA of Cduce.typ * bool
-  | LambdaA of 'a
+  | LambdaA of (Cduce.typ (* Last type of the lambda *) * 'a)
   [@@deriving show]
 
 type ('a, 'b) annot' =
@@ -48,8 +48,8 @@ let rec annot_a_equals el a1 a2 =
   match a1, a2 with
   | EmptyAtomA, EmptyAtomA -> true
   | UntypAtomA, UntypAtomA -> true
-  | AppA (t1, b1), AppA (t2, b2) -> Cduce.equiv t1 t2 && b1 = b2
-  | LambdaA a1, LambdaA a2 -> el a1 a2
+  | AppA (t1, b1), AppA (t2, b2) -> b1 = b2 && Cduce.equiv t1 t2
+  | LambdaA (t1, a1), LambdaA (t2, a2) -> el a1 a2 && Cduce.equiv t1 t2
   | _, _ -> false
 and annot_equals el eb a1 a2 =
   match a1, a2 with
@@ -63,8 +63,8 @@ let annot_a_initial il iel a =
   | Abstract _ | Const _ | Ite _ | Pair _ | Projection _
   | RecordUpdate _ | Let _ -> EmptyAtomA
   | App _ -> AppA (Cduce.any_or_absent, false)
-  | Lambda (_, Ast.Unnanoted, _, e) -> LambdaA (il e)
-  | Lambda (_, _, _, _) -> LambdaA (iel ())
+  | Lambda (_, Ast.Unnanoted, _, e) -> LambdaA (Cduce.any_or_absent, il e)
+  | Lambda (_, _, _, _) -> LambdaA (Cduce.any_or_absent, iel ())
 
 let annot_initial il ial ib e =
   match e with
@@ -76,7 +76,7 @@ let merge_annot_a ml a1 a2 =
   | UntypAtomA, a | a, UntypAtomA -> a
   | EmptyAtomA, EmptyAtomA -> EmptyAtomA
   | AppA (t1, b1), AppA (t2, b2) -> AppA (Cduce.cap_o t1 t2, b1 || b2)
-  | LambdaA a1, LambdaA a2 -> LambdaA (ml a1 a2)
+  | LambdaA (t1, a1), LambdaA (t2, a2) -> LambdaA (Cduce.cap_o t1 t2, ml a1 a2)
   | _, _ -> assert false
 
 let merge_annot ml mb a1 a2 =
@@ -95,7 +95,7 @@ module rec LambdaSA : sig
   val merge : t -> t -> t
   val construct : (Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ * bool)) list -> t
   val map_top : (Cduce.typ -> Cduce.typ -> bool -> Cduce.typ * Cduce.typ * bool) -> t -> t
-  val enrich : new_branches_maxdom:Cduce.typ -> (t,BindSA.t) annot'
+  val enrich : new_branches_maxdom:Cduce.typ -> former_typ:Cduce.typ -> (t,BindSA.t) annot'
                -> t -> (Cduce.typ * Cduce.typ) list -> t
   val splits : t -> Cduce.typ list
   val apply : t -> Cduce.typ -> Cduce.typ -> bool -> (t,BindSA.t) annot'
@@ -137,19 +137,14 @@ end = struct
       (s, (a, t, b)))
     (* |> construct*)
     |> (fun res -> T (new_node (), res))
-  let enrich ~new_branches_maxdom default_anns lst ts =
+  let enrich ~new_branches_maxdom ~former_typ default_anns lst ts =
     let t =
       destruct lst |>
-      List.map (fun (s, (_,t,_)) ->
-      (* TODO: Avoid duplicates by remembering the last type of the lambda. *)
-      (* NOTE: we should only consider branches with b=true as the others
-         are not guaranteed. But it would duplicate most of the branches...
-         (though it is already the case as the codomain of a branch is not updated to its most precise type)
-         and the faulty scenarios shouldn't happen.
-         The paper always consider annotations to have b=false
-         and consider them here anyway. *)
-      Cduce.mk_arrow (Cduce.cons s) (Cduce.cons t)
-    ) |> Types_additions.conj in
+      List.filter_map (fun (s, (_,t,b)) ->
+      if b
+      then Some (Cduce.mk_arrow (Cduce.cons s) (Cduce.cons t))
+      else None
+    ) |> Types_additions.conj |> Cduce.cap_o former_typ in
     let annot (s',t') =
       let s' = Cduce.cap_o s' new_branches_maxdom in
       let arrow_type = Cduce.mk_arrow (Cduce.cons s') (Cduce.cons t') in
@@ -295,3 +290,10 @@ let initial_annot = annot_initial LambdaSA.initial LambdaSA.empty BindSA.initial
 
 let merge_annot_a = merge_annot_a LambdaSA.merge
 let merge_annot = merge_annot LambdaSA.merge BindSA.merge
+
+let annotate_def_with_last_type t anns =
+  match anns with
+  | EmptyAtomA -> EmptyAtomA
+  | UntypAtomA -> UntypAtomA
+  | AppA (t,b) -> AppA (t,b)
+  | LambdaA (_, lsa) -> LambdaA (t, lsa)

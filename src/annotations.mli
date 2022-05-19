@@ -2,7 +2,7 @@ type 'a annot_a' =
     | EmptyAtomA
     | UntypAtomA
     | AppA of Cduce.typ * bool
-    | LambdaA of 'a
+    | LambdaA of (Cduce.typ (* Last type of the lambda *) * 'a)
 
 type ('a, 'b) annot' =
     | EmptyA
@@ -17,7 +17,7 @@ module rec LambdaSA : sig
     val merge : t -> t -> t
     val construct : (Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ * bool)) list -> t
     val map_top : (Cduce.typ -> Cduce.typ -> bool -> Cduce.typ * Cduce.typ * bool) -> t -> t
-    val enrich : new_branches_maxdom:Cduce.typ -> (t,BindSA.t) annot'
+    val enrich : new_branches_maxdom:Cduce.typ -> former_typ:Cduce.typ -> (t,BindSA.t) annot'
                  -> t -> (Cduce.typ * Cduce.typ) list -> t
     val splits : t -> Cduce.typ list
     val apply : t -> Cduce.typ -> Cduce.typ -> bool -> (t,BindSA.t) annot'
@@ -51,6 +51,8 @@ val initial_annot : Msc.e -> annot
 
 val remove_redundance : Cduce.typ list -> Cduce.typ list
 val regroup : ('a -> 'a -> bool) -> ('a * 'b) list -> ('a * ('b list)) list
+
+val annotate_def_with_last_type : Cduce.typ -> annot_a -> annot_a
 
 val pp_annot_a : Format.formatter -> annot_a -> unit
 val pp_annot : Format.formatter -> annot -> unit

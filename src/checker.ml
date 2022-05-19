@@ -319,7 +319,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
           match anns with
           | LambdaA (_, va) ->
             LambdaSA.destruct va
-            |> List.map (fun (s,(_,t,_)) -> mk_arrow (cons (worst s)) (cons t))
+            |> List.map (fun (s,(_,t,_)) -> mk_arrow (cons (worst s)) (cons t)) (* t shouldn't contain any joker *)
           |_ -> assert false
         )
         |> List.flatten |> conj |> cap former_typ

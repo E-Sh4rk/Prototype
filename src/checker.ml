@@ -324,9 +324,10 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
         )
         |> List.flatten |> conj |> cap former_typ
       in
+      let worst_target_t = worst t in
       let res =
-        if subtype best_t t then (res, false)
-        else (log "@,Cannot obtain the required type: %s" (actual_expected best_t t) ; ([], false))
+        if subtype best_t worst_target_t then (res, false)
+        else (log "@,Cannot obtain the required type: %s" (actual_expected best_t worst_target_t) ; ([], false))
       in
       log "@]@,END LAMBDA for variable %a" Variable.pp v ;
       res

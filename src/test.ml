@@ -1222,19 +1222,17 @@ let ho_fetish_explicit = fun (   ( Any  -> ( Any -> Any \ Int) -> Any -> 0)
    &( ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b | 0 )
 *)
 
-(*let ho_fetish_explicit_poly =
+let ho_fetish_explicit_poly =
               fun   ( ( ('a & Int -> 'b ) -> ( 'c -> 'a & Int) -> 'c -> 'b )
                           &( Any -> ('c -> 'a \ Int) -> 'c -> 0 )
                           &( ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b | 0 ) 
                          ) f g x -> if g x is Int then f (g x) else 0
- *)
-                                      
-(*let ho_fetish_expl_uncurry = fun   ( ( (('a & Int -> 'b ), ( 'c -> 'a & Int)) -> 'c -> 'b )
+                          
+let ho_fetish_expl_uncurry = fun   ( ( (('a & Int -> 'b ), ( 'c -> 'a & Int)) -> 'c -> 'b )
                           &( (Any , ('c -> 'a \ Int)) -> 'c -> 0 )
                           &( (('a -> 'b), ('c -> 'a)) -> 'c -> 'b | 0 ) 
                          ) f x -> if (snd f) x is Int then (fst f) ((snd f) x) else 0
-*)
-                                      
+                         
 let ho_fetish_explicit_mono = fun  (  ( (Int -> B ) -> ( C -> Int) -> C -> B )
                                     & ( Any -> (C -> Any \ Int) -> C -> 0 )
                                     & ( (Any -> B) -> (C -> Any) -> C -> B | 0 ) 
@@ -1369,24 +1367,8 @@ let foo y = fst ((fun x ->  x) y)
 let foo_eta1 y = (fun z -> (fst z)) ((fun x ->  x) y)
 
 let foo_eta2 y = (fun z -> (fst ((fun w -> z) y)) ) ((fun x ->  x) y)
-                  
-(* TODO: these two fail but should not. It is due to the fact that an annotation for the application (fun y -> x)(42),
-in a "jokerized" branch assuming that the result must be a pair, is merged with the "main" branch
-(the makes no assumption on the return type) and thus replaces its annotations,
-making it incorrect with the assumptions of the main branch. *)
 
-(*let foo y = fst ((fun x -> ((fun y -> x)(42))) y)*)
-
-(*let foo y = fst ((fun x -> ((fun y -> x)(x))) y)*)
-
-(* TODO: these two loop while they should fail. This is due to the fact that while typing the body of lamba x,
-    succ is asked to be refined. It goes up but does not refine it as it is constant, but then by going back
-    to the typing of lambda x, it retries the same refinement again and again
-    (in this case it seems to be due to the fact that there are two versions of the jokerized constraint on lambda x,
-    and when one ask the refinement, the other forget the branch because untypable, and the roles are exchanged the next time) *)
-(*
-let succ = <Int->Int>
-let foo y = fst ((fun x -> ((fun y -> x)(succ x))) y)
-
-let foo ( y : (Any,Any)) = fst ((fun x -> ((fun y -> x)(x+42))) y)              
- *)
+let foo y = fst ((fun x -> ((fun y -> x)(42))) y)
+let foo y = fst ((fun x -> ((fun y -> x)(x))) y)
+let foo_fail y = fst ((fun x -> ((fun y -> x)(succ x))) y)
+let foo_fail ( y : (Any,Any)) = fst ((fun x -> ((fun y -> x)(x+42))) y)              

@@ -319,15 +319,17 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
           match anns with
           | LambdaA (_, va) ->
             LambdaSA.destruct va
-            |> List.map (fun (s,(_,t,_)) -> mk_arrow (cons s) (cons t))
+            |> List.map (fun (s,(_,t,_)) -> mk_arrow (cons (worst s)) (cons t))
           |_ -> assert false
         )
         |> List.flatten |> conj |> cap former_typ
       in
+      let res =
+        if subtype best_t t then (res, false)
+        else (log "@,Cannot obtain the required type: %s" (actual_expected best_t t) ; ([], false))
+      in
       log "@]@,END LAMBDA for variable %a" Variable.pp v ;
-      if subtype best_t t
-      then (res, false)
-      else ([], false)
+      res
     end
   in
   if List.exists has_absent ts

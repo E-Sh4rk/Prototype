@@ -95,7 +95,7 @@ module rec LambdaSA : sig
   val merge : t -> t -> t
   val construct : (Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ * bool)) list -> t
   val map_top : (Cduce.typ -> Cduce.typ -> bool -> Cduce.typ * Cduce.typ * bool) -> t -> t
-  val enrich : new_branches_maxdom:Cduce.typ -> former_typ:Cduce.typ -> (t,BindSA.t) annot'
+  val enrich : opt_branches_maxdom:Cduce.typ -> former_typ:Cduce.typ -> (t,BindSA.t) annot'
                -> t -> (Cduce.typ * Cduce.typ) list -> t
   val splits : t -> Cduce.typ list
   val apply : t -> Cduce.typ -> Cduce.typ -> bool -> (t,BindSA.t) annot'
@@ -137,7 +137,7 @@ end = struct
       (s, (a, t, b)))
     (* |> construct*)
     |> (fun res -> T (new_node (), res))
-  let enrich ~new_branches_maxdom ~former_typ default_anns lst ts =
+  let enrich ~opt_branches_maxdom ~former_typ default_anns lst ts =
     let t =
       destruct lst |>
       List.filter_map (fun (s, (_,t,b)) ->
@@ -146,11 +146,11 @@ end = struct
       else None
     ) |> Types_additions.conj |> Cduce.cap_o former_typ in
     let annot (s',t') =
-      let s' = Cduce.cap_o s' new_branches_maxdom in
+      let req = (Types_additions.top_jokers Types_additions.Max s') = [] in
+      let s' = if req then s' else Cduce.cap_o s' opt_branches_maxdom in
       let arrow_type = Cduce.mk_arrow (Cduce.cons s') (Cduce.cons t') in
       if Cduce.subtype t arrow_type then None
       else
-        let req = (Types_additions.top_jokers Types_additions.Max s') = [] in
         let s' = Types_additions.substitute_top_jokers Types_additions.Max s' Cduce.any in
         let t' = Types_additions.substitute_top_jokers Types_additions.Min t' Cduce.any in
         Some (s', (default_anns, t', req))

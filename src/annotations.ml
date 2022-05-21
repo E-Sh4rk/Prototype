@@ -75,18 +75,25 @@ and annot_equals el eb a1 a2 =
     annot_a_equals el a1 a2 && eb b1 b2
   | _, _ -> false
 
-let annot_a_initial il iel a =
+let rec annot_a_initial cl cb a =
   match a with
   | Abstract _ | Const _ | Ite _ | Pair _ | Projection _
   | RecordUpdate _ | Let _ -> EmptyAtomA
   | App _ -> AppA (Cduce.any_or_absent, false)
-  | Lambda (_, Ast.Unnanoted, _, e) -> LambdaA (Cduce.any_or_absent, il e)
-  | Lambda (_, _, _, _) -> LambdaA (Cduce.any_or_absent, iel ())
+  | Lambda (_, Ast.Unnanoted, _, e) ->
+    let initial_e = annot_initial cl cb e in
+    LambdaA (Cduce.any_or_absent,
+      cl "initial" [(Cduce.any, (initial_e, Cduce.any, false))])
+  | Lambda (_, _, _, _) ->
+    LambdaA (Cduce.any_or_absent, cl "initial" [])
 
-let annot_initial il ial ib e =
+and annot_initial cl cb e =
   match e with
   | Var _ -> EmptyA
-  | Bind (_, _, a, e) -> BindA (annot_a_initial il ial a, ib e)
+  | Bind (_, _, a, e) ->
+    let initial_a = annot_a_initial cl cb a in
+    let initial_e = annot_initial cl cb e in
+    BindA (initial_a, cb "initial" [(Cduce.any_or_absent, initial_e)])
 
 let merge_annot_a ml a1 a2 =
   match a1, a2 with
@@ -103,14 +110,33 @@ let merge_annot ml mb a1 a2 =
     BindA (merge_annot_a ml a1 a2, mb b1 b2)
   | _, _ -> assert false
 
+module Node = struct
+  type t = { id:int }
+  [@@deriving show]
+  let default_node = { id=0 }
+  let new_node =
+    let last_id = ref 0 in
+    fun () -> last_id := !last_id + 1 ; {id = !last_id}
+  let node_of_id =
+    let h = Hashtbl.create 1000 in
+    fun str ->
+      match Hashtbl.find_opt h str with
+      | None ->
+        let res = new_node () in
+        Hashtbl.add h str res ;
+        res
+      | Some n -> n
+  let equals n1 n2 = n1.id = n2.id
+end
+
 module rec LambdaSA : sig
   type t
   val empty : unit -> t
-  val initial : Msc.e -> t
   val destruct : t -> (Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ * bool)) list
   val add : t -> Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ * bool) -> t
   val merge : t -> t -> t
   val construct : (Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ * bool)) list -> t
+  val construct_with_custom_eq : string -> (Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ * bool)) list -> t
   val map_top : (Cduce.typ -> Cduce.typ -> bool -> Cduce.typ * Cduce.typ * bool) -> t -> t
   val enrich : opt_branches_maxdom:Cduce.typ -> former_typ:Cduce.typ -> (t,BindSA.t) annot'
                -> t -> (Cduce.typ * Cduce.typ) list -> t
@@ -120,40 +146,31 @@ module rec LambdaSA : sig
   val equals : t -> t -> bool
   val pp : Format.formatter -> t -> unit
 end = struct
-  type node = { id:int }
+  type t = T of Node.t * (Cduce.typ * ((t, BindSA.t) annot' * Cduce.typ * bool)) list
   [@@deriving show]
-  let initial_node = { id=1 }
-  (* NOTE: For simplicity, we consider all the initial annots equal. *)
-  let empty_node = { id=0 }
-  let new_node =
-    let last_id = ref 1 in
-    fun () -> last_id := !last_id + 1 ; {id = !last_id}
-  type t = T of node * (Cduce.typ * ((t, BindSA.t) annot' * Cduce.typ * bool)) list
-  [@@deriving show]
-  let equals (T (n1,_)) (T (n2,_)) =
-    n1.id = n2.id
-  let empty () = T (empty_node, [])
-  let rec initial e =
-    let a = annot_initial initial empty BindSA.initial e in
-    T (initial_node, [(Cduce.any, (a, Cduce.any, false))])
+  let equals (T (n1,_)) (T (n2,_)) = Node.equals n1 n2
+  let empty () = T (Node.default_node, [])
   let destruct (T (_, lst)) = lst
   let add (T (node, lst)) (s, (a, t, b)) =
     if List.exists (fun (s', (a', t', b')) ->
       annot_equals equals BindSA.equals a a' &&
       b=b' && Cduce.equiv s s' && Cduce.equiv t t') lst
     then T (node, lst)
-    else T (new_node (), (s, (a, t, b))::lst)
+    else T (Node.new_node (), (s, (a, t, b))::lst)
   let merge a1 a2 =
     if equals a1 a2 then a1
     else destruct a2 |> List.fold_left add a1
   let construct lst =
     List.fold_left add (empty ()) lst
+  let construct_with_custom_eq str lst =
+    let T (_, a) = construct lst in
+    T (Node.node_of_id str, a)
   let map_top f (T (_, lst)) =
     lst |> List.map (fun (s, (a,t,b)) ->
       let (s, t, b) = f s t b in
       (s, (a, t, b)))
     (* |> construct*)
-    |> (fun res -> T (new_node (), res))
+    |> (fun res -> T (Node.new_node (), res))
   let enrich ~opt_branches_maxdom ~former_typ default_anns lst ts =
     let t =
       destruct lst |>
@@ -209,11 +226,11 @@ end
 and BindSA : sig
   type t
   val empty : unit -> t
-  val initial : Msc.e -> t
   val destruct : t -> (Cduce.typ * (LambdaSA.t, t) annot') list
   val add : t -> Cduce.typ * (LambdaSA.t, t) annot' -> t
   val merge : t -> t -> t
   val construct : (Cduce.typ * (LambdaSA.t, t) annot') list -> t
+  val construct_with_custom_eq : string -> (Cduce.typ * (LambdaSA.t, t) annot') list -> t
   val map_top : (Cduce.typ -> Cduce.typ) -> t -> t
   val choose : t -> Cduce.typ -> t
   val splits : t -> Cduce.typ list
@@ -222,37 +239,28 @@ and BindSA : sig
   val equals : t -> t -> bool
   val pp : Format.formatter -> t -> unit
 end = struct
-  type node = { id:int }
+  type t = T of Node.t * (Cduce.typ * (LambdaSA.t, t) annot') list
   [@@deriving show]
-  let initial_node = { id=1 }
-  (* NOTE: For simplicity, we consider all the initial annots equal. *)
-  let empty_node = { id=0 }
-  let new_node =
-    let last_id = ref 1 in
-    fun () -> last_id := !last_id + 1 ; {id = !last_id}
-  type t = T of node * (Cduce.typ * (LambdaSA.t, t) annot') list
-  [@@deriving show]
-  let equals (T (n1,_)) (T (n2,_)) =
-    n1.id = n2.id
-  let empty () = T (empty_node, [])
-  let rec initial e =
-    let a = annot_initial LambdaSA.initial LambdaSA.empty initial e in
-    T (initial_node, [(Cduce.any_or_absent, a)])
+  let equals (T (n1,_)) (T (n2,_)) = Node.equals n1 n2
+  let empty () = T (Node.default_node, [])
   let destruct (T (_, lst)) = lst
   let add (T (node, lst)) (s, a) =
     if List.exists (fun (s', a') ->
       annot_equals LambdaSA.equals equals a a' && Cduce.equiv s s') lst
     then T (node, lst)
-    else T (new_node (), (s, a)::lst)
+    else T (Node.new_node (), (s, a)::lst)
   let merge a1 a2 =
     if equals a1 a2 then a1
     else destruct a2 |> List.fold_left add a1
   let construct lst =
     List.fold_left add (empty ()) lst
+  let construct_with_custom_eq str lst =
+    let T (_, a) = construct lst in
+    T (Node.node_of_id str, a)
   let map_top f (T (_, lst)) =
     lst |> List.map (fun (s, a) -> (f s, a))
     (* |> construct*)
-    |> (fun res -> T (new_node (), res))
+    |> (fun res -> T (Node.new_node (), res))
   let choose (T (_, lst)) t =
     let max lst =
       lst |> List.partition (fun (t,_) ->
@@ -276,7 +284,7 @@ end = struct
           else aux (hd::acc) lst (Cduce.diff t (fst hd))
         end
     in
-    T (new_node (), aux [] lst t)
+    T (Node.new_node (), aux [] lst t)
   let splits (T (_, lst)) =
     List.map fst lst
   let apply (T (_, lst)) t =
@@ -302,8 +310,10 @@ type annot = (LambdaSA.t, BindSA.t) annot'
 let equals_annot_a = annot_a_equals LambdaSA.equals
 let equals_annot = annot_equals LambdaSA.equals BindSA.equals
 
-let initial_annot_a = annot_a_initial LambdaSA.initial LambdaSA.empty
-let initial_annot = annot_initial LambdaSA.initial LambdaSA.empty BindSA.initial
+let initial_annot_a =
+  annot_a_initial LambdaSA.construct_with_custom_eq BindSA.construct_with_custom_eq
+let initial_annot =
+  annot_initial LambdaSA.construct_with_custom_eq BindSA.construct_with_custom_eq
 
 let merge_annot_a = merge_annot_a LambdaSA.merge
 let merge_annot = merge_annot LambdaSA.merge BindSA.merge

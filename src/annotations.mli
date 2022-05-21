@@ -11,11 +11,11 @@ type ('a, 'b) annot' =
 module rec LambdaSA : sig
     type t
     val empty : unit -> t
-    val initial : Msc.e -> t
     val destruct : t -> (Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ * bool)) list
     val add : t -> Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ * bool) -> t
     val merge : t -> t -> t
     val construct : (Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ * bool)) list -> t
+    val construct_with_custom_eq : string -> (Cduce.typ * ((t,BindSA.t) annot' * Cduce.typ * bool)) list -> t
     val map_top : (Cduce.typ -> Cduce.typ -> bool -> Cduce.typ * Cduce.typ * bool) -> t -> t
     val enrich : opt_branches_maxdom:Cduce.typ -> former_typ:Cduce.typ -> (t,BindSA.t) annot'
                  -> t -> (Cduce.typ * Cduce.typ) list -> t
@@ -27,11 +27,11 @@ end
 and BindSA : sig
     type t
     val empty : unit -> t
-    val initial : Msc.e -> t
     val destruct : t -> (Cduce.typ * (LambdaSA.t, t) annot') list
     val add : t -> Cduce.typ * (LambdaSA.t, t) annot' -> t
     val merge : t -> t -> t
     val construct : (Cduce.typ * (LambdaSA.t, t) annot') list -> t
+    val construct_with_custom_eq : string -> (Cduce.typ * (LambdaSA.t, t) annot') list -> t
     val map_top : (Cduce.typ -> Cduce.typ) -> t -> t
     val choose : t -> Cduce.typ -> t
     val splits : t -> Cduce.typ list

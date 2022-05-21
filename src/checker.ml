@@ -4,6 +4,7 @@ open Types_additions
 open Variable
 open Utils
 open Annotations
+open Annotations.Annot
 
 exception Ill_typed of Position.t list * string
 
@@ -312,7 +313,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
         |> List.map simplify_dnf |> List.flatten |> List.flatten
       in
       log "@,Branches suggested by t: %a" pp_branches branches ;
-      let va = LambdaSA.enrich ~opt_branches_maxdom ~former_typ (initial_annot e) va branches in
+      let va = LambdaSA.enrich ~opt_branches_maxdom ~former_typ (initial_e e) va branches in
       let res = infer_a_iterated ~no_lambda_ua:true pos tenv env (LambdaA (former_typ,va)) a [arrow_any] in
       let best_t = res |>
         List.map (fun (_, anns) ->
@@ -595,7 +596,7 @@ let infer tenv env e =
     Bind (Old_annotations.VarAnnot.empty, v, Abstract (var_type [] v env), acc)
   ) fv e in
   let anns =
-    match infer_iterated tenv Env.empty (initial_annot e) e any with
+    match infer_iterated tenv Env.empty (initial_e e) e any with
     | [] -> raise (Ill_typed ([], "Annotations inference failed."))
     | [(_, anns)] -> (e, anns)
     | _ -> assert false

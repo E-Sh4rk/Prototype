@@ -50,18 +50,8 @@ let partition lst =
   in aux lst
 
   module type Annot = sig
-    type lsa
-    type bsa
-
-    type a =
-    | EmptyAtomA
-    | UntypAtomA
-    | AppA of Cduce.typ * bool
-    | LambdaA of (Cduce.typ (* Last type of the lambda *) * lsa)
-    and e =
-    | EmptyA
-    | BindA of (a * bsa)
-
+    type a
+    type e
     val equals_a : a -> a -> bool
     val equals_e : e -> e -> bool
     val merge_a : a -> a -> a
@@ -128,8 +118,9 @@ module Node = struct
   let equals n1 n2 = n1.id = n2.id
 end
 
-module LambdaSAMake (Annot:Annot) = struct
-  type annot = Annot.e
+module LambdaSAMake (A:Annot): (LambdaSA with type annot=A.e) =
+struct
+  type annot = A.e
   [@@deriving show]
   type t = T of Node.t * (Cduce.typ * (annot * Cduce.typ * bool)) list
   [@@deriving show]
@@ -138,7 +129,7 @@ module LambdaSAMake (Annot:Annot) = struct
   let destruct (T (_, lst)) = lst
   let add (T (node, lst)) (s, (a, t, b)) =
     if List.exists (fun (s', (a', t', b')) ->
-      Annot.equals_e a a' && b=b' && Cduce.equiv s s' && Cduce.equiv t t') lst
+      A.equals_e a a' && b=b' && Cduce.equiv s s' && Cduce.equiv t t') lst
     then T (node, lst)
     else T (Node.new_node (), (s, (a, t, b))::lst)
   let merge a1 a2 =
@@ -184,7 +175,7 @@ module LambdaSAMake (Annot:Annot) = struct
     ) in
     match anns with
     | [] -> assert false
-    | a1::anns -> List.fold_left Annot.merge_e a1 anns
+    | a1::anns -> List.fold_left A.merge_e a1 anns
   let apply (T (_, lst)) s t b =
     let lst = lst |> List.filter (fun (_, (_, t', b')) ->
       b = b' && Cduce.equiv t t'
@@ -208,8 +199,8 @@ module LambdaSAMake (Annot:Annot) = struct
     T (node, List.flatten lst)
 end
 
-module BindSAMake (Annot:Annot) = struct
-  type annot = Annot.e
+module BindSAMake (A:Annot): (BindSA with type annot=A.e) = struct
+  type annot = A.e
   [@@deriving show]
   type t = T of Node.t * (Cduce.typ * annot) list
   [@@deriving show]
@@ -217,7 +208,7 @@ module BindSAMake (Annot:Annot) = struct
   let empty () = T (Node.default_node, [])
   let destruct (T (_, lst)) = lst
   let add (T (node, lst)) (s, a) =
-    if List.exists (fun (s', a') -> Annot.equals_e a a' && Cduce.equiv s s') lst
+    if List.exists (fun (s', a') -> A.equals_e a a' && Cduce.equiv s s') lst
     then T (node, lst)
     else T (Node.new_node (), (s, a)::lst)
   let merge a1 a2 =
@@ -241,7 +232,7 @@ module BindSAMake (Annot:Annot) = struct
     ) in
     match anns with
     | [] -> assert false
-    | a1::anns -> List.fold_left Annot.merge_e a1 anns
+    | a1::anns -> List.fold_left A.merge_e a1 anns
   let normalize ((T (node, _)) as anns) s =
     let ts = splits anns
       |> List.map (Cduce.cap_o s)
@@ -249,23 +240,24 @@ module BindSAMake (Annot:Annot) = struct
     T (node, List.map (fun t -> (t, apply anns t)) ts)
 end
 
+type 'lsa anns_a =
+| EmptyAtomA
+| UntypAtomA
+| AppA of Cduce.typ * bool
+| LambdaA of (Cduce.typ (* Last type of the lambda *) * 'lsa)
+[@@deriving show]
+type ('lsa, 'bsa) anns_e =
+| EmptyA
+| BindA of ('lsa anns_a * 'bsa)
+[@@deriving show]
+
 module rec BindSA : (BindSA with type annot=Annot.e) = BindSAMake(Annot)
 and LambdaSA : (LambdaSA with type annot=Annot.e) = LambdaSAMake(Annot)
-and Annot : Annot with type lsa=LambdaSA.t and type bsa=BindSA.t =
+and Annot : (Annot with type a=LambdaSA.t anns_a and type e=(LambdaSA.t, BindSA.t) anns_e) =
 struct
-  type lsa = LambdaSA.t
+  type a = LambdaSA.t anns_a
   [@@deriving show]
-  type bsa = BindSA.t
-  [@@deriving show]
-  type a =
-  | EmptyAtomA
-  | UntypAtomA
-  | AppA of Cduce.typ * bool
-  | LambdaA of (Cduce.typ (* Last type of the lambda *) * lsa)
-  [@@deriving show]
-  and e =
-  | EmptyA
-  | BindA of (a * bsa)
+  type e = (LambdaSA.t, BindSA.t) anns_e
   [@@deriving show]
 
   let equals_a a1 a2 =
@@ -283,7 +275,7 @@ struct
       BindSA.equals b1 b2 && equals_a a1 a2
     | _, _ -> false
 
-  let rec initial_a a =
+  let rec initial_a a : a =
     match a with
     | Abstract _ | Const _ | Ite _ | Pair _ | Projection _
     | RecordUpdate _ | Let _ -> EmptyAtomA
@@ -296,7 +288,7 @@ struct
     | Lambda (_, _, _, _) ->
       LambdaA (Cduce.any_or_absent,
       LambdaSA.construct_with_custom_eq "initial" [])
-  and initial_e e =
+  and initial_e e : e =
     match e with
     | Var _ -> EmptyA
     | Bind (_, _, a, e) ->

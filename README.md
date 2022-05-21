@@ -15,7 +15,6 @@ opam pin add cduce-types 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cd
 opam pin add cduce 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#polymorphic'
 
 opam install cduce-types cduce
-
 ```
 
 ### Building the prototype

@@ -4,18 +4,8 @@ val remove_redundance : Cduce.typ list -> Cduce.typ list
 val partition : Cduce.typ list -> Cduce.typ list
 
 module type Annot = sig
-    type lsa
-    type bsa
-
-    type a =
-    | EmptyAtomA
-    | UntypAtomA
-    | AppA of Cduce.typ * bool
-    | LambdaA of (Cduce.typ (* Last type of the lambda *) * lsa)
-    and e =
-    | EmptyA
-    | BindA of (a * bsa)
-
+    type a
+    type e
     val equals_a : a -> a -> bool
     val equals_e : e -> e -> bool
     val merge_a : a -> a -> a
@@ -63,9 +53,18 @@ module type BindSA = sig
     val pp : Format.formatter -> t -> unit
 end
 
-module LambdaSAMake: functor(Annot: Annot) -> LambdaSA with type annot=Annot.e
-module BindSAMake: functor(Annot: Annot) -> BindSA with type annot=Annot.e
+module LambdaSAMake: functor(A: Annot) -> LambdaSA with type annot=A.e
+module BindSAMake: functor(A: Annot) -> BindSA with type annot=A.e
+
+type 'lsa anns_a =
+| EmptyAtomA
+| UntypAtomA
+| AppA of Cduce.typ * bool
+| LambdaA of (Cduce.typ (* Last type of the lambda *) * 'lsa)
+type ('lsa, 'bsa) anns_e =
+| EmptyA
+| BindA of ('lsa anns_a * 'bsa)
 
 module rec BindSA : (BindSA with type annot=Annot.e)
 and LambdaSA : (LambdaSA with type annot=Annot.e)
-and Annot : (Annot with type lsa=LambdaSA.t and type bsa=BindSA.t)
+and Annot : (Annot with type a=LambdaSA.t anns_a and type e=(LambdaSA.t, BindSA.t) anns_e)

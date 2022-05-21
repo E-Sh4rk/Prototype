@@ -58,7 +58,6 @@ let partition lst =
     val merge_e : e -> e -> e
     val initial_a : Msc.a -> a
     val initial_e : Msc.e -> e
-    val annotate_def_with_last_type : Cduce.typ -> a -> a
     val pp_a : Format.formatter -> a -> unit
     val pp_e : Format.formatter -> e -> unit
     val show_a : a -> string
@@ -251,9 +250,14 @@ type ('lsa, 'bsa) anns_e =
 | BindA of ('lsa anns_a * 'bsa)
 [@@deriving show]
 
-module rec BindSA : (BindSA with type annot=Annot.e) = BindSAMake(Annot)
-and LambdaSA : (LambdaSA with type annot=Annot.e) = LambdaSAMake(Annot)
-and Annot : (Annot with type a=LambdaSA.t anns_a and type e=(LambdaSA.t, BindSA.t) anns_e) =
+module type AnnotMono = sig
+  include Annot
+  val annotate_def_with_last_type : Cduce.typ -> a -> a
+end
+
+module rec BindSA : (BindSA with type annot=AnnotMono.e) = BindSAMake(AnnotMono)
+and LambdaSA : (LambdaSA with type annot=AnnotMono.e) = LambdaSAMake(AnnotMono)
+and AnnotMono : (AnnotMono with type a=LambdaSA.t anns_a and type e=(LambdaSA.t, BindSA.t) anns_e) =
 struct
   type a = LambdaSA.t anns_a
   [@@deriving show]

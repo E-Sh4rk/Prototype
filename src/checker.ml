@@ -4,7 +4,7 @@ open Types_additions
 open Variable
 open Utils
 open Annotations
-open Annotations.Annot
+open Annotations.AnnotMono
 
 exception Ill_typed of Position.t list * string
 

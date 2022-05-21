@@ -232,7 +232,6 @@ and BindSA : sig
   val construct : (Cduce.typ * (LambdaSA.t, t) annot') list -> t
   val construct_with_custom_eq : string -> (Cduce.typ * (LambdaSA.t, t) annot') list -> t
   val map_top : (Cduce.typ -> Cduce.typ) -> t -> t
-  val choose : t -> Cduce.typ -> t
   val splits : t -> Cduce.typ list
   val apply : t -> Cduce.typ -> (LambdaSA.t, t) annot'
   val normalize : t -> Cduce.typ -> t
@@ -261,30 +260,6 @@ end = struct
     lst |> List.map (fun (s, a) -> (f s, a))
     (* |> construct*)
     |> (fun res -> T (Node.new_node (), res))
-  let choose (T (_, lst)) t =
-    let max lst =
-      lst |> List.partition (fun (t,_) ->
-        lst |> List.exists (fun (t', _) ->
-          Cduce.subtype t t' && not (Cduce.subtype t' t)
-        ) |> not
-      )
-    in
-    let rec aux acc lst t =
-      match lst with
-      | [(t', anns')] when acc=[] -> [(t', anns')]
-      | [] -> acc
-      | lst ->
-        begin match max lst with
-        | ([], _) -> assert false
-        | (hd::tl, lst) ->
-          let lst = tl@lst in
-          let ot = List.map fst lst |> Types_additions.disj in
-          if Cduce.subtype t ot
-          then aux acc lst t
-          else aux (hd::acc) lst (Cduce.diff t (fst hd))
-        end
-    in
-    T (Node.new_node (), aux [] lst t)
   let splits (T (_, lst)) =
     List.map fst lst
   let apply (T (_, lst)) t =

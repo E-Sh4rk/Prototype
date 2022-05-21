@@ -33,7 +33,6 @@ and BindSA : sig
     val construct : (Cduce.typ * (LambdaSA.t, t) annot') list -> t
     val construct_with_custom_eq : string -> (Cduce.typ * (LambdaSA.t, t) annot') list -> t
     val map_top : (Cduce.typ -> Cduce.typ) -> t -> t
-    val choose : t -> Cduce.typ -> t
     val splits : t -> Cduce.typ list
     val apply : t -> Cduce.typ -> (LambdaSA.t, t) annot'
     val normalize : t -> Cduce.typ -> t

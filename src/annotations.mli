@@ -50,6 +50,7 @@ val initial_annot_a : Msc.a -> annot_a
 val initial_annot : Msc.e -> annot
 
 val remove_redundance : Cduce.typ list -> Cduce.typ list
+val partition : Cduce.typ list -> Cduce.typ list
 val regroup : ('a -> 'a -> bool) -> ('a * 'b) list -> ('a * ('b list)) list
 
 val annotate_def_with_last_type : Cduce.typ -> annot_a -> annot_a

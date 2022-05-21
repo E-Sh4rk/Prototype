@@ -13,6 +13,23 @@ let regroup equiv res =
   in
   List.fold_left aux [] res
 
+let partition lst =
+  let rec aux lst =
+    let rm_empty = List.filter (fun t -> Cduce.is_empty t |> not) in
+    let inter t1 t2 =
+      if Cduce.disjoint t1 t2 then t1 else Cduce.cap_o t1 t2
+    in
+    match rm_empty lst with
+    | [] -> []
+    | t::lst ->
+      let s = List.fold_left inter t lst in
+      let lst = (t::lst)
+      |> List.map (fun t -> Cduce.diff_o t s)
+      |> aux
+      in
+      s::lst
+  in aux lst
+
 let remove_redundance ts =
   (* Format.printf "Remove redundance: %a@." (Utils.pp_list Cduce.pp_typ) ts ; *)
   let change = ref false in

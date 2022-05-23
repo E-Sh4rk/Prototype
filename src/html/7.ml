@@ -34,7 +34,7 @@ let succ_fail = fun (x : Any) -> x + 1
  A complicated example of inference where
  the inferred type is
  ( Int  ->  (String->String) & (Int -> Int)) &
- ( ¬Int ->  Any -> Int )
+ ( ¬Int ->  Any -> String )
  and tells us precisely how the type of the
  second argument depends on the type of the
  first argument

@@ -239,6 +239,8 @@ module BindSAMake (A:Annot): (BindSA with type annot=A.e) = struct
     T (node, List.map (fun t -> (t, apply anns t)) ts)
 end
 
+(* === MONOMORPHIC SYSTEM === *)
+
 type 'lsa anns_a =
 | EmptyAtomA
 | UntypAtomA
@@ -322,4 +324,91 @@ struct
     | UntypAtomA -> UntypAtomA
     | AppA (t,b) -> AppA (t,b)
     | LambdaA (_, lsa) -> LambdaA (t, lsa)
+end
+
+(* === POLYMORPHIC SYSTEM === *)
+
+type 'lsa anns_a_poly =
+| PEmptyAtomA
+| PUntypAtomA
+| PAppA of Cduce.subst list
+| PLambdaA of (Cduce.typ (* Last type of the lambda *) * 'lsa)
+[@@deriving show]
+type ('lsa, 'bsa) anns_e_poly =
+| PEmptyA
+| PBindA of ('lsa anns_a_poly * 'bsa)
+[@@deriving show]
+
+module type AnnotPoly = sig
+    include Annot
+    val annotate_def_with_last_type : Cduce.typ -> a -> a
+end
+
+module rec BindSAP : (BindSA with type annot=AnnotPoly.e) = BindSAMake(AnnotPoly)
+and LambdaSAP : (LambdaSA with type annot=AnnotPoly.e) = LambdaSAMake(AnnotPoly)
+and AnnotPoly : (AnnotPoly with type a=LambdaSAP.t anns_a_poly and type e=(LambdaSAP.t, BindSAP.t) anns_e_poly) =
+struct (* TODO *)
+  type a = LambdaSAP.t anns_a_poly
+  [@@deriving show]
+  type e = (LambdaSAP.t, BindSAP.t) anns_e_poly
+  [@@deriving show]
+
+  let equals_a a1 a2 =
+    match a1, a2 with
+    | PEmptyAtomA, PEmptyAtomA -> true
+    | PUntypAtomA, PUntypAtomA -> true
+    | PAppA _, PAppA _ -> failwith "TODO"
+    | PLambdaA (t1, a1), PLambdaA (t2, a2) ->
+      LambdaSAP.equals a1 a2 && Cduce.equiv t1 t2
+    | _, _ -> false
+  let equals_e a1 a2 =
+    match a1, a2 with
+    | PEmptyA, PEmptyA -> true
+    | PBindA (a1, b1), PBindA (a2, b2) ->
+      BindSAP.equals b1 b2 && equals_a a1 a2
+    | _, _ -> false
+
+  let rec initial_a a : a =
+    match a with
+    | Abstract _ | Const _ | Ite _ | Pair _ | Projection _
+    | RecordUpdate _ | Let _ -> PEmptyAtomA
+    | App _ -> PAppA []
+    | Lambda (_, Ast.Unnanoted, _, e) ->
+      let initial_e = initial_e e in
+      PLambdaA (Cduce.any_or_absent,
+      LambdaSAP.construct_with_custom_eq "initial"
+        [(failwith "TODO", (initial_e, Cduce.any, false))])
+    | Lambda (_, _, _, _) ->
+      PLambdaA (Cduce.any_or_absent,
+      LambdaSAP.construct_with_custom_eq "initial" [])
+  and initial_e e : e =
+    match e with
+    | Var _ -> PEmptyA
+    | Bind (_, _, a, e) ->
+      let initial_a = initial_a a in
+      let initial_e = initial_e e in
+      PBindA (initial_a, BindSAP.construct_with_custom_eq "initial"
+      [(Cduce.any_or_absent, initial_e)])
+
+  let merge_a a1 a2 =
+    match a1, a2 with
+    | PUntypAtomA, a | a, PUntypAtomA -> a
+    | PEmptyAtomA, PEmptyAtomA -> PEmptyAtomA
+    | PAppA _, PAppA _ -> failwith "TODO"
+    | PLambdaA (t1, a1), PLambdaA (t2, a2) ->
+      PLambdaA (Cduce.cap_o t1 t2, LambdaSAP.merge a1 a2)
+    | _, _ -> assert false
+  let merge_e a1 a2 =
+    match a1, a2 with
+    | PEmptyA, PEmptyA -> PEmptyA
+    | PBindA (a1, b1), PBindA (a2, b2) ->
+      PBindA (merge_a a1 a2, BindSAP.merge b1 b2)
+    | _, _ -> assert false
+
+  let annotate_def_with_last_type t anns =
+    match anns with
+    | PEmptyAtomA -> PEmptyAtomA
+    | PUntypAtomA -> PUntypAtomA
+    | PAppA ss -> PAppA ss
+    | PLambdaA (_, lsa) -> PLambdaA (t, lsa)
 end

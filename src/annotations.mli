@@ -55,6 +55,8 @@ end
 module LambdaSAMake: functor(A: Annot) -> LambdaSA with type annot=A.e
 module BindSAMake: functor(A: Annot) -> BindSA with type annot=A.e
 
+(* === MONOMORPHIC SYSTEM === *)
+
 type 'lsa anns_a =
 | EmptyAtomA
 | UntypAtomA
@@ -72,3 +74,23 @@ end
 module rec BindSA : (BindSA with type annot=AnnotMono.e)
 and LambdaSA : (LambdaSA with type annot=AnnotMono.e)
 and AnnotMono : (AnnotMono with type a=LambdaSA.t anns_a and type e=(LambdaSA.t, BindSA.t) anns_e)
+
+(* === POLYMORPHIC SYSTEM === *)
+
+type 'lsa anns_a_poly =
+| PEmptyAtomA
+| PUntypAtomA
+| PAppA of Cduce.subst list (* TODO: substitution annots can also be in other atomics such as proj *)
+| PLambdaA of (Cduce.typ (* Last type of the lambda *) * 'lsa)
+type ('lsa, 'bsa) anns_e_poly =
+| PEmptyA
+| PBindA of ('lsa anns_a_poly * 'bsa)
+
+module type AnnotPoly = sig
+    include Annot
+    val annotate_def_with_last_type : Cduce.typ -> a -> a
+end
+
+module rec BindSAP : (BindSA with type annot=AnnotPoly.e)
+and LambdaSAP : (LambdaSA with type annot=AnnotPoly.e)
+and AnnotPoly : (AnnotPoly with type a=LambdaSAP.t anns_a_poly and type e=(LambdaSAP.t, BindSAP.t) anns_e_poly)

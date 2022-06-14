@@ -8,6 +8,7 @@ type subst = CD.Types.Subst.t
 
 val pp_typ : Format.formatter -> typ -> unit
 val show_typ : typ -> string
+val pp_subst : Format.formatter -> subst -> unit
 
 val register : string -> typ -> unit
 val pp : Format.formatter -> typ -> unit

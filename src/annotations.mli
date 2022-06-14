@@ -80,7 +80,7 @@ and AnnotMono : (AnnotMono with type a=LambdaSA.t anns_a and type e=(LambdaSA.t,
 type 'lsa anns_a_poly =
 | PEmptyAtomA
 | PUntypAtomA
-| PAppA of Cduce.subst list (* TODO: substitution annots can also be in other atomics such as proj *)
+| PInstA of Cduce.subst list
 | PLambdaA of (Cduce.typ (* Last type of the lambda *) * 'lsa)
 type ('lsa, 'bsa) anns_e_poly =
 | PEmptyA

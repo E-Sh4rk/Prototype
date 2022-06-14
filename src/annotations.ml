@@ -331,7 +331,7 @@ end
 type 'lsa anns_a_poly =
 | PEmptyAtomA
 | PUntypAtomA
-| PAppA of Cduce.subst list
+| PInstA of Cduce.subst list
 | PLambdaA of (Cduce.typ (* Last type of the lambda *) * 'lsa)
 [@@deriving show]
 type ('lsa, 'bsa) anns_e_poly =
@@ -357,7 +357,7 @@ struct (* TODO *)
     match a1, a2 with
     | PEmptyAtomA, PEmptyAtomA -> true
     | PUntypAtomA, PUntypAtomA -> true
-    | PAppA _, PAppA _ -> failwith "TODO"
+    | PInstA _, PInstA _ -> failwith "TODO"
     | PLambdaA (t1, a1), PLambdaA (t2, a2) ->
       LambdaSAP.equals a1 a2 && Cduce.equiv t1 t2
     | _, _ -> false
@@ -370,9 +370,9 @@ struct (* TODO *)
 
   let rec initial_a a : a =
     match a with
-    | Abstract _ | Const _ | Ite _ | Pair _ | Projection _
+    | Abstract _ | Const _ | Ite _ | Pair _
     | RecordUpdate _ | Let _ -> PEmptyAtomA
-    | App _ -> PAppA []
+    | Projection _ | App _ -> PInstA []
     | Lambda (_, Ast.Unnanoted, _, e) ->
       let initial_e = initial_e e in
       PLambdaA (Cduce.any_or_absent,
@@ -394,7 +394,7 @@ struct (* TODO *)
     match a1, a2 with
     | PUntypAtomA, a | a, PUntypAtomA -> a
     | PEmptyAtomA, PEmptyAtomA -> PEmptyAtomA
-    | PAppA _, PAppA _ -> failwith "TODO"
+    | PInstA _, PInstA _ -> failwith "TODO"
     | PLambdaA (t1, a1), PLambdaA (t2, a2) ->
       PLambdaA (Cduce.cap_o t1 t2, LambdaSAP.merge a1 a2)
     | _, _ -> assert false
@@ -409,6 +409,6 @@ struct (* TODO *)
     match anns with
     | PEmptyAtomA -> PEmptyAtomA
     | PUntypAtomA -> PUntypAtomA
-    | PAppA ss -> PAppA ss
+    | PInstA ss -> PInstA ss
     | PLambdaA (_, lsa) -> PLambdaA (t, lsa)
 end

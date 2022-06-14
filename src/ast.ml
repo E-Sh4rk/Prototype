@@ -60,22 +60,17 @@ module Expr = struct
         | -1 -> Lower
         | 1 -> Greater
         | 0 ->
-            let exact = ref true in
-            let compare_typ t1 t2 =
-                try Types_compare.compare_typ t1 t2
-                with Types_compare.Uncomparable -> (exact := false ; 0)
-            in
-            let cexact = compare
-                (fun () () -> 0)
-                compare_typ
-                Variable.compare t1 t2 in
-            begin match cexact with
-            | -1 -> Lower
-            | 1 -> Greater
-            | 0 when !exact -> Equal
-            | 0 -> Unknown
-            | _ -> assert false
-            end
+            begin try
+                let cexact = compare
+                    (fun () () -> 0)
+                    Types_compare.compare_typ
+                    Variable.compare t1 t2 in
+                match cexact with
+                | -1 -> Lower
+                | 1 -> Greater
+                | 0 -> Equal
+                | _ -> assert false
+            with Types_compare.Uncomparable -> Unknown end
         | _ -> assert false
 end
 module ExprMap = Pomap_impl.Make(Expr)

@@ -77,10 +77,18 @@ and AnnotMono : (AnnotMono with type a=LambdaSA.t anns_a and type e=(LambdaSA.t,
 
 (* === POLYMORPHIC SYSTEM === *)
 
+module Inst: sig
+    type t = Cduce.subst list
+    val empty : t
+    val equals : t -> t -> bool
+    val add : t -> Cduce.subst -> t
+    val union : t -> t -> t
+end
+
 type 'lsa anns_a_poly =
 | PEmptyAtomA
 | PUntypAtomA
-| PInstA of Cduce.subst list
+| PInstA of Inst.t
 | PLambdaA of (Cduce.typ (* Last type of the lambda *) * 'lsa)
 type ('lsa, 'bsa) anns_e_poly =
 | PEmptyA

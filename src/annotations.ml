@@ -328,10 +328,21 @@ end
 
 (* === POLYMORPHIC SYSTEM === *)
 
+module Inst = struct
+  type t = Cduce.subst list
+  [@@deriving show]
+
+  let empty = []
+  let equals _ _ = failwith "TODO"
+  let add _ _ = failwith "TODO"
+  let union t1 t2 =
+    List.fold_left add t1 t2
+end
+
 type 'lsa anns_a_poly =
 | PEmptyAtomA
 | PUntypAtomA
-| PInstA of Cduce.subst list
+| PInstA of Inst.t
 | PLambdaA of (Cduce.typ (* Last type of the lambda *) * 'lsa)
 [@@deriving show]
 type ('lsa, 'bsa) anns_e_poly =
@@ -347,7 +358,7 @@ end
 module rec BindSAP : (BindSA with type annot=AnnotPoly.e) = BindSAMake(AnnotPoly)
 and LambdaSAP : (LambdaSA with type annot=AnnotPoly.e) = LambdaSAMake(AnnotPoly)
 and AnnotPoly : (AnnotPoly with type a=LambdaSAP.t anns_a_poly and type e=(LambdaSAP.t, BindSAP.t) anns_e_poly) =
-struct (* TODO *)
+struct
   type a = LambdaSAP.t anns_a_poly
   [@@deriving show]
   type e = (LambdaSAP.t, BindSAP.t) anns_e_poly
@@ -357,7 +368,7 @@ struct (* TODO *)
     match a1, a2 with
     | PEmptyAtomA, PEmptyAtomA -> true
     | PUntypAtomA, PUntypAtomA -> true
-    | PInstA _, PInstA _ -> failwith "TODO"
+    | PInstA i1, PInstA i2 -> Inst.equals i1 i2
     | PLambdaA (t1, a1), PLambdaA (t2, a2) ->
       LambdaSAP.equals a1 a2 && Cduce.equiv t1 t2
     | _, _ -> false
@@ -394,7 +405,7 @@ struct (* TODO *)
     match a1, a2 with
     | PUntypAtomA, a | a, PUntypAtomA -> a
     | PEmptyAtomA, PEmptyAtomA -> PEmptyAtomA
-    | PInstA _, PInstA _ -> failwith "TODO"
+    | PInstA i1, PInstA i2 -> PInstA (Inst.union i1 i2)
     | PLambdaA (t1, a1), PLambdaA (t2, a2) ->
       PLambdaA (Cduce.cap_o t1 t2, LambdaSAP.merge a1 a2)
     | _, _ -> assert false

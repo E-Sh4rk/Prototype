@@ -422,7 +422,9 @@ let remove_field_info t label =
     let singleton = mk_record false [label, any_or_absent_node] in
     merge_records t singleton
 
-(* Operations on vars *)
+(* Operations on substs and vars *)
+
+(* Operations on jokers *)
 
 type joker_kind = Min | Max
 let reserved_name_for_joker t =

@@ -228,3 +228,9 @@ let var_name = CD.Var.name
 let var_set = CD.Var.Set.from_list
 let substitute = CD.Types.Subst.apply
 let mk_subst = CD.Types.Subst.from_list
+
+let subst_dom s = CD.Var.Map.domain s
+let subst_mem s v = CD.Var.Set.mem (subst_dom s) v
+let subst_find s v = CD.Var.Map.assoc v s
+let subst_equiv s1 s2 =
+    CD.Var.Map.equal equiv s1 s2

@@ -92,7 +92,9 @@ val remove_field_info : typ -> string -> typ
 (** [remove_field_info t label] removes all the information
     about the field label in the record t. *)
 
-(* Operations on vars *)
+(* Operations on substs and vars *)
+
+(* Operations on jokers *)
 
 type joker_kind = Min | Max
 val reserved_name_for_joker : joker_kind -> string

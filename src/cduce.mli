@@ -86,6 +86,10 @@ val var_name : var -> string
 val var_set : var list -> var list
 val substitute : subst -> typ -> typ
 val mk_subst : (var * typ) list -> subst
+val subst_dom : subst -> var list
+val subst_mem : subst -> var -> bool
+val subst_find : subst -> var -> typ
+val subst_equiv : subst -> subst -> bool
 
 val is_empty : typ -> bool
 val non_empty: typ -> bool

@@ -96,3 +96,10 @@ val non_empty: typ -> bool
 val subtype  : typ -> typ -> bool
 val disjoint : typ -> typ -> bool
 val equiv : typ -> typ -> bool
+
+(* Tallying *)
+(* TODO: Make a separate type var_set to avoid calling clean_type (etc.) on an invalid var list *)
+val clean_type : pos:typ -> neg:typ -> var list -> typ -> typ
+val rectype : typ -> var -> typ (* [rectype t u] returns the type corresponding to the equation u=t *)
+val refresh : var list -> typ -> typ
+val tallying : var list -> (typ * typ) list -> subst list

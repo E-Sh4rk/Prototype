@@ -234,3 +234,13 @@ let subst_mem s v = CD.Var.Set.mem (subst_dom s) v
 let subst_find s v = CD.Var.Map.assoc v s
 let subst_equiv s1 s2 =
     CD.Var.Map.equal equiv s1 s2
+
+(* Tallying *)
+let clean_type ~pos ~neg vars t =
+  CD.Types.Subst.clean_type ~pos ~neg vars t
+let rectype t var =
+  CD.Types.Subst.solve_rectype t var
+let refresh vars t =
+  CD.Types.Subst.refresh vars t
+let tallying vars eq =
+  CD.Types.Tallying.tallying vars eq

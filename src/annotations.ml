@@ -154,7 +154,7 @@ struct
       else None
     ) |> Types_additions.conj |> Cduce.cap_o former_typ in
     let annot (s',t') =
-      let req = (Types_additions.top_jokers Types_additions.Max s') = [] in
+      let req = (Types_additions.top_jokers Types_additions.Max s') |> Cduce.varlist = [] in
       let s' = if req then s' else Cduce.cap_o s' opt_branches_maxdom in
       let arrow_type = Cduce.mk_arrow (Cduce.cons s') (Cduce.cons t') in
       if Cduce.subtype t arrow_type then None

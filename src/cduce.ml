@@ -6,6 +6,7 @@ module LabelMap = CD.Ident.LabelMap
 type typ = CD.Types.t
 type node = CD.Types.Node.t
 type var = CD.Var.t
+type varset = CD.Var.Set.t
 type subst = CD.Types.Subst.t
 
 let register s = 
@@ -225,7 +226,9 @@ let mk_var name = CD.Var.mk name
 let vars = CD.Types.Subst.vars
 let top_vars = CD.Types.Subst.top_vars
 let var_name = CD.Var.name
-let var_set = CD.Var.Set.from_list
+let varset = CD.Var.Set.from_list
+let varset_filter = CD.Var.Set.filter
+let varlist = CD.Var.Set.get
 let substitute = CD.Types.Subst.apply
 let mk_subst = CD.Types.Subst.from_list
 

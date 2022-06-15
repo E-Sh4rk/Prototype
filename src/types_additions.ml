@@ -434,12 +434,12 @@ let reserved_name_for_joker t =
 
 let joker k = mk_var (reserved_name_for_joker k) |> var_typ
 let jokers k t =
-    vars t |> List.filter (fun v -> String.equal (var_name v) (reserved_name_for_joker k))
+    vars t |> varset_filter (fun v -> String.equal (var_name v) (reserved_name_for_joker k))
 let top_jokers k t =
-    top_vars t |> List.filter (fun v -> String.equal (var_name v) (reserved_name_for_joker k))
+    top_vars t |> varset_filter (fun v -> String.equal (var_name v) (reserved_name_for_joker k))
 
 let substitute_jokers k t t_subs =
-    let subst = jokers k t |> List.map (fun j -> (j,t_subs)) |> mk_subst in
+    let subst = jokers k t |> varlist |> List.map (fun j -> (j,t_subs)) |> mk_subst in
     substitute subst t
 
 let substitute_all_jokers t t_subs =
@@ -455,13 +455,13 @@ let worst t =
     substitute_jokers Min t any
 
 let substitute_top_jokers k t t_subs =
-    let subst = top_jokers k t |> List.map (fun j -> (j,t_subs)) |> mk_subst in
+    let subst = top_jokers k t |> varlist |> List.map (fun j -> (j,t_subs)) |> mk_subst in
     substitute subst t
 
 let required_part_of_branch (a,b) =
     if is_empty a then Some (a, b)
     else
-        let js = top_jokers Max a in
+        let js = top_jokers Max a |> varlist in
         let subst = js |> List.map (fun j -> (j, empty)) |> mk_subst in
         let a = substitute subst a in
         if is_empty a then None else Some (a,b)

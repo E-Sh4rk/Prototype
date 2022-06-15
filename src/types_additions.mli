@@ -100,8 +100,8 @@ type joker_kind = Min | Max
 val reserved_name_for_joker : joker_kind -> string
 
 val joker : joker_kind -> typ
-val jokers : joker_kind -> typ -> var list
-val top_jokers : joker_kind -> typ -> var list
+val jokers : joker_kind -> typ -> varset
+val top_jokers : joker_kind -> typ -> varset
 
 val substitute_jokers : joker_kind -> typ -> typ -> typ
 val substitute_all_jokers : typ -> typ -> typ

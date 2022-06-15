@@ -4,7 +4,8 @@ module CD = Cduce_types
 type typ = CD.Types.t
 type node = CD.Types.Node.t
 type var = CD.Var.t
-type subst = CD.Types.Subst.t
+type varset
+type subst
 
 val pp_typ : Format.formatter -> typ -> unit
 val show_typ : typ -> string
@@ -80,13 +81,15 @@ val dnf : typ -> (typ * typ) list list
 val full_dnf : typ -> ((typ list * typ list) * ((node * node) list * (node * node) list)) list
 
 val mk_var : string -> var
-val vars : typ -> var list
-val top_vars : typ -> var list
+val vars : typ -> varset
+val top_vars : typ -> varset
 val var_name : var -> string
-val var_set : var list -> var list
+val varset : var list -> varset
+val varset_filter : (var -> bool) -> varset -> varset
+val varlist : varset -> var list
 val substitute : subst -> typ -> typ
 val mk_subst : (var * typ) list -> subst
-val subst_dom : subst -> var list
+val subst_dom : subst -> varset
 val subst_mem : subst -> var -> bool
 val subst_find : subst -> var -> typ
 val subst_equiv : subst -> subst -> bool
@@ -98,8 +101,7 @@ val disjoint : typ -> typ -> bool
 val equiv : typ -> typ -> bool
 
 (* Tallying *)
-(* TODO: Make a separate type var_set to avoid calling clean_type (etc.) on an invalid var list *)
-val clean_type : pos:typ -> neg:typ -> var list -> typ -> typ
+val clean_type : pos:typ -> neg:typ -> varset -> typ -> typ
 val rectype : typ -> var -> typ (* [rectype t u] returns the type corresponding to the equation u=t *)
-val refresh : var list -> typ -> typ
-val tallying : var list -> (typ * typ) list -> subst list
+val refresh : varset -> typ -> typ
+val tallying : varset -> (typ * typ) list -> subst list

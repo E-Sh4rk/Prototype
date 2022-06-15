@@ -333,8 +333,10 @@ module Inst = struct
   [@@deriving show]
 
   let empty = []
-  let equals _ _ = failwith "TODO"
-  let add _ _ = failwith "TODO"
+  let equals _ _ = false (* Approximation *)
+  let add t s =
+    if List.exists (Cduce.subst_equiv s) t
+    then t else s::t
   let union t1 t2 =
     List.fold_left add t1 t2
 end
@@ -384,11 +386,11 @@ struct
     | Abstract _ | Const _ | Ite _ | Pair _
     | RecordUpdate _ | Let _ -> PEmptyAtomA
     | Projection _ | App _ -> PInstA []
-    | Lambda (_, Ast.Unnanoted, _, e) ->
+    | Lambda (_, Ast.Unnanoted, v, e) ->
       let initial_e = initial_e e in
       PLambdaA (Cduce.any_or_absent,
       LambdaSAP.construct_with_custom_eq "initial"
-        [(failwith "TODO", (initial_e, Cduce.any, false))])
+        [(Variable.Variable.to_typevar v |> Cduce.var_typ, (initial_e, Cduce.any, false))])
     | Lambda (_, _, _, _) ->
       PLambdaA (Cduce.any_or_absent,
       LambdaSAP.construct_with_custom_eq "initial" [])

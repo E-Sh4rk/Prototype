@@ -9,6 +9,7 @@ module Variable : sig
   val attach_location : t -> Position.t -> unit
   val get_locations : t -> Position.t list
   val get_name : t -> string option
+  val to_typevar : t -> Cduce.var
 end
 
 val get_predefined_var : int -> Variable.t

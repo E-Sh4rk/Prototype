@@ -39,9 +39,18 @@ module Variable = struct
     | None -> string_of_int t
     | Some str -> str
 
+  let typevars = Hashtbl.create 100
+
+  let to_typevar v =
+    if Hashtbl.mem typevars v
+    then Hashtbl.find typevars v
+    else
+      let tv = Cduce.mk_var (show v) in
+      Hashtbl.add typevars v tv ;
+      tv
 end
 
-let predefined_vars = Hashtbl.create 10
+let predefined_vars = Hashtbl.create 100
 
 let get_predefined_var i =
   if Hashtbl.mem predefined_vars i

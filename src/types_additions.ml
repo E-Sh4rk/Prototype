@@ -424,6 +424,10 @@ let remove_field_info t label =
 
 (* Operations on substs and vars *)
 
+let instantiate ss t =
+    List.map (fun s -> substitute s t) ss
+    |> conj_o
+
 (* Operations on jokers *)
 
 type joker_kind = Min | Max

@@ -94,6 +94,8 @@ val remove_field_info : typ -> string -> typ
 
 (* Operations on substs and vars *)
 
+val instantiate : Cduce.subst list -> typ -> typ
+
 (* Operations on jokers *)
 
 type joker_kind = Min | Max

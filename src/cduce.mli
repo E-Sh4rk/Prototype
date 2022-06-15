@@ -80,12 +80,15 @@ val apply : typ -> typ -> typ
 val dnf : typ -> (typ * typ) list list
 val full_dnf : typ -> ((typ list * typ list) * ((node * node) list * (node * node) list)) list
 
+(* TODO: Put varset functions into a VarSet module, and subst functions into a Subst module *)
 val mk_var : string -> var
 val vars : typ -> varset
 val top_vars : typ -> varset
 val var_name : var -> string
 val varset : var list -> varset
 val varset_filter : (var -> bool) -> varset -> varset
+val varset_union : varset -> varset -> varset
+val varset_inter : varset -> varset -> varset
 val varlist : varset -> var list
 val substitute : subst -> typ -> typ
 val mk_subst : (var * typ) list -> subst

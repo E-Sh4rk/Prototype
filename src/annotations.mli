@@ -1,7 +1,8 @@
 
 val regroup : ('a -> 'a -> bool) -> ('a * 'b) list -> ('a * ('b list)) list
-val remove_redundance : Cduce.typ list -> Cduce.typ list
+(*val remove_redundance : Cduce.typ list -> Cduce.typ list*)
 val partition : Cduce.typ list -> Cduce.typ list
+val partition_non_empty : Cduce.typ list -> Cduce.typ list
 
 module type Annot = sig
     type a

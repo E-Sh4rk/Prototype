@@ -13,7 +13,7 @@ let regroup equiv res =
   in
   List.fold_left aux [] res
 
-let remove_redundance ts =
+(*let remove_redundance ts =
   (* Format.printf "Remove redundance: %a@." (Utils.pp_list Cduce.pp_typ) ts ; *)
   let change = ref false in
   let aux ts t =
@@ -30,7 +30,7 @@ let remove_redundance ts =
     if !change then it ts else ts
   in
   it ts |> Utils.remove_duplicates Cduce.equiv
-  (* |> (fun r -> Format.printf "Result: %a@." (Utils.pp_list Cduce.pp_typ) r ; r) *)
+  (* |> (fun r -> Format.printf "Result: %a@." (Utils.pp_list Cduce.pp_typ) r ; r) *)*)
 
 let partition lst =
   let rec aux lst =
@@ -48,6 +48,11 @@ let partition lst =
       in
       s::lst
   in aux lst
+
+  let partition_non_empty lst =
+    match partition lst with
+    | [] -> [Cduce.empty]
+    | lst -> lst
 
   module type Annot = sig
     type a
@@ -190,7 +195,7 @@ struct
       |> regroup in
     let lst = ts
       |> List.map (fun ((t,b), lst) ->
-        let ss = List.map (fun (s,_) -> s) lst |> remove_redundance in
+        let ss = List.map (fun (s,_) -> s) lst |> partition_non_empty in
         let lst = lst |> List.map (fun (s, anns) -> (s, (anns, t, b))) in
         List.map (fun s -> (s, (apply_aux lst s, t, b))) ss
       )
@@ -235,7 +240,7 @@ module BindSAMake (A:Annot): (BindSA with type annot=A.e) = struct
   let normalize ((T (node, _)) as anns) s =
     let ts = splits anns
       |> List.map (Cduce.cap_o s)
-      |> remove_redundance in
+      |> partition_non_empty in
     T (node, List.map (fun t -> (t, apply anns t)) ts)
 end
 

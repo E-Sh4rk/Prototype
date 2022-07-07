@@ -2,6 +2,8 @@ open Variable
 
 type t = Env.t (* Base *) * Env.t (* Refinement *)
 
+(* TODO *)
+
 let empty b = (b, Env.empty)
 let is_empty (_,r) = Env.is_empty r
 

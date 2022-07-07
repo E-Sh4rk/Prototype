@@ -1,6 +1,8 @@
 open Variable
 open Cduce
 
+(* TODO: more general version where we can compose the refinements and retrieve only the refined part *)
+
 type t
 val empty : Env.t -> t
 val is_empty : t -> bool

@@ -56,6 +56,8 @@ let instantiate pos mono ss t =
 
 (* ===== TYPEOF ===== *)
 
+(* TODO: Add deltas + Update the \vee rule (free vars + intersections) *)
+
 let typeof_const_atom tenv c =
   match c with
   | Ast.Atom str -> get_type tenv str

@@ -19,10 +19,10 @@ val mem_ref : Variable.t -> t -> bool
 val find_ref : Variable.t -> t -> typ
 val is_empty_ref : t -> bool
 
-val refine_existing : Variable.t -> typ -> t -> t option
-val refine : Variable.t -> typ -> t -> t option
 val strengthen : Variable.t -> typ -> t -> t
-val restrict : Variable.t -> t -> t
+val refine_old : Variable.t -> typ -> t -> t option
+val refine : Variable.t -> typ -> t -> t option
+val rm : Variable.t -> t -> t
 
 val equiv : t -> t -> bool
 val leq : t -> t -> bool

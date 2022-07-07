@@ -6,7 +6,6 @@ val empty : t
 val is_empty : t -> bool
 val singleton : Variable.t -> typ -> t
 val add : Variable.t -> typ -> t -> t
-val strengthen_existing : Variable.t -> typ -> t -> t
 val strengthen : Variable.t -> typ -> t -> t
 val domain : t -> Variable.t list
 val mem : Variable.t -> t -> bool

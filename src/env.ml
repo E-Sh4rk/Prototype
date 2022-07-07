@@ -24,8 +24,7 @@ let strengthen_existing v t env =
   add v t env
 
 let strengthen v t env =
-  let t = try Cduce.cap_o t (find v env) with Not_found -> Cduce.any in
-  add v t env
+  try strengthen_existing v t env with Not_found -> add v t env
 
 let cap =
   VarMap.union (fun _ t1 t2 ->

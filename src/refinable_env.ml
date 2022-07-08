@@ -52,29 +52,29 @@ let rec is_empty t =
   | Base b -> Env.is_empty b
   | Ref (b, r) -> is_empty b && Env.is_empty r
 
-let rec domain_ref t =
+let domain_ref t =
   match t with
   | Base _ -> failwith "Invalid operation."
   | Ref (_, r) -> Env.domain r
-let rec mem_ref v t =
+let mem_ref v t =
   match t with
   | Base _ -> failwith "Invalid operation."
   | Ref (_, r) -> Env.mem v r
-let rec find_ref v t =
+let find_ref v t =
   match t with
   | Base _ -> failwith "Invalid operation."
   | Ref (_, r) -> Env.find v r
-let rec is_empty_ref t =
+let is_empty_ref t =
   match t with
   | Base _ -> failwith "Invalid operation."
   | Ref (_, r) -> Env.is_empty r
 
 let strengthen v t tt =
   match tt with
-  | Base b -> Base (Env.strenghten v t b)
+  | Base b -> Base (Env.strengthen v t b)
   | Ref (b, r) ->
     if mem v b && Cduce.subtype (find v b) t then Ref (b, r)
-    else Ref (b, Env.strenghten v t r)
+    else Ref (b, Env.strengthen v t r)
 let refine_old v t tt =
   try
     let ot = find v tt in

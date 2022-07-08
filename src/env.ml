@@ -10,6 +10,8 @@ let add = VarMap.add
 
 let domain vm = VarMap.bindings vm |> List.map fst
 
+let bindings vm = VarMap.bindings vm
+
 let mem = VarMap.mem
 
 let mem_strict v t =

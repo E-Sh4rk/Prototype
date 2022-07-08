@@ -5,11 +5,27 @@ type t =
   | Ref of t * Env.t
 
 let from_env b = Base b
+let rec to_env t =
+  match t with
+  | Base b -> b
+  | Ref (b, r) ->
+    List.fold_left (fun b (x,t) ->
+      Env.strengthen x t b
+    ) (to_env b) (Env.bindings r)
 
 let push t = Ref (t, Env.empty)
+let merge t = match t with
+  | Base _ -> failwith "Invalid operation."
+  | Ref (b, r) ->
+    let env = match b with Base b -> b | Ref (_, r) -> r in
+    let env = List.fold_left (fun e (x,t) ->
+        Env.strengthen x t e
+      ) env (Env.bindings r)
+    in
+    match b with Base _ -> Base env | Ref (b, _) -> Ref (b, env)
 let pop t = match t with
   | Base _ -> failwith "Invalid operation."
-  | Ref (t, _) -> t
+  | Ref (b, _) -> b
 
 let rec domain t =
   match t with
@@ -77,21 +93,23 @@ let rm v t =
   | Ref (b, r) when mem v b |> not -> Ref (b, Env.rm v r)
   | _ -> failwith "Variable cannot be removed because it is present in a parent environment."
 
-let rec to_env t =
+let leq_ref t1 t2 =
+  match t1, t2 with
+  | Base _, _ | _, Base _ -> failwith "Invalid operation."
+  | Ref (_, r1), Ref (_, r2) -> Env.leq r1 r2
+let equiv_ref t1 t2 = leq_ref t1 t2 && leq_ref t2 t1
+let leq t1 t2 = Env.leq (to_env t1) (to_env t2)
+let equiv t1 t2 = leq t1 t2 && leq t2 t1
+
+let show t =
   match t with
-  | Base b -> b
-  | Ref (b, r) ->
-    List.fold_left (fun b x ->
-      let t = Env.find x r in
-      Env.strengthen x t b
-    ) (to_env b) (Env.domain r) (* TODO: Use destruct instead *)
-
-(* TODO *)
-let leq_ref (_,r1) (_,r2) = Env.leq r1 r2
-let equiv_ref env1 env2 = leq_ref env1 env2 && leq_ref env2 env1
-let leq e1 e2 = Env.leq (to_env e1) (to_env e2)
-let equiv env1 env2 = leq env1 env2 && leq env2 env1
-
-let show (_,r) = Env.show r
-let pp fmt (_,r) = Env.pp fmt r
-let pp_filtered lst fmt (_,r) = Env.pp_filtered lst fmt r
+  | Base _ -> "Base"
+  | Ref (_, r) -> Env.show r
+let pp fmt t =
+  match t with
+  | Base _ -> Format.fprintf fmt "Base"
+  | Ref (_, r) -> Env.pp fmt r
+let pp_filtered lst fmt t =
+  match t with
+  | Base _ -> Format.fprintf fmt "Base"
+  | Ref (_, r) -> Env.pp_filtered lst fmt r

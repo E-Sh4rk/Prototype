@@ -1,6 +1,5 @@
 open Msc
 
-(* TODO: update regroup so that it only strenghten the split with the actual refinement *)
 let regroup equiv res =
   let rec add_if_equiv treated lst t o =
     match lst with

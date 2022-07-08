@@ -56,8 +56,6 @@ let instantiate pos mono ss t =
 
 (* ===== TYPEOF ===== *)
 
-(* TODO: Add deltas + Update the \vee rule (free vars + intersections) *)
-
 let typeof_const_atom tenv c =
   match c with
   | Ast.Atom str -> get_type tenv str
@@ -179,9 +177,14 @@ and typeof tenv env mono anns e =
       if subtype s d
       then
         BindSAP.destruct va |> List.map (fun (t, anns) ->
-          let env = Env.add v t env in
+          let env = Env.add v (cap_o t s) env in
+          let mono = varset_union mono (vars t) in
           typeof tenv env mono anns e
         ) |> disj_o |> simplify_typ
       else raise (Ill_typed (pos,
         "Invalid splits (does not cover the initial domain). "^(splits_domain splits s)))
     end  
+
+(* ===== INFER ===== *)
+
+(* TODO: update regroup so that it only strenghten the split with the actual refinement *)

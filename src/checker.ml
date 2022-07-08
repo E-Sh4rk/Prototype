@@ -250,7 +250,7 @@ let refine_a ~sufficient tenv env a prev_t t =
 let regroup v res =
   res |> List.map (fun (gamma, o) ->
     let vt = Refinable_env.find v gamma in
-    let gamma = Refinable_env.rm v gamma in
+    let gamma = Refinable_env.rm_deep v gamma in
     (gamma, (vt, o))
   ) |> regroup Refinable_env.equiv_ref
 

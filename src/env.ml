@@ -58,3 +58,5 @@ let pp_filtered names fmt env =
     | None -> false
     | Some str -> List.mem str names) env in
   pp fmt env
+
+let add v t e = assert (VarMap.mem v e |> not) ; add v t e

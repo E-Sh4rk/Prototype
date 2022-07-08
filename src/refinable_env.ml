@@ -87,11 +87,15 @@ let refine v t tt =
       (Cduce.is_empty ot |> not) && Cduce.disjoint t ot
   then None
   else Some (strengthen v t tt)
-let rm v t =
+let rm_ref v t =
   match t with
-  | Base b -> Base (Env.rm v b)
+  | Base _ -> failwith "Invalid operation."
   | Ref (b, r) when mem v b |> not -> Ref (b, Env.rm v r)
   | _ -> failwith "Variable cannot be removed because it is present in a parent environment."
+let rec rm_deep v t =
+  match t with
+  | Base b -> Base (Env.rm v b)
+  | Ref (b, r) -> Ref (rm_deep v b, Env.rm v r)
 
 let leq_ref t1 t2 =
   match t1, t2 with

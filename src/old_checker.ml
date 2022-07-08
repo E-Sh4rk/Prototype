@@ -186,13 +186,13 @@ let extract x gammas =
       if Refinable_env.mem x envr
       then
         Some (VarAnnot.singleton
-          (Refinable_env.rm x envr |> Refinable_env.to_env)
+          (Refinable_env.rm_deep x envr |> Refinable_env.to_env)
           (Refinable_env.find x envr))
       else (* None *) assert false
     ) in
   let gammas =
     gammas |> List.map (fun envr ->
-      Refinable_env.rm x envr
+      Refinable_env.rm_deep x envr
     ) in
   (VarAnnot.union vas, gammas)
 

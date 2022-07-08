@@ -22,7 +22,8 @@ val is_empty_ref : t -> bool
 val strengthen : Variable.t -> typ -> t -> t
 val refine_old : Variable.t -> typ -> t -> t option
 val refine : Variable.t -> typ -> t -> t option
-val rm : Variable.t -> t -> t
+val rm_ref : Variable.t -> t -> t
+val rm_deep : Variable.t -> t -> t
 
 val equiv : t -> t -> bool
 val leq : t -> t -> bool

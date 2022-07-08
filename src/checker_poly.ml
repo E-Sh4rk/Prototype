@@ -3,6 +3,7 @@ open Msc
 open Types_additions
 open Variable
 open Annotations
+open Utils
 
 exception Ill_typed of Position.t list * string
 
@@ -183,7 +184,60 @@ and typeof tenv env mono anns e =
         ) |> disj_o |> simplify_typ
       else raise (Ill_typed (pos,
         "Invalid splits (does not cover the initial domain). "^(splits_domain splits s)))
-    end  
+    end
+
+(* ===== REFINE ===== *)
+
+(* TODO: update (especially App rule) *)
+
+let refine_a tenv env mono a prev_t t =
+  ignore mono ;
+  assert (has_absent prev_t |> not && has_absent t |> not) ;
+  if subtype prev_t t then [env]
+  else match a with
+  | Abstract s -> if subtype s t then [env] else []
+  | Const c -> if subtype (typeof_const_atom tenv c) t then [env] else []
+  | Pair (v1, v2) ->
+    split_pair t
+    |> List.filter_map (
+      fun (t1, t2) ->
+        env |>
+        option_chain [Refinable_env.refine v1 t1 ; Refinable_env.refine v2 t2]
+    )
+  | Projection (Fst, v) -> [Refinable_env.refine v (mk_times (cons t) any_node) env] |> filter_options
+  | Projection (Snd, v) -> [Refinable_env.refine v (mk_times any_node (cons t)) env] |> filter_options
+  | Projection (Field label, v) ->
+    [Refinable_env.refine v (mk_record true [label, cons t]) env] |> filter_options
+  | RecordUpdate (v, label, None) ->
+    let t = cap_o t (record_any_without label) in
+    split_record t
+    |> List.filter_map (
+      fun ti ->
+          let ti = remove_field_info ti label in
+          Refinable_env.refine v ti env
+    )
+  | RecordUpdate (v, label, Some x) ->
+    split_record t
+    |> List.filter_map (
+      fun ti ->
+        let field_type = get_field_assuming_not_absent ti label in
+        let ti = remove_field_info ti label in
+        env |>
+        option_chain [Refinable_env.refine v ti ; Refinable_env.refine x field_type]
+      )
+  | App (v1, v2) ->
+    ignore (v1, v2) ;
+    failwith "TODO"
+  | Ite (v, s, x1, x2) ->
+    [ env |> option_chain [Refinable_env.refine v s       ; Refinable_env.refine x1 t] ;
+      env |> option_chain [Refinable_env.refine v (neg s) ; Refinable_env.refine x2 t] ]
+    |> filter_options
+  | Lambda _ ->
+    if subtype arrow_any t then [env] else []
+  | Let (v1, v2) ->
+    [ env |>
+    option_chain [Refinable_env.refine v1 any ; Refinable_env.refine v2 t]]
+    |> filter_options
 
 (* ===== INFER ===== *)
 

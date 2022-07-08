@@ -24,6 +24,8 @@ val refine_old : Variable.t -> typ -> t -> t option
 val refine : Variable.t -> typ -> t -> t option
 val rm_ref : Variable.t -> t -> t
 val rm_deep : Variable.t -> t -> t
+val neg_ref : t -> t list
+val neg_refs : t list -> t list
 
 val equiv : t -> t -> bool
 val leq : t -> t -> bool

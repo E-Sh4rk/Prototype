@@ -96,6 +96,13 @@ let rec rm_deep v t =
   match t with
   | Base b -> Base (Env.rm v b)
   | Ref (b, r) -> Ref (rm_deep v b, Env.rm v r)
+let neg_ref t =
+  match t with
+  | Base _ -> failwith "Invalid operation."
+  | Ref (b, r) ->
+    failwith "TODO"
+let neg_refs ts =
+  failwith "TODO"
 
 let leq_ref t1 t2 =
   match t1, t2 with

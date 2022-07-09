@@ -100,9 +100,41 @@ let neg_ref t =
   match t with
   | Base _ -> failwith "Invalid operation."
   | Ref (b, r) ->
-    failwith "TODO"
+    let base = Ref (b, Env.empty) in
+    Env.bindings r |>
+    List.filter_map (fun (x,t) ->
+      refine x (Cduce.neg t) base
+    )
 let neg_refs ts =
-  failwith "TODO"
+  let merge t1 t2 =
+    match t1, t2 with
+    | Base _, _ | _, Base _ -> assert false
+    | Ref (b, r1), Ref (_, r2) ->
+      let rec aux acc lst = match lst with
+      | [] -> Some (Ref (b, acc))
+      | (x,t)::lst ->
+        let acc = Env.strengthen x t acc in
+        if Cduce.is_empty (Env.find x acc) && Cduce.is_empty t |> not
+        then None else aux acc lst
+      in
+      aux r1 (Env.bindings r2)
+  in
+  let rec aux acc lst =
+    match lst with
+    | [] -> acc
+    | disj::lst ->
+      let acc =
+        disj |> List.map (fun r2 ->
+          acc |> List.filter_map (fun r1 ->
+            merge r1 r2
+          )
+        ) |> List.flatten
+      in
+      aux acc lst 
+  in
+  match ts |> List.map neg_ref with
+  | [] -> failwith "Invalid operation."
+  | acc::lst -> aux acc lst
 
 let leq_ref t1 t2 =
   match t1, t2 with

@@ -188,7 +188,8 @@ and typeof tenv env mono anns e =
 
 (* ===== REFINE ===== *)
 
-(* TODO: update (especially App rule) *)
+let tmpvar = mk_var "%TMP%"
+let tmpvar_t = var_typ tmpvar
 
 let refine_a tenv env mono a prev_t t =
   ignore mono ;
@@ -226,8 +227,15 @@ let refine_a tenv env mono a prev_t t =
         option_chain [Refinable_env.refine v ti ; Refinable_env.refine x field_type]
       )
   | App (v1, v2) ->
-    ignore (v1, v2) ;
-    failwith "TODO"
+    let mono = varset_union mono (vars t) in
+    let lhs = Refinable_env.find v1 env in
+    let rhs = mk_arrow (cons tmpvar_t) (cons t) in
+    tallying mono [(lhs,rhs)] |>
+    List.filter_map (fun s ->
+      let s = subst_find s tmpvar in
+      let s = clean_type ~pos:any ~neg:empty mono s in
+      Refinable_env.refine v2 s env
+    )
   | Ite (v, s, x1, x2) ->
     [ env |> option_chain [Refinable_env.refine v s       ; Refinable_env.refine x1 t] ;
       env |> option_chain [Refinable_env.refine v (neg s) ; Refinable_env.refine x2 t] ]

@@ -229,6 +229,7 @@ let var_name = CD.Var.name
 let varset = CD.Var.Set.from_list
 let varset_filter = CD.Var.Set.filter
 let varset_union = CD.Var.Set.cup
+let varset_add = CD.Var.Set.add
 let varset_inter = CD.Var.Set.cap
 let varlist = CD.Var.Set.get
 let substitute = CD.Types.Subst.apply

@@ -88,6 +88,7 @@ val var_name : var -> string
 val varset : var list -> varset
 val varset_filter : (var -> bool) -> varset -> varset
 val varset_union : varset -> varset -> varset
+val varset_add : var -> varset -> varset
 val varset_inter : varset -> varset -> varset
 val varlist : varset -> var list
 val substitute : subst -> typ -> typ

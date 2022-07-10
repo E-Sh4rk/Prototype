@@ -13,11 +13,13 @@ val domain : t -> Variable.t list
 val mem : Variable.t -> t -> bool
 val find : Variable.t -> t -> typ
 val is_empty : t -> bool
+val bindings : t -> (Variable.t * typ) list
 
 val domain_ref : t -> Variable.t list
 val mem_ref : Variable.t -> t -> bool
 val find_ref : Variable.t -> t -> typ
 val is_empty_ref : t -> bool
+val bindings_ref : t -> (Variable.t * typ) list
 
 val strengthen : Variable.t -> typ -> t -> t
 val refine_old : Variable.t -> typ -> t -> t option

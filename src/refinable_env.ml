@@ -51,6 +51,7 @@ let rec is_empty t =
   match t with
   | Base b -> Env.is_empty b
   | Ref (b, r) -> is_empty b && Env.is_empty r
+let bindings t = to_env t |> Env.bindings
 
 let domain_ref t =
   match t with
@@ -68,6 +69,10 @@ let is_empty_ref t =
   match t with
   | Base _ -> failwith "Invalid operation."
   | Ref (_, r) -> Env.is_empty r
+let bindings_ref t =
+  match t with
+  | Base _ -> failwith "Invalid operation."
+  | Ref (_, r) -> Env.bindings r
 
 let strengthen v t tt =
   match tt with
@@ -107,17 +112,14 @@ let neg_ref t =
     )
 let neg_refs ts =
   let merge t1 t2 =
-    match t1, t2 with
-    | Base _, _ | _, Base _ -> assert false
-    | Ref (b, r1), Ref (_, r2) ->
-      let rec aux acc lst = match lst with
-      | [] -> Some (Ref (b, acc))
-      | (x,t)::lst ->
-        let acc = Env.strengthen x t acc in
-        if Cduce.is_empty (Env.find x acc) && Cduce.is_empty t |> not
-        then None else aux acc lst
-      in
-      aux r1 (Env.bindings r2)
+    let rec aux acc lst = match lst with
+    | [] -> Some acc
+    | (x,t)::lst ->
+      let acc = strengthen x t acc in
+      if Cduce.is_empty (find x acc) && Cduce.is_empty t |> not
+      then None else aux acc lst
+    in
+    aux t1 (bindings_ref t2)
   in
   let rec aux acc lst =
     match lst with

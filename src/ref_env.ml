@@ -110,7 +110,7 @@ let neg_ref t =
     List.filter_map (fun (x,t) ->
       refine x (Cduce.neg t) base
     )
-let neg_refs ts =
+let neg_refs b ts =
   let merge t1 t2 =
     let rec aux acc lst = match lst with
     | [] -> Some acc
@@ -135,7 +135,7 @@ let neg_refs ts =
       aux acc lst 
   in
   match ts |> List.map neg_ref with
-  | [] -> failwith "Invalid operation."
+  | [] -> [Ref (b, Env.empty)]
   | acc::lst -> aux acc lst
 
 let leq_ref t1 t2 =

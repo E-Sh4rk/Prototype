@@ -31,7 +31,7 @@ let%test "neg_refs" [@tags "no-js"] =
   let r1 = b |> Ref_env.push |> Ref_env.strengthen v1 int_typ
     |> Ref_env.strengthen v2 true_typ in
   let r2 = b |> Ref_env.push |> Ref_env.strengthen v2 false_typ in
-  let res = Ref_env.neg_refs [r1;r2] in
+  let res = Ref_env.neg_refs b [r1;r2] in
   match res with
   | [renv] when Ref_env.find v1 renv |> equiv (neg int_typ)
     && Ref_env.find v2 renv |> equiv (true_typ) -> true

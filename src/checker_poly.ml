@@ -191,13 +191,12 @@ and typeof tenv env mono anns e =
 let tmpvar = mk_var "%TMP%"
 let tmpvar_t = var_typ tmpvar
 
-let refine_a tenv env mono a prev_t t =
+let refine_a _ env mono a prev_t t =
   ignore mono ;
   assert (has_absent prev_t |> not && has_absent t |> not) ;
   if subtype prev_t t then [env]
   else match a with
-  | Abstract s -> if subtype s t then [env] else []
-  | Const c -> if subtype (typeof_const_atom tenv c) t then [env] else []
+  | Abstract _ | Const _ | Lambda _ -> []
   | Pair (v1, v2) ->
     split_pair t
     |> List.filter_map (
@@ -240,8 +239,6 @@ let refine_a tenv env mono a prev_t t =
     [ env |> option_chain [Ref_env.refine v s       ; Ref_env.refine x1 t] ;
       env |> option_chain [Ref_env.refine v (neg s) ; Ref_env.refine x2 t] ]
     |> filter_options
-  | Lambda _ ->
-    if subtype arrow_any t then [env] else []
   | Let (v1, v2) ->
     [ env |>
     option_chain [Ref_env.refine v1 any ; Ref_env.refine v2 t]]

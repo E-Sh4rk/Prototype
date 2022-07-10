@@ -10,3 +10,6 @@ val typeof_a : Position.t list -> type_env -> Env.t -> varset -> AnnotPoly.a -> 
 
 val refine_a : type_env ->
     Ref_env.t -> varset -> a -> typ -> typ -> Ref_env.t list
+
+val infer : type_env -> Env.t -> varset -> e -> e * AnnotMono.e
+val typeof_simple : type_env -> Env.t -> varset -> e -> typ

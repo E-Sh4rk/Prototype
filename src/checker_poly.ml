@@ -18,7 +18,12 @@ let pp_lambda_splits fmt =
   in
   Format.fprintf fmt "%a" (Utils.pp_list pp_lsplit)
 
-
+let pp_branches fmt =
+  let pp_lsplit fmt (s,t) =
+    Format.fprintf fmt "%a -> %a" pp_typ s pp_typ t
+  in
+  Format.fprintf fmt "%a" (Utils.pp_list pp_lsplit)
+  
 let splits_domain splits domain =
   Format.asprintf "Splits: %a - Domain: %a"
     pp_splits splits Cduce.pp_typ domain
@@ -199,7 +204,7 @@ and typeof tenv env mono anns e =
 let tmpvar = mk_var "%TMP%"
 let tmpvar_t = var_typ tmpvar
 
-let necessary_a env mono a prev_t t =
+let sufficient_a env mono a prev_t t =
   ignore mono ;
   assert (has_absent prev_t |> not && has_absent t |> not) ;
   if subtype prev_t t then [env]
@@ -253,9 +258,9 @@ let necessary_a env mono a prev_t t =
     |> filter_options
 
 let propagate_a env mono a prev_t t =
-  let necessary = necessary_a (Ref_env.push env) mono a prev_t t in
+  let sufficient = sufficient_a (Ref_env.push env) mono a prev_t t in
   let merge = List.map Ref_env.merge in
-  (necessary |> merge, Ref_env.neg_refs env necessary |> merge)
+  (sufficient |> merge, Ref_env.neg_refs env sufficient |> merge)
 
 (* ===== INFER ===== *)
 
@@ -288,7 +293,7 @@ let filter_res_a =
 let filter_res =
   List.filter_map (function (None, _) -> None | (Some gamma, anns) -> Some (gamma, anns))
 
-(* TODO : remove jokers, keep track of mono, app/pi rules *)
+(* TODO : remove jokers, keep track of mono, cap with s for bindings, app/pi rules *)
 
 let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
   let envr = Ref_env.from_env env |> Ref_env.push in
@@ -297,44 +302,44 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
     if subtype arrow_any t
     then begin
       log "@,@[<v 1>LAMBDA for variable %a (unconstrained)" Variable.pp v ;
-      log "@,Initial splits: %a" pp_lambda_splits (LambdaSA.destruct va) ;
-      let va = LambdaSA.map_top (fun s t b ->
+      log "@,Initial splits: %a" pp_lambda_splits (LambdaSAP.destruct va) ;
+      let va = LambdaSAP.map_top (fun s t b ->
         if b then (worst s, t, b) else (substitute_all_jokers s any, t, b)) va
-        |> LambdaSA.normalize
+        |> LambdaSAP.normalize
       in
-      let splits = va |> LambdaSA.destruct in
-      log "@,Using the following splits: %a" pp_lambda_splits (LambdaSA.destruct va) ;
+      let splits = va |> LambdaSAP.destruct in
+      log "@,Using the following splits: %a" pp_lambda_splits (LambdaSAP.destruct va) ;
       let res =
         splits |> List.map (fun (s, (anns, t, b)) ->
           assert (has_absent s |> not) ;
           let env = Env.add v s env in
           let res = infer_iterated tenv env mono anns e t in
           let changes = exactly_current_env res = None in
-          let res = List.map (fun (gamma, anns) -> (gamma, (anns, worst t, b))) res in
+          let res = List.map (fun (gamma, anns) -> (s, gamma, (anns, worst t, b))) res in
           (res, changes)
         ) in
         let (ress, changess) = List.split res in
         let changes = List.exists identity changess in
         let res = List.flatten ress |> regroup v |> List.map (
-          fun (gamma, anns_a) -> (gamma, LambdaA (former_typ, LambdaSA.construct anns_a))
+          fun (gamma, anns_a) -> (gamma, LambdaA (former_typ, LambdaSAP.construct anns_a))
         ) in
       log "@]@,END LAMBDA for variable %a" Variable.pp v ;
       (res, changes)
     end else begin (* AbsConstr *)
       log "@,@[<v 1>LAMBDA for variable %a with t=%a" Variable.pp v pp_typ t ;
-      log "@,Initial splits: %a" pp_lambda_splits (LambdaSA.destruct va) ;
+      log "@,Initial splits: %a" pp_lambda_splits (LambdaSAP.destruct va) ;
       let branches =
         ts |> List.map dnf |> List.map (List.filter (fun arrows -> subtype (branch_type arrows) t)) (* Optimisation *)
         |> List.map simplify_dnf |> List.flatten |> List.flatten
       in
       log "@,Branches suggested by t: %a" pp_branches branches ;
-      let va = LambdaSA.enrich ~opt_branches_maxdom ~former_typ (initial_e e) va branches in
+      let va = LambdaSAP.enrich ~opt_branches_maxdom ~former_typ (initial_e e) va branches in
       let res = infer_a_iterated ~no_lambda_ua:true pos tenv env mono (LambdaA (former_typ,va)) a [arrow_any] in
       let best_t = res |>
         List.map (fun (_, anns) ->
           match anns with
           | LambdaA (_, va) ->
-            LambdaSA.destruct va
+            LambdaSAP.destruct va
             |> List.map (fun (s,(_,t,_)) -> mk_arrow (cons (worst s)) (cons t)) (* t shouldn't contain any joker *)
           |_ -> assert false
         )
@@ -506,18 +511,19 @@ and infer' tenv env mono anns e' t =
   | Bind (_, v, a, e), BindA (anns_a, va) ->
     log "@,@[<v 1>BIND for variable %a with t=%a" Variable.pp v pp_typ t ;
     let pos = Variable.get_locations v in
-    log "@,Initial splits: %a" pp_splits (BindSA.splits va) ;
-    let dom_a = BindSA.splits va in
-    let va = BindSA.map_top worst va in
+    log "@,Initial splits: %a" pp_splits (BindSAP.splits va) ;
+    let dom_a = BindSAP.splits va in
+    let va = BindSAP.map_top worst va in
     let res =
-      match BindSA.destruct va with
+      match BindSAP.destruct va with
       | [(s, anns)] when subtype any_or_absent s -> (* BindDefSkip *)
         log "@,Skipping definition." ;
         let env = Env.add v s env in
         let res = infer_iterated tenv env mono anns e t in
         let changes = exactly_current_env res = None in
-        let res = regroup v res |> List.map (
-          fun (gamma, anns) -> (gamma, BindA (anns_a, BindSA.construct anns))
+        let res = res |> List.map (fun (g,e) -> (any_or_absent,g,e))
+          |> regroup v |> List.map (
+          fun (gamma, anns) -> (gamma, BindA (anns_a, BindSAP.construct anns))
         ) in
         (res, changes)
       | splits ->
@@ -536,41 +542,39 @@ and infer' tenv env mono anns e' t =
           log "@,Type of the definition: %a" Cduce.pp_typ s ;
           (*if subtype s dom_a |> not then Format.printf "%s@." (actual_expected s dom_a) ;*)
           assert (subtype s (List.map fst splits |> disj)) ;
-          let va = BindSA.normalize va s in
-          let splits = BindSA.destruct va in
+          let va = BindSAP.normalize va any_or_absent in
+          let splits = BindSAP.destruct va in
           let rec propagate lst treated =
             match lst with
             | [] -> None
             | (ns,anns)::lst ->
-              let necessary = refine_a ~sufficient:false tenv envr a s ns in
-              if exactly_current_env_gammas necessary
+              let (sufficient, necessary) = propagate_a envr mono a s (neg ns) in
+              if sufficient <> []
               then propagate lst ((ns,anns)::treated)
-              else
-                let sufficient = refine_a ~sufficient:true tenv envr a s (cap_o (neg ns) s) in
-                Some ((ns,anns), lst@treated, necessary, sufficient)
+              else Some ((ns,anns), lst@treated, necessary, sufficient)
           in
           let propagate =
             if subtype s any && List.length splits > 1
             then propagate splits []
             else None
-          in
+          in(* TODO *)
           begin match propagate with
           | Some ((s,anns), splits, necessary, sufficient) -> (* BindPropagate *)
             log "@,Some constraints must be propagated." ;
             let res1 = necessary |> List.map (fun gamma ->
-              let anns = (s,anns)::splits |> BindSA.construct in
+              let anns = (s,anns)::splits |> BindSAP.construct in
               (gamma, BindA (anns_a, anns))
             ) in
             let res2 = sufficient |> List.map (fun gamma ->
-              let anns = splits |> BindSA.construct in
+              let anns = splits |> BindSAP.construct in
               (gamma, BindA (anns_a, anns))
             ) in
             (res1@res2, true)
           | None -> (* Bind *)
             log "@,Using the following splits: %a" pp_splits (List.map fst splits) ;
             let res =
-              splits |> List.map (fun (s, anns) ->
-                let env = Env.add v s env in
+              splits |> List.map (fun (s', anns) ->
+                let env = Env.add v (cap_o s s') env in
                 let res = infer_iterated tenv env mono anns e t in
                 let changes = exactly_current_env res = None in
                 (res, changes)
@@ -578,7 +582,7 @@ and infer' tenv env mono anns e' t =
             let (ress, changess) = List.split res in
             let changes = List.exists identity changess in
             let res = List.flatten ress |> regroup v |> List.map (
-              fun (gamma, anns) -> (gamma, BindA (anns_a, BindSA.construct anns))
+              fun (gamma, anns) -> (gamma, BindA (anns_a, BindSAP.construct anns))
             ) in
             (res, changes)
           end

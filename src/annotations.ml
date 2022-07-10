@@ -238,6 +238,7 @@ module BindSAMake (A:Annot): (BindSA with type annot=A.e) = struct
     match anns with
     | [] -> assert false
     | a1::anns -> List.fold_left A.merge_e a1 anns
+  (* TODO: remove s argument for polymorphic system *)
   let normalize ((T (node, _)) as anns) s =
     let ts = splits anns
       |> List.map (Cduce.cap_o s)

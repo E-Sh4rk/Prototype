@@ -201,19 +201,19 @@ let refine_a ~sufficient tenv env a prev_t t =
     |> List.filter_map (
       fun (t1, t2) ->
         env |>
-        option_chain [Refinable_env.refine v1 t1 ; Refinable_env.refine v2 t2]
+        option_chain [Ref_env.refine v1 t1 ; Ref_env.refine v2 t2]
     )
-  | Projection (Fst, v), _ -> [Refinable_env.refine v (mk_times (cons t) any_node) env] |> filter_options
-  | Projection (Snd, v), _ -> [Refinable_env.refine v (mk_times any_node (cons t)) env] |> filter_options
+  | Projection (Fst, v), _ -> [Ref_env.refine v (mk_times (cons t) any_node) env] |> filter_options
+  | Projection (Snd, v), _ -> [Ref_env.refine v (mk_times any_node (cons t)) env] |> filter_options
   | Projection (Field label, v), _ ->
-    [Refinable_env.refine v (mk_record true [label, cons t]) env] |> filter_options
+    [Ref_env.refine v (mk_record true [label, cons t]) env] |> filter_options
   | RecordUpdate (v, label, None), _ ->
     let t = cap_o t (record_any_without label) in
     split_record t
     |> List.filter_map (
       fun ti ->
           let ti = remove_field_info ti label in
-          Refinable_env.refine v ti env
+          Ref_env.refine v ti env
     )
   | RecordUpdate (v, label, Some x), _ ->
     split_record t
@@ -222,19 +222,19 @@ let refine_a ~sufficient tenv env a prev_t t =
         let field_type = get_field_assuming_not_absent ti label in
         let ti = remove_field_info ti label in
         env |>
-        option_chain [Refinable_env.refine v ti ; Refinable_env.refine x field_type]
+        option_chain [Ref_env.refine v ti ; Ref_env.refine x field_type]
       )
   | App (v1, v2), _ ->
-    let t1 = Refinable_env.find v1 env in
+    let t1 = Ref_env.find v1 env in
     (if sufficient then triangle_split t1 t else square_split t1 t)
     |> List.filter_map (
       fun (t1, t2) ->
         env |>
-        option_chain [Refinable_env.refine v1 t1 ; Refinable_env.refine v2 t2]
+        option_chain [Ref_env.refine v1 t1 ; Ref_env.refine v2 t2]
     )
   | Ite (v, s, x1, x2), _ ->
-    [ env |> option_chain [Refinable_env.refine v s       ; Refinable_env.refine x1 t] ;
-      env |> option_chain [Refinable_env.refine v (neg s) ; Refinable_env.refine x2 t] ]
+    [ env |> option_chain [Ref_env.refine v s       ; Ref_env.refine x1 t] ;
+      env |> option_chain [Ref_env.refine v (neg s) ; Ref_env.refine x2 t] ]
     |> filter_options
   | Lambda _, false ->
     if disjoint arrow_any t then [] else [env]
@@ -242,17 +242,17 @@ let refine_a ~sufficient tenv env a prev_t t =
     if subtype arrow_any t then [env] else []
   | Let (v1, v2), _ ->
     [ env |>
-    option_chain [Refinable_env.refine v1 any ; Refinable_env.refine v2 t]]
+    option_chain [Ref_env.refine v1 any ; Ref_env.refine v2 t]]
     |> filter_options
 
 (* ===== INFER ===== *)
 
 let regroup v res =
   res |> List.map (fun (gamma, o) ->
-    let vt = Refinable_env.find v gamma in
-    let gamma = Refinable_env.rm_deep v gamma in
+    let vt = Ref_env.find v gamma in
+    let gamma = Ref_env.rm_deep v gamma in
     (gamma, (vt, o))
-  ) |> regroup Refinable_env.equiv_ref
+  ) |> regroup Ref_env.equiv_ref
 
 let try_typeof_a pos tenv env anns a =
   let s =
@@ -263,11 +263,11 @@ let try_typeof_a pos tenv env anns a =
 
 let exactly_current_env lst =
   match lst with
-  | [(gamma, anns)] when Refinable_env.is_empty_ref gamma -> Some anns
+  | [(gamma, anns)] when Ref_env.is_empty_ref gamma -> Some anns
   | _ -> None
 
 let exactly_current_env_gammas gammas =
-  gammas <> [] && List.for_all Refinable_env.is_empty_ref gammas
+  gammas <> [] && List.for_all Ref_env.is_empty_ref gammas
 
 let filter_res_a =
   List.filter_map (function (None, _) -> None | (Some gamma, anns) -> Some (gamma, anns))
@@ -276,7 +276,7 @@ let filter_res =
   List.filter_map (function (None, _) -> None | (Some gamma, anns) -> Some (gamma, anns))
 
 let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
-  let envr = Refinable_env.from_env env |> Refinable_env.push in
+  let envr = Ref_env.from_env env |> Ref_env.push in
   let type_lambda v e ts va ~opt_branches_maxdom ~former_typ =
     let t = disj ts in
     if subtype arrow_any t
@@ -339,7 +339,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
     let ts = ts |> List.map (cap_o any) in
     let (res, changes) = infer_a' pos tenv env anns a ts in
     let res =
-      if subtype any (disj ts) && List.for_all (fun (gamma,_) -> Refinable_env.is_empty_ref gamma |> not) res
+      if subtype any (disj ts) && List.for_all (fun (gamma,_) -> Ref_env.is_empty_ref gamma |> not) res
       then (envr, UntypAtomA)::res else res
     in
     (res, changes)
@@ -361,7 +361,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
         if has_absent vt1 || has_absent vt2
         then
           [(envr |> option_chain
-            [Refinable_env.refine v1 any ; Refinable_env.refine v2 any], EmptyAtomA)]
+            [Ref_env.refine v1 any ; Ref_env.refine v2 any], EmptyAtomA)]
           |> filter_res_a
         else begin
           let s = mk_times (cons vt1) (cons vt2) in
@@ -372,7 +372,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
             split_pair t
             |> List.map (fun (ti,si) ->
               (envr |> option_chain
-              [Refinable_env.refine v1 ti ; Refinable_env.refine v2 si], EmptyAtomA)
+              [Ref_env.refine v1 ti ; Ref_env.refine v2 si], EmptyAtomA)
             ) |> filter_res_a
         end
       in (res, false)
@@ -383,12 +383,12 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
         | Snd -> mk_times any_node (cons t)
         | Field label -> mk_record true [label, cons t]
       in
-      let res = [(Refinable_env.refine v t envr, EmptyAtomA)] |> filter_res_a in
+      let res = [(Ref_env.refine v t envr, EmptyAtomA)] |> filter_res_a in
       (res, false)
     | RecordUpdate (v, label, None), _ ->
       let t = cap_o (record_any_without label) t in
       let t = remove_field_info t label in
-      let res = [(Refinable_env.refine v t envr, EmptyAtomA)] |> filter_res_a in
+      let res = [(Ref_env.refine v t envr, EmptyAtomA)] |> filter_res_a in
       (res, false)
     | RecordUpdate (v, label, Some f), _ ->
       let vt = Env.find v env in
@@ -397,7 +397,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
         if subtype vt record_any |> not || has_absent ft
         then
           [(envr |> option_chain
-            [Refinable_env.refine v record_any ; Refinable_env.refine f any], EmptyAtomA)]
+            [Ref_env.refine v record_any ; Ref_env.refine f any], EmptyAtomA)]
           |> filter_res_a
         else begin
           let right_record = mk_record false [label, cons ft] in
@@ -411,7 +411,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
               let si = get_field ti label in
               let ti = remove_field_info ti label in
               (envr |> option_chain
-              [Refinable_env.refine v ti ; Refinable_env.refine f si], EmptyAtomA)
+              [Ref_env.refine v ti ; Ref_env.refine f si], EmptyAtomA)
             ) |> filter_res_a
         end
       in (res, false)
@@ -420,11 +420,11 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
       let res =
         if is_empty vt then [(envr, EmptyAtomA)]
         else if subtype vt s
-        then [(Refinable_env.refine v1 t envr, EmptyAtomA)] |> filter_res_a
+        then [(Ref_env.refine v1 t envr, EmptyAtomA)] |> filter_res_a
         else if subtype vt (neg s)
-        then [(Refinable_env.refine v2 t envr, EmptyAtomA)] |> filter_res_a
-        else [(Refinable_env.refine v s envr, EmptyAtomA) ;
-              (Refinable_env.refine v (neg s) envr, EmptyAtomA)]
+        then [(Ref_env.refine v2 t envr, EmptyAtomA)] |> filter_res_a
+        else [(Ref_env.refine v s envr, EmptyAtomA) ;
+              (Ref_env.refine v (neg s) envr, EmptyAtomA)]
             |> filter_res_a
       in
       (res, false)
@@ -433,9 +433,9 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
       let vt2 = Env.find v2 env in
       let res =
         if is_empty vt1
-        then [(Refinable_env.refine v2 any envr, AppA (t',b))] |> filter_res_a
+        then [(Ref_env.refine v2 any envr, AppA (t',b))] |> filter_res_a
         else if is_empty vt2
-        then [(Refinable_env.refine v1 arrow_any envr, AppA (t',b))] |> filter_res_a
+        then [(Ref_env.refine v1 arrow_any envr, AppA (t',b))] |> filter_res_a
         else begin
           let can_refine_l = (has_absent vt1 || has_absent vt2) |> not in
           let can_refine_r = can_refine_l && subtype t' t in
@@ -444,20 +444,20 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
           match dnf (cap_o vt1 arrow_any) |> simplify_dnf with
           | [arrows] when can_split_r -> (* AppSplitR *)
               arrows |> List.map (fun (si,_) ->
-                (Refinable_env.refine v2 si envr, AppA (t',true))
+                (Ref_env.refine v2 si envr, AppA (t',true))
               ) |> filter_res_a
           | [_] when can_refine_r -> (* AppRefineR *)
             let s = triangle_exact vt1 t in
-            [(Refinable_env.refine v2 s envr, AppA (t',b))]
+            [(Ref_env.refine v2 s envr, AppA (t',b))]
             |> filter_res_a
           | [_] when can_refine_l -> (* AppRefineL *)
             let arrow_type = mk_arrow (cons (cap vt2 (joker Max))) (cons (cap t (joker Min))) in
-            [(Refinable_env.refine v1 arrow_type envr, AppA (cap_o t t',b))]
+            [(Ref_env.refine v1 arrow_type envr, AppA (cap_o t t',b))]
             |> filter_res_a
           | lst -> (* AppSplitL *)
             lst |> List.map (fun arrows ->
               (envr |> option_chain [
-                Refinable_env.refine v1 (branch_type arrows) ; Refinable_env.refine v2 any
+                Ref_env.refine v1 (branch_type arrows) ; Ref_env.refine v2 any
               ], AppA (t',b)
               )
             ) |> filter_res_a
@@ -467,7 +467,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
     | Let (v1, v2), _ ->
       let res =
         [(envr |> option_chain
-          [Refinable_env.refine v1 any ; Refinable_env.refine v2 t ], EmptyAtomA)]
+          [Ref_env.refine v1 any ; Ref_env.refine v2 t ], EmptyAtomA)]
         |> filter_res_a in
       (res, false)
     | Lambda (_, ua, v, e), LambdaA (former_typ, va) when ua = Ast.Unnanoted || no_lambda_ua ->
@@ -484,10 +484,10 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
   end
 
 and infer' tenv env anns e' t =
-  let envr = Refinable_env.from_env env |> Refinable_env.push in
+  let envr = Ref_env.from_env env |> Ref_env.push in
   assert (has_absent t |> not) ;
   match e', anns with
-  | Var v, _ -> ([(Refinable_env.refine v t envr, EmptyA)] |> filter_res, false)
+  | Var v, _ -> ([(Ref_env.refine v t envr, EmptyA)] |> filter_res, false)
   | Bind (_, v, a, e), BindA (anns_a, va) ->
     log "@,@[<v 1>BIND for variable %a with t=%a" Variable.pp v pp_typ t ;
     let pos = Variable.get_locations v in

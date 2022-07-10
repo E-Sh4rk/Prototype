@@ -203,19 +203,19 @@ let refine_a tenv env mono a prev_t t =
     |> List.filter_map (
       fun (t1, t2) ->
         env |>
-        option_chain [Refinable_env.refine v1 t1 ; Refinable_env.refine v2 t2]
+        option_chain [Ref_env.refine v1 t1 ; Ref_env.refine v2 t2]
     )
-  | Projection (Fst, v) -> [Refinable_env.refine v (mk_times (cons t) any_node) env] |> filter_options
-  | Projection (Snd, v) -> [Refinable_env.refine v (mk_times any_node (cons t)) env] |> filter_options
+  | Projection (Fst, v) -> [Ref_env.refine v (mk_times (cons t) any_node) env] |> filter_options
+  | Projection (Snd, v) -> [Ref_env.refine v (mk_times any_node (cons t)) env] |> filter_options
   | Projection (Field label, v) ->
-    [Refinable_env.refine v (mk_record true [label, cons t]) env] |> filter_options
+    [Ref_env.refine v (mk_record true [label, cons t]) env] |> filter_options
   | RecordUpdate (v, label, None) ->
     let t = cap_o t (record_any_without label) in
     split_record t
     |> List.filter_map (
       fun ti ->
           let ti = remove_field_info ti label in
-          Refinable_env.refine v ti env
+          Ref_env.refine v ti env
     )
   | RecordUpdate (v, label, Some x) ->
     split_record t
@@ -224,27 +224,27 @@ let refine_a tenv env mono a prev_t t =
         let field_type = get_field_assuming_not_absent ti label in
         let ti = remove_field_info ti label in
         env |>
-        option_chain [Refinable_env.refine v ti ; Refinable_env.refine x field_type]
+        option_chain [Ref_env.refine v ti ; Ref_env.refine x field_type]
       )
   | App (v1, v2) ->
     let mono = varset_union mono (vars t) in
-    let lhs = Refinable_env.find v1 env in
+    let lhs = Ref_env.find v1 env in
     let rhs = mk_arrow (cons tmpvar_t) (cons t) in
     tallying mono [(lhs,rhs)] |>
     List.filter_map (fun s ->
       let s = subst_find s tmpvar in
       let s = clean_type ~pos:any ~neg:empty mono s in
-      Refinable_env.refine v2 s env
+      Ref_env.refine v2 s env
     )
   | Ite (v, s, x1, x2) ->
-    [ env |> option_chain [Refinable_env.refine v s       ; Refinable_env.refine x1 t] ;
-      env |> option_chain [Refinable_env.refine v (neg s) ; Refinable_env.refine x2 t] ]
+    [ env |> option_chain [Ref_env.refine v s       ; Ref_env.refine x1 t] ;
+      env |> option_chain [Ref_env.refine v (neg s) ; Ref_env.refine x2 t] ]
     |> filter_options
   | Lambda _ ->
     if subtype arrow_any t then [env] else []
   | Let (v1, v2) ->
     [ env |>
-    option_chain [Refinable_env.refine v1 any ; Refinable_env.refine v2 t]]
+    option_chain [Ref_env.refine v1 any ; Ref_env.refine v2 t]]
     |> filter_options
 
 (* ===== INFER ===== *)

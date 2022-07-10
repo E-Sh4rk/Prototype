@@ -150,6 +150,7 @@ struct
       (s, (a, t, b)))
     (* |> construct*)
     |> (fun res -> T (Node.new_node (), res))
+  (* TODO: version of enrich without support for jokers? (for the polymorphic system) *)
   let enrich ~opt_branches_maxdom ~former_typ default_anns lst ts =
     let t =
       destruct lst |>

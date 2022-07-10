@@ -12,6 +12,13 @@ exception Ill_typed of Position.t list * string
 
 let pp_splits = Utils.pp_list Cduce.pp_typ
 
+let pp_lambda_splits fmt =
+  let pp_lsplit fmt (s,(_,t,b)) =
+    Format.fprintf fmt "%a -> %a (%b)" pp_typ s pp_typ t b
+  in
+  Format.fprintf fmt "%a" (Utils.pp_list pp_lsplit)
+
+
 let splits_domain splits domain =
   Format.asprintf "Splits: %a - Domain: %a"
     pp_splits splits Cduce.pp_typ domain
@@ -192,7 +199,7 @@ and typeof tenv env mono anns e =
 let tmpvar = mk_var "%TMP%"
 let tmpvar_t = var_typ tmpvar
 
-let refine_a _ env mono a prev_t t =
+let necessary_a env mono a prev_t t =
   ignore mono ;
   assert (has_absent prev_t |> not && has_absent t |> not) ;
   if subtype prev_t t then [env]
@@ -245,6 +252,11 @@ let refine_a _ env mono a prev_t t =
     option_chain [Ref_env.refine v1 any ; Ref_env.refine v2 t]]
     |> filter_options
 
+let propagate_a env mono a prev_t t =
+  let necessary = necessary_a (Ref_env.push env) mono a prev_t t in
+  let merge = List.map Ref_env.merge in
+  (necessary |> merge, Ref_env.neg_refs env necessary |> merge)
+
 (* ===== INFER ===== *)
 
 let regroup v res =
@@ -262,8 +274,6 @@ let try_typeof_a pos tenv env mono anns a =
   in
   (s, annotate_def_with_last_type s anns)
 
-(* TODO *)
-
 let exactly_current_env lst =
   match lst with
   | [(gamma, anns)] when Ref_env.is_empty_ref gamma -> Some anns
@@ -278,7 +288,9 @@ let filter_res_a =
 let filter_res =
   List.filter_map (function (None, _) -> None | (Some gamma, anns) -> Some (gamma, anns))
 
-let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
+(* TODO : remove jokers, keep track of mono, app/pi rules *)
+
+let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
   let envr = Ref_env.from_env env |> Ref_env.push in
   let type_lambda v e ts va ~opt_branches_maxdom ~former_typ =
     let t = disj ts in
@@ -296,7 +308,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
         splits |> List.map (fun (s, (anns, t, b)) ->
           assert (has_absent s |> not) ;
           let env = Env.add v s env in
-          let res = infer_iterated tenv env anns e t in
+          let res = infer_iterated tenv env mono anns e t in
           let changes = exactly_current_env res = None in
           let res = List.map (fun (gamma, anns) -> (gamma, (anns, worst t, b))) res in
           (res, changes)
@@ -317,7 +329,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
       in
       log "@,Branches suggested by t: %a" pp_branches branches ;
       let va = LambdaSA.enrich ~opt_branches_maxdom ~former_typ (initial_e e) va branches in
-      let res = infer_a_iterated ~no_lambda_ua:true pos tenv env (LambdaA (former_typ,va)) a [arrow_any] in
+      let res = infer_a_iterated ~no_lambda_ua:true pos tenv env mono (LambdaA (former_typ,va)) a [arrow_any] in
       let best_t = res |>
         List.map (fun (_, anns) ->
           match anns with
@@ -340,7 +352,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
   if List.exists has_absent ts
   then begin (* Option *)
     let ts = ts |> List.map (cap_o any) in
-    let (res, changes) = infer_a' pos tenv env anns a ts in
+    let (res, changes) = infer_a' pos tenv env mono anns a ts in
     let res =
       if subtype any (disj ts) && List.for_all (fun (gamma,_) -> Ref_env.is_empty_ref gamma |> not) res
       then (envr, UntypAtomA)::res else res
@@ -486,7 +498,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
     | Lambda _, _ -> assert false
   end
 
-and infer' tenv env anns e' t =
+and infer' tenv env mono anns e' t =
   let envr = Ref_env.from_env env |> Ref_env.push in
   assert (has_absent t |> not) ;
   match e', anns with
@@ -502,14 +514,14 @@ and infer' tenv env anns e' t =
       | [(s, anns)] when subtype any_or_absent s -> (* BindDefSkip *)
         log "@,Skipping definition." ;
         let env = Env.add v s env in
-        let res = infer_iterated tenv env anns e t in
+        let res = infer_iterated tenv env mono anns e t in
         let changes = exactly_current_env res = None in
         let res = regroup v res |> List.map (
           fun (gamma, anns) -> (gamma, BindA (anns_a, BindSA.construct anns))
         ) in
         (res, changes)
       | splits ->
-        let res_a = infer_a_iterated pos tenv env anns_a a dom_a in
+        let res_a = infer_a_iterated pos tenv env mono anns_a a dom_a in
         begin match exactly_current_env res_a with
         | None -> (* BindDefRefEnv *)
           if res_a = [] then log "@,Untypable definition..."
@@ -520,7 +532,7 @@ and infer' tenv env anns e' t =
           (res, false)
         | Some anns_a ->
           log "@,The definition has been successfully annotated." ;
-          let (s, anns_a) = try_typeof_a pos tenv env anns_a a in
+          let (s, anns_a) = try_typeof_a pos tenv env mono anns_a a in
           log "@,Type of the definition: %a" Cduce.pp_typ s ;
           (*if subtype s dom_a |> not then Format.printf "%s@." (actual_expected s dom_a) ;*)
           assert (subtype s (List.map fst splits |> disj)) ;
@@ -559,7 +571,7 @@ and infer' tenv env anns e' t =
             let res =
               splits |> List.map (fun (s, anns) ->
                 let env = Env.add v s env in
-                let res = infer_iterated tenv env anns e t in
+                let res = infer_iterated tenv env mono anns e t in
                 let changes = exactly_current_env res = None in
                 (res, changes)
             ) in
@@ -575,37 +587,37 @@ and infer' tenv env anns e' t =
     log "@]@,END BIND for variable %a" Variable.pp v ; res
   | Bind _, _ -> assert false
 
-and infer_a_iterated ?(no_lambda_ua=false) pos tenv env anns a ts =
-  match infer_a' ~no_lambda_ua pos tenv env anns a ts with
+and infer_a_iterated ?(no_lambda_ua=false) pos tenv env mono anns a ts =
+  match infer_a' ~no_lambda_ua pos tenv env mono anns a ts with
   | (res, true) ->
     begin match exactly_current_env res with
     | None -> res
-    | Some anns -> infer_a_iterated ~no_lambda_ua pos tenv env anns a (List.map worst ts)
+    | Some anns -> infer_a_iterated ~no_lambda_ua pos tenv env mono anns a ts
     end
   | (res, _) -> res
 
-and infer_iterated tenv env anns e t =
-  match infer' tenv env anns e t with
+and infer_iterated tenv env mono anns e t =
+  match infer' tenv env mono anns e t with
   | (res, true) ->
     begin match exactly_current_env res with
     | None -> res
-    | Some anns -> infer_iterated tenv env anns e t (* t should not contain jokers *)
+    | Some anns -> infer_iterated tenv env mono anns e t
     end
   | (res, _) -> res
 
-let infer tenv env e =
+let infer tenv env mono e =
   let fv = fv_e e in
   let e = VarSet.fold (fun v acc ->
     Bind (Old_annotations.VarAnnot.empty, v, Abstract (var_type [] v env), acc)
   ) fv e in
   let anns =
-    match infer_iterated tenv Env.empty (initial_e e) e any with
+    match infer_iterated tenv Env.empty mono (initial_e e) e any with
     | [] -> raise (Ill_typed ([], "Annotations inference failed."))
     | [(_, anns)] -> (e, anns)
     | _ -> assert false
   in
   log "@." ; anns
 
-let typeof_simple tenv env e =
-  let (e, anns) = infer tenv env e in
-  typeof tenv Env.empty anns e |> simplify_typ
+let typeof_simple tenv env mono e =
+  let (e, anns) = infer tenv env mono e in
+  typeof tenv Env.empty mono anns e |> simplify_typ

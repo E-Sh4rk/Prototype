@@ -205,7 +205,6 @@ let tmpvar = mk_var "%TMP%"
 let tmpvar_t = var_typ tmpvar
 
 let sufficient_a env mono a prev_t t =
-  ignore mono ;
   assert (has_absent prev_t |> not && has_absent t |> not) ;
   if subtype prev_t t then [env]
   else match a with
@@ -290,7 +289,7 @@ let filter_res_a =
 let filter_res =
   List.filter_map (function (None, _) -> None | (Some gamma, anns) -> Some (gamma, anns))
 
-(* TODO : keep track of mono, app/pi rules *)
+(* TODO : app/pi rules *)
 
 let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
   let envr = Ref_env.from_env env |> Ref_env.push in
@@ -307,6 +306,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
         splits |> List.map (fun (s, (anns, t)) ->
           assert (has_absent s |> not) ;
           let env = Env.add v s env in
+          let mono = varset_union mono (vars s) in
           let res = infer_iterated tenv env mono anns e t in
           let changes = exactly_current_env res = None in
           let res = List.map (fun (gamma, anns) -> (s, gamma, (anns, t))) res in
@@ -525,6 +525,7 @@ and infer' tenv env mono anns e' t =
             let res =
               splits |> List.map (fun (s', anns) ->
                 let env = Env.add v (cap_o s s') env in
+                let mono = varset_union mono (vars s') in
                 let res = infer_iterated tenv env mono anns e t in
                 let changes = exactly_current_env res = None in
                 let res = res |> List.map (fun (g, e) -> (s', g, e)) in

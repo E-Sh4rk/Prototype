@@ -68,7 +68,7 @@ let partition lst =
     val show_a : a -> string
     val show_e : e -> string
 end
-module type LambdaSAC = sig
+module type LambdaSA_Common = sig
   type annot
   type t
   val empty : unit -> t
@@ -79,7 +79,7 @@ module type LambdaSAC = sig
   val pp : Format.formatter -> t -> unit
 end
 module type LambdaSA = sig
-  include LambdaSAC
+  include LambdaSA_Common
   val destruct : t -> (Cduce.typ * (annot * Cduce.typ * bool)) list
   val add : t -> Cduce.typ * (annot * Cduce.typ * bool) -> t
   val construct : (Cduce.typ * (annot * Cduce.typ * bool)) list -> t
@@ -90,7 +90,7 @@ module type LambdaSA = sig
   -> t -> (Cduce.typ * Cduce.typ) list -> t
 end
 module type LambdaSAP = sig
-  include LambdaSAC
+  include LambdaSA_Common
   val destruct : t -> (Cduce.typ * (annot * Cduce.typ)) list
   val add : t -> Cduce.typ * (annot * Cduce.typ) -> t
   val construct : (Cduce.typ * (annot * Cduce.typ)) list -> t
@@ -100,7 +100,7 @@ module type LambdaSAP = sig
   val enrich : former_typ:Cduce.typ -> annot
   -> t -> (Cduce.typ * Cduce.typ) list -> t
 end
-module type BindSAC = sig
+module type BindSA_Common = sig
   type annot
   type t
   val empty : unit -> t
@@ -116,11 +116,11 @@ module type BindSAC = sig
   val pp : Format.formatter -> t -> unit
 end
 module type BindSA = sig
-  include BindSAC
+  include BindSA_Common
   val normalize : t -> Cduce.typ -> t
 end
 module type BindSAP = sig
-  include BindSAC
+  include BindSA_Common
   val normalize : t -> t
 end
 

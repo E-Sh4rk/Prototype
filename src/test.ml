@@ -1372,3 +1372,21 @@ let foo y = fst ((fun x -> ((fun y -> x)(42))) y)
 let foo y = fst ((fun x -> ((fun y -> x)(x))) y)
 let foo_fail y = fst ((fun x -> ((fun y -> x)(succ x))) y)
 let foo_fail ( y : (Any,Any)) = fst ((fun x -> ((fun y -> x)(x+42))) y)              
+
+let f = <Any->Any>
+
+let no_principal_type x =
+  let y = f x in
+  (y,y)
+
+let npt_fail x =
+  let z = no_principal_type x in
+  if fst z is Int then succ (snd z) else 42
+
+let npt_ok x =
+  let test x =
+    let y = f x in
+    (y,y)
+  in
+  let z = test x in
+  if fst z is Int then succ (snd z) else 42

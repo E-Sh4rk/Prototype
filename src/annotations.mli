@@ -18,7 +18,7 @@ module type Annot = sig
     val show_a : a -> string
     val show_e : e -> string
 end
-module type LambdaSA = sig
+module type LambdaSAC = sig
     type annot
     type t
     val empty : unit -> t
@@ -28,15 +28,23 @@ module type LambdaSA = sig
     val construct : (Cduce.typ * (annot * Cduce.typ * bool)) list -> t
     val construct_with_custom_eq : string -> (Cduce.typ * (annot * Cduce.typ * bool)) list -> t
     val map_top : (Cduce.typ -> Cduce.typ -> bool -> Cduce.typ * Cduce.typ * bool) -> t -> t
-    val enrich : opt_branches_maxdom:Cduce.typ -> former_typ:Cduce.typ -> annot
-                 -> t -> (Cduce.typ * Cduce.typ) list -> t
     val splits : t -> Cduce.typ list
     val apply : t -> Cduce.typ -> Cduce.typ -> bool -> annot
     val normalize : t -> t
     val equals : t -> t -> bool
     val pp : Format.formatter -> t -> unit
 end
-module type BindSA = sig
+module type LambdaSA = sig
+    include LambdaSAC
+    val enrich : opt_branches_maxdom:Cduce.typ -> former_typ:Cduce.typ -> annot
+    -> t -> (Cduce.typ * Cduce.typ) list -> t
+end
+module type LambdaSAP = sig
+    include LambdaSAC
+    val enrich : former_typ:Cduce.typ -> annot
+    -> t -> (Cduce.typ * Cduce.typ) list -> t
+end
+module type BindSAC = sig
     type annot
     type t
     val empty : unit -> t
@@ -48,13 +56,17 @@ module type BindSA = sig
     val map_top : (Cduce.typ -> Cduce.typ) -> t -> t
     val splits : t -> Cduce.typ list
     val apply : t -> Cduce.typ -> annot
-    val normalize : t -> Cduce.typ -> t
     val equals : t -> t -> bool
     val pp : Format.formatter -> t -> unit
 end
-
-module LambdaSAMake: functor(A: Annot) -> LambdaSA with type annot=A.e
-module BindSAMake: functor(A: Annot) -> BindSA with type annot=A.e
+module type BindSA = sig
+    include BindSAC
+    val normalize : t -> Cduce.typ -> t
+end
+module type BindSAP = sig
+    include BindSAC
+    val normalize : t -> t
+end
 
 (* === MONOMORPHIC SYSTEM === *)
 
@@ -100,6 +112,6 @@ module type AnnotPoly = sig
     val annotate_def_with_last_type : Cduce.typ -> a -> a
 end
 
-module rec BindSAP : (BindSA with type annot=AnnotPoly.e)
-and LambdaSAP : (LambdaSA with type annot=AnnotPoly.e)
+module rec BindSAP : (BindSAP with type annot=AnnotPoly.e)
+and LambdaSAP : (LambdaSAP with type annot=AnnotPoly.e)
 and AnnotPoly : (AnnotPoly with type a=LambdaSAP.t anns_a_poly and type e=(LambdaSAP.t, BindSAP.t) anns_e_poly)

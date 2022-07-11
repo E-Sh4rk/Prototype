@@ -68,7 +68,7 @@ let partition lst =
     val show_a : a -> string
     val show_e : e -> string
 end
-module type LambdaSA = sig
+module type LambdaSAC = sig
   type annot
   type t
   val empty : unit -> t
@@ -78,15 +78,23 @@ module type LambdaSA = sig
   val construct : (Cduce.typ * (annot * Cduce.typ * bool)) list -> t
   val construct_with_custom_eq : string -> (Cduce.typ * (annot * Cduce.typ * bool)) list -> t
   val map_top : (Cduce.typ -> Cduce.typ -> bool -> Cduce.typ * Cduce.typ * bool) -> t -> t
-  val enrich : opt_branches_maxdom:Cduce.typ -> former_typ:Cduce.typ -> annot
-               -> t -> (Cduce.typ * Cduce.typ) list -> t
   val splits : t -> Cduce.typ list
   val apply : t -> Cduce.typ -> Cduce.typ -> bool -> annot
   val normalize : t -> t
   val equals : t -> t -> bool
   val pp : Format.formatter -> t -> unit
 end
-module type BindSA = sig
+module type LambdaSA = sig
+  include LambdaSAC
+  val enrich : opt_branches_maxdom:Cduce.typ -> former_typ:Cduce.typ -> annot
+  -> t -> (Cduce.typ * Cduce.typ) list -> t
+end
+module type LambdaSAP = sig
+  include LambdaSAC
+  val enrich : former_typ:Cduce.typ -> annot
+  -> t -> (Cduce.typ * Cduce.typ) list -> t
+end
+module type BindSAC = sig
   type annot
   type t
   val empty : unit -> t
@@ -98,9 +106,16 @@ module type BindSA = sig
   val map_top : (Cduce.typ -> Cduce.typ) -> t -> t
   val splits : t -> Cduce.typ list
   val apply : t -> Cduce.typ -> annot
-  val normalize : t -> Cduce.typ -> t
   val equals : t -> t -> bool
   val pp : Format.formatter -> t -> unit
+end
+module type BindSA = sig
+  include BindSAC
+  val normalize : t -> Cduce.typ -> t
+end
+module type BindSAP = sig
+  include BindSAC
+  val normalize : t -> t
 end
 
 module Node = struct
@@ -122,7 +137,7 @@ module Node = struct
   let equals n1 n2 = n1.id = n2.id
 end
 
-module LambdaSAMake (A:Annot): (LambdaSA with type annot=A.e) =
+module LambdaSACMake (A:Annot) =
 struct
   type annot = A.e
   [@@deriving show]
@@ -150,27 +165,6 @@ struct
       (s, (a, t, b)))
     (* |> construct*)
     |> (fun res -> T (Node.new_node (), res))
-  (* TODO: version of enrich without support for jokers? (for the polymorphic system) *)
-  let enrich ~opt_branches_maxdom ~former_typ default_anns lst ts =
-    let t =
-      destruct lst |>
-      List.filter_map (fun (s, (_,t,b)) ->
-      if b
-      then Some (Cduce.mk_arrow (Cduce.cons s) (Cduce.cons t))
-      else None
-    ) |> Types_additions.conj |> Cduce.cap_o former_typ in
-    let annot (s',t') =
-      let req = (Types_additions.top_jokers Types_additions.Max s') |> Cduce.varlist = [] in
-      let s' = if req then s' else Cduce.cap_o s' opt_branches_maxdom in
-      let arrow_type = Cduce.mk_arrow (Cduce.cons s') (Cduce.cons t') in
-      if Cduce.subtype t arrow_type then None
-      else
-        let s' = Types_additions.substitute_top_jokers Types_additions.Max s' Cduce.any in
-        let t' = Types_additions.substitute_top_jokers Types_additions.Min t' Cduce.any in
-        Some (s', (default_anns, t', req))
-    in
-    let new_anns = List.filter_map annot ts in
-    List.fold_left add lst new_anns
   let splits (T (_, lst)) =
     List.map fst lst
   let apply_aux lst s =
@@ -203,8 +197,50 @@ struct
     in
     T (node, List.flatten lst)
 end
+module LambdaSAMake (A:Annot): (LambdaSA with type annot=A.e) =
+struct
+  include LambdaSACMake(A) 
+  let enrich ~opt_branches_maxdom ~former_typ default_anns lst ts =
+    let t =
+      destruct lst |>
+      List.filter_map (fun (s, (_,t,b)) ->
+      if b
+      then Some (Cduce.mk_arrow (Cduce.cons s) (Cduce.cons t))
+      else None
+    ) |> Types_additions.conj |> Cduce.cap_o former_typ in
+    let annot (s',t') =
+      let req = (Types_additions.top_jokers Types_additions.Max s') |> Cduce.varlist = [] in
+      let s' = if req then s' else Cduce.cap_o s' opt_branches_maxdom in
+      let arrow_type = Cduce.mk_arrow (Cduce.cons s') (Cduce.cons t') in
+      if Cduce.subtype t arrow_type then None
+      else
+        let s' = Types_additions.substitute_top_jokers Types_additions.Max s' Cduce.any in
+        let t' = Types_additions.substitute_top_jokers Types_additions.Min t' Cduce.any in
+        Some (s', (default_anns, t', req))
+    in
+    let new_anns = List.filter_map annot ts in
+    List.fold_left add lst new_anns
+end
+module LambdaSAPMake (A:Annot): (LambdaSAP with type annot=A.e) =
+struct
+  include LambdaSACMake(A)
+  (* TODO: Also update add, destruct and construct (remove the 'required' boolean) *)
+  let enrich ~former_typ default_anns lst ts =
+    let t =
+      destruct lst |>
+      List.map (fun (s, (_,t,_)) ->
+      Cduce.mk_arrow (Cduce.cons s) (Cduce.cons t)
+    ) |> Types_additions.conj |> Cduce.cap_o former_typ in
+    let annot (s',t') =
+      let arrow_type = Cduce.mk_arrow (Cduce.cons s') (Cduce.cons t') in
+      if Cduce.subtype t arrow_type then None
+      else Some (s', (default_anns, t', true))
+    in
+    let new_anns = List.filter_map annot ts in
+    List.fold_left add lst new_anns
+end
 
-module BindSAMake (A:Annot): (BindSA with type annot=A.e) = struct
+module BindSACMake (A:Annot) = struct
   type annot = A.e
   [@@deriving show]
   type t = T of Node.t * (Cduce.typ * annot) list
@@ -238,10 +274,19 @@ module BindSAMake (A:Annot): (BindSA with type annot=A.e) = struct
     match anns with
     | [] -> assert false
     | a1::anns -> List.fold_left A.merge_e a1 anns
-  (* TODO: remove s argument for polymorphic system *)
+end
+module BindSAMake (A:Annot): (BindSA with type annot=A.e) = struct
+  include BindSACMake(A)
   let normalize ((T (node, _)) as anns) s =
     let ts = splits anns
       |> List.map (Cduce.cap_o s)
+      |> partition_non_empty in
+    T (node, List.map (fun t -> (t, apply anns t)) ts)
+end
+module BindSAPMake (A:Annot): (BindSAP with type annot=A.e) = struct
+  include BindSACMake(A)
+  let normalize ((T (node, _)) as anns) =
+    let ts = splits anns
       |> partition_non_empty in
     T (node, List.map (fun t -> (t, apply anns t)) ts)
 end
@@ -364,8 +409,8 @@ module type AnnotPoly = sig
     val annotate_def_with_last_type : Cduce.typ -> a -> a
 end
 
-module rec BindSAP : (BindSA with type annot=AnnotPoly.e) = BindSAMake(AnnotPoly)
-and LambdaSAP : (LambdaSA with type annot=AnnotPoly.e) = LambdaSAMake(AnnotPoly)
+module rec BindSAP : (BindSAP with type annot=AnnotPoly.e) = BindSAPMake(AnnotPoly)
+and LambdaSAP : (LambdaSAP with type annot=AnnotPoly.e) = LambdaSAPMake(AnnotPoly)
 and AnnotPoly : (AnnotPoly with type a=LambdaSAP.t anns_a_poly and type e=(LambdaSAP.t, BindSAP.t) anns_e_poly) =
 struct
   type a = LambdaSAP.t anns_a_poly

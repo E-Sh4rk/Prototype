@@ -1,18 +1,17 @@
 open Cduce
 open Variable
 open Msc
-open Types_additions
 
 let v1 = Variable.create (Some "v1")
 let v2 = Variable.create (Some "v2")
 
-let%test "refine-app" [@tags "no-js"] =
+let%test "propagate-app" [@tags "no-js"] =
   let ii = mk_arrow (cons int_typ) (cons int_typ) in
   let aa = mk_arrow any_node any_node in
   let f = cap ii aa in
   let env = Env.singleton v1 f |> Env.add v2 any |> Ref_env.from_env in
   let e = App (v1, v2) in
-  let res = Checker_poly.refine_a empty_tenv env (varset []) e any int_typ in
+  let (res, _) = Checker_poly.propagate_a env (varset []) e any int_typ in
   match res with
   | [env] when equiv int_typ (Ref_env.find v2 env) -> true
   | _ -> false

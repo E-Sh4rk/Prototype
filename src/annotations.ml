@@ -72,25 +72,31 @@ module type LambdaSAC = sig
   type annot
   type t
   val empty : unit -> t
-  val destruct : t -> (Cduce.typ * (annot * Cduce.typ * bool)) list
-  val add : t -> Cduce.typ * (annot * Cduce.typ * bool) -> t
   val merge : t -> t -> t
-  val construct : (Cduce.typ * (annot * Cduce.typ * bool)) list -> t
-  val construct_with_custom_eq : string -> (Cduce.typ * (annot * Cduce.typ * bool)) list -> t
-  val map_top : (Cduce.typ -> Cduce.typ -> bool -> Cduce.typ * Cduce.typ * bool) -> t -> t
   val splits : t -> Cduce.typ list
-  val apply : t -> Cduce.typ -> Cduce.typ -> bool -> annot
   val normalize : t -> t
   val equals : t -> t -> bool
   val pp : Format.formatter -> t -> unit
 end
 module type LambdaSA = sig
   include LambdaSAC
+  val destruct : t -> (Cduce.typ * (annot * Cduce.typ * bool)) list
+  val add : t -> Cduce.typ * (annot * Cduce.typ * bool) -> t
+  val construct : (Cduce.typ * (annot * Cduce.typ * bool)) list -> t
+  val construct_with_custom_eq : string -> (Cduce.typ * (annot * Cduce.typ * bool)) list -> t
+  val map_top : (Cduce.typ -> Cduce.typ -> bool -> Cduce.typ * Cduce.typ * bool) -> t -> t
+  val apply : t -> Cduce.typ -> Cduce.typ -> bool -> annot
   val enrich : opt_branches_maxdom:Cduce.typ -> former_typ:Cduce.typ -> annot
   -> t -> (Cduce.typ * Cduce.typ) list -> t
 end
 module type LambdaSAP = sig
   include LambdaSAC
+  val destruct : t -> (Cduce.typ * (annot * Cduce.typ)) list
+  val add : t -> Cduce.typ * (annot * Cduce.typ) -> t
+  val construct : (Cduce.typ * (annot * Cduce.typ)) list -> t
+  val construct_with_custom_eq : string -> (Cduce.typ * (annot * Cduce.typ)) list -> t
+  val map_top : (Cduce.typ -> Cduce.typ -> Cduce.typ * Cduce.typ) -> t -> t
+  val apply : t -> Cduce.typ -> Cduce.typ -> annot
   val enrich : former_typ:Cduce.typ -> annot
   -> t -> (Cduce.typ * Cduce.typ) list -> t
 end
@@ -137,7 +143,7 @@ module Node = struct
   let equals n1 n2 = n1.id = n2.id
 end
 
-module LambdaSACMake (A:Annot) =
+module LambdaSAMake (A:Annot) =
 struct
   type annot = A.e
   [@@deriving show]
@@ -184,10 +190,9 @@ struct
     let equiv (t1,b1) (t2,b2) =
       b1 = b2 && Cduce.equiv t1 t2
     in
-    let regroup = regroup equiv in
     let ts = lst
       |> List.map (fun (s, (anns, t, b)) -> ((t, b), (s, anns)))
-      |> regroup in
+      |> regroup equiv in
     let lst = ts
       |> List.map (fun ((t,b), lst) ->
         let ss = List.map (fun (s,_) -> s) lst |> partition_non_empty in
@@ -196,10 +201,6 @@ struct
       )
     in
     T (node, List.flatten lst)
-end
-module LambdaSAMake (A:Annot): (LambdaSA with type annot=A.e) =
-struct
-  include LambdaSACMake(A) 
   let enrich ~opt_branches_maxdom ~former_typ default_anns lst ts =
     let t =
       destruct lst |>
@@ -223,18 +224,69 @@ struct
 end
 module LambdaSAPMake (A:Annot): (LambdaSAP with type annot=A.e) =
 struct
-  include LambdaSACMake(A)
-  (* TODO: Also update add, destruct and construct (remove the 'required' boolean) *)
+  type annot = A.e
+  [@@deriving show]
+  type t = T of Node.t * (Cduce.typ * (annot * Cduce.typ)) list
+  [@@deriving show]
+  let equals (T (n1,_)) (T (n2,_)) = Node.equals n1 n2
+  let empty () = T (Node.default_node, [])
+  let destruct (T (_, lst)) = lst
+  let add (T (node, lst)) (s, (a, t)) =
+    if List.exists (fun (s', (a', t')) ->
+      A.equals_e a a' && Cduce.equiv s s' && Cduce.equiv t t') lst
+    then T (node, lst)
+    else T (Node.new_node (), (s, (a, t))::lst)
+  let merge a1 a2 =
+    if equals a1 a2 then a1
+    else destruct a2 |> List.fold_left add a1
+  let construct lst =
+    List.fold_left add (empty ()) lst
+  let construct_with_custom_eq str lst =
+    let T (_, a) = construct lst in
+    T (Node.node_of_id str, a)
+  let map_top f (T (_, lst)) =
+    lst |> List.map (fun (s, (a,t)) ->
+      let (s, t) = f s t in
+      (s, (a, t)))
+    (* |> construct*)
+    |> (fun res -> T (Node.new_node (), res))
+  let splits (T (_, lst)) =
+    List.map fst lst
+  let apply_aux lst s =
+    let anns = lst |> List.filter_map (fun (s', (anns, _)) ->
+      if Cduce.subtype s s'
+      then Some anns else None
+    ) in
+    match anns with
+    | [] -> assert false
+    | a1::anns -> List.fold_left A.merge_e a1 anns
+  let apply (T (_, lst)) s t =
+    let lst = lst |> List.filter (fun (_, (_, t')) ->
+      Cduce.equiv t t'
+    ) in
+    apply_aux lst s
+  let normalize (T (node, lst)) =
+    let ts = lst
+      |> List.map (fun (s, (anns, t)) -> (t, (s, anns)))
+      |> regroup Cduce.equiv in
+    let lst = ts
+      |> List.map (fun (t, lst) ->
+        let ss = List.map (fun (s,_) -> s) lst |> partition_non_empty in
+        let lst = lst |> List.map (fun (s, anns) -> (s, (anns, t))) in
+        List.map (fun s -> (s, (apply_aux lst s, t))) ss
+      )
+    in
+    T (node, List.flatten lst)
   let enrich ~former_typ default_anns lst ts =
     let t =
       destruct lst |>
-      List.map (fun (s, (_,t,_)) ->
+      List.map (fun (s, (_,t)) ->
       Cduce.mk_arrow (Cduce.cons s) (Cduce.cons t)
     ) |> Types_additions.conj |> Cduce.cap_o former_typ in
     let annot (s',t') =
       let arrow_type = Cduce.mk_arrow (Cduce.cons s') (Cduce.cons t') in
       if Cduce.subtype t arrow_type then None
-      else Some (s', (default_anns, t', true))
+      else Some (s', (default_anns, t'))
     in
     let new_anns = List.filter_map annot ts in
     List.fold_left add lst new_anns
@@ -442,7 +494,7 @@ struct
       let initial_e = initial_e e in
       PLambdaA (Cduce.any_or_absent,
       LambdaSAP.construct_with_custom_eq "initial"
-        [(Variable.Variable.to_typevar v |> Cduce.var_typ, (initial_e, Cduce.any, false))])
+        [(Variable.Variable.to_typevar v |> Cduce.var_typ, (initial_e, Cduce.any))])
     | Lambda (_, _, _, _) ->
       PLambdaA (Cduce.any_or_absent,
       LambdaSAP.construct_with_custom_eq "initial" [])

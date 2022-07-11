@@ -13,8 +13,8 @@ exception Ill_typed of Position.t list * string
 let pp_splits = Utils.pp_list Cduce.pp_typ
 
 let pp_lambda_splits fmt =
-  let pp_lsplit fmt (s,(_,t,b)) =
-    Format.fprintf fmt "%a -> %a (%b)" pp_typ s pp_typ t b
+  let pp_lsplit fmt (s,(_,t)) =
+    Format.fprintf fmt "%a -> %a" pp_typ s pp_typ t
   in
   Format.fprintf fmt "%a" (Utils.pp_list pp_lsplit)
 
@@ -84,7 +84,7 @@ let rec typeof_a pos tenv env mono anns a =
     if splits = []
     then raise (Ill_typed (pos, "Empty annotation for variable "^(Variable.show v)^"."))
     else begin
-      LambdaSAP.destruct va |> List.map (fun (t, (anns, _, _)) ->
+      LambdaSAP.destruct va |> List.map (fun (t, (anns, _)) ->
         let env = Env.add v t env in
         let mono = varset_union mono (vars t) in
         let res = typeof tenv env mono anns e in
@@ -300,19 +300,16 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
     then begin
       log "@,@[<v 1>LAMBDA for variable %a (unconstrained)" Variable.pp v ;
       log "@,Initial splits: %a" pp_lambda_splits (LambdaSAP.destruct va) ;
-      let va = LambdaSAP.map_top (fun s t b ->
-        if b then (worst s, t, b) else (substitute_all_jokers s any, t, b)) va
-        |> LambdaSAP.normalize
-      in
+      let va = va |> LambdaSAP.normalize in
       let splits = va |> LambdaSAP.destruct in
       log "@,Using the following splits: %a" pp_lambda_splits (LambdaSAP.destruct va) ;
       let res =
-        splits |> List.map (fun (s, (anns, t, b)) ->
+        splits |> List.map (fun (s, (anns, t)) ->
           assert (has_absent s |> not) ;
           let env = Env.add v s env in
           let res = infer_iterated tenv env mono anns e t in
           let changes = exactly_current_env res = None in
-          let res = List.map (fun (gamma, anns) -> (s, gamma, (anns, worst t, b))) res in
+          let res = List.map (fun (gamma, anns) -> (s, gamma, (anns, worst t))) res in
           (res, changes)
         ) in
         let (ress, changess) = List.split res in
@@ -337,7 +334,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
           match anns with
           | PLambdaA (_, va) ->
             LambdaSAP.destruct va
-            |> List.map (fun (s,(_,t,_)) -> mk_arrow (cons (worst s)) (cons t)) (* t shouldn't contain any joker *)
+            |> List.map (fun (s,(_,t)) -> mk_arrow (cons (worst s)) (cons t)) (* t shouldn't contain any joker *)
           |_ -> assert false
         )
         |> List.flatten |> conj |> cap former_typ

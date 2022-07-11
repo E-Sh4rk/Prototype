@@ -22,25 +22,31 @@ module type LambdaSAC = sig
     type annot
     type t
     val empty : unit -> t
-    val destruct : t -> (Cduce.typ * (annot * Cduce.typ * bool)) list
-    val add : t -> Cduce.typ * (annot * Cduce.typ * bool) -> t
     val merge : t -> t -> t
-    val construct : (Cduce.typ * (annot * Cduce.typ * bool)) list -> t
-    val construct_with_custom_eq : string -> (Cduce.typ * (annot * Cduce.typ * bool)) list -> t
-    val map_top : (Cduce.typ -> Cduce.typ -> bool -> Cduce.typ * Cduce.typ * bool) -> t -> t
     val splits : t -> Cduce.typ list
-    val apply : t -> Cduce.typ -> Cduce.typ -> bool -> annot
     val normalize : t -> t
     val equals : t -> t -> bool
     val pp : Format.formatter -> t -> unit
 end
 module type LambdaSA = sig
     include LambdaSAC
+    val destruct : t -> (Cduce.typ * (annot * Cduce.typ * bool)) list
+    val add : t -> Cduce.typ * (annot * Cduce.typ * bool) -> t
+    val construct : (Cduce.typ * (annot * Cduce.typ * bool)) list -> t
+    val construct_with_custom_eq : string -> (Cduce.typ * (annot * Cduce.typ * bool)) list -> t
+    val map_top : (Cduce.typ -> Cduce.typ -> bool -> Cduce.typ * Cduce.typ * bool) -> t -> t
+    val apply : t -> Cduce.typ -> Cduce.typ -> bool -> annot
     val enrich : opt_branches_maxdom:Cduce.typ -> former_typ:Cduce.typ -> annot
     -> t -> (Cduce.typ * Cduce.typ) list -> t
 end
 module type LambdaSAP = sig
     include LambdaSAC
+    val destruct : t -> (Cduce.typ * (annot * Cduce.typ)) list
+    val add : t -> Cduce.typ * (annot * Cduce.typ) -> t
+    val construct : (Cduce.typ * (annot * Cduce.typ)) list -> t
+    val construct_with_custom_eq : string -> (Cduce.typ * (annot * Cduce.typ)) list -> t
+    val map_top : (Cduce.typ -> Cduce.typ -> Cduce.typ * Cduce.typ) -> t -> t
+    val apply : t -> Cduce.typ -> Cduce.typ -> annot
     val enrich : former_typ:Cduce.typ -> annot
     -> t -> (Cduce.typ * Cduce.typ) list -> t
 end

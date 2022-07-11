@@ -290,7 +290,7 @@ let filter_res_a =
 let filter_res =
   List.filter_map (function (None, _) -> None | (Some gamma, anns) -> Some (gamma, anns))
 
-(* TODO : keep track of mono, cap with s for bindings, app/pi rules *)
+(* TODO : keep track of mono, app/pi rules *)
 
 let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
   let envr = Ref_env.from_env env |> Ref_env.push in
@@ -498,7 +498,7 @@ and infer' tenv env mono anns e' t =
             match lst with
             | [] -> None
             | (ns,anns)::lst ->
-              let (sufficient, necessary) = propagate_a envr mono a s (neg ns) in
+              let (sufficient, necessary) = propagate_a envr mono a s (neg (cap ns any)) in
               if sufficient <> []
               then propagate lst ((ns,anns)::treated)
               else Some ((ns,anns), lst@treated, necessary, sufficient)

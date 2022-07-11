@@ -95,7 +95,6 @@ module type LambdaSAP = sig
   val add : t -> Cduce.typ * (annot * Cduce.typ) -> t
   val construct : (Cduce.typ * (annot * Cduce.typ)) list -> t
   val construct_with_custom_eq : string -> (Cduce.typ * (annot * Cduce.typ)) list -> t
-  val map_top : (Cduce.typ -> Cduce.typ -> Cduce.typ * Cduce.typ) -> t -> t
   val apply : t -> Cduce.typ -> Cduce.typ -> annot
   val enrich : former_typ:Cduce.typ -> annot
   -> t -> (Cduce.typ * Cduce.typ) list -> t
@@ -109,7 +108,6 @@ module type BindSA_Common = sig
   val merge : t -> t -> t
   val construct : (Cduce.typ * annot) list -> t
   val construct_with_custom_eq : string -> (Cduce.typ * annot) list -> t
-  val map_top : (Cduce.typ -> Cduce.typ) -> t -> t
   val splits : t -> Cduce.typ list
   val apply : t -> Cduce.typ -> annot
   val equals : t -> t -> bool
@@ -118,6 +116,7 @@ end
 module type BindSA = sig
   include BindSA_Common
   val normalize : t -> Cduce.typ -> t
+  val map_top : (Cduce.typ -> Cduce.typ) -> t -> t
 end
 module type BindSAP = sig
   include BindSA_Common
@@ -244,12 +243,6 @@ struct
   let construct_with_custom_eq str lst =
     let T (_, a) = construct lst in
     T (Node.node_of_id str, a)
-  let map_top f (T (_, lst)) =
-    lst |> List.map (fun (s, (a,t)) ->
-      let (s, t) = f s t in
-      (s, (a, t)))
-    (* |> construct*)
-    |> (fun res -> T (Node.new_node (), res))
   let splits (T (_, lst)) =
     List.map fst lst
   let apply_aux lst s =
@@ -312,10 +305,6 @@ module BindSACMake (A:Annot) = struct
   let construct_with_custom_eq str lst =
     let T (_, a) = construct lst in
     T (Node.node_of_id str, a)
-  let map_top f (T (_, lst)) =
-    lst |> List.map (fun (s, a) -> (f s, a))
-    (* |> construct*)
-    |> (fun res -> T (Node.new_node (), res))
   let splits (T (_, lst)) =
     List.map fst lst
   let apply (T (_, lst)) t =
@@ -334,6 +323,10 @@ module BindSAMake (A:Annot): (BindSA with type annot=A.e) = struct
       |> List.map (Cduce.cap_o s)
       |> partition_non_empty in
     T (node, List.map (fun t -> (t, apply anns t)) ts)
+  let map_top f (T (_, lst)) =
+    lst |> List.map (fun (s, a) -> (f s, a))
+    (* |> construct*)
+    |> (fun res -> T (Node.new_node (), res))
 end
 module BindSAPMake (A:Annot): (BindSAP with type annot=A.e) = struct
   include BindSACMake(A)

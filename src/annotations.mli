@@ -45,7 +45,6 @@ module type LambdaSAP = sig
     val add : t -> Cduce.typ * (annot * Cduce.typ) -> t
     val construct : (Cduce.typ * (annot * Cduce.typ)) list -> t
     val construct_with_custom_eq : string -> (Cduce.typ * (annot * Cduce.typ)) list -> t
-    val map_top : (Cduce.typ -> Cduce.typ -> Cduce.typ * Cduce.typ) -> t -> t
     val apply : t -> Cduce.typ -> Cduce.typ -> annot
     val enrich : former_typ:Cduce.typ -> annot
     -> t -> (Cduce.typ * Cduce.typ) list -> t
@@ -59,7 +58,6 @@ module type BindSA_Common = sig
     val merge : t -> t -> t
     val construct : (Cduce.typ * annot) list -> t
     val construct_with_custom_eq : string -> (Cduce.typ * annot) list -> t
-    val map_top : (Cduce.typ -> Cduce.typ) -> t -> t
     val splits : t -> Cduce.typ list
     val apply : t -> Cduce.typ -> annot
     val equals : t -> t -> bool
@@ -68,6 +66,7 @@ end
 module type BindSA = sig
     include BindSA_Common
     val normalize : t -> Cduce.typ -> t
+    val map_top : (Cduce.typ -> Cduce.typ) -> t -> t
 end
 module type BindSAP = sig
     include BindSA_Common

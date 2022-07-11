@@ -290,7 +290,7 @@ let filter_res_a =
 let filter_res =
   List.filter_map (function (None, _) -> None | (Some gamma, anns) -> Some (gamma, anns))
 
-(* TODO : remove jokers, keep track of mono, cap with s for bindings, app/pi rules *)
+(* TODO : keep track of mono, cap with s for bindings, app/pi rules *)
 
 let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
   let envr = Ref_env.from_env env |> Ref_env.push in
@@ -309,7 +309,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
           let env = Env.add v s env in
           let res = infer_iterated tenv env mono anns e t in
           let changes = exactly_current_env res = None in
-          let res = List.map (fun (gamma, anns) -> (s, gamma, (anns, worst t))) res in
+          let res = List.map (fun (gamma, anns) -> (s, gamma, (anns, t))) res in
           (res, changes)
         ) in
         let (ress, changess) = List.split res in
@@ -334,15 +334,14 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
           match anns with
           | PLambdaA (_, va) ->
             LambdaSAP.destruct va
-            |> List.map (fun (s,(_,t)) -> mk_arrow (cons (worst s)) (cons t)) (* t shouldn't contain any joker *)
+            |> List.map (fun (s,(_,t)) -> mk_arrow (cons s) (cons t))
           |_ -> assert false
         )
         |> List.flatten |> conj |> cap former_typ
       in
-      let worst_target_t = worst t in
       let res =
-        if subtype best_t worst_target_t then (res, false)
-        else (log "@,Cannot obtain the required type: %s" (actual_expected best_t worst_target_t) ; ([], false))
+        if subtype best_t t then (res, false)
+        else (log "@,Cannot obtain the required type: %s" (actual_expected best_t t) ; ([], false))
       in
       log "@]@,END LAMBDA for variable %a" Variable.pp v ;
       res
@@ -359,11 +358,9 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
     (res, changes)
   end else begin
     let t = disj ts in
-    let worst_t = worst t in
     match a, anns with
     | _, PUntypAtomA -> ([], false)
-    | Abstract s, _ when subtype s worst_t ->
-      ([(envr, PEmptyAtomA)], false)
+    | Abstract s, _ when subtype s t -> ([(envr, PEmptyAtomA)], false)
     | Abstract _, _ -> ([], false)
     | Const c, _ when subtype (typeof_const_atom tenv c) t ->
       ([(envr, PEmptyAtomA)], false)
@@ -450,7 +447,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
     | Lambda (_, Ast.ADomain s, v, e), PLambdaA (former_typ, va) ->
       let ts = ts |> List.map (cap_o (mk_arrow (cons s) any_node)) in
       type_lambda v e ts va ~former_typ
-    | Lambda (_, Ast.AArrow s, v, e), PLambdaA (former_typ, va) when subtype s worst_t ->
+    | Lambda (_, Ast.AArrow s, v, e), PLambdaA (former_typ, va) when subtype s t ->
       let ts = [cap_o s arrow_any] in
       type_lambda v e ts va ~former_typ
     | Lambda (_, Ast.AArrow _, _, _), PLambdaA _ -> ([], false)
@@ -467,7 +464,6 @@ and infer' tenv env mono anns e' t =
     let pos = Variable.get_locations v in
     log "@,Initial splits: %a" pp_splits (BindSAP.splits va) ;
     let dom_a = BindSAP.splits va in
-    let va = BindSAP.map_top worst va in
     let res =
       match BindSAP.destruct va with
       | [(s, anns)] when subtype any_or_absent s -> (* BindDefSkip *)

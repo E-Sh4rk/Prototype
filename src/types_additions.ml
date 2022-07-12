@@ -428,6 +428,17 @@ let instantiate ss t =
     List.map (fun s -> substitute s t) ss
     |> conj_o
 
+let compose_subst s1 s2 =
+    subst_destruct s1 |>
+    List.map (fun (v,t) -> (v, substitute s2 t)) |>
+    mk_subst
+
+let rename_poly mono t =
+    let poly_vars = varset_diff (vars t) mono in
+    poly_vars |> varlist |> List.map
+        (fun v -> (v, var_typ (mk_var (var_name v))))
+    |> mk_subst
+
 (* Operations on jokers *)
 
 type joker_kind = Min | Max

@@ -90,6 +90,7 @@ val varset_filter : (var -> bool) -> varset -> varset
 val varset_union : varset -> varset -> varset
 val varset_add : var -> varset -> varset
 val varset_inter : varset -> varset -> varset
+val varset_diff : varset -> varset -> varset
 val varlist : varset -> var list
 val substitute : subst -> typ -> typ
 val mk_subst : (var * typ) list -> subst
@@ -97,6 +98,7 @@ val subst_dom : subst -> varset
 val subst_mem : subst -> var -> bool
 val subst_find : subst -> var -> typ
 val subst_equiv : subst -> subst -> bool
+val subst_destruct : subst -> (var * typ) list
 
 val is_empty : typ -> bool
 val non_empty: typ -> bool

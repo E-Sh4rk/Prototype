@@ -95,6 +95,8 @@ val remove_field_info : typ -> string -> typ
 (* Operations on substs and vars *)
 
 val instantiate : Cduce.subst list -> typ -> typ
+val compose_subst : Cduce.subst -> Cduce.subst -> Cduce.subst
+val rename_poly : Cduce.varset -> Cduce.typ -> Cduce.subst
 
 (* Operations on jokers *)
 

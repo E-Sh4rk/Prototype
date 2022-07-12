@@ -231,9 +231,11 @@ let varset_filter = CD.Var.Set.filter
 let varset_union = CD.Var.Set.cup
 let varset_add = CD.Var.Set.add
 let varset_inter = CD.Var.Set.cap
+let varset_diff = CD.Var.Set.diff
 let varlist = CD.Var.Set.get
 let substitute = CD.Types.Subst.apply
 let mk_subst = CD.Types.Subst.from_list
+let subst_destruct = CD.Var.Map.get
 
 let subst_dom s = CD.Var.Map.domain s
 let subst_mem s v = CD.Var.Set.mem (subst_dom s) v

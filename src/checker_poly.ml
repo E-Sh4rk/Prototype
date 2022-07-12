@@ -361,8 +361,17 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
       res
     end
   in
-  let type_app t1 t2 =
-    ignore (t1, t2) ;
+  let type_app t1 t2 t =
+    let vars_t = vars t in
+    let mono = varset_union mono vars_t in
+    let renaming1 = rename_poly mono t1 in
+    let renaming2 = rename_poly mono t2 in
+    let renaming = combine_subst renaming1 renaming2 in
+    let fresh = mk_var "app" in
+    let lhs = t1 in
+    let rhs = mk_arrow (cons t2) (cap (var_typ fresh) t |> cons) in
+    let substs = tallying vars_t [(lhs, rhs)] in
+    ignore (substs,renaming) ;
     failwith "TODO"
   in
   if List.exists has_absent ts
@@ -416,7 +425,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
           let ft = match p with
           | Fst -> pi1_type | Snd -> pi2_type
           | Field label -> pi_record_type label
-          in type_app ft vt
+          in type_app ft vt t
       in (res, false)
     | Projection _, _ -> assert false
     | RecordUpdate (v, label, None), _ ->
@@ -474,7 +483,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
         then [(Ref_env.refine v2 any envr, PInstA [])] |> filter_res_a
         else if is_empty vt2
         then [(Ref_env.refine v1 arrow_any envr, PInstA [])] |> filter_res_a
-        else type_app vt1 vt2
+        else type_app vt1 vt2 t
       in (res, false)
     | App _, _ -> assert false
     | Let (v1, v2), _ ->

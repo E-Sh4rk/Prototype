@@ -289,7 +289,19 @@ let filter_res_a =
 let filter_res =
   List.filter_map (function (None, _) -> None | (Some gamma, anns) -> Some (gamma, anns))
 
-(* TODO : app/pi rules *)
+(* TODO : type_app *)
+let pi1_type =
+  let nv1 = mk_var "pi1" |> var_typ in
+  let lhs = mk_times (cons nv1) any_node in
+  mk_arrow (cons lhs) (cons nv1)
+let pi2_type =
+  let nv2 = mk_var "pi2" |> var_typ in
+  let lhs = mk_times any_node (cons nv2) in
+  mk_arrow (cons lhs) (cons nv2)
+let pi_record_type label =
+  let nv = mk_var ("pi_"^label) |> var_typ in
+  let lhs = mk_record true [label, cons nv] in
+  mk_arrow (cons lhs) (cons nv)
 
 let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
   let envr = Ref_env.from_env env |> Ref_env.push in
@@ -347,6 +359,10 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
       res
     end
   in
+  let type_app t1 t2 =
+    ignore (t1, t2) ;
+    failwith "TODO"
+  in
   if List.exists has_absent ts
   then begin (* Option *)
     let ts = ts |> List.map (cap_o any) in
@@ -387,8 +403,20 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
             ) |> filter_res_a
         end
       in (res, false)
-    | Projection (_, _), _ ->
-      failwith "TODO"
+    | Projection (p, v), PInstA _ ->
+      let vt = Env.find v env in
+      let res =
+        if has_absent vt
+        then [(Ref_env.refine v any envr, PInstA [])] |> filter_res_a
+        else if is_empty vt
+        then [(envr, PInstA [])]
+        else
+          let ft = match p with
+          | Fst -> pi1_type | Snd -> pi2_type
+          | Field label -> pi_record_type label
+          in type_app ft vt
+      in (res, false)
+    | Projection _, _ -> assert false
     | RecordUpdate (v, label, None), _ ->
       let t = cap_o (record_any_without label) t in
       let t = remove_field_info t label in
@@ -432,8 +460,20 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
             |> filter_res_a
       in
       (res, false)
-    | App (_, _), PInstA _ ->
-      failwith "TODO"
+    | App (v1, v2), PInstA _ ->
+      let vt1 = Env.find v1 env in
+      let vt2 = Env.find v2 env in
+      let res =
+        if has_absent vt1 || has_absent vt2
+        then [(envr |> option_chain [
+          Ref_env.refine v1 arrow_any ; Ref_env.refine v2 any
+          ], PInstA [])] |> filter_res_a
+        else if is_empty vt1
+        then [(Ref_env.refine v2 any envr, PInstA [])] |> filter_res_a
+        else if is_empty vt2
+        then [(Ref_env.refine v1 arrow_any envr, PInstA [])] |> filter_res_a
+        else type_app vt1 vt2
+      in (res, false)
     | App _, _ -> assert false
     | Let (v1, v2), _ ->
       let res =

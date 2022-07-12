@@ -240,10 +240,12 @@ let sufficient_a env mono a prev_t t =
   | App (v1, v2) ->
     let mono = varset_union mono (vars t) in
     let lhs = Ref_env.find v1 env in
+    let renaming = rename_poly mono lhs in
     let rhs = mk_arrow (cons tmpvar_t) (cons t) in
     tallying mono [(lhs,rhs)] |>
     List.filter_map (fun s ->
       let s = subst_find s tmpvar in
+      let s = substitute renaming s in
       let s = clean_type ~pos:any ~neg:empty mono s in
       Ref_env.refine v2 s env
     )

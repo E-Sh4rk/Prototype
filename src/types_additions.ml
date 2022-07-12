@@ -441,6 +441,12 @@ let rename_poly mono t =
         (fun v -> (v, var_typ (mk_var (var_name v))))
     |> mk_subst
 
+let combine_subst s1 s2 =
+    assert (varset_inter (subst_dom s1) (subst_dom s2) |> varlist = []) ;
+    let s1 = subst_destruct s1 in
+    let s2 = subst_destruct s2 in
+    s1@s2 |> mk_subst
+
 (* Operations on jokers *)
 
 type joker_kind = Min | Max

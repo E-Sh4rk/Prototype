@@ -429,9 +429,11 @@ let instantiate ss t =
     |> conj_o
 
 let compose_subst s1 s2 =
-    subst_destruct s1 |>
-    List.map (fun (v,t) -> (v, substitute s2 t)) |>
-    mk_subst
+    let only_s2 = subst_destruct s2 |>
+        List.filter (fun (v, _) -> subst_mem s1 v |> not) in
+    let res = subst_destruct s1 |>
+        List.map (fun (v,t) -> (v, substitute s2 t)) in
+    mk_subst (res@only_s2)
 
 let rename_poly mono t =
     let poly_vars = varset_diff (vars t) mono in

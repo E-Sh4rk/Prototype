@@ -265,7 +265,7 @@ let propagate_a env mono a prev_t t =
 
 (* ===== INFER ===== *)
 
-let regroup v res =
+let regroup_res v res =
   res |> List.map (fun (t, gamma, o) ->
     let vt = if Ref_env.mem_ref v gamma
       then Ref_env.find_ref v gamma |> cap t else t in
@@ -291,8 +291,7 @@ let filter_res_a =
 let filter_res =
   List.filter_map (function (None, _) -> None | (Some gamma, anns) -> Some (gamma, anns))
 
-(* TODO : type_app *)
-let pi1_type =
+  let pi1_type =
   let nv1 = mk_var "pi1" |> var_typ in
   let lhs = mk_times (cons nv1) any_node in
   mk_arrow (cons lhs) (cons nv1)
@@ -304,6 +303,10 @@ let pi_record_type label =
   let nv = mk_var ("pi_"^label) |> var_typ in
   let lhs = mk_record true [label, cons nv] in
   mk_arrow (cons lhs) (cons nv)
+
+let strenghten_env_with_subst envr s =
+  ignore (envr, s) ;
+  failwith "TODO"
 
 let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
   let envr = Ref_env.from_env env |> Ref_env.push in
@@ -328,7 +331,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
         ) in
         let (ress, changess) = List.split res in
         let changes = List.exists identity changess in
-        let res = List.flatten ress |> regroup v |> List.map (
+        let res = List.flatten ress |> regroup_res v |> List.map (
           fun (gamma, anns_a) -> (gamma, PLambdaA (former_typ, LambdaSAP.construct anns_a))
         ) in
       log "@]@,END LAMBDA for variable %a" Variable.pp v ;
@@ -371,8 +374,15 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
     let lhs = t1 in
     let rhs = mk_arrow (cons t2) (cap (var_typ fresh) t |> cons) in
     let substs = tallying vars_t [(lhs, rhs)] in
-    ignore (substs,renaming) ;
-    failwith "TODO"
+    let res =
+      substs |> List.map (fun s ->
+        (* TODO: simplify types *)
+        let s = compose_subst s renaming in
+        let (ms, ps) = split_subst s mono in
+        (strenghten_env_with_subst envr ms, ps)
+      ) in
+    regroup Ref_env.equiv_ref res |>
+    List.map (fun (e,il) -> (e, PInstA il))
   in
   if List.exists has_absent ts
   then begin (* Option *)
@@ -523,7 +533,7 @@ and infer' tenv env mono anns e' t =
         let res = infer_iterated tenv env mono anns e t in
         let changes = exactly_current_env res = None in
         let res = res |> List.map (fun (g,e) -> (any_or_absent,g,e))
-          |> regroup v |> List.map (
+          |> regroup_res v |> List.map (
           fun (gamma, anns) -> (gamma, PBindA (anns_a, BindSAP.construct anns))
         ) in
         (res, changes)
@@ -584,7 +594,7 @@ and infer' tenv env mono anns e' t =
             ) in
             let (ress, changess) = List.split res in
             let changes = List.exists identity changess in
-            let res = List.flatten ress |> regroup v |> List.map (
+            let res = List.flatten ress |> regroup_res v |> List.map (
               fun (gamma, anns) -> (gamma, PBindA (anns_a, BindSAP.construct anns))
             ) in
             (res, changes)

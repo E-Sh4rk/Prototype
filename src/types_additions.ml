@@ -447,6 +447,13 @@ let combine_subst s1 s2 =
     let s2 = subst_destruct s2 in
     s1@s2 |> mk_subst
 
+let split_subst s vars =
+    let vars = varset_inter (subst_dom s) vars in
+    let nvars = varset_diff (subst_dom s) vars in
+    let res1 = vars |> varlist |> List.map (fun v -> (v, subst_find s v)) in
+    let res2 = nvars |> varlist |> List.map (fun v -> (v, subst_find s v)) in
+    (res1 |> mk_subst, res2 |> mk_subst)
+
 (* Operations on jokers *)
 
 type joker_kind = Min | Max

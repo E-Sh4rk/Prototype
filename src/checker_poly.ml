@@ -305,6 +305,8 @@ let pi_record_type label =
   mk_arrow (cons lhs) (cons nv)
 
 let strenghten_env_with_subst envr s =
+  (* TODO: strengthening should be done only on the "split" part
+     of the environment (not on the "definition" part) *)
   let dom_s = subst_dom s in
   let rec aux acc lst =
     match lst with

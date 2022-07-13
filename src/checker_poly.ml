@@ -305,8 +305,20 @@ let pi_record_type label =
   mk_arrow (cons lhs) (cons nv)
 
 let strenghten_env_with_subst envr s =
-  ignore (envr, s) ;
-  failwith "TODO"
+  let dom_s = subst_dom s in
+  let rec aux acc lst =
+    match lst with
+    | [] -> Some acc
+    | (v,t)::lst ->
+      let dom_t = vars t in
+      let dom = varset_inter dom_s dom_t |> varlist in
+      if dom = [] then aux acc lst
+      else
+        let t' = substitute s t in
+        (match Ref_env.refine v t' acc with
+         | None -> None | Some acc -> aux acc lst)
+  in
+  aux envr (Ref_env.bindings envr)
 
 let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
   let envr = Ref_env.from_env env |> Ref_env.push in
@@ -375,11 +387,13 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
     let rhs = mk_arrow (cons t2) (cap (var_typ fresh) t |> cons) in
     let substs = tallying vars_t [(lhs, rhs)] in
     let res =
-      substs |> List.map (fun s ->
+      substs |> List.filter_map (fun s ->
         (* TODO: simplify types *)
         let s = compose_subst s renaming in
         let (ms, ps) = split_subst s mono in
-        (strenghten_env_with_subst envr ms, ps)
+        match strenghten_env_with_subst envr ms with
+        | None -> None
+        | Some env -> Some (env, ps)
       ) in
     regroup Ref_env.equiv_ref res |>
     List.map (fun (e,il) -> (e, PInstA il))

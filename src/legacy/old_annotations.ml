@@ -1,5 +1,4 @@
-module Typ=Types.Base
-open Typ
+open Types.Base
 open Types.Additions
 open Parsing.Variable
 open Common
@@ -34,13 +33,6 @@ let partition_for_full_domain lst =
 
 module VarAnnot = struct
   type t = (Env.t * typ) list
-  let empty = []
-  let any = [Env.empty, any]
-  let initial_lambda ~legacy = if legacy then any else empty
-  let initial_binding ~legacy = if legacy then any else empty
-  let is_empty va = va = []
-
-  let singleton env t = [(env, t)]
 
   let full_domain t =
     List.map snd t |> disj
@@ -70,7 +62,7 @@ module VarAnnot = struct
       VarSet.for_all (fun v ->
         let t1 = Env.find v env in
         let t2 = Env.find v aenv in
-        (Typ.is_empty t1) || (cap t1 t2 |> Typ.is_empty |> not)
+        (is_empty t1) || (cap t1 t2 |> is_empty |> not)
         )
       ) |>
     List.map (fun (gamma, t) -> (Env.cap env gamma, t))
@@ -80,6 +72,13 @@ module VarAnnot = struct
 
   let union lst =
     List.fold_left cup [] lst
+
+  let empty = []
+  let any = [Env.empty, any]
+  let singleton env t = [(env, t)]
+  let initial_lambda ~legacy = if legacy then any else empty
+  let initial_binding ~legacy = if legacy then any else empty
+  let is_empty va = va = []
 
   let pp_filtered names fmt t =
     List.iter (

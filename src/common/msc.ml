@@ -1,13 +1,12 @@
 open Parsing
 open Parsing.Variable
-open Old_annotations
 module ExprMap = Parsing.Ast.ExprMap
 open Types.Base
 
-type a =
+type 'va a =
   | Abstract of typ
   | Const of Ast.const
-  | Lambda of VarAnnot.t * (typ Ast.type_annot) * Variable.t * e
+  | Lambda of 'va * (typ Ast.type_annot) * Variable.t * 'va e
   | Ite of Variable.t * typ * Variable.t * Variable.t
   | App of Variable.t * Variable.t
   | Pair of Variable.t * Variable.t
@@ -16,11 +15,10 @@ type a =
   | Let of Variable.t * Variable.t
   [@@deriving show]
 
-and e =
-  | Bind of VarAnnot.t * Variable.t * a * e
+and 'va e =
+  | Bind of 'va * Variable.t * 'va a * 'va e
   | Var of Variable.t
   [@@deriving show]
-
 
 let map ef af =
   let rec aux_a a =
@@ -47,6 +45,22 @@ let map ef af =
 let map_e ef af = map ef af |> fst
 let map_a ef af = map ef af |> snd
 
+let rec map_annot_a ef af a =
+  match a with
+    | Abstract t -> Abstract t
+    | Const c -> Const c
+    | Lambda (va, ta, v, e) -> Lambda (af va, ta, v, map_annot_e ef af e)
+    | Ite (v, t, x1, x2) -> Ite (v, t, x1, x2)
+    | App (v1, v2) -> App (v1, v2)
+    | Pair (v1, v2) -> Pair (v1, v2)
+    | Projection (p, v) -> Projection (p, v)
+    | RecordUpdate (v, str, vo) -> RecordUpdate (v, str, vo)
+    | Let (v1, v2) -> Let (v1, v2)
+and map_annot_e ef af e =
+    match e with
+    | Bind (va, v, a, e) -> Bind (ef va, v, map_annot_a ef af a, map_annot_e ef af e)
+    | Var v -> Var v
+
 let fold ef af =
   let rec aux_a a =
     begin match a with
@@ -66,79 +80,34 @@ let fold ef af =
 let fold_e ef af = fold ef af |> fst
 let fold_a ef af = fold ef af |> snd
 
+let fv_e' e acc =
+  let acc = List.fold_left VarSet.union VarSet.empty acc in
+  match e with
+  | Bind (_, v, _, _) -> VarSet.remove v acc
+  | Var v -> VarSet.add v acc
+let fv_a' a acc =
+  let acc = List.fold_left VarSet.union VarSet.empty acc in
+  match a with
+  | Lambda (_, _, v, _) -> VarSet.remove v acc
+  | Projection (_, v) | RecordUpdate (v, _, None) ->
+    VarSet.add v acc
+  | Ite (v, _, x1, x2) -> VarSet.add v acc |> VarSet.add x1 |> VarSet.add x2
+  | App (v1, v2) | Pair (v1, v2) | Let (v1, v2) | RecordUpdate (v1, _, Some v2) ->
+    VarSet.add v1 acc |> VarSet.add v2
+  | Const _ | Abstract _ -> acc
 
-let free_vars =
-  let f1 e acc =
-    let acc = List.fold_left VarSet.union VarSet.empty acc in
-    match e with
-    | Bind (_, v, _, _) -> VarSet.remove v acc
-    | Var v -> VarSet.add v acc
-  in
-  let f2 a acc =
-    let acc = List.fold_left VarSet.union VarSet.empty acc in
-    match a with
-    | Lambda (_, _, v, _) -> VarSet.remove v acc
-    | Projection (_, v) | RecordUpdate (v, _, None) ->
-      VarSet.add v acc
-    | Ite (v, _, x1, x2) -> VarSet.add v acc |> VarSet.add x1 |> VarSet.add x2
-    | App (v1, v2) | Pair (v1, v2) | Let (v1, v2) | RecordUpdate (v1, _, Some v2) ->
-      VarSet.add v1 acc |> VarSet.add v2
-    | Const _ | Abstract _ -> acc
-  in
-  (fold_a f1 f2, fold_e f1 f2)
+let fv_a x = fold_a fv_e' fv_a' x
+let fv_e x = fold_e fv_e' fv_a' x
 
-let fv_a = free_vars |> fst
-let fv_e = free_vars |> snd
+let bv_e' e acc =
+  let acc = List.fold_left VarSet.union VarSet.empty acc in
+  match e with Bind (_, v, _, _) -> VarSet.add v acc | Var _ -> acc
+let bv_a' a acc =
+  let acc = List.fold_left VarSet.union VarSet.empty acc in
+  match a with Lambda (_, _, v, _) -> VarSet.add v acc | _ -> acc
 
-let bound_vars =
-  let f1 e acc =
-    let acc = List.fold_left VarSet.union VarSet.empty acc in
-    match e with Bind (_, v, _, _) -> VarSet.add v acc | Var _ -> acc
-  in
-  let f2 a acc =
-    let acc = List.fold_left VarSet.union VarSet.empty acc in
-    match a with Lambda (_, _, v, _) -> VarSet.add v acc | _ -> acc
-  in
-  (fold_a f1 f2, fold_e f1 f2)
-
-let bv_a = bound_vars |> fst
-let bv_e = bound_vars |> snd
-
-let merge_annots' =
-  let rec aux_a a1 a2 =
-    match a1, a2 with
-    | Abstract t, _ -> Abstract t
-    | Const c, _ -> Const c
-    | Lambda (va1, t, v, e1), Lambda (va2, _, _, e2) ->
-      Lambda (VarAnnot.cup va1 va2, t, v, aux_e e1 e2)
-    | Lambda _, _ -> assert false
-    | Ite (v, t, x1, x2), _ -> Ite (v, t, x1, x2)
-    | App (v1, v2), _ -> App (v1, v2)
-    | Pair (v1, v2), _ -> Pair (v1, v2)
-    | Projection (p, v), _ -> Projection (p, v)
-    | RecordUpdate (v, str, vo), _ -> RecordUpdate (v, str, vo)
-    | Let (v1, v2), _ -> Let (v1, v2)
-  and aux_e e1 e2 =
-    match e1, e2 with
-    | Var v, _ -> Var v
-    | Bind (va1, v, a1, e1), Bind (va2, _, a2, e2) ->
-      Bind (VarAnnot.cup va1 va2, v, aux_a a1 a2, aux_e e1 e2)
-    | Bind _, _ -> assert false
-  in
-  (aux_a, aux_e)
-
-let merge_annots_a' = merge_annots' |> fst
-let merge_annots_e' = merge_annots' |> snd
-
-let merge_annots_a a_s =
-  match a_s with
-  | [] -> raise Not_found
-  | a::a_s -> List.fold_left merge_annots_a' a a_s
-let merge_annots_e es =
-  match es with
-  | [] -> raise Not_found
-  | e::es -> List.fold_left merge_annots_e' e es
-
+let bv_a x = fold_a bv_e' bv_a' x
+let bv_e x = fold_e bv_e' bv_a' x
 
 let rec separate_defs bvs defs =
   match defs with
@@ -162,7 +131,7 @@ let filter_expr_map vals em =
 
 exception IsVar of Variable.t
 
-let convert_to_msc ~legacy ast =
+let convert_to_msc ast =
   let aux expr_var_map ast =
     let rec to_defs_and_a expr_var_map ast =
       let (_, e) = ast in
@@ -187,7 +156,7 @@ let convert_to_msc ~legacy ast =
           filter_expr_map (defs |> List.map fst |> VarSet.of_list) in
         let (defs, defs') = (List.rev defs, List.rev defs') in
         let e = defs_and_x_to_e defs' x in
-        (defs, expr_var_map, Lambda (VarAnnot.initial_lambda ~legacy, t, v, e))
+        (defs, expr_var_map, Lambda ((), t, v, e))
       | Ast.Ite (e, t, e1, e2) ->
         let (defs, expr_var_map, x) = to_defs_and_x expr_var_map e in
         let (defs1, expr_var_map, x1) = to_defs_and_x expr_var_map e1 in
@@ -235,7 +204,7 @@ let convert_to_msc ~legacy ast =
       defs |>
       List.fold_left (
         fun nf (v, d) ->
-        Bind (VarAnnot.initial_binding ~legacy, v, d, nf)
+        Bind ((), v, d, nf)
       ) (Var x)
     in
     

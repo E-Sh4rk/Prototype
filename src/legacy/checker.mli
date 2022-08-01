@@ -1,4 +1,4 @@
-open Common.Msc
+open Msc
 open Types.Base
 open Types.Additions
 open Annotations

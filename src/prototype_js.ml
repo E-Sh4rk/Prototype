@@ -14,8 +14,8 @@ let () =
     in
     let ofmt = Format.make_formatter (out_fun false) ignore in
     let efmt = Format.make_formatter (out_fun true) ignore in
-    Main_proto.std_fmt := ofmt;
-    Main_proto.err_fmt := efmt;
+    Main.std_fmt := ofmt;
+    Main.err_fmt := efmt;
     let button = Dom_html.getElementById "checkButton" in
     ignore @@
      Dom_html.addEventListener button Dom_html.Event.click
@@ -25,6 +25,6 @@ let () =
          | Some textArea ->
           output ##.innerHTML := Js.string "";
           let txt = textArea##.value in
-           Main_proto.main (`String (Js.to_string txt));
+          Main.main (`String (Js.to_string txt));
          ;  Js._true)
     ) Js._false

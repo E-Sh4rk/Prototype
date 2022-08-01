@@ -1,5 +1,4 @@
-module Msc = Common.Msc
-open Msc
+open Common.Msc
 open Types.Base
 open Types.Additions
 open Parsing

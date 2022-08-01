@@ -1,11 +1,12 @@
 open Types.Base
 open Common.Msc
+open Msc
 open Types.Additions
 open Parsing
 open Parsing.Variable
 open Utils
 open Common
-module VarAnnot = Common.Old_annotations.VarAnnot
+module VarAnnot = Old_annotations.VarAnnot
 (* TODO: Improve error messages
    (when failing due to all branches having failed, print errors of the branches) *)
 (* TODO: Better inference of the domain of functionnal arguments

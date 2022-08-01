@@ -1,27 +1,11 @@
-(ocamllex lexer)
-
-(menhir
- (modules parser))
-
-(library
- (name main_proto)
- (inline_tests)
- (libraries num unix cduce-types  cduce.lib.core pomap)
- (preprocess
-  (pps ppx_deriving.show ppx_deriving.ord ppx_deriving.eq ppx_expect ppx_inline_test))
- (modules
-  (:standard
-   \
-   ("prototype_js" prototype test))))
-
 (executable
  (name prototype)
- (libraries main_proto)
+ (libraries main)
  (modules prototype))
 
 (executable
  (name prototype_js)
- (libraries main_proto)
+ (libraries main)
  (modes js)
  (preprocess (pps js_of_ocaml-ppx))
  (modules prototype_js))

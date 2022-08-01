@@ -1,0 +1,4 @@
+(library
+ (name types)
+ (libraries cduce-types cduce.lib.core unix)
+ (modules (:standard)))

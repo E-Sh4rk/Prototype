@@ -1,0 +1,11 @@
+(ocamllex lexer)
+
+(menhir
+ (modules parser))
+
+(library
+ (name parsing)
+ (libraries types pomap utils)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.ord ppx_deriving.eq))
+ (modules (:standard)))

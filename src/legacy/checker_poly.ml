@@ -37,7 +37,7 @@ let unbound_variable pos v =
   raise (Ill_typed (pos, "Unbound variable "^(Variable.show v)^"."))
 
 let var_type pos v env =
-  if Env.mem_strict v env then Env.find v env else unbound_variable pos v
+  if Env.mem_not_absent v env then Env.find v env else unbound_variable pos v
 
 let get_bind_annots pos v anns =
   match anns with
@@ -169,7 +169,7 @@ let rec typeof_a pos tenv env mono anns a =
       "The inferred type for the abstraction is too weak. "^(actual_expected inferred_t t)))
   | Lambda (_, Unnanoted, v, e) -> type_lambda env v e
   | Let (v1, v2) ->
-    if Env.mem_strict v1 env
+    if Env.mem_not_absent v1 env
     then var_type pos v2 env
     else raise (Ill_typed (pos, "Unable to type the definition."))
 

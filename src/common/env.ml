@@ -15,7 +15,7 @@ let bindings vm = VarMap.bindings vm
 
 let mem = VarMap.mem
 
-let mem_strict v t =
+let mem_not_absent v t =
   VarMap.mem v t && has_absent (VarMap.find v t) |> not
 
 let rm = VarMap.remove

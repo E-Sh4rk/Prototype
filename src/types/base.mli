@@ -121,4 +121,7 @@ val equiv : typ -> typ -> bool
 val clean_type : pos:typ -> neg:typ -> TVarSet.t -> typ -> typ
 val rectype : typ -> var -> typ (* [rectype t u] returns the type corresponding to the equation u=t *)
 val refresh : TVarSet.t -> typ -> typ
+(* Variables not in var_order are considered greater. In the result, a variable will be expressed
+in term of the variables that are greater. Thus, greater variables (in particular variables not in var_order)
+are less likely to be constrained. *)
 val tallying : ?var_order:var list -> TVarSet.t -> (typ * typ) list -> Subst.t list

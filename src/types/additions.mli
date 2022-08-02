@@ -65,7 +65,6 @@ val simplify_dnf : (typ * typ) list list -> (typ * typ) list list
 val simplify_typ : typ -> typ
 
 val branch_type : (typ*typ) list -> typ
-val decompose_branches : (typ*typ) list -> ((typ*typ) list) (* Jokerized branches *) * ((typ*typ) list)
 
 val is_test_type : typ -> bool
 
@@ -105,19 +104,22 @@ val instantiate : Subst.t list -> typ -> typ
 val fresh_subst : TVarSet.t -> Subst.t
 val tallying_fresh : TVarSet.t -> TVarSet.t -> (typ * typ) list -> Subst.t list
 
-(* Operations on jokers *)
+(* Operations on jokers (legacy) *)
 
-type joker_kind = Min | Max
-val reserved_name_for_joker : joker_kind -> string
+module Joker : sig
+    type joker_kind = Min | Max
+    val reserved_name_for_joker : joker_kind -> string
 
-val joker : joker_kind -> typ
-val jokers : joker_kind -> typ -> TVarSet.t
-val top_jokers : joker_kind -> typ -> TVarSet.t
+    val joker : joker_kind -> typ
+    val jokers : joker_kind -> typ -> TVarSet.t
+    val top_jokers : joker_kind -> typ -> TVarSet.t
 
-val substitute_jokers : joker_kind -> typ -> typ -> typ
-val substitute_all_jokers : typ -> typ -> typ
-val optimal : typ -> typ
-val worst : typ -> typ
-val substitute_top_jokers : joker_kind -> typ -> typ -> typ
+    val substitute_jokers : joker_kind -> typ -> typ -> typ
+    val substitute_all_jokers : typ -> typ -> typ
+    val optimal : typ -> typ
+    val worst : typ -> typ
+    val substitute_top_jokers : joker_kind -> typ -> typ -> typ
 
-val share_jokerized_arrows : typ list -> typ list
+    val decompose_branches : (typ*typ) list -> ((typ*typ) list) (* Jokerized branches *) * ((typ*typ) list)
+    val share_jokerized_arrows : typ list -> typ list
+end

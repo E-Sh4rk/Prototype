@@ -286,7 +286,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
       log "@,@[<v 1>LAMBDA for variable %a (unconstrained)" Variable.pp v ;
       log "@,Initial splits: %a" pp_lambda_splits (LambdaSA.destruct va) ;
       let va = LambdaSA.map_top (fun s t b ->
-        if b then (worst s, t, b) else (substitute_all_jokers s any, t, b)) va
+        if b then (Joker.worst s, t, b) else (Joker.substitute_all_jokers s any, t, b)) va
         |> LambdaSA.normalize
       in
       let splits = va |> LambdaSA.destruct in
@@ -297,7 +297,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
           let env = Env.add v s env in
           let res = infer_iterated tenv env anns e t in
           let changes = exactly_current_env res = None in
-          let res = List.map (fun (gamma, anns) -> (gamma, (anns, worst t, b))) res in
+          let res = List.map (fun (gamma, anns) -> (gamma, (anns, Joker.worst t, b))) res in
           (res, changes)
         ) in
         let (ress, changess) = List.split res in
@@ -322,12 +322,12 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
           match anns with
           | LambdaA (_, va) ->
             LambdaSA.destruct va
-            |> List.map (fun (s,(_,t,_)) -> mk_arrow (cons (worst s)) (cons t)) (* t shouldn't contain any joker *)
+            |> List.map (fun (s,(_,t,_)) -> mk_arrow (cons (Joker.worst s)) (cons t)) (* t shouldn't contain any Joker.joker *)
           |_ -> assert false
         )
         |> List.flatten |> conj |> cap former_typ
       in
-      let worst_target_t = worst t in
+      let worst_target_t = Joker.worst t in
       let res =
         if subtype best_t worst_target_t then (res, false)
         else (log "@,Cannot obtain the required type: %s" (actual_expected best_t worst_target_t) ; ([], false))
@@ -347,7 +347,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
     (res, changes)
   end else begin
     let t = disj ts in
-    let worst_t = worst t in
+    let worst_t = Joker.worst t in
     match a, anns with
     | _, UntypAtomA -> ([], false)
     | Abstract s, _ when subtype s worst_t ->
@@ -453,7 +453,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
             [(Ref_env.refine v2 s envr, AppA (t',b))]
             |> filter_res_a
           | [_] when can_refine_l -> (* AppRefineL *)
-            let arrow_type = mk_arrow (cons (cap vt2 (joker Max))) (cons (cap t (joker Min))) in
+            let arrow_type = mk_arrow (cons (cap vt2 (Joker.joker Max))) (cons (cap t (Joker.joker Min))) in
             [(Ref_env.refine v1 arrow_type envr, AppA (cap_o t t',b))]
             |> filter_res_a
           | lst -> (* AppSplitL *)
@@ -495,7 +495,7 @@ and infer' tenv env anns e' t =
     let pos = Variable.get_locations v in
     log "@,Initial splits: %a" pp_splits (BindSA.splits va) ;
     let dom_a = BindSA.splits va in
-    let va = BindSA.map_top worst va in
+    let va = BindSA.map_top Joker.worst va in
     let res =
       match BindSA.destruct va with
       | [(s, anns)] when subtype any_or_absent s -> (* BindDefSkip *)
@@ -579,7 +579,7 @@ and infer_a_iterated ?(no_lambda_ua=false) pos tenv env anns a ts =
   | (res, true) ->
     begin match exactly_current_env res with
     | None -> res
-    | Some anns -> infer_a_iterated ~no_lambda_ua pos tenv env anns a (List.map worst ts)
+    | Some anns -> infer_a_iterated ~no_lambda_ua pos tenv env anns a (List.map Joker.worst ts)
     end
   | (res, _) -> res
 

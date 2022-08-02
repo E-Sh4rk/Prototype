@@ -467,80 +467,82 @@ let tallying_fresh mono poly constr =
     let ren = fresh_subst poly in
     List.map (fun s -> Subst.compose s ren) res
 
-(* Operations on jokers *)
+(* Operations on jokers (legacy) *)
 
-type joker_kind = Min | Max
-let reserved_name_for_joker t =
-    match t with
-    | Min -> "-"
-    | Max -> "+"
+module Joker = struct
+    type joker_kind = Min | Max
+    let reserved_name_for_joker t =
+        match t with
+        | Min -> "-"
+        | Max -> "+"
 
-let joker k = mk_var (reserved_name_for_joker k) |> var_typ
-let jokers k t =
-    vars t |> TVarSet.filter (fun v -> String.equal (var_name v) (reserved_name_for_joker k))
-let top_jokers k t =
-    top_vars t |> TVarSet.filter (fun v -> String.equal (var_name v) (reserved_name_for_joker k))
+    let joker k = mk_var (reserved_name_for_joker k) |> var_typ
+    let jokers k t =
+        vars t |> TVarSet.filter (fun v -> String.equal (var_name v) (reserved_name_for_joker k))
+    let top_jokers k t =
+        top_vars t |> TVarSet.filter (fun v -> String.equal (var_name v) (reserved_name_for_joker k))
 
-let substitute_jokers k t t_subs =
-    let subst = jokers k t |> TVarSet.destruct |> List.map (fun j -> (j,t_subs)) |> Subst.construct in
-    Subst.apply subst t
+    let substitute_jokers k t t_subs =
+        let subst = jokers k t |> TVarSet.destruct |> List.map (fun j -> (j,t_subs)) |> Subst.construct in
+        Subst.apply subst t
 
-let substitute_all_jokers t t_subs =
-    let t = substitute_jokers Min t t_subs in
-    substitute_jokers Max t t_subs
+    let substitute_all_jokers t t_subs =
+        let t = substitute_jokers Min t t_subs in
+        substitute_jokers Max t t_subs
 
-let optimal t =
-    let t = substitute_jokers Min t empty in
-    substitute_jokers Max t any
+    let optimal t =
+        let t = substitute_jokers Min t empty in
+        substitute_jokers Max t any
 
-let worst t =
-    let t = substitute_jokers Max t empty in
-    substitute_jokers Min t any
+    let worst t =
+        let t = substitute_jokers Max t empty in
+        substitute_jokers Min t any
 
-let substitute_top_jokers k t t_subs =
-    let subst = top_jokers k t |> TVarSet.destruct |> List.map (fun j -> (j,t_subs)) |> Subst.construct in
-    Subst.apply subst t
+    let substitute_top_jokers k t t_subs =
+        let subst = top_jokers k t |> TVarSet.destruct |> List.map (fun j -> (j,t_subs)) |> Subst.construct in
+        Subst.apply subst t
 
-let required_part_of_branch (a,b) =
-    if is_empty a then Some (a, b)
-    else
-        let js = top_jokers Max a |> TVarSet.destruct in
-        let subst = js |> List.map (fun j -> (j, empty)) |> Subst.construct in
-        let a = Subst.apply subst a in
-        if is_empty a then None else Some (a,b)
+    let required_part_of_branch (a,b) =
+        if is_empty a then Some (a, b)
+        else
+            let js = top_jokers Max a |> TVarSet.destruct in
+            let subst = js |> List.map (fun j -> (j, empty)) |> Subst.construct in
+            let a = Subst.apply subst a in
+            if is_empty a then None else Some (a,b)
 
-let decompose_branch (a,b) =
-    match required_part_of_branch (a,b) with
-    | None -> (Some (a,b), None)
-    | Some (a',_) ->
-        let a = diff a a' in
-        let res = if is_empty a then None else Some (a,b) in
-        (res, Some (a', b))
+    let decompose_branch (a,b) =
+        match required_part_of_branch (a,b) with
+        | None -> (Some (a,b), None)
+        | Some (a',_) ->
+            let a = diff a a' in
+            let res = if is_empty a then None else Some (a,b) in
+            (res, Some (a', b))
 
-let decompose_branches lst =
-    let rec aux lst =
-        match lst with
-        | [] -> ([], [])
-        | b::lst -> begin
-            let (js, njs) = aux lst in
-            match decompose_branch b with
-            | None, None -> (js, njs)
-            | None, Some b -> (js, b::njs)
-            | Some b, None -> (b::js, njs)
-            | Some b1, Some b2 -> (b1::js, b2::njs)
-        end
-    in
-    aux lst
+    let decompose_branches lst =
+        let rec aux lst =
+            match lst with
+            | [] -> ([], [])
+            | b::lst -> begin
+                let (js, njs) = aux lst in
+                match decompose_branch b with
+                | None, None -> (js, njs)
+                | None, Some b -> (js, b::njs)
+                | Some b, None -> (b::js, njs)
+                | Some b1, Some b2 -> (b1::js, b2::njs)
+            end
+        in
+        aux lst
 
-let extract_jokerized_arrows t =
-    dnf t |> List.map decompose_branches |> List.map fst
-    |> List.concat
+    let extract_jokerized_arrows t =
+        dnf t |> List.map decompose_branches |> List.map fst
+        |> List.concat
 
-let add_joker_branch t joker =
-    let non_arrow = diff t arrow_any in
-    cup non_arrow (cap_o t (branch_type joker))
+    let add_joker_branch t joker =
+        let non_arrow = diff t arrow_any in
+        cup non_arrow (cap_o t (branch_type joker))
 
-let share_jokerized_arrows lst =
-    let jokers = lst |> List.map extract_jokerized_arrows in
-    lst |> List.map
-        (fun t -> List.fold_left add_joker_branch t jokers)
+    let share_jokerized_arrows lst =
+        let jokers = lst |> List.map extract_jokerized_arrows in
+        lst |> List.map
+            (fun t -> List.fold_left add_joker_branch t jokers)
+end

@@ -212,13 +212,13 @@ struct
       else None
     ) |> conj |> cap_o former_typ in
     let annot (s',t') =
-      let req = (top_jokers Max s') |> TVarSet.is_empty in
+      let req = (Joker.top_jokers Max s') |> TVarSet.is_empty in
       let s' = if req then s' else cap_o s' opt_branches_maxdom in
       let arrow_type = mk_arrow (cons s') (cons t') in
       if subtype t arrow_type then None
       else
-        let s' = substitute_top_jokers Max s' any in
-        let t' = substitute_top_jokers Min t' any in
+        let s' = Joker.substitute_top_jokers Max s' any in
+        let t' = Joker.substitute_top_jokers Min t' any in
         Some (s', (default_anns, t', req))
     in
     let new_anns = List.filter_map annot ts in

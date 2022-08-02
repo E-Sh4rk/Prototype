@@ -460,9 +460,9 @@ let fresh_subst vars =
         (fun v -> (v, var_typ (mk_var (var_name v))))
     |> Subst.construct
 
-let tallying_fresh mono rename constr =
+let tallying_fresh ?(var_order=[]) mono rename constr =
     assert (TVarSet.inter mono rename |> TVarSet.is_empty) ;
-    let res = tallying mono constr in
+    let res = tallying ~var_order mono constr in
     let ren = fresh_subst rename in
     List.map (fun s -> Subst.compose s ren) res
 

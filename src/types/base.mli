@@ -94,6 +94,7 @@ module TVarSet : TVarSet
 val mk_var : string -> var
 val vars : typ -> TVarSet.t
 val top_vars : typ -> TVarSet.t
+val vars_with_polarity : typ -> (var * [ `Both | `Neg | `Pos ]) list
 val var_name : var -> string
 
 type subst
@@ -120,4 +121,4 @@ val equiv : typ -> typ -> bool
 val clean_type : pos:typ -> neg:typ -> TVarSet.t -> typ -> typ
 val rectype : typ -> var -> typ (* [rectype t u] returns the type corresponding to the equation u=t *)
 val refresh : TVarSet.t -> typ -> typ
-val tallying : TVarSet.t -> (typ * typ) list -> Subst.t list
+val tallying : ?var_order:var list -> TVarSet.t -> (typ * typ) list -> Subst.t list

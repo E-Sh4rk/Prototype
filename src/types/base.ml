@@ -247,6 +247,7 @@ end
 let mk_var name = CD.Var.mk name
 let vars = CD.Types.Subst.vars
 let top_vars = CD.Types.Subst.top_vars
+let vars_with_polarity t = CD.Types.Subst.var_polarities t |> CD.Var.Map.get
 let var_name = CD.Var.name
 
 type subst = CD.Types.Subst.t
@@ -282,9 +283,6 @@ end
 (* Tallying *)
 let clean_type ~pos ~neg vars t =
   CD.Types.Subst.clean_type ~pos ~neg vars t
-let rectype t var =
-  CD.Types.Subst.solve_rectype t var
-let refresh vars t =
-  CD.Types.Subst.refresh vars t
-let tallying vars eq =
-  CD.Types.Tallying.tallying vars eq
+let rectype = CD.Types.Subst.solve_rectype
+let refresh = CD.Types.Subst.refresh
+let tallying = CD.Types.Tallying.tallying

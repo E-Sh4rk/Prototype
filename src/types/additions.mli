@@ -92,13 +92,17 @@ val remove_field_info : typ -> string -> typ
 (** [remove_field_info t label] removes all the information
     about the field label in the record t. *)
 
-(* Operations on substs and vars *)
+(* Operations on substitutions and type variables *)
 
-val instantiate : subst list -> typ -> typ
-val compose_subst : subst -> subst -> subst
-val rename_poly : varset -> typ -> subst
-val combine_subst : subst -> subst -> subst
-val split_subst : subst -> varset -> subst * subst
+module type Subst = sig
+    include Subst
+    val compose : t -> t -> t
+    val combine : t -> t -> t
+    val split : t -> TVarSet.t -> t * t
+end
+module Subst : Subst
+val instantiate : Subst.t list -> typ -> typ
+val rename_poly : TVarSet.t -> typ -> Subst.t
 
 (* Operations on jokers *)
 
@@ -106,8 +110,8 @@ type joker_kind = Min | Max
 val reserved_name_for_joker : joker_kind -> string
 
 val joker : joker_kind -> typ
-val jokers : joker_kind -> typ -> varset
-val top_jokers : joker_kind -> typ -> varset
+val jokers : joker_kind -> typ -> TVarSet.t
+val top_jokers : joker_kind -> typ -> TVarSet.t
 
 val substitute_jokers : joker_kind -> typ -> typ -> typ
 val substitute_all_jokers : typ -> typ -> typ

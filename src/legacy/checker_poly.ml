@@ -63,8 +63,8 @@ let treat_untypable_annot_a pos anns =
 
 let instantiate pos mono ss t =
   let check_s s =
-    let vs = subst_dom s |> varset_inter mono in
-    varlist vs = []
+    let vs = Subst.dom s |> TVarSet.inter mono in
+    TVarSet.destruct vs = []
   in
   if List.for_all check_s ss
   then instantiate ss t
@@ -88,7 +88,7 @@ let rec typeof_a pos tenv env mono anns a =
     else begin
       LambdaSAP.destruct va |> List.map (fun (t, (anns, _)) ->
         let env = Env.add v t env in
-        let mono = varset_union mono (vars t) in
+        let mono = TVarSet.union mono (vars t) in
         let res = typeof tenv env mono anns e in
         mk_arrow (cons t) (cons res)
       ) |> conj_o |> simplify_typ
@@ -194,7 +194,7 @@ and typeof tenv env mono anns e =
       then
         BindSAP.destruct va |> List.map (fun (t, anns) ->
           let env = Env.add v (cap_o t s) env in
-          let mono = varset_union mono (vars t) in
+          let mono = TVarSet.union mono (vars t) in
           typeof tenv env mono anns e
         ) |> disj_o |> simplify_typ
       else raise (Ill_typed (pos,
@@ -240,14 +240,14 @@ let sufficient_a env mono a prev_t t =
         option_chain [Ref_env.refine v ti ; Ref_env.refine x field_type]
       )
   | App (v1, v2) ->
-    let mono = varset_union mono (vars t) in
+    let mono = TVarSet.union mono (vars t) in
     let lhs = Ref_env.find v1 env in
     let renaming = rename_poly mono lhs in
     let rhs = mk_arrow (cons tmpvar_t) (cons t) in
     tallying mono [(lhs,rhs)] |>
     List.filter_map (fun s ->
-      let s = subst_find s tmpvar in
-      let s = substitute renaming s in
+      let s = Subst.find s tmpvar in
+      let s = Subst.apply renaming s in
       let s = clean_type ~pos:any ~neg:empty mono s in
       Ref_env.refine v2 s env
     )
@@ -309,16 +309,16 @@ let pi_record_type label =
 let strenghten_env_with_subst envr s =
   (* TODO: strengthening should be done only on the "split" part
      of the environment (not on the "definition" part) *)
-  let dom_s = subst_dom s in
+  let dom_s = Subst.dom s in
   let rec aux acc lst =
     match lst with
     | [] -> Some acc
     | (v,t)::lst ->
       let dom_t = vars t in
-      let dom = varset_inter dom_s dom_t |> varlist in
+      let dom = TVarSet.inter dom_s dom_t |> TVarSet.destruct in
       if dom = [] then aux acc lst
       else
-        let t' = substitute s t in
+        let t' = Subst.apply s t in
         (match Ref_env.refine v t' acc with
          | None -> None | Some acc -> aux acc lst)
   in
@@ -339,7 +339,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
         splits |> List.map (fun (s, (anns, t)) ->
           assert (has_absent s |> not) ;
           let env = Env.add v s env in
-          let mono = varset_union mono (vars s) in
+          let mono = TVarSet.union mono (vars s) in
           let res = infer_iterated tenv env mono anns e t in
           let changes = exactly_current_env res = None in
           let res = List.map (fun (gamma, anns) -> (s, gamma, (anns, t))) res in
@@ -382,10 +382,10 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
   in
   let type_app t1 t2 t =
     let vars_t = vars t in
-    let mono = varset_union mono vars_t in
+    let mono = TVarSet.union mono vars_t in
     let renaming1 = rename_poly mono t1 in
     let renaming2 = rename_poly mono t2 in
-    let renaming = combine_subst renaming1 renaming2 in
+    let renaming = Subst.combine renaming1 renaming2 in
     let fresh = mk_var "app" in
     let lhs = t1 in
     let rhs = mk_arrow (cons t2) (cap (var_typ fresh) t |> cons) in
@@ -393,8 +393,8 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
     let res =
       substs |> List.filter_map (fun s ->
         (* TODO: simplify types *)
-        let s = compose_subst s renaming in
-        let (ms, ps) = split_subst s mono in
+        let s = Subst.compose s renaming in
+        let (ms, ps) = Subst.split s mono in
         match strenghten_env_with_subst envr ms with
         | None -> None
         | Some env -> Some (env, ps)
@@ -604,7 +604,7 @@ and infer' tenv env mono anns e' t =
             let res =
               splits |> List.map (fun (s', anns) ->
                 let env = Env.add v (cap_o s s') env in
-                let mono = varset_union mono (vars s') in
+                let mono = TVarSet.union mono (vars s') in
                 let res = infer_iterated tenv env mono anns e t in
                 let changes = exactly_current_env res = None in
                 let res = res |> List.map (fun (g, e) -> (s', g, e)) in

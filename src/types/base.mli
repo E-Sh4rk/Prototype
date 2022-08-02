@@ -4,12 +4,9 @@ module CD = Cduce_types
 type typ = CD.Types.t
 type node = CD.Types.Node.t
 type var = CD.Var.t
-type varset
-type subst
 
 val pp_typ : Format.formatter -> typ -> unit
 val show_typ : typ -> string
-val pp_subst : Format.formatter -> subst -> unit
 
 val register : string -> typ -> unit
 val pp : Format.formatter -> typ -> unit
@@ -80,25 +77,38 @@ val apply : typ -> typ -> typ
 val dnf : typ -> (typ * typ) list list
 val full_dnf : typ -> ((typ list * typ list) * ((node * node) list * (node * node) list)) list
 
-(* TODO: Put varset functions into a VarSet module, and subst functions into a Subst module *)
+module type TVarSet = sig
+    type t
+    val empty : t
+    val construct : var list -> t
+    val is_empty : t -> bool
+    val filter : (var -> bool) -> t -> t
+    val union : t -> t -> t
+    val add : var -> t -> t
+    val inter : t -> t -> t
+    val diff : t -> t -> t
+    val destruct : t -> var list
+end
+module TVarSet : TVarSet
+
 val mk_var : string -> var
-val vars : typ -> varset
-val top_vars : typ -> varset
+val vars : typ -> TVarSet.t
+val top_vars : typ -> TVarSet.t
 val var_name : var -> string
-val varset : var list -> varset
-val varset_filter : (var -> bool) -> varset -> varset
-val varset_union : varset -> varset -> varset
-val varset_add : var -> varset -> varset
-val varset_inter : varset -> varset -> varset
-val varset_diff : varset -> varset -> varset
-val varlist : varset -> var list
-val substitute : subst -> typ -> typ
-val mk_subst : (var * typ) list -> subst
-val subst_dom : subst -> varset
-val subst_mem : subst -> var -> bool
-val subst_find : subst -> var -> typ
-val subst_equiv : subst -> subst -> bool
-val subst_destruct : subst -> (var * typ) list
+
+type subst
+module type Subst = sig
+    type t = subst
+    val construct : (var * typ) list -> t
+    val dom : t -> TVarSet.t
+    val mem : t -> var -> bool
+    val find : t -> var -> typ
+    val equiv : t -> t -> bool
+    val apply : t -> typ -> typ
+    val destruct : t -> (var * typ) list
+    val pp : Format.formatter -> t -> unit
+end
+module Subst : Subst
 
 val is_empty : typ -> bool
 val non_empty: typ -> bool
@@ -107,7 +117,7 @@ val disjoint : typ -> typ -> bool
 val equiv : typ -> typ -> bool
 
 (* Tallying *)
-val clean_type : pos:typ -> neg:typ -> varset -> typ -> typ
+val clean_type : pos:typ -> neg:typ -> TVarSet.t -> typ -> typ
 val rectype : typ -> var -> typ (* [rectype t u] returns the type corresponding to the equation u=t *)
-val refresh : varset -> typ -> typ
-val tallying : varset -> (typ * typ) list -> subst list
+val refresh : TVarSet.t -> typ -> typ
+val tallying : TVarSet.t -> (typ * typ) list -> Subst.t list

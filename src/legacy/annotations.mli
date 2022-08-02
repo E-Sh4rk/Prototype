@@ -98,10 +98,10 @@ and AnnotMono : (AnnotMono with type a=LambdaSA.t anns_a and type e=(LambdaSA.t,
 (* === POLYMORPHIC SYSTEM === *)
 
 module Inst: sig
-    type t = subst list
+    type t = Subst.t list
     val empty : t
     val equals : t -> t -> bool
-    val add : t -> subst -> t
+    val add : t -> Subst.t -> t
     val union : t -> t -> t
 end
 

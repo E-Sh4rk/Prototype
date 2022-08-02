@@ -212,7 +212,7 @@ struct
       else None
     ) |> conj |> cap_o former_typ in
     let annot (s',t') =
-      let req = (top_jokers Max s') |> varlist = [] in
+      let req = (top_jokers Max s') |> TVarSet.is_empty in
       let s' = if req then s' else cap_o s' opt_branches_maxdom in
       let arrow_type = mk_arrow (cons s') (cons t') in
       if subtype t arrow_type then None
@@ -429,13 +429,13 @@ end
 (* === POLYMORPHIC SYSTEM === *)
 
 module Inst = struct
-  type t = subst list
+  type t = Subst.t list
   [@@deriving show]
 
   let empty = []
   let equals _ _ = false (* Approximation *)
   let add t s =
-    if List.exists (subst_equiv s) t
+    if List.exists (Subst.equiv s) t
     then t else s::t
   let union t1 t2 =
     List.fold_left add t1 t2

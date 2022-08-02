@@ -13,7 +13,7 @@ let%test "propagate-app" [@tags "no-js"] =
   let f = cap ii aa in
   let env = Env.singleton v1 f |> Env.add v2 any |> Ref_env.from_env in
   let e = App (v1, v2) in
-  let (res, _) = Checker_poly.propagate_a env (varset []) e any int_typ in
+  let (res, _) = Checker_poly.propagate_a env TVarSet.empty e any int_typ in
   match res with
   | [env] when equiv int_typ (Ref_env.find v2 env) -> true
   | _ -> false

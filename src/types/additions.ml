@@ -424,35 +424,42 @@ let remove_field_info t label =
 
 (* Operations on substs and vars *)
 
+module type Subst = sig
+    include Subst
+    val compose : t -> t -> t
+    val combine : t -> t -> t
+    val split : t -> TVarSet.t -> t * t
+end
+module Subst : Subst = struct
+    include Subst
+    let compose s1 s2 =
+        let only_s2 = destruct s2 |>
+            List.filter (fun (v, _) -> mem s1 v |> not) in
+        let res = destruct s1 |>
+            List.map (fun (v,t) -> (v, apply s2 t)) in
+        construct (res@only_s2)
+    let combine s1 s2 =
+        assert (TVarSet.inter (dom s1) (dom s2) |> TVarSet.is_empty) ;
+        let s1 = destruct s1 in
+        let s2 = destruct s2 in
+        s1@s2 |> construct
+    let split s vars =
+        let vars = TVarSet.inter (dom s) vars in
+        let nvars = TVarSet.diff (dom s) vars in
+        let res1 = vars |> TVarSet.destruct |> List.map (fun v -> (v, find s v)) in
+        let res2 = nvars |> TVarSet.destruct |> List.map (fun v -> (v, find s v)) in
+        (res1 |> construct, res2 |> construct)            
+end
+
 let instantiate ss t =
-    List.map (fun s -> substitute s t) ss
+    List.map (fun s -> Subst.apply s t) ss
     |> conj_o
 
-let compose_subst s1 s2 =
-    let only_s2 = subst_destruct s2 |>
-        List.filter (fun (v, _) -> subst_mem s1 v |> not) in
-    let res = subst_destruct s1 |>
-        List.map (fun (v,t) -> (v, substitute s2 t)) in
-    mk_subst (res@only_s2)
-
 let rename_poly mono t =
-    let poly_vars = varset_diff (vars t) mono in
-    poly_vars |> varlist |> List.map
+    let poly_vars = TVarSet.diff (vars t) mono in
+    poly_vars |> TVarSet.destruct |> List.map
         (fun v -> (v, var_typ (mk_var (var_name v))))
-    |> mk_subst
-
-let combine_subst s1 s2 =
-    assert (varset_inter (subst_dom s1) (subst_dom s2) |> varlist = []) ;
-    let s1 = subst_destruct s1 in
-    let s2 = subst_destruct s2 in
-    s1@s2 |> mk_subst
-
-let split_subst s vars =
-    let vars = varset_inter (subst_dom s) vars in
-    let nvars = varset_diff (subst_dom s) vars in
-    let res1 = vars |> varlist |> List.map (fun v -> (v, subst_find s v)) in
-    let res2 = nvars |> varlist |> List.map (fun v -> (v, subst_find s v)) in
-    (res1 |> mk_subst, res2 |> mk_subst)
+    |> Subst.construct
 
 (* Operations on jokers *)
 
@@ -464,13 +471,13 @@ let reserved_name_for_joker t =
 
 let joker k = mk_var (reserved_name_for_joker k) |> var_typ
 let jokers k t =
-    vars t |> varset_filter (fun v -> String.equal (var_name v) (reserved_name_for_joker k))
+    vars t |> TVarSet.filter (fun v -> String.equal (var_name v) (reserved_name_for_joker k))
 let top_jokers k t =
-    top_vars t |> varset_filter (fun v -> String.equal (var_name v) (reserved_name_for_joker k))
+    top_vars t |> TVarSet.filter (fun v -> String.equal (var_name v) (reserved_name_for_joker k))
 
 let substitute_jokers k t t_subs =
-    let subst = jokers k t |> varlist |> List.map (fun j -> (j,t_subs)) |> mk_subst in
-    substitute subst t
+    let subst = jokers k t |> TVarSet.destruct |> List.map (fun j -> (j,t_subs)) |> Subst.construct in
+    Subst.apply subst t
 
 let substitute_all_jokers t t_subs =
     let t = substitute_jokers Min t t_subs in
@@ -485,15 +492,15 @@ let worst t =
     substitute_jokers Min t any
 
 let substitute_top_jokers k t t_subs =
-    let subst = top_jokers k t |> varlist |> List.map (fun j -> (j,t_subs)) |> mk_subst in
-    substitute subst t
+    let subst = top_jokers k t |> TVarSet.destruct |> List.map (fun j -> (j,t_subs)) |> Subst.construct in
+    Subst.apply subst t
 
 let required_part_of_branch (a,b) =
     if is_empty a then Some (a, b)
     else
-        let js = top_jokers Max a |> varlist in
-        let subst = js |> List.map (fun j -> (j, empty)) |> mk_subst in
-        let a = substitute subst a in
+        let js = top_jokers Max a |> TVarSet.destruct in
+        let subst = js |> List.map (fun j -> (j, empty)) |> Subst.construct in
+        let a = Subst.apply subst a in
         if is_empty a then None else Some (a,b)
 
 let decompose_branch (a,b) =

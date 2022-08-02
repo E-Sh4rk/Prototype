@@ -6,15 +6,12 @@ module LabelMap = CD.Ident.LabelMap
 type typ = CD.Types.t
 type node = CD.Types.Node.t
 type var = CD.Var.t
-type varset = CD.Var.Set.t
-type subst = CD.Types.Subst.t
 
 let register s = 
   let module U = Encodings.Utf8 in
   CD.Types.Print.register_global "" (Ns.Uri.mk (U.mk ""), U.mk s) ?params:None
 let pp_typ = CD.Types.Print.print_noname
 let show_typ t = Format.asprintf "%a" pp_typ t
-let pp_subst fmt _ = Format.fprintf fmt "Subst"
 
 let pp = pp_typ
 let string_of_type = CD.Types.Print.to_string
@@ -222,26 +219,59 @@ let full_dnf t =
     ((pvs, nvs), expl)
   )
 
+module type TVarSet = sig
+  type t
+  val empty : t
+  val construct : var list -> t
+  val is_empty : t -> bool
+  val filter : (var -> bool) -> t -> t
+  val union : t -> t -> t
+  val add : var -> t -> t
+  val inter : t -> t -> t
+  val diff : t -> t -> t
+  val destruct : t -> var list
+end
+module TVarSet = struct
+  type t = CD.Var.Set.t
+  let empty = CD.Var.Set.empty
+  let construct = CD.Var.Set.from_list
+  let is_empty = CD.Var.Set.is_empty
+  let filter = CD.Var.Set.filter
+  let union = CD.Var.Set.cup
+  let add = CD.Var.Set.add
+  let inter = CD.Var.Set.cap
+  let diff = CD.Var.Set.diff
+  let destruct = CD.Var.Set.get
+end
+
 let mk_var name = CD.Var.mk name
 let vars = CD.Types.Subst.vars
 let top_vars = CD.Types.Subst.top_vars
 let var_name = CD.Var.name
-let varset = CD.Var.Set.from_list
-let varset_filter = CD.Var.Set.filter
-let varset_union = CD.Var.Set.cup
-let varset_add = CD.Var.Set.add
-let varset_inter = CD.Var.Set.cap
-let varset_diff = CD.Var.Set.diff
-let varlist = CD.Var.Set.get
-let substitute = CD.Types.Subst.apply
-let mk_subst = CD.Types.Subst.from_list
-let subst_destruct = CD.Var.Map.get
 
-let subst_dom s = CD.Var.Map.domain s
-let subst_mem s v = CD.Var.Set.mem (subst_dom s) v
-let subst_find s v = CD.Var.Map.assoc v s
-let subst_equiv s1 s2 =
-    CD.Var.Map.equal equiv s1 s2
+type subst = CD.Types.Subst.t
+module type Subst = sig
+  type t = subst
+  val construct : (var * typ) list -> t
+  val dom : t -> TVarSet.t
+  val mem : t -> var -> bool
+  val find : t -> var -> typ
+  val equiv : t -> t -> bool
+  val apply : t -> typ -> typ
+  val destruct : t -> (var * typ) list
+  val pp : Format.formatter -> t -> unit
+end
+module Subst = struct
+  type t = subst
+  let construct = CD.Types.Subst.from_list
+  let destruct = CD.Var.Map.get
+  let apply = CD.Types.Subst.apply
+  let dom s = CD.Var.Map.domain s
+  let mem s v = CD.Var.Set.mem (dom s) v
+  let find s v = CD.Var.Map.assoc v s
+  let equiv s1 s2 = CD.Var.Map.equal equiv s1 s2
+  let pp fmt _ = Format.fprintf fmt "Subst"
+end
 
 (* Tallying *)
 let clean_type ~pos ~neg vars t =

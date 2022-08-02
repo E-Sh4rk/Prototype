@@ -263,7 +263,13 @@ module type Subst = sig
 end
 module Subst = struct
   type t = subst
-  let construct = CD.Types.Subst.from_list
+  let construct lst =
+    let is_id (v,t) =
+      match CD.Types.Subst.check_var t with
+      | `Pos v' when CD.Var.equal v v' -> false
+      | _ -> true
+    in
+    lst |> List.filter is_id |> CD.Types.Subst.from_list
   let destruct = CD.Var.Map.get
   let apply = CD.Types.Subst.apply
   let dom s = CD.Var.Map.domain s

@@ -96,13 +96,14 @@ val remove_field_info : typ -> string -> typ
 
 module type Subst = sig
     include Subst
-    val compose : t -> t -> t
+    val compose : t -> t -> t (* compose s1 s2 does s2 \circ s1 *)
     val combine : t -> t -> t
     val split : t -> TVarSet.t -> t * t
 end
 module Subst : Subst
 val instantiate : Subst.t list -> typ -> typ
-val rename_poly : TVarSet.t -> typ -> Subst.t
+val fresh_subst : TVarSet.t -> Subst.t
+val tallying_fresh : TVarSet.t -> TVarSet.t -> (typ * typ) list -> Subst.t list
 
 (* Operations on jokers *)
 

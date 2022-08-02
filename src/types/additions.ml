@@ -455,11 +455,16 @@ let instantiate ss t =
     List.map (fun s -> Subst.apply s t) ss
     |> conj_o
 
-let rename_poly mono t =
-    let poly_vars = TVarSet.diff (vars t) mono in
-    poly_vars |> TVarSet.destruct |> List.map
+let fresh_subst vars =
+    vars |> TVarSet.destruct |> List.map
         (fun v -> (v, var_typ (mk_var (var_name v))))
     |> Subst.construct
+
+let tallying_fresh mono rename constr =
+    assert (TVarSet.inter mono rename |> TVarSet.is_empty) ;
+    let res = tallying mono constr in
+    let ren = fresh_subst rename in
+    List.map (fun s -> Subst.compose s ren) res
 
 (* Operations on jokers *)
 

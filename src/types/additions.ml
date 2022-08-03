@@ -469,9 +469,18 @@ let fresh mono t =
     let (x, subst) = fresh_subst poly in
     (x, subst, Subst.apply subst t)
 
-let tallying poly noninfered constr =
+let tallying_infer poly noninfered constr =
     let var_order = TVarSet.destruct poly in
     tallying ~var_order noninfered constr
+
+let tallying mono constr =
+    let var_order = [] in
+    tallying ~var_order mono constr
+
+let subtype_poly mono t1 t2 =
+    let (xs, _, t) = fresh mono t2 in
+    let res = tallying (TVarSet.union mono xs) [(t1,t)] in
+    res <> []
 
 (* Operations on jokers (legacy) *)
 

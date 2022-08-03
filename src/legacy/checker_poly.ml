@@ -245,7 +245,7 @@ let sufficient_a env mono a prev_t t =
     (* TODO: rename poly vars *)
     let poly_vars = TVarSet.diff (vars lhs) mono in
     let rhs = mk_arrow (cons tmpvar_t) (cons t) in
-    tallying poly_vars mono [(lhs,rhs)] |>
+    tallying_infer poly_vars mono [(lhs,rhs)] |>
     List.filter_map (fun s ->
       let s = Subst.find s tmpvar in
       let s = clean_type ~pos:any ~neg:empty mono s in
@@ -388,7 +388,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
     let fresh = mk_var "app" in
     let lhs = t1 in
     let rhs = mk_arrow (cons t2) (cap (var_typ fresh) t |> cons) in
-    let substs = tallying poly_vars vars_t [(lhs, rhs)] in
+    let substs = tallying_infer poly_vars vars_t [(lhs, rhs)] in
     let res =
       substs |> List.filter_map (fun s ->
         (* TODO: simplify types *)

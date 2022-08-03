@@ -285,4 +285,4 @@ let clean_type ~pos ~neg vars t =
   CD.Types.Subst.clean_type ~pos ~neg vars t
 let rectype = CD.Types.Subst.solve_rectype
 let refresh = CD.Types.Subst.refresh
-let tallying = CD.Types.Tallying.tallying
+let tallying ~var_order = CD.Types.Tallying.tallying ~var_order

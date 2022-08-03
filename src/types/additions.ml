@@ -456,9 +456,18 @@ let instantiate ss t =
     |> conj_o
 
 let fresh_subst vars =
-    vars |> TVarSet.destruct |> List.map
-        (fun v -> (v, var_typ (mk_var (var_name v))))
-    |> Subst.construct
+    let x = ref TVarSet.empty in
+    let subst =
+        vars |> TVarSet.destruct |> List.map
+            (fun v -> (v, let v = mk_var (var_name v) in x := TVarSet.add v !x; var_typ v))
+        |> Subst.construct
+    in
+    (!x, subst)
+
+let fresh mono t =
+    let poly = TVarSet.diff (vars t) mono in
+    let (x, subst) = fresh_subst poly in
+    (x, subst, Subst.apply subst t)
 
 let tallying poly noninfered constr =
     let var_order = TVarSet.destruct poly in

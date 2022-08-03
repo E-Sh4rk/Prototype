@@ -103,8 +103,8 @@ module Subst : Subst
 val instantiate : Subst.t list -> typ -> typ
 val fresh_subst : TVarSet.t -> TVarSet.t * Subst.t
 val fresh : TVarSet.t -> typ -> TVarSet.t * Subst.t * typ
-val tallying : TVarSet.t (* Monomorphic *) -> (typ * typ) list -> Subst.t list
 val tallying_infer : TVarSet.t (* Polymorphic *) -> TVarSet.t (* Non-inferred *) -> (typ * typ) list -> Subst.t list
+val tallying : TVarSet.t (* Monomorphic *) -> (typ * typ) list -> Subst.t list
 val subtype_poly : TVarSet.t -> typ -> typ -> bool
 
 (* Operations on jokers (legacy) *)

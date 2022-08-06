@@ -254,6 +254,7 @@ type subst = CD.Types.Subst.t
 module type Subst = sig
   type t = subst
   val construct : (var * typ) list -> t
+  val is_identity : t -> bool
   val dom : t -> TVarSet.t
   val mem : t -> var -> bool
   val find : t -> var -> typ
@@ -264,14 +265,14 @@ module type Subst = sig
 end
 module Subst = struct
   type t = subst
+  let is_id (v,t) =
+    match CD.Types.Subst.check_var t with
+    | `Pos v' when CD.Var.equal v v' -> false
+    | _ -> true
   let construct lst =
-    let is_id (v,t) =
-      match CD.Types.Subst.check_var t with
-      | `Pos v' when CD.Var.equal v v' -> false
-      | _ -> true
-    in
     lst |> List.filter is_id |> CD.Types.Subst.from_list
   let destruct = CD.Var.Map.get
+  let is_identity t = destruct t |> List.for_all is_id
   let apply = CD.Types.Subst.apply
   let dom s = CD.Var.Map.domain s
   let mem s v = CD.Var.Set.mem (dom s) v

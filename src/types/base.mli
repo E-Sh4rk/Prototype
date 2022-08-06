@@ -101,6 +101,7 @@ type subst
 module type Subst = sig
     type t = subst
     val construct : (var * typ) list -> t
+    val is_identity : t -> bool
     val dom : t -> TVarSet.t
     val mem : t -> var -> bool
     val find : t -> var -> typ

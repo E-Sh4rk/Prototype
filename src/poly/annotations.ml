@@ -97,6 +97,34 @@ module Annot = struct
     UnkA (apply_subst_a s a, Option.map (apply_subst_split s) so,
       Option.map (apply_subst s) to1, Option.map (apply_subst s) to2)
 
-  let initial_a = failwith "TODO"
-  let initial_e = failwith "TODO"
+  let rec initial_a a =
+    let open Msc in match a with
+    | Abstract _ | Const _ | Pair _ | Let _ -> NoneA
+    | Ite _ -> IteA []
+    | Projection _ -> ProjA []
+    | RecordUpdate _ -> RecordUpdateA []
+    | App _ -> AppA ([], [])
+    | Lambda (_, Parsing.Ast.Unnanoted, v, e) ->
+      let initial_s = [(any, initial_e e)] in
+      let v = Variable.to_typevar v |> var_typ in
+      LambdaA [(v, initial_s)]
+    | Lambda (_, Parsing.Ast.ADomain dt, _, e) ->
+      let initial_s = [(any, initial_e e)] in
+      LambdaA [(dt, initial_s)]
+    | Lambda (_, Parsing.Ast.AArrow t, _, e) ->
+      let initial_s = [(any, initial_e e)] in
+      let branches =
+        dnf t |> List.map (List.map fst) |> List.flatten
+        |> List.map (fun s -> (s, initial_s))
+      in
+      LambdaA branches
+
+  and initial_e e =
+      let open Msc in match e with
+      | Var _ -> VarA
+      | Bind (_, _, a, e) ->
+        let initial_a = initial_a a in
+        let initial_e = initial_e e in
+        let initial_s = [(any, initial_e)] in
+        UnkA (initial_a, Some initial_s, Some initial_e, Some initial_e)
 end

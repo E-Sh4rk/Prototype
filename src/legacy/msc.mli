@@ -1,10 +1,9 @@
-open Parsing
 open Old_annotations
 
 type a = VarAnnot.t Common.Msc.a
 type e = VarAnnot.t Common.Msc.e
 
-val convert_to_msc : legacy:bool -> Ast.annot_expr -> e
+val from_common_msc : legacy:bool -> unit Common.Msc.e -> e
 
 val pp_a : Format.formatter -> a -> unit
 val pp_e : Format.formatter -> e -> unit

@@ -96,4 +96,7 @@ module Annot = struct
   | UnkA (a, so, to1, to2) ->
     UnkA (apply_subst_a s a, Option.map (apply_subst_split s) so,
       Option.map (apply_subst s) to1, Option.map (apply_subst s) to2)
+
+  let initial_a = failwith "TODO"
+  let initial_e = failwith "TODO"
 end

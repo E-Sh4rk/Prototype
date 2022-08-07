@@ -6,8 +6,7 @@ type a = VarAnnot.t Common.Msc.a
 type e = VarAnnot.t Common.Msc.e
 [@@deriving show]
 
-let convert_to_msc ~legacy ast =
-  let unannotated = convert_to_msc ast in
+let from_common_msc ~legacy unannotated =
   let annot_e () = VarAnnot.initial_binding ~legacy in
   let annot_a () = VarAnnot.initial_lambda ~legacy in
   map_annot_e annot_e annot_a unannotated

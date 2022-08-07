@@ -1,7 +1,6 @@
 open Parsing.IO
 open Common.Msc
 open Common
-open Legacy
 open Types.Base
 open Types.Additions
 open Parsing
@@ -24,19 +23,19 @@ let type_check_program
       let var = Variable.create (Some name) in
       let annot_expr = Ast.parser_expr_to_annot_expr tenv empty_vtenv varm parsed_expr in
       let time0 = Unix.gettimeofday () in
-      let nf_expr = Legacy.Msc.convert_to_msc ~legacy:true annot_expr in
+      let nf_expr = Msc.convert_to_msc annot_expr |> Legacy.Msc.from_common_msc ~legacy:true in
       let time1 = Unix.gettimeofday () in
       assert (VarSet.subset (fv_e nf_expr) (Env.domain env |> VarSet.of_list)) ;
       let tmp_log = !Utils.log_enabled in
       Utils.log_enabled := false ;
       let typ_legacy =
-        try Some (Old_checker.typeof_simple_legacy tenv env nf_expr)
-        with Old_checker.Ill_typed _ -> None
+        try Some (Legacy.Old_checker.typeof_simple_legacy tenv env nf_expr)
+        with Legacy.Old_checker.Ill_typed _ -> None
       in
       Utils.log_enabled := tmp_log ;
       try
         (*Format.printf "%a@." pp_e nf_expr ;*)
-        let typ = Checker.typeof_simple tenv env nf_expr in
+        let typ = Legacy.Checker.typeof_simple tenv env nf_expr in
         let time2 = Unix.gettimeofday () in
         let msc_time = (time1 -. time0 ) *. 1000. in
         let typ_time = (time2 -. time1) *. 1000. in
@@ -56,7 +55,7 @@ let type_check_program
           )
         end ;
         (varm, env)
-      with Checker.Ill_typed (pos, str) ->
+      with Legacy.Checker.Ill_typed (pos, str) ->
         (*Format.printf "%a@." pp_e nf_expr ;*)
         pr_ill_typed (pos, str);
         begin match typ_legacy with

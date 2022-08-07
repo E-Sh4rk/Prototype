@@ -267,8 +267,8 @@ module Subst = struct
   type t = subst
   let is_id (v,t) =
     match CD.Types.Subst.check_var t with
-    | `Pos v' when CD.Var.equal v v' -> false
-    | _ -> true
+    | `Pos v' when CD.Var.equal v v' -> true
+    | _ -> false
   let normalize = CD.Var.Map.filter (fun v t -> is_id (v,t) |> not)
   let construct lst =
     lst |> CD.Types.Subst.from_list |> normalize

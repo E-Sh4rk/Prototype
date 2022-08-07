@@ -54,3 +54,21 @@ module Refinements = struct
       VarSet.subset dom' dom && VarSet.for_all compat dom'
     )
 end
+
+type substs = Subst.t list
+let pp_substs fmt ss =
+  Format.fprintf fmt "Substs[%i]" (List.length ss)
+
+type anns_split = (typ*anns) list
+[@@deriving show]
+
+and anns_a =
+    | NoneA | ProjA of substs | IteA of substs | AppA of (substs * substs)
+    | RecordUpdateA of substs | LambdaA of (typ * anns_split) list
+    [@@deriving show]
+
+and anns =
+    | VarA | DoA of (typ * anns_a * anns_split) | SkipA of anns
+    | EmptyA of (anns_a * anns)
+    | UnkA of (anns_a * (anns_split option) * (anns option) * (anns option))
+    [@@deriving show]

@@ -18,8 +18,6 @@ let log a =
   if !log_enabled then Format.fprintf Format.std_formatter a
   else Format.ifprintf Format.std_formatter a
 
-
-let option_map f = function None -> None | Some e -> Some (f e)
 let option_chain fs e =
   List.fold_left (fun acc f -> match acc with None -> None | Some e -> f e) (Some e) fs
   

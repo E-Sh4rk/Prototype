@@ -20,8 +20,7 @@ module Annot : sig
         | NoneA | ProjA of substs | IteA of substs | AppA of (substs * substs)
         | RecordUpdateA of substs | LambdaA of (typ * split) list
     and t =
-        | VarA | DoA of (typ * a * split) | SkipA of t
-        | EmptyA of (a * t)
+        | VarA | DoA of (typ * a * split) | SkipA of t | EmptyA of (a * t)
         | UnkA of (a * (split option) * (t option) * (t option))
 
     val pp_substs : Format.formatter -> substs -> unit

@@ -138,7 +138,7 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
             Pair (aux vtenv env e1, aux vtenv env e2)
         | Projection (p, e) -> Projection (p, aux vtenv env e)
         | RecordUpdate (e1, l, e2) ->
-            RecordUpdate (aux vtenv env e1, l, Utils.option_map (aux vtenv env) e2)
+            RecordUpdate (aux vtenv env e1, l, Option.map (aux vtenv env) e2)
         in
         ((exprid,pos),e)
     in
@@ -156,7 +156,7 @@ let rec unannot (_,e) =
     | Pair (e1, e2) -> Pair (unannot e1, unannot e2)
     | Projection (p, e) -> Projection (p, unannot e)
     | RecordUpdate (e1, l, e2) ->
-        RecordUpdate (unannot e1, l, Utils.option_map unannot e2)
+        RecordUpdate (unannot e1, l, Option.map unannot e2)
     in
     ( (), e )
 
@@ -183,7 +183,7 @@ let normalize_bvs e =
             Pair (aux depth map e1, aux depth map e2)
         | Projection (p, e) -> Projection (p, aux depth map e)
         | RecordUpdate (e1, l, e2) ->
-            RecordUpdate (aux depth map e1, l, Utils.option_map (aux depth map) e2)
+            RecordUpdate (aux depth map e1, l, Option.map (aux depth map) e2)
         in (a, e)
     in aux 0 VarMap.empty e
 

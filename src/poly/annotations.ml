@@ -72,12 +72,28 @@ module Annot = struct
       [@@deriving show]
 
   and t =
-      | VarA | DoA of (typ * a * split) | SkipA of t
-      | EmptyA of (a * t)
+      | VarA | DoA of (typ * a * split) | SkipA of t | EmptyA of (a * t)
       | UnkA of (a * (split option) * (t option) * (t option))
       [@@deriving show]
 
-  let apply_subst_split = failwith "TODO"
-  let apply_subst_a = failwith "TODO"
-  let apply_subst = failwith "TODO"
+  let rec apply_subst_split s lst =
+    lst |> List.map (fun (ty,t) -> (Subst.apply s ty, apply_subst s t))
+  and apply_subst_a s a = match a with
+  | NoneA -> NoneA
+  | ProjA ss -> ProjA (apply_subst_substs s ss)
+  | IteA ss -> IteA (apply_subst_substs s ss)
+  | AppA (ss1, ss2) -> AppA (apply_subst_substs s ss1, apply_subst_substs s ss2)
+  | RecordUpdateA ss -> RecordUpdateA (apply_subst_substs s ss)
+  | LambdaA lst ->
+    let aux (ty, split) = (Subst.apply s ty, apply_subst_split s split) in
+    LambdaA (List.map aux lst)
+  and apply_subst s t = match t with
+  | VarA -> VarA
+  | DoA (ty, a, split) ->
+    DoA (Subst.apply s ty, apply_subst_a s a, apply_subst_split s split)
+  | SkipA t -> SkipA (apply_subst s t)
+  | EmptyA (a,t) -> EmptyA (apply_subst_a s a, apply_subst s t)
+  | UnkA (a, so, to1, to2) ->
+    UnkA (apply_subst_a s a, Option.map (apply_subst_split s) so,
+      Option.map (apply_subst s) to1, Option.map (apply_subst s) to2)
 end

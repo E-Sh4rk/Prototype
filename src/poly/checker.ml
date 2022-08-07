@@ -37,9 +37,8 @@ let rec typeof_a pos tenv env mono annot_a a =
       annot |> List.map (fun (s, annot) ->
         let env = Env.add v s env in
         let mono = TVarSet.union mono (vars s) in
-        typeof_splits tenv env mono v annot e
-        |> List.map (fun (s,t) -> mk_arrow (cons s) (cons t))
-        |> conj_o
+        let t = typeof_splits tenv env mono v annot e in
+        mk_arrow (cons s) (cons t)
       ) |> conj_o
   in
   begin match a, annot_a with
@@ -119,8 +118,8 @@ and typeof_splits tenv env mono v splits e =
   then splits |> List.map (fun (s, annot) ->
     let env = Env.strengthen v s env in
     let mono = TVarSet.union mono (vars s) in
-    (Env.find v env, typeof tenv env mono annot e)
-  )
+    typeof tenv env mono annot e
+  ) |> disj_o
   else raise (Untypeable (pos, "Invalid split: does not cover the whole domain."))
 
 and typeof tenv env mono annot e =

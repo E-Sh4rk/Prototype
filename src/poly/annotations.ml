@@ -14,6 +14,17 @@ let partition lst =
       s::(aux (diff_o dom s) lst)
   in aux any lst
 
+let regroup equiv res =
+  let rec add_if_equiv treated lst k o =
+    match lst with
+    | [] -> (k,[o])::treated
+    | (k', os)::lst when equiv k k' ->
+      ((k, o::os)::lst)@treated
+    | elt::lst -> add_if_equiv (elt::treated) lst k o
+  in
+  let aux acc (k, o) = add_if_equiv [] acc k o in
+  List.fold_left aux [] res
+
 module Refinements = struct
   type t = Env.t list
   let dom lst =
@@ -31,4 +42,15 @@ module Refinements = struct
       |> List.flatten
     in
     aux (dom lst)
+  let compatibles env lst =
+    let dom = Env.domain env |> VarSet.of_list in
+    lst |> List.filter (fun env' ->
+      let compat x =
+        let t = Env.find x env in
+        let t' = Env.find x env' in
+        is_empty t || non_empty (cap t t')
+      in
+      let dom' = Env.domain env' |> VarSet.of_list in
+      VarSet.subset dom' dom && VarSet.for_all compat dom'
+    )
 end

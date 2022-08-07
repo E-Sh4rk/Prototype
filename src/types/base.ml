@@ -269,15 +269,19 @@ module Subst = struct
     match CD.Types.Subst.check_var t with
     | `Pos v' when CD.Var.equal v v' -> false
     | _ -> true
+  let normalize = CD.Var.Map.filter (fun v t -> is_id (v,t) |> not)
   let construct lst =
-    lst |> List.filter is_id |> CD.Types.Subst.from_list
+    lst |> CD.Types.Subst.from_list |> normalize
   let destruct = CD.Var.Map.get
   let is_identity t = destruct t |> List.for_all is_id
   let apply = CD.Types.Subst.apply
   let dom s = CD.Var.Map.domain s
   let mem s v = CD.Var.Set.mem (dom s) v
   let find s v = CD.Var.Map.assoc v s
-  let equiv s1 s2 = CD.Var.Map.equal equiv s1 s2
+  let equiv s1 s2 =
+    let s1 = normalize s1 in
+    let s2 = normalize s2 in
+    CD.Var.Map.equal equiv s1 s2
   let pp fmt _ = Format.fprintf fmt "Subst"
 end
 

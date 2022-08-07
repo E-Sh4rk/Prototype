@@ -31,9 +31,18 @@ let instantiate_check pos mono ss t =
   
 let rec typeof_a pos tenv env mono annot_a a =
   let type_lambda env annot v e =
-    failwith "TODO"
+    if annot = []
+    then raise (Untypeable (pos, "Invalid lambda: empty annotations."))
+    else
+      annot |> List.map (fun (s, annot) ->
+        let env = Env.add v s env in
+        let mono = TVarSet.union mono (vars s) in
+        typeof_splits tenv env mono v annot e
+        |> List.map (fun (s,t) -> mk_arrow (cons s) (cons t))
+        |> conj_o
+      ) |> conj_o
   in
-  match a, annot_a with
+  begin match a, annot_a with
   | Abstract t, NoneA -> t
   | Const c, NoneA -> typeof_const_atom tenv c
   | Pair (v1, v2), NoneA ->
@@ -88,12 +97,31 @@ let rec typeof_a pos tenv env mono annot_a a =
     then var_type pos v2 env
     else raise (Untypeable (pos, "Invalid let binding: definition has been skipped."))
   | Lambda (_, Parsing.Ast.Unnanoted, v, e), LambdaA annot ->
-    failwith "TODO"
+    type_lambda env annot v e
   | Lambda (_, Parsing.Ast.ADomain dt, v, e), LambdaA annot ->
-    failwith "TODO"
+    let t = type_lambda env annot v e in
+    if equiv (domain t) dt
+    then t
+    else raise (Untypeable (pos, "Invalid lambda: domain does not match with user annotation."))
   | Lambda (_, Parsing.Ast.AArrow t, v, e), LambdaA annot ->
-    failwith "TODO"
+    let t' = type_lambda env annot v e in
+    if subtype t' t
+    then t
+    else raise (Untypeable (pos, "Invalid lambda: type does not match with user annotation."))
   | _, _ -> raise (Untypeable (pos, "Invalid annotations."))
+  end
+  |> clean_type ~pos:empty ~neg:any mono |> simplify_typ
+
+and typeof_splits tenv env mono v splits e =
+  let pos = Variable.get_locations v in
+  let dom = splits |> List.map fst |> disj in
+  if subtype (Env.find v env) dom
+  then splits |> List.map (fun (s, annot) ->
+    let env = Env.strengthen v s env in
+    let mono = TVarSet.union mono (vars s) in
+    (Env.find v env, typeof tenv env mono annot e)
+  )
+  else raise (Untypeable (pos, "Invalid split: does not cover the whole domain."))
 
 and typeof tenv env mono annot e =
   ignore (tenv, env, mono, annot, e, typeof) ;

@@ -457,7 +457,7 @@ end
 
 let instantiate ss t =
     List.map (fun s -> Subst.apply s t) ss
-    |> conj_o
+    |> conj
 
 let fresh_subst vars =
     let x = ref TVarSet.empty in

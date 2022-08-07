@@ -1,4 +1,5 @@
 open Types.Base
+open Types.Additions
 open Common
 open Parsing.Variable
 
@@ -55,20 +56,28 @@ module Refinements = struct
     )
 end
 
-type substs = Subst.t list
-let pp_substs fmt ss =
-  Format.fprintf fmt "Substs[%i]" (List.length ss)
+module Annot = struct
+  type substs = Subst.t list
+  let pp_substs fmt ss =
+    Format.fprintf fmt "Substs[%i]" (List.length ss)
+  let apply_subst_substs s ss =
+    List.map (fun s' -> Subst.compose_restr s s') ss
 
-type anns_split = (typ*anns) list
-[@@deriving show]
+  type split = (typ*t) list
+  [@@deriving show]
 
-and anns_a =
-    | NoneA | ProjA of substs | IteA of substs | AppA of (substs * substs)
-    | RecordUpdateA of substs | LambdaA of (typ * anns_split) list
-    [@@deriving show]
+  and a =
+      | NoneA | ProjA of substs | IteA of substs | AppA of (substs * substs)
+      | RecordUpdateA of substs | LambdaA of (typ * split) list
+      [@@deriving show]
 
-and anns =
-    | VarA | DoA of (typ * anns_a * anns_split) | SkipA of anns
-    | EmptyA of (anns_a * anns)
-    | UnkA of (anns_a * (anns_split option) * (anns option) * (anns option))
-    [@@deriving show]
+  and t =
+      | VarA | DoA of (typ * a * split) | SkipA of t
+      | EmptyA of (a * t)
+      | UnkA of (a * (split option) * (t option) * (t option))
+      [@@deriving show]
+
+  let apply_subst_split = failwith "TODO"
+  let apply_subst_a = failwith "TODO"
+  let apply_subst = failwith "TODO"
+end

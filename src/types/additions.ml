@@ -427,28 +427,32 @@ let remove_field_info t label =
 module type Subst = sig
     include Subst
     val compose : t -> t -> t
+    val compose_restr : t -> t -> t
     val combine : t -> t -> t
+    val restrict : t -> TVarSet.t -> t
     val split : t -> TVarSet.t -> t * t
 end
 module Subst : Subst = struct
     include Subst
-    let compose s1 s2 =
+    let compose_restr_ s2 s1 =
+        destruct s1 |>
+            List.map (fun (v,t) -> (v, apply s2 t))
+    let compose_restr s2 s1 = compose_restr_ s2 s1 |> construct
+    let compose s2 s1 =
         let only_s2 = destruct s2 |>
             List.filter (fun (v, _) -> mem s1 v |> not) in
-        let res = destruct s1 |>
-            List.map (fun (v,t) -> (v, apply s2 t)) in
-        construct (res@only_s2)
+        construct ((compose_restr_ s2 s1)@only_s2)
     let combine s1 s2 =
         assert (TVarSet.inter (dom s1) (dom s2) |> TVarSet.is_empty) ;
         let s1 = destruct s1 in
         let s2 = destruct s2 in
         s1@s2 |> construct
-    let split s vars =
+    let restrict s vars =
         let vars = TVarSet.inter (dom s) vars in
+        vars |> TVarSet.destruct |> List.map (fun v -> (v, find s v)) |> construct
+    let split s vars =
         let nvars = TVarSet.diff (dom s) vars in
-        let res1 = vars |> TVarSet.destruct |> List.map (fun v -> (v, find s v)) in
-        let res2 = nvars |> TVarSet.destruct |> List.map (fun v -> (v, find s v)) in
-        (res1 |> construct, res2 |> construct)            
+        (restrict s vars, restrict s nvars)
 end
 
 let instantiate ss t =

@@ -13,17 +13,24 @@ module Refinements : sig
     val compatibles : Env.t -> t -> t
 end
 
-type substs = Subst.t list
-type anns_split = (typ*anns) list
-and anns_a =
-    | NoneA | ProjA of substs | IteA of substs | AppA of (substs * substs)
-    | RecordUpdateA of substs | LambdaA of (typ * anns_split) list
-and anns =
-    | VarA | DoA of (typ * anns_a * anns_split) | SkipA of anns
-    | EmptyA of (anns_a * anns)
-    | UnkA of (anns_a * (anns_split option) * (anns option) * (anns option))
+module Annot : sig
+    type substs = Subst.t list
+    type split = (typ*t) list
+    and a =
+        | NoneA | ProjA of substs | IteA of substs | AppA of (substs * substs)
+        | RecordUpdateA of substs | LambdaA of (typ * split) list
+    and t =
+        | VarA | DoA of (typ * a * split) | SkipA of t
+        | EmptyA of (a * t)
+        | UnkA of (a * (split option) * (t option) * (t option))
 
-val pp_substs : Format.formatter -> substs -> unit
-val pp_anns_split : Format.formatter -> anns_split -> unit
-val pp_anns_a : Format.formatter -> anns_a -> unit
-val pp_anns : Format.formatter -> anns -> unit
+    val pp_substs : Format.formatter -> substs -> unit
+    val pp_split : Format.formatter -> split -> unit
+    val pp_a : Format.formatter -> a -> unit
+    val pp : Format.formatter -> t -> unit
+
+    val apply_subst_substs : Subst.t -> substs -> substs
+    val apply_subst_split : Subst.t -> split -> split
+    val apply_subst_a : Subst.t -> a -> a
+    val apply_subst : Subst.t -> t -> t
+end

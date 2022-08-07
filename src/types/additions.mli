@@ -95,8 +95,10 @@ val remove_field_info : typ -> string -> typ
 
 module type Subst = sig
     include Subst
-    val compose : t -> t -> t (* compose s1 s2 does s2 \circ s1 *)
+    val compose : t -> t -> t
+    val compose_restr : t -> t -> t
     val combine : t -> t -> t
+    val restrict : t -> TVarSet.t -> t
     val split : t -> TVarSet.t -> t * t
 end
 module Subst : Subst

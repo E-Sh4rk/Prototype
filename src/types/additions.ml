@@ -474,6 +474,7 @@ let fresh mono t =
     (x, subst, Subst.apply subst t)
 
 let tallying_infer poly noninfered constr =
+    assert (TVarSet.inter poly noninfered |> TVarSet.is_empty) ;
     let var_order = TVarSet.destruct poly in
     tallying ~var_order noninfered constr
 
@@ -485,6 +486,16 @@ let subtype_poly mono t1 t2 =
     let (xs, _, t) = fresh mono t2 in
     let res = tallying (TVarSet.union mono xs) [(t1,t)] in
     res <> []
+
+let triangle_poly mono t s =
+    let (vt',_,t') = fresh mono t in
+    let alpha = mk_var "triangle" in
+    let alphat = var_typ alpha in
+    let delta = TVarSet.union mono (vars s) in
+    let res = tallying_infer vt' delta [(t', mk_arrow (cons alphat) (cons s))] in
+    res |> List.map (fun subst ->
+        Subst.find subst alpha |> clean_type ~pos:any ~neg:empty delta
+    )
 
 (* Operations on jokers (legacy) *)
 

@@ -237,6 +237,7 @@ and infer' tenv env mono noninferred annot e =
   | Var v, VarA -> if Env.mem v env then Ok(VarA) else fail
   | Bind ((), v, a, e), UnkA (annot_a, s, k1, k2) ->
     let pos = Variable.get_locations v in
+    (* TODO: static analysis on the body in order to be lazy *)
     let res = infer_a' pos tenv env mono noninferred annot_a a in
     begin match res, k1 with
     | Ok annot_a, _ ->
@@ -262,7 +263,7 @@ and infer' tenv env mono noninferred annot e =
   | Bind ((), _, _, e), SkipA annot ->
     let res = infer' tenv env mono noninferred annot e in
     map_res (fun annot -> SkipA annot) res
-  | Bind ((), v, a, e), EmptyA (annot_a, annot) ->
+  | Bind ((), v, _, e), EmptyA (annot_a, annot) ->
     let env = Env.add v empty env in
     let res = infer' tenv env mono noninferred annot e in
     map_res (fun annot -> EmptyA (annot_a, annot)) res

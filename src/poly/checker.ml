@@ -269,7 +269,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
   let simple_constraint_check v s sigma =
     Env.mem v env && subtype (instantiate sigma (Env.find v env)) s
   in
-  let lambda v branches e =
+  let lambda ~inferred v branches e =
     let rec aux branches =
       match branches with
       | [] -> Ok []
@@ -280,6 +280,10 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
           let vs = vars s in
           let xs = TVarSet.diff vs mono in
           let mono = TVarSet.union mono vs in
+          let noninferred =
+            if inferred then noninferred
+            else TVarSet.union noninferred xs
+          in
           begin match infer_splits' tenv env mono noninferred v splits e with
           | Subst lst ->
             let res =
@@ -376,12 +380,13 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
       else if subtype t (neg s) && Env.mem v2 env then Ok (IteA sigma)
       else fail
     else fail
-  | Lambda ((), _, v, e), LambdaA branches ->
+  | Lambda ((), ua, v, e), LambdaA branches ->
     let branches = branches |> List.filter (fun (s, _) -> is_empty s |> not) in
     begin match branches with
     | [] -> fail
     | branches ->
-      lambda v branches e
+      let inferred = ua = Parsing.Ast.Unnanoted in
+      lambda ~inferred v branches e
       |> map_res (fun branches -> LambdaA branches)
     end
   | _, _ -> assert false

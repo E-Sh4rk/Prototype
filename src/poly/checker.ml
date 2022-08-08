@@ -211,7 +211,14 @@ and infer_splits' tenv env mono noninferred v splits e =
         let noninferred = TVarSet.union noninferred (TVarSet.diff vs mono) in
         let mono = TVarSet.union mono vs in
         begin match infer_iterated tenv env mono noninferred annot e with
-        | Split _ -> failwith "TODO"
+        | Split lst ->
+          let res =
+            lst |> List.map (fun (env', annot) ->
+              let env' = Env.strengthen v s env' in
+              (Env.rm v env', (Env.find v env', annot)))
+            |> regroup Env.equiv
+          in
+          map_res (fun splits' -> splits'@splits) (Split res)
         | res -> map_res (fun annot -> (s,annot)::splits) res
         end
       | res -> map_res (fun splits -> (s, annot)::splits) res

@@ -15,6 +15,8 @@ let print_ill_typed (pos, str) =
 let print_result str =
   Format.fprintf !std_fmt "%s@?" str
 
+let use_poly () = true
+
 let type_check_program
   (program:Ast.parser_program) (pr:string -> unit) pr_ill_typed =
   let test_def (tenv,varm,env) (name,parsed_expr) =
@@ -23,19 +25,24 @@ let type_check_program
       let var = Variable.create (Some name) in
       let annot_expr = Ast.parser_expr_to_annot_expr tenv empty_vtenv varm parsed_expr in
       let time0 = Unix.gettimeofday () in
-      let nf_expr = Msc.convert_to_msc annot_expr |> Legacy.Msc.from_common_msc ~legacy:true in
+      let nf_expr = Msc.convert_to_msc annot_expr in
+      let nf_expr_ann = nf_expr |> Legacy.Msc.from_common_msc ~legacy:true in
       let time1 = Unix.gettimeofday () in
       assert (VarSet.subset (fv_e nf_expr) (Env.domain env |> VarSet.of_list)) ;
       let tmp_log = !Utils.log_enabled in
       Utils.log_enabled := false ;
       let typ_legacy =
-        try Some (Legacy.Old_checker.typeof_simple_legacy tenv env nf_expr)
+        try Some (Legacy.Old_checker.typeof_simple_legacy tenv env nf_expr_ann)
         with Legacy.Old_checker.Ill_typed _ -> None
       in
       Utils.log_enabled := tmp_log ;
       try
         (*Format.printf "%a@." pp_e nf_expr ;*)
-        let typ = Legacy.Checker.typeof_simple tenv env nf_expr in
+        let typ =
+          if use_poly ()
+          then Poly.Checker.typeof_simple tenv env TVarSet.empty nf_expr
+          else Legacy.Checker.typeof_simple tenv env nf_expr_ann
+        in
         let time2 = Unix.gettimeofday () in
         let msc_time = (time1 -. time0 ) *. 1000. in
         let typ_time = (time2 -. time1) *. 1000. in

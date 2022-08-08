@@ -127,4 +127,13 @@ module Annot = struct
         let initial_e = initial_e e in
         let initial_s = [(any, initial_e)] in
         UnkA (initial_a, Some initial_s, Some initial_e, Some initial_e)
+
+  let retype a t =
+    let a = initial_a a in
+    match t with
+    | VarA -> VarA
+    | UnkA (_,s,t1,t2) -> UnkA (a,s,t1,t2)
+    | SkipA (t) -> UnkA (a, Some [(any,t)], Some t, Some t)
+    | DoA (_, _, s) -> UnkA (a, Some s, None, None)
+    | EmptyA (_, t) -> UnkA (a, None, None, Some t)
 end

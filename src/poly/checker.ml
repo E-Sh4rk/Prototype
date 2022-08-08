@@ -181,25 +181,47 @@ let refine_a env mono a t = (* empty possibilites are often omitted *)
 (* ===== INFER ===== *)
 
 type 'a result =
-    | Ok of 'a
-    | Split of (Refinements.t * 'a) list
-    | Subst of (Subst.t * 'a) list
+  | Ok of 'a
+  | Split of (Env.t * 'a) list
+  | Subst of (Subst.t * 'a) list
+
+let map_res f res =
+  match res with
+  | Ok a -> Ok (f a)
+  | Split lst ->
+    Split (lst |> List.map (fun (e,a) -> (e, f a)))
+  | Subst lst ->
+    Subst (lst |> List.map (fun (s,a) -> (s, f a)))
 
 let rec infer_a' pos tenv env mono noninferred annot_a a =
-    ignore (infer_a', pos, tenv, env, mono, noninferred, annot_a, a) ;
-    failwith "TODO"
+  ignore (infer_a', pos, tenv, env, mono, noninferred, annot_a, a) ;
+  failwith "TODO"
+
+and infer_splits' tenv env mono noninferred var annot_split e =
+  ignore (refine_a, infer_a', tenv, env, mono, noninferred, var, annot_split, e) ;
+  failwith "TODO"
 
 and infer' tenv env mono noninferred annot e =
   ignore (refine_a, infer_a', tenv, env, mono, noninferred, annot, e) ;
   failwith "TODO"
 
 and infer_a_iterated pos tenv env mono noninferred annot_a a =
-  ignore (infer', pos, tenv, env, mono, noninferred, annot_a, a) ;
-  failwith "TODO"
+  match infer_a' pos tenv env mono noninferred annot_a a with
+  | Split [(env', annot_a)] when Env.leq env env' ->
+    infer_a_iterated pos tenv env mono noninferred annot_a a
+  | Subst [(subst, annot_a)] when Subst.is_identity subst ->
+    infer_a_iterated pos tenv env mono noninferred annot_a a
+  | res -> res
 
 and infer_iterated tenv env mono noninferred annot e =
-  ignore (infer_a_iterated, tenv, env, mono, noninferred, annot, e) ;
-  failwith "TODO"
+  match infer' tenv env mono noninferred annot e, e with
+  | Split [(env', annot)], _ when Env.leq env env' ->
+    infer_iterated tenv env mono noninferred annot e
+  | Subst [(subst, annot)], _ when Subst.is_identity subst ->
+    infer_iterated tenv env mono noninferred annot e
+  | Split r, Bind (_, _, a, _) ->
+    map_res (fun annot -> Annot.retype a annot) (Split r)
+  | res, _ -> res
 
 let infer tenv env mono e =
   let fv = fv_e e in

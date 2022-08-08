@@ -34,4 +34,6 @@ module Annot : sig
 
     val initial_a : Msc.a -> a
     val initial_e : Msc.e -> t
+
+    val retype : Msc.a -> t -> t
 end

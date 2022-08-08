@@ -197,9 +197,27 @@ let rec infer_a' pos tenv env mono noninferred annot_a a =
   ignore (infer_a', pos, tenv, env, mono, noninferred, annot_a, a) ;
   failwith "TODO"
 
-and infer_splits' tenv env mono noninferred var annot_split e =
-  ignore (refine_a, infer_a', tenv, env, mono, noninferred, var, annot_split, e) ;
-  failwith "TODO"
+and infer_splits' tenv env mono noninferred v splits e =
+  let t = Env.find v env in
+  let splits = splits |> List.filter (fun (s, _) -> disjoint s t |> not) in
+  let rec aux splits =
+    match splits with
+    | [] -> Ok []
+    | (s, annot)::splits ->
+      begin match aux splits with
+      | Ok (splits) ->
+        let env = Env.strengthen v s env in
+        let vs = vars s in
+        let noninferred = TVarSet.union noninferred (TVarSet.diff vs mono) in
+        let mono = TVarSet.union mono vs in
+        begin match infer_iterated tenv env mono noninferred annot e with
+        | Split _ -> failwith "TODO"
+        | res -> map_res (fun annot -> (s,annot)::splits) res
+        end
+      | res -> map_res (fun splits -> (s, annot)::splits) res
+      end
+  in
+  aux splits
 
 and infer' tenv env mono noninferred annot e =
   ignore (refine_a, infer_a', tenv, env, mono, noninferred, annot, e) ;

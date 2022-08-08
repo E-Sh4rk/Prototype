@@ -245,6 +245,33 @@ let rec infer_a' pos tenv env mono noninferred annot_a a =
       if simple_constraint_check v record_any sigma
       then Ok (RecordUpdateA sigma) else fail
     end
+  | App (v1, v2), AppA ([], []) ->
+    if Env.mem v1 env && Env.mem v2 env
+    then
+      let (vs1,subst1,t1) = fresh mono (Env.find v1 env) in
+      let (vs2,subst2,t2) = fresh mono (Env.find v2 env) in
+      let alpha = mk_var "app_res" in
+      let poly = TVarSet.union vs1 vs2 |> TVarSet.add alpha in
+      let arrow_typ = mk_arrow (cons t2) (cons (var_typ alpha)) in
+      let res = tallying_infer poly noninferred [(t1, arrow_typ)] in
+      let res = res |> List.map (fun sol ->
+        let poly_part =
+          (Subst.compose (Subst.restrict sol vs1) subst1,
+           Subst.compose (Subst.restrict sol vs2) subst2)
+        in
+        (Subst.restrict sol mono, poly_part)
+      ) |> regroup Subst.equiv in
+      Subst res |> map_res (fun sigmas -> AppA (List.split sigmas))
+    else fail
+  | App (v1, v2), AppA (sigma1, sigma2) ->
+    if Env.mem v1 env && Env.mem v2 env
+    then
+      let t1 = instantiate sigma1 (Env.find v1 env) in
+      let t2 = instantiate sigma2 (Env.find v2 env) in
+      if subtype t1 (mk_arrow (cons t2) any_node)
+      then Ok (AppA (sigma1, sigma2))
+      else fail
+    else fail
   | _, _ -> assert false
 
 and infer_splits' tenv env mono noninferred v splits e =

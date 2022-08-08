@@ -334,7 +334,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     then
       let (vs1,subst1,t1) = fresh mono (Env.find v1 env) in
       let (vs2,subst2,t2) = fresh mono (Env.find v2 env) in
-      let alpha = mk_var "app_res" in
+      let alpha = fresh_var () in
       let poly = TVarSet.union vs1 vs2 |> TVarSet.add alpha in
       let arrow_typ = mk_arrow (cons t2) (cons (var_typ alpha)) in
       let res = tallying_infer poly noninferred [(t1, arrow_typ)] in

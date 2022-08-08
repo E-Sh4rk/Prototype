@@ -458,6 +458,11 @@ module Subst : Subst = struct
         (restrict s vars, remove s vars)
 end
 
+let next_var_name = ref 0
+let fresh_var () =
+    next_var_name := !next_var_name + 1 ;
+    mk_var (string_of_int !next_var_name)
+
 let instantiate ss t =
     List.map (fun s -> Subst.apply s t) ss
     |> conj
@@ -492,7 +497,7 @@ let subtype_poly mono t1 t2 =
 
 let triangle_poly mono t s =
     let (vt',_,t') = fresh mono t in
-    let alpha = mk_var "triangle" in
+    let alpha = fresh_var () in
     let alphat = var_typ alpha in
     let delta = TVarSet.union mono (vars s) in
     let res = tallying_infer vt' delta [(t', mk_arrow (cons alphat) (cons s))] in

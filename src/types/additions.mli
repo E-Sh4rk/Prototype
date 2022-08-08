@@ -103,6 +103,7 @@ module type Subst = sig
     val split : t -> TVarSet.t -> t * t
 end
 module Subst : Subst
+val fresh_var : unit -> var
 val instantiate : Subst.t list -> typ -> typ
 val fresh_subst : TVarSet.t -> TVarSet.t * Subst.t
 val fresh : TVarSet.t -> typ -> TVarSet.t * Subst.t * typ

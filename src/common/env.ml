@@ -6,6 +6,7 @@ type t = typ VarMap.t
 let empty = VarMap.empty
 let is_empty =  VarMap.is_empty
 let singleton = VarMap.singleton
+let construct lst = VarMap.of_seq (List.to_seq lst)
 
 let add = VarMap.add
 

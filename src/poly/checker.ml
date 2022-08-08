@@ -139,3 +139,40 @@ and typeof tenv env mono annot e =
   | _, _ -> raise (Untypeable ([], "Invalid annotations."))
   end
   |> clean_type ~pos:empty ~neg:any mono |> simplify_typ
+
+  (* ===== REFINE ===== *)
+
+  let refine_a env mono a t =
+    match a with
+    | Abstract _ | Const _ | Lambda _ -> []
+    | Pair (v1, v2) -> (* empty possibilites are omitted *)
+      split_pair t
+      |> List.map (
+        fun (t1, t2) -> Env.construct [(v1,t1) ; (v2, t2)]
+      )
+    | Projection (Fst, v) -> [Env.singleton v (mk_times (cons t) any_node)]
+    | Projection (Snd, v) -> [Env.singleton v (mk_times any_node (cons t))]
+    | Projection (Field label, v) ->
+      [Env.singleton v (mk_record true [(label, cons t)])]
+    | RecordUpdate (v, label, None) ->
+      let t = cap t (record_any_without label) in
+      split_record t
+      |> List.map (
+        fun ti -> Env.singleton v (remove_field_info ti label)
+      )
+    | RecordUpdate (v, label, Some x) ->
+      let t = cap t (record_any_with label) in
+      split_record t
+      |> List.map (
+        fun ti ->
+          let field_type = get_field_assuming_not_absent ti label in
+          let ti = remove_field_info ti label in
+          Env.construct [(v, ti) ; (x, field_type)]
+        )
+    | App (v1, v2) ->
+      let t1 = Env.find v1 env in
+      triangle_poly mono t1 t
+      |> List.map (fun ti -> Env.singleton v2 ti)
+    | _ -> failwith "TODO"
+
+let _ = ignore refine_a

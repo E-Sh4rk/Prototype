@@ -259,9 +259,35 @@ and infer' tenv env mono noninferred annot e =
     | res, _ ->
       map_res (fun annot_a -> UnkA (annot_a, s, k1, k2)) res
     end
-  | Bind ((), v, a, e), SkipA annot -> failwith "TODO"
-  | Bind ((), v, a, e), EmptyA (annot_a, annot) -> failwith "TODO"
-  | Bind ((), v, a, e), DoA (t, annot_a, splits) -> failwith "TODO"
+  | Bind ((), _, _, e), SkipA annot ->
+    let res = infer' tenv env mono noninferred annot e in
+    map_res (fun annot -> SkipA annot) res
+  | Bind ((), v, a, e), EmptyA (annot_a, annot) ->
+    let env = Env.add v empty env in
+    let res = infer' tenv env mono noninferred annot e in
+    map_res (fun annot -> EmptyA (annot_a, annot)) res
+  | Bind ((), v, a, e), DoA (t, annot_a, splits) ->
+    let refinements = splits |> List.find_map (fun (s,_) ->
+      if disjoint s t then None
+      else
+        let refinements =
+          refine_a env mono a (neg s) |> Refinements.partition
+          |> Refinements.compatibles env
+        in
+        if List.length refinements > 1
+        then Some refinements
+        else None
+    ) in
+    begin match refinements with
+    | Some refinements ->
+      let res = refinements |> List.map (fun env' ->
+        (env', DoA (t, annot_a, splits))) in
+      Split res
+    | None ->
+      let env = Env.add v t env in
+      let res = infer_splits' tenv env mono noninferred v splits e in
+      map_res (fun splits -> DoA (t, annot_a, splits)) res
+    end
   | _, _ -> assert false
 
 and infer_a_iterated pos tenv env mono noninferred annot_a a =

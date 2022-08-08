@@ -200,8 +200,52 @@ let map_res f res =
     Subst (lst |> List.map (fun (s,a) -> (s, f a)))
 
 let rec infer_a' pos tenv env mono noninferred annot_a a =
-  ignore (infer_a', pos, tenv, env, mono, noninferred, annot_a, a) ;
-  failwith "TODO"
+  let simple_constraint_infer v s =
+    if Env.mem v env
+    then
+      let (vs,tsubst,t) = fresh mono (Env.find v env) in
+      let res = tallying_infer vs noninferred [(t, s)] in
+      let res = res |> List.map (fun sol ->
+        (Subst.restrict sol mono, Subst.compose (Subst.restrict sol vs) tsubst)
+      ) |> regroup Subst.equiv in
+      Subst res
+    else fail
+  in
+  let simple_constraint_check v s sigma =
+    Env.mem v env && subtype (instantiate sigma (Env.find v env)) s
+  in
+  match a, annot_a with
+  | Abstract _, NoneA | Const _, NoneA -> Ok NoneA
+  | Pair (v1, v2), NoneA ->
+    if Env.mem v1 env && Env.mem v2 env
+    then Ok NoneA else fail
+  | Projection (Parsing.Ast.Field label, v), ProjA [] ->
+    let res = simple_constraint_infer v (record_any_with label) in
+    map_res (fun sigma -> ProjA sigma) res
+  | Projection (Parsing.Ast.Field label, v), ProjA sigma ->
+    if simple_constraint_check v (record_any_with label) sigma
+    then Ok (ProjA sigma) else fail
+  | Projection (_, v), ProjA [] ->
+    let res = simple_constraint_infer v pair_any in
+    map_res (fun sigma -> ProjA sigma) res
+  | Projection (_, v), ProjA sigma ->
+    if simple_constraint_check v pair_any sigma
+    then Ok (ProjA sigma) else fail
+  | RecordUpdate (v, _, o), RecordUpdateA [] ->
+    begin match o with
+    | Some v' when Env.mem v' env |> not -> fail
+    | _ ->
+      let res = simple_constraint_infer v record_any in
+      map_res (fun sigma -> RecordUpdateA sigma) res
+    end
+  | RecordUpdate (v, _, o), RecordUpdateA sigma ->
+    begin match o with
+    | Some v' when Env.mem v' env |> not -> fail
+    | _ ->
+      if simple_constraint_check v record_any sigma
+      then Ok (RecordUpdateA sigma) else fail
+    end
+  | _, _ -> assert false
 
 and infer_splits' tenv env mono noninferred v splits e =
   let t = Env.find v env in

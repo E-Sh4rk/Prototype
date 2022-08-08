@@ -5,6 +5,7 @@ open Annotations
 open Annot
 open Common
 open Parsing.Variable
+open Utils
 
 exception Untypeable of Position.t list * string
 
@@ -177,4 +178,42 @@ let refine_a env mono a t = (* empty possibilites are often omitted *)
     [Env.construct [(v,s);(v1,t)] ; Env.construct [(v,neg s);(v2,t)]]
   | Let (_, v2) -> [Env.singleton v2 t]
 
-let _ = ignore refine_a
+(* ===== INFER ===== *)
+
+type 'a result =
+    | Ok of 'a
+    | Split of (Refinements.t * 'a) list
+    | Subst of (Subst.t * 'a) list
+
+let rec infer_a' pos tenv env mono noninferred annot_a a =
+    ignore (infer_a', pos, tenv, env, mono, noninferred, annot_a, a) ;
+    failwith "TODO"
+
+and infer' tenv env mono noninferred annot e =
+  ignore (refine_a, infer_a', tenv, env, mono, noninferred, annot, e) ;
+  failwith "TODO"
+
+and infer_a_iterated pos tenv env mono noninferred annot_a a =
+  ignore (infer', pos, tenv, env, mono, noninferred, annot_a, a) ;
+  failwith "TODO"
+
+and infer_iterated tenv env mono noninferred annot e =
+  ignore (infer_a_iterated, tenv, env, mono, noninferred, annot, e) ;
+  failwith "TODO"
+
+let infer tenv env mono e =
+  let fv = fv_e e in
+  let e = VarSet.fold (fun v acc ->
+    Bind ((), v, Abstract (var_type [] v env), acc)
+  ) fv e in
+  let annot =
+    match infer_iterated tenv Env.empty mono mono (Annot.initial_e e) e with
+    | Subst [] -> raise (Untypeable ([], "Annotations inference failed."))
+    | Ok annot -> (e, annot)
+    | _ -> assert false
+  in
+  log "@." ; annot
+
+let typeof_simple tenv env mono e =
+  let (e, anns) = infer tenv env mono e in
+  typeof tenv Env.empty mono anns e  

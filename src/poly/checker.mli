@@ -7,4 +7,7 @@ open Common
 exception Untypeable of Position.t list * string
 
 val typeof : type_env -> Env.t -> TVarSet.t -> Annot.t -> e -> typ
-val typeof_a : Position.t list -> type_env -> Env.t -> TVarSet.t -> Annot.a -> a -> typ
+
+val infer : type_env -> Env.t -> TVarSet.t -> e -> e * Annot.t
+
+val typeof_simple : type_env -> Env.t -> TVarSet.t -> e -> typ

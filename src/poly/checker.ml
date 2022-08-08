@@ -207,7 +207,7 @@ let complete default_annot res =
     else res
   | _ -> assert false
 
-let rec infer_a' pos tenv env mono noninferred annot_a a =
+let rec infer_a' _ tenv env mono noninferred annot_a a =
   let simple_constraint_infer v s =
     if Env.mem v env
     then
@@ -230,17 +230,20 @@ let rec infer_a' pos tenv env mono noninferred annot_a a =
         begin match aux branches with
         | Ok (branches) ->
           let env = Env.add v s env in
-          let mono = TVarSet.union mono (vars s) in
+          let vs = vars s in
+          let xs = TVarSet.diff vs mono in
+          let mono = TVarSet.union mono vs in
           begin match infer_splits' tenv env mono noninferred v splits e with
           | Subst lst ->
-            (*let res =
-              lst |> List.map (fun (env', annot) ->
-                let env' = Env.strengthen v s env' in
-                (Env.rm v env', (Env.find v env', annot)))
-              |> regroup Env.equiv
+            let res =
+              lst |> List.map (fun (sigma, splits) ->
+                let sigmaxs = Subst.restrict sigma xs in
+                (Subst.remove sigma xs,
+                (Subst.apply sigmaxs s, Annot.apply_subst_split sigmaxs splits)))
+              |> regroup Subst.equiv
             in
-            map_res (fun splits' -> splits'@splits) (Split res)*)
-            failwith "TODO"
+            map_res (fun splits -> splits@branches) (Subst res)
+            |> complete branches
           | res -> map_res (fun splits -> (s, splits)::branches) res
           end
         | res -> map_res (fun branches -> (s, splits)::branches) res
@@ -371,7 +374,7 @@ and infer' tenv env mono noninferred annot e =
   | Bind ((), v, a, e), UnkA (annot_a, s, k1, k2) ->
     let pos = Variable.get_locations v in
     (* TODO: static analysis on the body in order to be lazy *)
-    let res = infer_a' pos tenv env mono noninferred annot_a a in
+    let res = infer_a_iterated pos tenv env mono noninferred annot_a a in
     begin match res, k1 with
     | Ok annot_a, _ ->
       let t = typeof_a_nofail pos tenv env mono annot_a a in
@@ -394,11 +397,11 @@ and infer' tenv env mono noninferred annot e =
       map_res (fun annot_a -> UnkA (annot_a, s, k1, k2)) res
     end
   | Bind ((), _, _, e), SkipA annot ->
-    let res = infer' tenv env mono noninferred annot e in
+    let res = infer_iterated tenv env mono noninferred annot e in
     map_res (fun annot -> SkipA annot) res
   | Bind ((), v, _, e), EmptyA (annot_a, annot) ->
     let env = Env.add v empty env in
-    let res = infer' tenv env mono noninferred annot e in
+    let res = infer_iterated tenv env mono noninferred annot e in
     map_res (fun annot -> EmptyA (annot_a, annot)) res
   | Bind ((), v, a, e), DoA (t, annot_a, splits) ->
     let refinements = splits |> List.find_map (fun (s,_) ->

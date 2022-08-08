@@ -430,6 +430,7 @@ module type Subst = sig
     val compose_restr : t -> t -> t
     val combine : t -> t -> t
     val restrict : t -> TVarSet.t -> t
+    val remove : t -> TVarSet.t -> t
     val split : t -> TVarSet.t -> t * t
 end
 module Subst : Subst = struct
@@ -450,9 +451,11 @@ module Subst : Subst = struct
     let restrict s vars =
         let vars = TVarSet.inter (dom s) vars in
         vars |> TVarSet.destruct |> List.map (fun v -> (v, find s v)) |> construct
-    let split s vars =
+    let remove s vars =
         let nvars = TVarSet.diff (dom s) vars in
-        (restrict s vars, restrict s nvars)
+        restrict s nvars
+    let split s vars =
+        (restrict s vars, remove s vars)
 end
 
 let instantiate ss t =

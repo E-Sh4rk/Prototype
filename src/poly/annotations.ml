@@ -87,7 +87,9 @@ module Annot = struct
   | LambdaA lst ->
     let aux (ty, split) = (Subst.apply s ty, apply_subst_split s split) in
     LambdaA (List.map aux lst)
-  and apply_subst s t = match t with
+  and apply_subst s t =
+  if Subst.is_identity s then t
+  else match t with
   | VarA -> VarA
   | DoA (ty, a, split) ->
     DoA (Subst.apply s ty, apply_subst_a s a, apply_subst_split s split)

@@ -99,6 +99,7 @@ module type Subst = sig
     val compose_restr : t -> t -> t
     val combine : t -> t -> t
     val restrict : t -> TVarSet.t -> t
+    val remove : t -> TVarSet.t -> t
     val split : t -> TVarSet.t -> t * t
 end
 module Subst : Subst

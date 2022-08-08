@@ -178,6 +178,53 @@ let refine_a env mono a t = (* empty possibilites are often omitted *)
     [Env.construct [(v,s);(v1,t)] ; Env.construct [(v,neg s);(v2,t)]]
   | Let (_, v2) -> [Env.singleton v2 t]
 
+(* ===== VAR DEPENDENCY ANALYZER ===== *)
+
+let analyze_dependencies env e =
+  let fv = Msc.fv_e e in
+  let rec aux_a a =
+    match a with
+    | Abstract _ | Const _ -> (VarSet.empty, VarSet.empty)
+    | App (v1, v2) | RecordUpdate (v1, _, Some v2) | Let (v1, v2) | Pair (v1, v2) ->
+      let dep = VarSet.singleton v1 |> VarSet.add v2 in
+      (dep, dep)
+    | Projection (_, v) | RecordUpdate (v, _, None) ->
+      (VarSet.singleton v, VarSet.singleton v)
+    | Ite (v, s, v1, v2) ->
+      if VarSet.mem v fv
+      then
+        if Env.mem v env
+        then
+          let t = Env.find v env in
+          if is_empty t
+          then (VarSet.singleton v, VarSet.singleton v)
+          else if subtype t s
+          then
+            let dep = VarSet.singleton v |> VarSet.add v1 in
+            (dep, dep)
+          else if subtype t (neg s)
+          then
+            let dep = VarSet.singleton v |> VarSet.add v2 in
+            (dep, dep)
+          else (VarSet.singleton v, VarSet.singleton v)
+        else (VarSet.singleton v, VarSet.singleton v)
+      else (VarSet.singleton v, VarSet.singleton v |> VarSet.add v1 |> VarSet.add v2)
+    | Lambda ((), _, _, e) -> aux e
+  and aux e =
+    match e with
+    | Var v -> (VarSet.singleton v, VarSet.singleton v)
+    | Bind ((), v, a, e) ->
+      let (req, opt) = aux e in
+      if VarSet.mem v opt
+      then
+        let (req_a, opt_a) = aux_a a in
+        if VarSet.mem v req
+        then (VarSet.union req req_a, VarSet.union opt opt_a)
+        else (req, VarSet.union opt opt_a)
+      else (req, opt)
+  in
+  aux e
+
 (* ===== INFER ===== *)
 
 let typeof_a_nofail pos tenv env mono annot_a a =
@@ -373,8 +420,13 @@ and infer' tenv env mono noninferred annot e =
   | Var v, VarA -> if Env.mem v env then Ok(VarA) else fail
   | Bind ((), v, a, e), UnkA (annot_a, s, k1, k2) ->
     let pos = Variable.get_locations v in
-    (* TODO: static analysis on the body in order to be lazy *)
-    let res = infer_a_iterated pos tenv env mono noninferred annot_a a in
+    let (req, opt) = analyze_dependencies env e in
+    (* Note: optimisation *)
+    let skippable = VarSet.mem v req |> not in
+    let skipped = skippable && (VarSet.mem v opt |> not) in
+    let res =
+      if skipped then fail
+      else infer_a_iterated pos tenv env mono noninferred annot_a a in
     begin match res, k1 with
     | Ok annot_a, _ ->
       let t = typeof_a_nofail pos tenv env mono annot_a a in
@@ -388,7 +440,7 @@ and infer' tenv env mono noninferred annot e =
         infer' tenv env mono noninferred annot e
       | _, _ , _-> fail
       end
-    | Subst lst, Some k1 when
+    | Subst lst, Some k1 when skippable &&
       lst |> List.for_all (fun (subst,_) -> Subst.is_identity subst |> not) ->
       let res = lst |> List.map (fun (subst, annot_a) ->
         (subst, UnkA (annot_a, s, Some k1, k2))) in

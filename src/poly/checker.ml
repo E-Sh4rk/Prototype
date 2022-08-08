@@ -123,5 +123,19 @@ and typeof_splits tenv env mono v splits e =
   else raise (Untypeable (pos, "Invalid split: does not cover the whole domain."))
 
 and typeof tenv env mono annot e =
-  ignore (tenv, env, mono, annot, e, typeof) ;
-  failwith "TODO"
+  begin match e, annot with
+  | Var v, VarA -> var_type (Variable.get_locations v) v env
+  | Bind (_, v, a, e), EmptyA (annot_a, annot) ->
+    let t = typeof_a (Variable.get_locations v) tenv env mono annot_a a in
+    let env = Env.add v t env in
+    if subtype t empty
+    then typeof tenv env mono annot e
+    else raise (Untypeable ([], "Invalid binding: does not cover the whole domain."))
+  | Bind (_, v, a, e), DoA (_, annot_a, annot_split) ->
+    let t = typeof_a (Variable.get_locations v) tenv env mono annot_a a in
+    let env = Env.add v t env in
+    typeof_splits tenv env mono v annot_split e
+  | Bind (_, _, _, e), SkipA (annot) -> typeof tenv env mono annot e
+  | _, _ -> raise (Untypeable ([], "Invalid annotations."))
+  end
+  |> clean_type ~pos:empty ~neg:any mono |> simplify_typ

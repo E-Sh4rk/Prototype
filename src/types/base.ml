@@ -254,6 +254,7 @@ type subst = CD.Types.Subst.t
 module type Subst = sig
   type t = subst
   val construct : (var * typ) list -> t
+  val identity : t
   val is_identity : t -> bool
   val dom : t -> TVarSet.t
   val mem : t -> var -> bool
@@ -272,6 +273,7 @@ module Subst = struct
   let normalize = CD.Var.Map.filter (fun v t -> is_id (v,t) |> not)
   let construct lst =
     lst |> CD.Types.Subst.from_list |> normalize
+  let identity = CD.Types.Subst.from_list []
   let destruct = CD.Var.Map.get
   let is_identity t = destruct t |> List.for_all is_id
   let apply = CD.Types.Subst.apply

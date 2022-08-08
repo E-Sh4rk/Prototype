@@ -85,7 +85,7 @@ let rec typeof_a pos tenv env mono annot_a a =
     else raise (Untypeable (pos, "Invalid application: not a function."))
   | Ite (v, s, v1, v2), IteA ss ->
     let t = var_type pos v env |> instantiate_check pos mono ss in
-    if subtype t empty
+    if is_empty t
     then empty
     else if subtype t s
     then var_type pos v1 env
@@ -129,7 +129,7 @@ and typeof tenv env mono annot e =
   | Bind (_, v, a, e), EmptyA (annot_a, annot) ->
     let t = typeof_a (Variable.get_locations v) tenv env mono annot_a a in
     let env = Env.add v t env in
-    if subtype t empty
+    if is_empty t
     then typeof tenv env mono annot e
     else raise (Untypeable ([], "Invalid binding: does not cover the whole domain."))
   | Bind (_, v, a, e), DoA (_, annot_a, annot_split) ->
@@ -180,10 +180,16 @@ let refine_a env mono a t = (* empty possibilites are often omitted *)
 
 (* ===== INFER ===== *)
 
+let typeof_a_nofail pos tenv env mono annot_a a =
+  try typeof_a pos tenv env mono annot_a a
+  with Untypeable _ -> assert false
+
 type 'a result =
   | Ok of 'a
   | Split of (Env.t * 'a) list
   | Subst of (Subst.t * 'a) list
+
+let fail = Subst []
 
 let map_res f res =
   match res with
@@ -227,8 +233,36 @@ and infer_splits' tenv env mono noninferred v splits e =
   aux splits
 
 and infer' tenv env mono noninferred annot e =
-  ignore (refine_a, infer_a', tenv, env, mono, noninferred, annot, e) ;
-  failwith "TODO"
+  match e, annot with
+  | Var v, VarA -> if Env.mem v env then Ok(VarA) else fail
+  | Bind ((), v, a, e), UnkA (annot_a, s, k1, k2) ->
+    let pos = Variable.get_locations v in
+    let res = infer_a' pos tenv env mono noninferred annot_a a in
+    begin match res, k1 with
+    | Ok annot_a, _ ->
+      let t = typeof_a_nofail pos tenv env mono annot_a a in
+      let e = Bind ((), v, a, e) in
+      begin match s, k2, is_empty t with
+      | _, Some annot, true ->
+        let annot = EmptyA (annot_a, annot) in
+        infer' tenv env mono noninferred annot e
+      | Some splits, _, false ->
+        let annot = DoA (t, annot_a, splits) in
+        infer' tenv env mono noninferred annot e
+      | _, _ , _-> fail
+      end
+    | Subst lst, Some k1 when
+      lst |> List.for_all (fun (subst,_) -> Subst.is_identity subst |> not) ->
+      let res = lst |> List.map (fun (subst, annot_a) ->
+        (subst, UnkA (annot_a, s, Some k1, k2))) in
+      Subst ((Subst.identity, SkipA k1)::res)
+    | res, _ ->
+      map_res (fun annot_a -> UnkA (annot_a, s, k1, k2)) res
+    end
+  | Bind ((), v, a, e), SkipA annot -> failwith "TODO"
+  | Bind ((), v, a, e), EmptyA (annot_a, annot) -> failwith "TODO"
+  | Bind ((), v, a, e), DoA (t, annot_a, splits) -> failwith "TODO"
+  | _, _ -> assert false
 
 and infer_a_iterated pos tenv env mono noninferred annot_a a =
   match infer_a' pos tenv env mono noninferred annot_a a with

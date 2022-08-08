@@ -199,6 +199,14 @@ let map_res f res =
   | Subst lst ->
     Subst (lst |> List.map (fun (s,a) -> (s, f a)))
 
+let complete default_annot res =
+  match res with
+  | Subst lst ->
+    if List.for_all (fun (sigma, _) -> Subst.is_identity sigma |> not) lst
+    then Subst ((Subst.identity, default_annot)::lst)
+    else res
+  | _ -> assert false
+
 let rec infer_a' pos tenv env mono noninferred annot_a a =
   let simple_constraint_infer v s =
     if Env.mem v env
@@ -272,6 +280,18 @@ let rec infer_a' pos tenv env mono noninferred annot_a a =
       then Ok (AppA (sigma1, sigma2))
       else fail
     else fail
+  | Ite (v, s, _, _), IteA [] ->
+    if Env.mem v env
+    then
+      let t = Env.find v env in
+      if (subtype t s || subtype t (neg s)) |> not
+      then Split [(Env.singleton v s, IteA []) ; (Env.singleton v (neg s), IteA [])]
+      else
+        let res = simple_constraint_infer v empty in
+        map_res (fun sigma -> IteA sigma) res
+        |> complete (IteA [Subst.identity])
+    else fail
+  | Ite (v, s, v1, v2), IteA sigma -> failwith "TODO"
   | _, _ -> assert false
 
 and infer_splits' tenv env mono noninferred v splits e =

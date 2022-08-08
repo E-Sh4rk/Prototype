@@ -224,7 +224,7 @@ let rec infer_a' pos tenv env mono noninferred annot_a a =
   in
   match a, annot_a with
   | Abstract _, NoneA | Const _, NoneA -> Ok NoneA
-  | Pair (v1, v2), NoneA ->
+  | Pair (v1, v2), NoneA | Let (v1, v2), NoneA ->
     if Env.mem v1 env && Env.mem v2 env
     then Ok NoneA else fail
   | Projection (Parsing.Ast.Field label, v), ProjA [] ->
@@ -291,7 +291,15 @@ let rec infer_a' pos tenv env mono noninferred annot_a a =
         map_res (fun sigma -> IteA sigma) res
         |> complete (IteA [Subst.identity])
     else fail
-  | Ite (v, s, v1, v2), IteA sigma -> failwith "TODO"
+  | Ite (v, s, v1, v2), IteA sigma ->
+    if Env.mem v env
+    then
+      let t = instantiate sigma (Env.find v env) in
+      if is_empty t then Ok (IteA sigma)
+      else if subtype t s && Env.mem v1 env then Ok (IteA sigma)
+      else if subtype t (neg s) && Env.mem v2 env then Ok (IteA sigma)
+      else fail
+    else fail
   | _, _ -> assert false
 
 and infer_splits' tenv env mono noninferred v splits e =

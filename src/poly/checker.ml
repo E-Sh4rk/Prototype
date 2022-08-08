@@ -222,6 +222,32 @@ let rec infer_a' pos tenv env mono noninferred annot_a a =
   let simple_constraint_check v s sigma =
     Env.mem v env && subtype (instantiate sigma (Env.find v env)) s
   in
+  let lambda v branches e =
+    let rec aux branches =
+      match branches with
+      | [] -> Ok []
+      | (s, splits)::branches ->
+        begin match aux branches with
+        | Ok (branches) ->
+          let env = Env.add v s env in
+          let mono = TVarSet.union mono (vars s) in
+          begin match infer_splits' tenv env mono noninferred v splits e with
+          | Subst lst ->
+            (*let res =
+              lst |> List.map (fun (env', annot) ->
+                let env' = Env.strengthen v s env' in
+                (Env.rm v env', (Env.find v env', annot)))
+              |> regroup Env.equiv
+            in
+            map_res (fun splits' -> splits'@splits) (Split res)*)
+            failwith "TODO"
+          | res -> map_res (fun splits -> (s, splits)::branches) res
+          end
+        | res -> map_res (fun branches -> (s, splits)::branches) res
+        end  
+    in
+    aux branches
+  in
   match a, annot_a with
   | Abstract _, NoneA | Const _, NoneA -> Ok NoneA
   | Pair (v1, v2), NoneA | Let (v1, v2), NoneA ->
@@ -300,6 +326,14 @@ let rec infer_a' pos tenv env mono noninferred annot_a a =
       else if subtype t (neg s) && Env.mem v2 env then Ok (IteA sigma)
       else fail
     else fail
+  | Lambda ((), _, v, e), LambdaA branches ->
+    let branches = branches |> List.filter (fun (s, _) -> is_empty s |> not) in
+    begin match branches with
+    | [] -> fail
+    | branches ->
+      lambda v branches e
+      |> map_res (fun branches -> LambdaA branches)
+    end
   | _, _ -> assert false
 
 and infer_splits' tenv env mono noninferred v splits e =

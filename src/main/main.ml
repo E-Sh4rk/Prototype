@@ -16,6 +16,7 @@ let print_result str =
   Format.fprintf !std_fmt "%s@?" str
 
 let use_poly () = true
+let compare_to_popl () = false
 
 let type_check_program
   (program:Ast.parser_program) (pr:string -> unit) pr_ill_typed =
@@ -32,8 +33,11 @@ let type_check_program
       let tmp_log = !Utils.log_enabled in
       Utils.log_enabled := false ;
       let typ_legacy =
-        try Some (Legacy.Old_checker.typeof_simple_legacy tenv env nf_expr_ann)
-        with Legacy.Old_checker.Ill_typed _ -> None
+        if compare_to_popl ()
+        then
+          try Some (Legacy.Old_checker.typeof_simple_legacy tenv env nf_expr_ann)
+          with Legacy.Old_checker.Ill_typed _ -> None
+        else None
       in
       Utils.log_enabled := tmp_log ;
       try
@@ -51,25 +55,28 @@ let type_check_program
         let env = Env.add var typ env in
         Format.ksprintf pr "%s (checked in %.02fms (msc:%.02fms, type:%.02fms))\n" 
           (string_of_type typ) time msc_time typ_time;
-        begin match typ_legacy with
-        | None -> Format.ksprintf pr "===== Good news: Was untypable with POPL22 system =====\n" 
-        | Some t ->
-          if subtype typ t |> not
-          then (
-            Format.ksprintf pr "===== Warning: Not better than the type obtained by POPL22 system =====\nType was: %s\n"
-            (string_of_type t)
-            (*; Format.printf "%a@." pp_e nf_expr*)
-          )
-        end ;
+        if compare_to_popl () then
+          begin match typ_legacy with
+          | None -> Format.ksprintf pr "===== Good news: Was untypable with POPL22 system =====\n" 
+          | Some t ->
+            if subtype typ t |> not
+            then (
+              Format.ksprintf pr "===== Warning: Not better than the type obtained by POPL22 system =====\nType was: %s\n"
+              (string_of_type t)
+              (*; Format.printf "%a@." pp_e nf_expr*)
+            )
+          end ;
         (varm, env)
-      with Legacy.Checker.Ill_typed (pos, str) ->
+      with Legacy.Checker.Ill_typed (pos, str)
+      | Poly.Checker.Untypeable (pos, str) ->
         (*Format.printf "%a@." pp_e nf_expr ;*)
         pr_ill_typed (pos, str);
-        begin match typ_legacy with
-        | None -> ()
-        | Some t ->
-          Format.ksprintf pr "===== Warning: Was typable with POPL22 system =====\nType was: %s\n" (string_of_type t)
-        end ;
+        if compare_to_popl () then
+          begin match typ_legacy with
+          | None -> ()
+          | Some t ->
+            Format.ksprintf pr "===== Warning: Was typable with POPL22 system =====\nType was: %s\n" (string_of_type t)
+          end ;
         (varm,env)
       end
     in

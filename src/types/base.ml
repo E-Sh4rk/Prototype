@@ -12,6 +12,7 @@ let register s =
   CD.Types.Print.register_global "" (Ns.Uri.mk (U.mk ""), U.mk s) ?params:None
 let pp_typ = CD.Types.Print.print_noname
 let show_typ t = Format.asprintf "%a" pp_typ t
+let pp_var = CD.Var.print
 
 let pp = pp_typ
 let string_of_type = CD.Types.Print.to_string

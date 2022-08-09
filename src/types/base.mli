@@ -7,6 +7,7 @@ type var = CD.Var.t
 
 val pp_typ : Format.formatter -> typ -> unit
 val show_typ : typ -> string
+val pp_var : Format.formatter -> var -> unit
 
 val register : string -> typ -> unit
 val pp : Format.formatter -> typ -> unit

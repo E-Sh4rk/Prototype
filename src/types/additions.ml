@@ -487,12 +487,16 @@ let fresh mono t =
 
 let tallying_infer poly noninfered constr =
     assert (TVarSet.inter poly noninfered |> TVarSet.is_empty) ;
+    Utils.log "Tallying (inference) instance initiated...@?" ;
     let var_order = TVarSet.destruct poly in
-    tallying ~var_order noninfered constr
+    let res = tallying ~var_order noninfered constr in
+    Utils.log " Done (%i sol).@." (List.length res) ; res
 
 let tallying mono constr =
+    Utils.log "Tallying (no inference) instance initiated...@?" ;
     let var_order = [] in
-    tallying ~var_order mono constr
+    let res = tallying ~var_order mono constr in
+    Utils.log " Done (%i sol).@." (List.length res) ; res
 
 let subtype_poly mono t1 t2 =
     let (xs, _, t) = fresh mono t2 in

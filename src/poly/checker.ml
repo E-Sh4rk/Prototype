@@ -259,6 +259,10 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     if Env.mem v env
     then
       let (vs,tsubst,t) = fresh mono (Env.find v env) in
+      let log_delta =
+        TVarSet.inter noninferred (vars t) |> TVarSet.destruct in
+      log "Simple constraint: solving %a <= %a with delta=%a@."
+        pp_typ t pp_typ s (pp_list pp_var) log_delta ;
       let res = tallying_infer vs noninferred [(t, s)] in
       let res = res |> List.map (fun sol ->
         (Subst.restrict sol mono, Subst.compose (Subst.restrict sol vs) tsubst)
@@ -341,8 +345,14 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
       let alpha = fresh_var () in
       let poly = TVarSet.union vs1 vs2 |> TVarSet.add alpha in
       let arrow_typ = mk_arrow (cons t2) (cons (var_typ alpha)) in
-      let res = tallying_infer poly noninferred [(t1, arrow_typ)] in
-      let res = res |> List.map (fun sol ->
+      let log_delta =
+        TVarSet.inter noninferred (TVarSet.union (vars t1) (vars arrow_typ))
+        |> TVarSet.destruct in
+      log "Application: solving %a <= %a with delta=%a@."
+        pp_typ t1 pp_typ arrow_typ (pp_list pp_var) log_delta ;
+      let res =
+        tallying_infer poly noninferred [(t1, arrow_typ)]
+        |> List.map (fun sol ->
         let poly_part =
           (Subst.compose (Subst.restrict sol vs1) subst1,
            Subst.compose (Subst.restrict sol vs2) subst2)

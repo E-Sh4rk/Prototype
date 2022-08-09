@@ -290,7 +290,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
               lst |> List.map (fun (sigma, splits) ->
                 let sigmaxs = Subst.restrict sigma xs in
                 (Subst.remove sigma xs,
-                (Subst.apply sigmaxs s, Annot.apply_subst_split sigmaxs splits)))
+                (Subst.apply_simplify sigmaxs s, Annot.apply_subst_split sigmaxs splits)))
               |> regroup Subst.equiv
             in
             map_res (fun splits -> splits@branches) (Subst res)

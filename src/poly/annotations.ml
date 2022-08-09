@@ -77,7 +77,7 @@ module Annot = struct
       [@@deriving show]
 
   let rec apply_subst_split s lst =
-    lst |> List.map (fun (ty,t) -> (Subst.apply s ty, apply_subst s t))
+    lst |> List.map (fun (ty,t) -> (Subst.apply_simplify s ty, apply_subst s t))
   and apply_subst_a s a = match a with
   | NoneA -> NoneA
   | ProjA ss -> ProjA (apply_subst_substs s ss)
@@ -85,14 +85,14 @@ module Annot = struct
   | AppA (ss1, ss2) -> AppA (apply_subst_substs s ss1, apply_subst_substs s ss2)
   | RecordUpdateA ss -> RecordUpdateA (apply_subst_substs s ss)
   | LambdaA lst ->
-    let aux (ty, split) = (Subst.apply s ty, apply_subst_split s split) in
+    let aux (ty, split) = (Subst.apply_simplify s ty, apply_subst_split s split) in
     LambdaA (List.map aux lst)
   and apply_subst s t =
   if Subst.is_identity s then t
   else match t with
   | VarA -> VarA
   | DoA (ty, a, split) ->
-    DoA (Subst.apply s ty, apply_subst_a s a, apply_subst_split s split)
+    DoA (Subst.apply_simplify s ty, apply_subst_a s a, apply_subst_split s split)
   | SkipA t -> SkipA (apply_subst s t)
   | EmptyA (a,t) -> EmptyA (apply_subst_a s a, apply_subst s t)
   | UnkA (a, so, to1, to2) ->

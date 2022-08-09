@@ -432,6 +432,7 @@ module type Subst = sig
     val restrict : t -> TVarSet.t -> t
     val remove : t -> TVarSet.t -> t
     val split : t -> TVarSet.t -> t * t
+    val apply_simplify : t -> typ -> typ
 end
 module Subst : Subst = struct
     include Subst
@@ -456,6 +457,9 @@ module Subst : Subst = struct
         restrict s nvars
     let split s vars =
         (restrict s vars, remove s vars)
+    let apply_simplify s t =
+        if TVarSet.inter (Subst.dom s) (vars t) |> TVarSet.is_empty
+        then t else Subst.apply s t |> simplify_typ
 end
 
 let next_var_name = ref 0

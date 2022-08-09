@@ -101,6 +101,7 @@ module type Subst = sig
     val restrict : t -> TVarSet.t -> t
     val remove : t -> TVarSet.t -> t
     val split : t -> TVarSet.t -> t * t
+    val apply_simplify : t -> typ -> typ
 end
 module Subst : Subst
 val fresh_var : unit -> var

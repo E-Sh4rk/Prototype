@@ -386,11 +386,11 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     if (subtype t s || subtype t (neg s)) |> not
     then Split [(Env.singleton v s, IteA []) ; (Env.singleton v (neg s), IteA [])]
     else
-      (* TODO: Enable this again when we manage to optimize it. *)
-      (*let res = simple_constraint_infer v "typecase" empty in
+      (* TODO: Find an optimisation... *)
+      let res = simple_constraint_infer v "typecase" empty in
       map_res (fun sigma -> IteA sigma) res
-      |> complete (IteA [Subst.identity])*)
-      Subst [(Subst.identity, IteA [Subst.identity])]
+      |> complete (IteA [Subst.identity])
+      (*Subst [(Subst.identity, IteA [Subst.identity])]*)
   | Ite (v, s, v1, v2), IteA sigma ->
     need_var v "typecase" ;
     let t = instantiate sigma (Env.find v env) in
@@ -399,7 +399,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     else if subtype t (neg s) then (need_var v2 "typecase" ; Ok (IteA sigma))
     else assert false
   | Lambda ((), ua, v, e), LambdaA branches ->
-    let branches = branches |> List.filter (fun (s, _) -> is_empty s |> not) in
+    let branches = branches |> remove_redundant_branches in
     begin match branches with
     | [] ->
       log "Untypeable lambda for %s (no branch left).@." (Variable.show v) ;

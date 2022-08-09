@@ -26,6 +26,30 @@ let regroup equiv res =
   let aux acc (k, o) = add_if_equiv [] acc k o in
   List.fold_left aux [] res
 
+let remove_redundant_branches lst =
+  let rec is_useful s rs others =
+    if is_empty rs then false
+    else match others with
+    | [] -> true
+    | o::others ->
+      if subtype o s
+      then is_useful s (diff rs o) others
+      else is_useful s rs others
+  in
+  let rec aux treated current =
+    match current with
+    | [] -> treated
+    | (s,v)::current ->
+      let others = treated@current |> List.map fst in
+      if is_useful s s others
+      then aux ((s,v)::treated) current
+      else aux treated current
+  in
+  aux [] lst
+
+let remove_empty_branches lst =
+  lst |> List.filter (fun (s,_) -> non_empty s)
+
 module Refinements = struct
   type t = Env.t list
   let dom lst =

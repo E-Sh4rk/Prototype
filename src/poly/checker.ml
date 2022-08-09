@@ -258,25 +258,30 @@ let complete default_annot res =
     else res
   | _ -> assert false
 
+exception NeedVar of (Variable.t * string)
+let need_var env v str =
+  if Env.mem v env |> not
+  then raise (NeedVar (v, str))
+
 let rec infer_a' _ tenv env mono noninferred annot_a a =
-  let simple_constraint_infer v s =
-    if Env.mem v env
-    then
-      let (vs,tsubst,t) = fresh mono (Env.find v env) in
-      let log_delta =
-        TVarSet.inter noninferred (vars t) |> TVarSet.destruct in
-      log "Simple constraint: solving %a <= %a with delta=%a@."
-        pp_typ t pp_typ s (pp_list pp_var) log_delta ;
-      let res = tallying_infer vs noninferred [(t, s)] in
-      let res = res |> List.map (fun sol ->
-        (Subst.restrict sol mono, Subst.compose (Subst.restrict sol vs) tsubst)
-      ) |> regroup Subst.equiv in
-      Subst res
-    else fail
+  let need_var = need_var env in
+  let simple_constraint_infer v str s =
+    need_var v str ;
+    let (vs,tsubst,t) = fresh mono (Env.find v env) in
+    let log_delta =
+      TVarSet.inter noninferred (vars t) |> TVarSet.destruct in
+    log "Simple constraint: solving %a <= %a with delta=%a@."
+      pp_typ t pp_typ s (pp_list pp_var) log_delta ;
+    let res = tallying_infer vs noninferred [(t, s)] in
+    let res = res |> List.map (fun sol ->
+      (Subst.restrict sol mono, Subst.compose (Subst.restrict sol vs) tsubst)
+    ) |> regroup Subst.equiv in
+    Subst res
   in
-  let simple_constraint_check v s sigma =
+  let simple_constraint_check v str s sigma =
+    need_var v str ;
     log "Simple constraint: checking substitutions...@." ;
-    Env.mem v env && subtype (instantiate sigma (Env.find v env)) s
+    subtype (instantiate sigma (Env.find v env)) s
   in
   let lambda ~inferred v branches e =
     Utils.log "Lambda for %s entered with %i branches.@."
@@ -314,106 +319,100 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     let res = aux branches in
     Utils.log "Lambda for %s exited.@." (Variable.show v) ; res
   in
-  match a, annot_a with
+  try match a, annot_a with
   | Abstract _, NoneA | Const _, NoneA -> Ok NoneA
   | Pair (v1, v2), NoneA | Let (v1, v2), NoneA ->
-    if Env.mem v1 env && Env.mem v2 env
-    then Ok NoneA else fail
+    need_var v1 "pair" ; need_var v2 "pair" ; Ok NoneA
   | Projection (Parsing.Ast.Field label, v), ProjA [] ->
-    let res = simple_constraint_infer v (record_any_with label) in
+    let res = simple_constraint_infer v "projection" (record_any_with label) in
     map_res (fun sigma -> ProjA sigma) res
   | Projection (Parsing.Ast.Field label, v), ProjA sigma ->
-    if simple_constraint_check v (record_any_with label) sigma
-    then Ok (ProjA sigma) else fail
+    if simple_constraint_check v "projection" (record_any_with label) sigma
+    then Ok (ProjA sigma) else assert false
   | Projection (_, v), ProjA [] ->
-    let res = simple_constraint_infer v pair_any in
+    let res = simple_constraint_infer v "projection" pair_any in
     map_res (fun sigma -> ProjA sigma) res
   | Projection (_, v), ProjA sigma ->
-    if simple_constraint_check v pair_any sigma
-    then Ok (ProjA sigma) else fail
+    if simple_constraint_check v "projection" pair_any sigma
+    then Ok (ProjA sigma) else assert false
   | RecordUpdate (v, _, o), RecordUpdateA [] ->
-    begin match o with
-    | Some v' when Env.mem v' env |> not -> fail
-    | _ ->
-      let res = simple_constraint_infer v record_any in
-      map_res (fun sigma -> RecordUpdateA sigma) res
-    end
+    (match o with None -> () | Some v' -> need_var v' "record update") ;
+    let res = simple_constraint_infer v "record update" record_any in
+    map_res (fun sigma -> RecordUpdateA sigma) res
   | RecordUpdate (v, _, o), RecordUpdateA sigma ->
-    begin match o with
-    | Some v' when Env.mem v' env |> not -> fail
-    | _ ->
-      if simple_constraint_check v record_any sigma
-      then Ok (RecordUpdateA sigma) else fail
-    end
+    (match o with None -> () | Some v' -> need_var v' "record update") ;
+    if simple_constraint_check v "record update" record_any sigma
+    then Ok (RecordUpdateA sigma) else assert false
   | App (v1, v2), AppA ([], []) ->
-    if Env.mem v1 env && Env.mem v2 env
-    then
-      let (vs1,subst1,t1) = fresh mono (Env.find v1 env) in
-      let (vs2,subst2,t2) = fresh mono (Env.find v2 env) in
-      let alpha = fresh_var () in
-      let poly = TVarSet.union vs1 vs2 |> TVarSet.add alpha in
-      let arrow_typ = mk_arrow (cons t2) (cons (var_typ alpha)) in
-      let log_delta =
-        TVarSet.inter noninferred (TVarSet.union (vars t1) (vars arrow_typ))
-        |> TVarSet.destruct in
-      log "Application: solving %a <= %a with delta=%a@."
-        pp_typ t1 pp_typ arrow_typ (pp_list pp_var) log_delta ;
-      let res =
-        tallying_infer poly noninferred [(t1, arrow_typ)]
-        |> List.map (fun sol ->
-        let poly_part =
-          (Subst.compose (Subst.restrict sol vs1) subst1,
-           Subst.compose (Subst.restrict sol vs2) subst2)
-        in
-        let mono_part = Subst.restrict sol mono in
-        (* log "%a@." Subst.pp (fst poly_part) ;
-        log "%a@." Subst.pp (snd poly_part) ;
-        log "%a@." Subst.pp (mono_part) ; *)
-        (mono_part, poly_part)
-      ) |> regroup Subst.equiv in
-      Subst res |> map_res (fun sigmas -> AppA (List.split sigmas))
-    else fail
+    need_var v1 "application" ;
+    need_var v2 "application" ;
+    let (vs1,subst1,t1) = fresh mono (Env.find v1 env) in
+    let (vs2,subst2,t2) = fresh mono (Env.find v2 env) in
+    let alpha = fresh_var () in
+    let poly = TVarSet.union vs1 vs2 |> TVarSet.add alpha in
+    let arrow_typ = mk_arrow (cons t2) (cons (var_typ alpha)) in
+    let log_delta =
+      TVarSet.inter noninferred (TVarSet.union (vars t1) (vars arrow_typ))
+      |> TVarSet.destruct in
+    log "Application: solving %a <= %a with delta=%a@."
+      pp_typ t1 pp_typ arrow_typ (pp_list pp_var) log_delta ;
+    let res =
+      tallying_infer poly noninferred [(t1, arrow_typ)]
+      |> List.map (fun sol ->
+      let poly_part =
+        (Subst.compose (Subst.restrict sol vs1) subst1,
+          Subst.compose (Subst.restrict sol vs2) subst2)
+      in
+      let mono_part = Subst.restrict sol mono in
+      (* log "%a@." Subst.pp (fst poly_part) ;
+      log "%a@." Subst.pp (snd poly_part) ;
+      log "%a@." Subst.pp (mono_part) ; *)
+      (mono_part, poly_part)
+    ) |> regroup Subst.equiv in
+    Subst res |> map_res (fun sigmas -> AppA (List.split sigmas))
   | App (v1, v2), AppA (sigma1, sigma2) ->
-    if Env.mem v1 env && Env.mem v2 env
-    then begin
-      log "Application: checking substitutions...@." ;
-      let t1 = instantiate sigma1 (Env.find v1 env) in
-      let t2 = instantiate sigma2 (Env.find v2 env) in
-      let arrow_type = (mk_arrow (cons t2) any_node) in
-      if subtype t1 arrow_type
-      then (Ok (AppA (sigma1, sigma2)))
-      else (log "WARNING: check failed@."; fail)
-    end else fail
+    need_var v1 "application" ;
+    need_var v2 "application" ;
+    log "Application: checking substitutions...@." ;
+    let t1 = instantiate sigma1 (Env.find v1 env) in
+    let t2 = instantiate sigma2 (Env.find v2 env) in
+    let arrow_type = (mk_arrow (cons t2) any_node) in
+    if subtype t1 arrow_type
+    then (Ok (AppA (sigma1, sigma2)))
+    else assert false
   | Ite (v, s, _, _), IteA [] ->
-    if Env.mem v env
-    then
-      let t = Env.find v env in
-      if (subtype t s || subtype t (neg s)) |> not
-      then Split [(Env.singleton v s, IteA []) ; (Env.singleton v (neg s), IteA [])]
-      else
-        let res = simple_constraint_infer v empty in
-        map_res (fun sigma -> IteA sigma) res
-        |> complete (IteA [Subst.identity])
-    else fail
+    need_var v "typecase" ;
+    let t = Env.find v env in
+    if (subtype t s || subtype t (neg s)) |> not
+    then Split [(Env.singleton v s, IteA []) ; (Env.singleton v (neg s), IteA [])]
+    else
+      (* TODO: Enable this again when we manage to optimize it. *)
+      (*let res = simple_constraint_infer v "typecase" empty in
+      map_res (fun sigma -> IteA sigma) res
+      |> complete (IteA [Subst.identity])*)
+      Subst [(Subst.identity, IteA [Subst.identity])]
   | Ite (v, s, v1, v2), IteA sigma ->
-    if Env.mem v env
-    then
-      let t = instantiate sigma (Env.find v env) in
-      if is_empty t then Ok (IteA sigma)
-      else if subtype t s && Env.mem v1 env then Ok (IteA sigma)
-      else if subtype t (neg s) && Env.mem v2 env then Ok (IteA sigma)
-      else fail
-    else fail
+    need_var v "typecase" ;
+    let t = instantiate sigma (Env.find v env) in
+    if is_empty t then Ok (IteA sigma)
+    else if subtype t s then (need_var v1 "typecase" ; Ok (IteA sigma))
+    else if subtype t (neg s) then (need_var v2 "typecase" ; Ok (IteA sigma))
+    else assert false
   | Lambda ((), ua, v, e), LambdaA branches ->
     let branches = branches |> List.filter (fun (s, _) -> is_empty s |> not) in
     begin match branches with
-    | [] -> fail
+    | [] ->
+      log "Untypeable lambda for %s (no branch left).@." (Variable.show v) ;
+      fail
     | branches ->
       let inferred = ua = Parsing.Ast.Unnanoted in
       lambda ~inferred v branches e
       |> map_res (fun branches -> LambdaA branches)
     end
   | _, _ -> assert false
+  with
+  | NeedVar (v, str) ->
+    log "Untypeable %s (---> need %s)" (Variable.show v) str ; fail
 
 and infer_splits' tenv env mono noninferred v splits e =
   let t = Env.find v env in
@@ -449,13 +448,16 @@ and infer_splits' tenv env mono noninferred v splits e =
 
 and infer' tenv env mono noninferred annot e =
   match e, annot with
-  | Var v, VarA -> if Env.mem v env then Ok(VarA) else fail
+  | Var v, VarA ->
+    if Env.mem v env then Ok(VarA)
+    else (log "Untypeable expression (--> need %s)@." (Variable.show v) ; fail)
   | Bind ((), v, a, e), UnkA (annot_a, s, k1, k2) ->
     let pos = Variable.get_locations v in
     let (req, opt) = analyze_dependencies env e in
     (* Note: optimisation *)
     let skippable = VarSet.mem v req |> not in
     let skipped = skippable && (VarSet.mem v opt |> not) in
+    (*let (skippable, skipped) = (skippable || true, skipped && false) in*)
     let res =
       if skipped then fail
       else begin
@@ -474,7 +476,8 @@ and infer' tenv env mono noninferred annot e =
       | Some splits, _, false ->
         let annot = DoA (t, annot_a, splits) in
         infer' tenv env mono noninferred annot e
-      | _, _ , _-> fail
+      | _, _ , _->
+        log "Definition is typeable, but its type cannot be handled.@." ; fail
       end
     | Subst lst, Some k1 when skippable &&
       lst |> List.for_all (fun (subst,_) -> Subst.is_identity subst |> not) ->

@@ -1,16 +1,4 @@
 
-(* TODO: Investigate weird union for foo_highord1_wrong *)
-
-let foo_highord1_wrong = fun f -> f 3                                
-
-let foo_highord2_wrong = fun f -> (f 3 , f true)                           
-                           
-let foo_highord3_wrong = fun f -> f (f 3)                           
-
-let foo_highord4_wrong = fun f -> (f f) 3                           
-
-let foo_highord5_wrong = fun f -> (f (f 3) , f true)                           
-
 (* TODO: Why is it so long on test_1? *)
 
 let lnot = fun a ->

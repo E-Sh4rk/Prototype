@@ -368,10 +368,11 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
   | App (v1, v2), AppA (sigma1, sigma2) ->
     if Env.mem v1 env && Env.mem v2 env
     then begin
-      log "Application: checking substitutions...@.";
+      log "Application: checking substitutions...@." ;
       let t1 = instantiate sigma1 (Env.find v1 env) in
       let t2 = instantiate sigma2 (Env.find v2 env) in
-      if subtype t1 (mk_arrow (cons t2) any_node)
+      let arrow_type = (mk_arrow (cons t2) any_node) in
+      if subtype t1 arrow_type
       then (Ok (AppA (sigma1, sigma2)))
       else (log "WARNING: check failed@."; fail)
     end else fail

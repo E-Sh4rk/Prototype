@@ -302,10 +302,11 @@ let simplify_full_dnf dnf =
     List.map regroup_conjuncts dnf
 
 let simplify_typ t =
+    (*Utils.log "Simplifying type...@?" ;*)
     let arrow = t |> full_dnf |> simplify_full_dnf |> List.map full_branch_type |> disj in
     let non_arrow = diff t arrow_any in
     let res = cup arrow non_arrow (*|> normalize_typ*) in
-    assert (equiv res t) ; res
+    assert (equiv res t) (*; Utils.log " Done.@."*) ; res
 
 let remove_negative_arrows t =
     let pos_arrow = t |> dnf |> List.map branch_type |> disj in

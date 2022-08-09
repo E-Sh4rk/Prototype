@@ -40,8 +40,8 @@ let type_check_program
         else None
       in
       Utils.log_enabled := tmp_log ;
-      try
-        (*Format.printf "%a@." pp_e nf_expr ;*)
+      try begin
+        Utils.log "%a@." Poly.Msc.pp_e nf_expr ;
         let typ =
           if use_poly ()
           then Poly.Checker.typeof_simple tenv env TVarSet.empty nf_expr
@@ -63,13 +63,11 @@ let type_check_program
             then (
               Format.ksprintf pr "===== Warning: Not better than the type obtained by POPL22 system =====\nType was: %s\n"
               (string_of_type t)
-              (*; Format.printf "%a@." pp_e nf_expr*)
             )
           end ;
         (varm, env)
-      with Legacy.Checker.Ill_typed (pos, str)
+      end with Legacy.Checker.Ill_typed (pos, str)
       | Poly.Checker.Untypeable (pos, str) ->
-        (*Format.printf "%a@." pp_e nf_expr ;*)
         pr_ill_typed (pos, str);
         if compare_to_popl () then
           begin match typ_legacy with

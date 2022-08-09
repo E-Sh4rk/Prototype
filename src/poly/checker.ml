@@ -271,9 +271,12 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     else fail
   in
   let simple_constraint_check v s sigma =
+    log "Simple constraint: checking substitutions...@." ;
     Env.mem v env && subtype (instantiate sigma (Env.find v env)) s
   in
   let lambda ~inferred v branches e =
+    Utils.log "Lambda for %s entered with %i branches.@."
+      (Variable.show v) (List.length branches) ;
     let rec aux branches =
       match branches with
       | [] -> Ok []
@@ -304,7 +307,8 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
         | res -> map_res (fun branches -> (s, splits)::branches) res
         end  
     in
-    aux branches
+    let res = aux branches in
+    Utils.log "Lambda for %s exited.@." (Variable.show v) ; res
   in
   match a, annot_a with
   | Abstract _, NoneA | Const _, NoneA -> Ok NoneA
@@ -363,13 +367,14 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     else fail
   | App (v1, v2), AppA (sigma1, sigma2) ->
     if Env.mem v1 env && Env.mem v2 env
-    then
+    then begin
+      log "Application: checking substitutions...@.";
       let t1 = instantiate sigma1 (Env.find v1 env) in
       let t2 = instantiate sigma2 (Env.find v2 env) in
       if subtype t1 (mk_arrow (cons t2) any_node)
-      then Ok (AppA (sigma1, sigma2))
-      else fail
-    else fail
+      then (Ok (AppA (sigma1, sigma2)))
+      else (log "WARNING: check failed@."; fail)
+    end else fail
   | Ite (v, s, _, _), IteA [] ->
     if Env.mem v env
     then
@@ -404,6 +409,8 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
 and infer_splits' tenv env mono noninferred v splits e =
   let t = Env.find v env in
   let splits = splits |> List.filter (fun (s, _) -> disjoint s t |> not) in
+  log "Splits for %s entered with %i branches.@."
+    (Variable.show v) (List.length splits); 
   let rec aux splits =
     match splits with
     | [] -> Ok []
@@ -428,7 +435,8 @@ and infer_splits' tenv env mono noninferred v splits e =
       | res -> map_res (fun splits -> (s, annot)::splits) res
       end
   in
-  aux splits
+  let res = aux splits in
+  log "Splits for %s exited.@." (Variable.show v) ; res
 
 and infer' tenv env mono noninferred annot e =
   match e, annot with
@@ -441,7 +449,11 @@ and infer' tenv env mono noninferred annot e =
     let skipped = skippable && (VarSet.mem v opt |> not) in
     let res =
       if skipped then fail
-      else infer_a_iterated pos tenv env mono noninferred annot_a a in
+      else begin
+        log "(Re)Infering definition for %s...@." (Variable.show v) ;
+        let res = infer_a_iterated pos tenv env mono noninferred annot_a a in
+        log "Done (definiton of %s).@." (Variable.show v) ; res
+      end in
     begin match res, k1 with
     | Ok annot_a, _ ->
       let t = typeof_a_nofail pos tenv env mono annot_a a in
@@ -484,6 +496,7 @@ and infer' tenv env mono noninferred annot e =
     ) in
     begin match refinements with
     | Some refinements ->
+      Utils.log "Splits must be propagated...@." ;
       let res = refinements |> List.map (fun env' ->
         (env', DoA (t, annot_a, splits))) in
       Split res
@@ -495,6 +508,7 @@ and infer' tenv env mono noninferred annot e =
   | _, _ -> assert false
 
 and infer_a_iterated pos tenv env mono noninferred annot_a a =
+  (*log "Iteration...@." ;*)
   match infer_a' pos tenv env mono noninferred annot_a a with
   | Split [(env', annot_a)] when Env.leq env env' ->
     infer_a_iterated pos tenv env mono noninferred annot_a a
@@ -503,6 +517,7 @@ and infer_a_iterated pos tenv env mono noninferred annot_a a =
   | res -> res
 
 and infer_iterated tenv env mono noninferred annot e =
+  (*log "Iteration...@." ;*)
   match infer' tenv env mono noninferred annot e, e with
   | Split [(env', annot)], _ when Env.leq env env' ->
     infer_iterated tenv env mono noninferred annot e

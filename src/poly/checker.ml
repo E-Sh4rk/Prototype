@@ -231,6 +231,10 @@ let typeof_a_nofail pos tenv env mono annot_a a =
   try typeof_a pos tenv env mono annot_a a
   with Untypeable _ -> assert false
 
+let typeof_nofail tenv env mono annot_a a =
+  try typeof tenv env mono annot_a a
+  with Untypeable _ -> assert false
+
 type 'a result =
   | Ok of 'a
   | Split of (Env.t * 'a) list
@@ -361,7 +365,11 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
           (Subst.compose (Subst.restrict sol vs1) subst1,
            Subst.compose (Subst.restrict sol vs2) subst2)
         in
-        (Subst.restrict sol mono, poly_part)
+        let mono_part = Subst.restrict sol mono in
+        (* log "%a@." Subst.pp (fst poly_part) ;
+        log "%a@." Subst.pp (snd poly_part) ;
+        log "%a@." Subst.pp (mono_part) ; *)
+        (mono_part, poly_part)
       ) |> regroup Subst.equiv in
       Subst res |> map_res (fun sigmas -> AppA (List.split sigmas))
     else fail
@@ -543,4 +551,4 @@ let infer tenv env mono e =
 
 let typeof_simple tenv env mono e =
   let (e, anns) = infer tenv env mono e in
-  typeof tenv Env.empty mono anns e  
+  typeof_nofail tenv Env.empty mono anns e  

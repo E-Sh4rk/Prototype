@@ -59,7 +59,9 @@ end
 module Annot = struct
   type substs = Subst.t list
   let pp_substs fmt ss =
-    Format.fprintf fmt "Substs[%i]" (List.length ss)
+    ss |> List.iteri (fun i s ->
+      Format.fprintf fmt "----- Subst %i -----@.%a@." i Subst.pp s
+    )
   let apply_subst_substs s ss =
     List.map (fun s' -> Subst.compose_restr s s') ss
 

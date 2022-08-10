@@ -258,6 +258,24 @@ let complete default_annot res =
     else res
   | _ -> assert false
 
+exception Error
+let complete_fine_grained default_annot res =
+  match res with
+  | Subst [(subst, annot)] ->
+    begin try (
+    let def = subst
+      |> Subst.destruct |> List.map (
+        fun (a, t) ->
+          let t = clean_type ~pos:any ~neg:empty TVarSet.empty t in
+          if (vars t) |> TVarSet.is_empty |> not then raise Error ;
+          let t = cap_o (var_typ a) (neg t) in
+          let s = [(a, t)] |> Subst.construct in
+          (s, default_annot)
+      ) in
+    Subst ((subst,annot)::def)
+    ) with Error -> complete default_annot res end
+  | _ -> complete default_annot res
+
 exception NeedVar of (Variable.t * string)
 let need_var env v str =
   if Env.mem v env |> not
@@ -311,7 +329,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
               |> regroup Subst.equiv
             in
             map_res (fun splits -> splits@branches) (Subst res)
-            |> complete branches
+            |> complete_fine_grained branches
           | res -> map_res (fun splits -> (s, splits)::branches) res
           end
         | res -> map_res (fun branches -> (s, splits)::branches) res
@@ -387,10 +405,9 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     if (subtype t s || subtype t (neg s)) |> not
     then Split [(Env.singleton v s, IteA []) ; (Env.singleton v (neg s), IteA [])]
     else
-      (* TODO: Find an optimisation... *)
       let res = simple_constraint_infer v "typecase" empty in
       map_res (fun sigma -> IteA sigma) res
-      |> complete (IteA [Subst.identity])
+      |> complete_fine_grained (IteA [Subst.identity])
       (*Subst [(Subst.identity, IteA [Subst.identity])]*)
   | Ite (v, s, v1, v2), IteA sigma ->
     need_var v "typecase" ;
@@ -484,7 +501,7 @@ and infer' tenv env mono noninferred annot e =
       lst |> List.for_all (fun (subst,_) -> Subst.is_identity subst |> not) ->
       let res = lst |> List.map (fun (subst, annot_a) ->
         (subst, UnkA (annot_a, s, Some k1, k2))) in
-      Subst ((Subst.identity, SkipA k1)::res)
+      complete_fine_grained (SkipA k1) (Subst res)
     | res, _ ->
       map_res (fun annot_a -> UnkA (annot_a, s, k1, k2)) res
     end

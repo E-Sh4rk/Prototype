@@ -286,6 +286,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
   let lambda ~inferred v branches e =
     Utils.log "Lambda for %s entered with %i branches.@."
       (Variable.show v) (List.length branches) ;
+    (*Utils.log "%a@." (pp_list pp_typ) (List.map fst branches) ;*)
     let rec aux branches =
       match branches with
       | [] -> Ok []
@@ -399,7 +400,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     else if subtype t (neg s) then (need_var v2 "typecase" ; Ok (IteA sigma))
     else assert false
   | Lambda ((), ua, v, e), LambdaA branches ->
-    let branches = branches |> remove_redundant_branches in
+    let branches = branches |> remove_empty_branches in
     begin match branches with
     | [] ->
       log "Untypeable lambda for %s (no branch left).@." (Variable.show v) ;

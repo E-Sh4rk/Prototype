@@ -261,20 +261,56 @@ let complete default_annot res =
 exception Error
 let complete_fine_grained default_annot res =
   match res with
-  | Subst [(subst, annot)] ->
+  | Subst lst ->
+    let substs = lst |> List.map fst in
+    (*log "Initial: %a@." Annot.pp_substs substs ;*)
+    let rec choose lst = match lst with
+    | [] -> [[]]
+    | subst::lst ->
+      let res = choose lst in
+      Subst.dom subst |> TVarSet.destruct |> List.map (fun x ->
+        List.map (fun lst -> (x, Subst.find subst x)::lst) res
+      ) |> List.flatten
+    in
+    let possibilities = choose substs in
     begin try (
-    let def = subst
-      |> Subst.destruct |> List.map (
-        fun (a, t) ->
-          let t = clean_type ~pos:any ~neg:empty TVarSet.empty t in
-          if (vars t) |> TVarSet.is_empty |> not then raise Error ;
-          let t = cap_o (var_typ a) (neg t) in
-          let s = [(a, t)] |> Subst.construct in
-          (s, default_annot)
+    let defs =
+      possibilities |> List.map (
+        fun lst ->
+          let parts = lst |> List.map (fun (v,t) ->
+            let t = clean_type ~pos:any ~neg:empty TVarSet.empty t in
+            if (vars t) |> TVarSet.is_empty |> not then raise Error ;
+            (v, neg t)
+          ) in
+          let parts = List.fold_left (fun acc (v,t) ->
+              if List.mem_assoc v acc
+              then
+                let t' = List.assoc v acc in
+                let acc = List.remove_assoc v acc in
+                (v, cap_o t t')::acc
+              else
+                (v,t)::acc
+            ) [] parts in
+          let subst =
+            parts
+            |> List.map (fun (v,t) -> (v,cap t (var_typ v)))
+            |> Subst.construct
+          in
+          (subst, default_annot)
       ) in
-    Subst ((subst,annot)::def)
+    let rec filter defs =
+      match defs with
+      | [] -> []
+      | (s,a)::defs ->
+        if Subst.is_identity s
+        then (s,a)::(List.filter (fun (s,_) -> Subst.is_identity s |> not) defs)
+        else (s,a)::(filter defs)
+    in
+    let defs = filter defs in
+    (*log "Added: %a@." Annot.pp_substs (List.map fst defs) ;*)
+    Subst (defs@lst)
     ) with Error -> complete default_annot res end
-  | _ -> complete default_annot res
+  | _ -> assert false
 
 exception NeedVar of (Variable.t * string)
 let need_var env v str =
@@ -302,9 +338,8 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     subtype (instantiate sigma (Env.find v env)) s
   in
   let lambda ~inferred v branches e =
-    log ~level:0 "Lambda for %s entered with %i branches.@."
-      (Variable.show v) (List.length branches) ;
-    (*log ~level:0 "%a@." (pp_list pp_typ) (List.map fst branches) ;*)
+    log ~level:0 "Lambda for %s entered with %i branches:%a@."
+      (Variable.show v) (List.length branches) (pp_list pp_typ) (List.map fst branches) ;
     let rec aux branches =
       match branches with
       | [] -> Ok []
@@ -385,7 +420,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
       let mono_part = Subst.restrict sol mono in
       (* log ~level:1 "%a@." Subst.pp (fst poly_part) ;
       log ~level:1 "%a@." Subst.pp (snd poly_part) ;
-      log ~level:1 "%a@." Subst.pp (mono_part) ; *)
+      log ~level:1 "%a@." Subst.pp (mono_part) ;*)
       (mono_part, poly_part)
     ) |> regroup Subst.equiv in
     Subst res |> map_res (fun sigmas -> AppA (List.split sigmas))

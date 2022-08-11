@@ -27,6 +27,8 @@ let regroup equiv res =
   List.fold_left aux [] res
 
 let remove_redundant_branches mono lst =
+  (* NOTE: We should use tallying to determine subtyping and emptiness
+     (in the case there are non-cleanable vars), but no need for it for now. *)
   let rec is_useful s rs others =
     if is_empty rs then false
     else match others with

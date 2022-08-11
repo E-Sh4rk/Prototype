@@ -98,8 +98,9 @@ unique_term: t=term EOF { t }
 
 
 element:
-  a=definition { Definition (false, a) }
-| DEBUG a=definition { Definition (true, a) }
+  a=definition { Definition (Utils.log_disabled, a) }
+| DEBUG a=definition { Definition (Utils.log_full, a) }
+| DEBUG i=LINT a=definition { Definition (i, a) }
 | a=atoms      { Atoms a }
 | a=types_def  { Types a }
 

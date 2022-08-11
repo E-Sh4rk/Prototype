@@ -30,8 +30,8 @@ let type_check_program
       let nf_expr_ann = nf_expr |> Legacy.Msc.from_common_msc ~legacy:true in
       let time1 = Unix.gettimeofday () in
       assert (VarSet.subset (fv_e nf_expr) (Env.domain env |> VarSet.of_list)) ;
-      let tmp_log = !Utils.log_enabled in
-      Utils.log_enabled := false ;
+      let tmp_log = !Utils.log_level in
+      Utils.log_level := Utils.log_disabled ;
       let typ_legacy =
         if compare_to_popl ()
         then
@@ -39,7 +39,7 @@ let type_check_program
           with Legacy.Old_checker.Ill_typed _ -> None
         else None
       in
-      Utils.log_enabled := tmp_log ;
+      Utils.log_level := tmp_log ;
       try begin
         Utils.log "%a@." Poly.Msc.pp_e nf_expr ;
         let typ =
@@ -81,9 +81,8 @@ let type_check_program
     let treat_elem (tenv,varm,env) elem =
       match elem with
       | Ast.Definition (log, d) ->
-        if log then Utils.log_enabled := true ;
+        Utils.log_level := log ;
         let (varm,env) = test_def (tenv,varm,env) d in
-        Utils.log_enabled := false ;
         (tenv,varm,env)
       | Ast.Atoms lst ->
         let tenv = List.fold_left define_atom tenv lst in

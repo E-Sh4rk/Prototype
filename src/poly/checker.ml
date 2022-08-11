@@ -436,7 +436,7 @@ and infer_splits' tenv env mono noninferred v splits e =
   let t = Env.find v env in
   let splits = splits |> List.filter (fun (s, _) -> disjoint s t |> not) in
   log "Splits for %s entered with %i branches.@."
-    (Variable.show v) (List.length splits); 
+    (Variable.show v) (List.length splits);
   let rec aux splits =
     match splits with
     | [] -> Ok []
@@ -498,6 +498,7 @@ and infer' tenv env mono noninferred annot e =
         log "Definition is typeable, but its type cannot be handled.@." ; fail
       end
     | Subst lst, Some k1 when skippable ->
+      log "The definition needs a substitution and is skippable. Adding a default branch...@." ;
       let res = (Subst lst) |> map_res (fun annot_a -> UnkA (annot_a, s, Some k1, k2)) in
       complete_fine_grained (SkipA k1) res
     | res, _ ->

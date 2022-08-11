@@ -13,9 +13,11 @@ let error fmt pos msg =
   ) "" pos in
   Format.fprintf fmt "Error:%s\t%s\n" pos msg
 
-let log_enabled = ref false
-let log a =
-  if !log_enabled then Format.fprintf Format.std_formatter a
+let log_disabled = 10
+let log_full = 0
+let log_level = ref log_disabled
+let log ?(level=5) a =
+  if level >= !log_level then Format.fprintf Format.std_formatter a
   else Format.ifprintf Format.std_formatter a
 
 let option_chain fs e =

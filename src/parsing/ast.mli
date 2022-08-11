@@ -66,7 +66,7 @@ val substitute : annot_expr -> Variable.t -> annot_expr -> annot_expr
 val const_to_typ : const -> typ
 
 type parser_element =
-| Definition of (bool (* log? *) * (string * parser_expr))
+| Definition of (int (* log level *) * (string * parser_expr))
 | Atoms of string list
 | Types of (string * type_expr) list
 

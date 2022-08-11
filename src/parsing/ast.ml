@@ -244,7 +244,7 @@ let const_to_typ c =
         failwith (Printf.sprintf "Can't retrieve the type of the atom %s." t)
 
 type parser_element =
-| Definition of (bool * (string * parser_expr))
+| Definition of (int * (string * parser_expr))
 | Atoms of string list
 | Types of (string * type_expr) list
 

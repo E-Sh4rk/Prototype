@@ -16,7 +16,7 @@ end
 
 module Annot : sig
     type substs = Subst.t list
-    type split = (typ*t) list
+    type split = (typ*(bool*t)) list
     and a =
         | NoneA | ProjA of substs | IteA of substs | AppA of (substs * substs)
         | RecordUpdateA of substs | LambdaA of (typ * split) list

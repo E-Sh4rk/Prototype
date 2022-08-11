@@ -116,7 +116,7 @@ and typeof_splits tenv env mono v splits e =
   let pos = Variable.get_locations v in
   let dom = splits |> List.map fst |> disj in
   if subtype (Env.find v env) dom
-  then splits |> List.map (fun (s, annot) ->
+  then splits |> List.map (fun (s, (_, annot)) ->
     let env = Env.strengthen v s env in
     let mono = TVarSet.union mono (vars s) in
     typeof tenv env mono annot e
@@ -475,7 +475,7 @@ and infer_splits' tenv env mono noninferred v splits e =
   let rec aux splits =
     match splits with
     | [] -> Ok []
-    | (s, annot)::splits ->
+    | (s, (b, annot))::splits ->
       begin match aux splits with
       | Ok (splits) ->
         let env = Env.strengthen v s env in
@@ -486,14 +486,15 @@ and infer_splits' tenv env mono noninferred v splits e =
         | Split lst ->
           let res =
             lst |> List.map (fun (env', annot) ->
+              let b = b || Env.mem v env' in
               let env' = Env.strengthen v s env' in
-              (Env.rm v env', (Env.find v env', annot)))
+              (Env.rm v env', (Env.find v env', (b, annot))))
             |> regroup Env.equiv
           in
           map_res (fun splits' -> splits'@splits) (Split res)
-        | res -> map_res (fun annot -> (s,annot)::splits) res
+        | res -> map_res (fun annot -> (s,(b,annot))::splits) res
         end
-      | res -> map_res (fun splits -> (s, annot)::splits) res
+      | res -> map_res (fun splits -> (s,(b,annot))::splits) res
       end
   in
   let res = aux splits in
@@ -547,17 +548,20 @@ and infer' tenv env mono noninferred annot e =
     let res = infer_iterated tenv env mono noninferred annot e in
     map_res (fun annot -> EmptyA (annot_a, annot)) res
   | Bind ((), v, a, e), DoA (t, annot_a, splits) ->
-    let refinements = splits |> List.find_map (fun (s,_) ->
-      if disjoint s t then None
+    let splits = List.map (fun (s,(b,a)) -> (s, (ref b, a))) splits in
+    let refinements = splits |> List.find_map (fun (s,(b,_)) ->
+      if disjoint s t || not !b then None
       else
         let refinements =
           refine_a env mono a (neg s) |> Refinements.partition
           |> Refinements.compatibles env
         in
+        b := false ;
         if List.length refinements > 1
         then Some refinements
         else None
     ) in
+    let splits = List.map (fun (s,(b,a)) -> (s,(!b, a))) splits in
     begin match refinements with
     | Some refinements ->
       log ~level:2 "Splits must be propagated for variable %s...@." (Variable.show v) ;

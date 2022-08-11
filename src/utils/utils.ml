@@ -74,3 +74,7 @@ let pp_list pp_elt fmt lst =
 
 let assert_with b msg =
   if not b then failwith msg
+
+let fst3 (a,_,_) = a
+let snd3 (_,b,_) = b
+let trd3 (_,_,c) = c

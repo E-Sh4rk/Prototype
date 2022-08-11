@@ -92,7 +92,7 @@ module Annot = struct
   let apply_subst_substs s ss =
     List.map (fun s' -> Subst.compose_restr s s') ss
 
-  type split = (typ*t) list
+  type split = (typ*(bool*t)) list
   [@@deriving show]
 
   and a =
@@ -106,7 +106,7 @@ module Annot = struct
       [@@deriving show]
 
   let rec apply_subst_split s lst =
-    lst |> List.map (fun (ty,t) -> (Subst.apply_simplify s ty, apply_subst s t))
+    lst |> List.map (fun (ty,(b,t)) -> (Subst.apply_simplify s ty, (b, apply_subst s t)))
   and apply_subst_a s a = match a with
   | NoneA -> NoneA
   | ProjA ss -> ProjA (apply_subst_substs s ss)
@@ -136,14 +136,14 @@ module Annot = struct
     | RecordUpdate _ -> RecordUpdateA []
     | App _ -> AppA ([], [])
     | Lambda (_, Parsing.Ast.Unnanoted, v, e) ->
-      let initial_s = [(any, initial_e e)] in
+      let initial_s = [(any, (false, initial_e e))] in
       let v = Variable.to_typevar v |> var_typ in
       LambdaA [(v, initial_s)]
     | Lambda (_, Parsing.Ast.ADomain dt, _, e) ->
-      let initial_s = [(any, initial_e e)] in
+      let initial_s = [(any, (false, initial_e e))] in
       LambdaA [(dt, initial_s)]
     | Lambda (_, Parsing.Ast.AArrow t, _, e) ->
-      let initial_s = [(any, initial_e e)] in
+      let initial_s = [(any, (false, initial_e e))] in
       let branches =
         dnf t |> List.map (List.map fst) |> List.flatten
         |> List.map (fun s -> (s, initial_s))
@@ -156,7 +156,7 @@ module Annot = struct
       | Bind (_, _, a, e) ->
         let initial_a = initial_a a in
         let initial_e = initial_e e in
-        let initial_s = [(any, initial_e)] in
+        let initial_s = [(any, (false, initial_e))] in
         UnkA (initial_a, Some initial_s, Some initial_e, Some initial_e)
 
   let retype a t =
@@ -164,7 +164,7 @@ module Annot = struct
     match t with
     | VarA -> VarA
     | UnkA (_,s,t1,t2) -> UnkA (a,s,t1,t2)
-    | SkipA (t) -> UnkA (a, Some [(any,t)], Some t, Some t)
+    | SkipA (t) -> UnkA (a, Some [(any,(false,t))], Some t, Some t)
     | DoA (_, _, s) -> UnkA (a, Some s, None, None)
     | EmptyA (_, t) -> UnkA (a, None, None, Some t)
 end

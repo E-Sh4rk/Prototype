@@ -1,15 +1,3 @@
-(* TODO: Why is it so long on typeof? *)
-
-  let typeof x =
-    if x is String then "String"
-    else if x is Char then "Char"
-    else if x is Int then "Number"
-    else if x is Bool then "Boolean"
-    else if x is Unit|Nil then "Nil"
-    else "Object"
-  
-  let test_typeof y =
-    if typeof y is "Boolean" then lnot y else false  
 
 (* TODO: Why is it so long on test_1? *)
 

@@ -497,11 +497,9 @@ and infer' tenv env mono noninferred annot e =
       | _, _ , _->
         log "Definition is typeable, but its type cannot be handled.@." ; fail
       end
-    | Subst lst, Some k1 when skippable &&
-      lst |> List.for_all (fun (subst,_) -> Subst.is_identity subst |> not) ->
-      let res = lst |> List.map (fun (subst, annot_a) ->
-        (subst, UnkA (annot_a, s, Some k1, k2))) in
-      complete_fine_grained (SkipA k1) (Subst res)
+    | Subst lst, Some k1 when skippable ->
+      let res = (Subst lst) |> map_res (fun annot_a -> UnkA (annot_a, s, Some k1, k2)) in
+      complete_fine_grained (SkipA k1) res
     | res, _ ->
       map_res (fun annot_a -> UnkA (annot_a, s, k1, k2)) res
     end

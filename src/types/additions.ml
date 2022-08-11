@@ -302,11 +302,11 @@ let simplify_full_dnf dnf =
     List.map regroup_conjuncts dnf
 
 let simplify_typ t =
-    (*Utils.log "Simplifying type...@?" ;*)
+    (*Utils.log ~level:2 "Simplifying type...@?" ;*)
     let arrow = t |> full_dnf |> simplify_full_dnf |> List.map full_branch_type |> disj in
     let non_arrow = diff t arrow_any in
     let res = cup arrow non_arrow (*|> normalize_typ*) in
-    assert (equiv res t) (*; Utils.log " Done.@."*) ; res
+    assert (equiv res t) (*; Utils.log ~level:2 " Done.@."*) ; res
 
 let remove_negative_arrows t =
     let pos_arrow = t |> dnf |> List.map branch_type |> disj in
@@ -498,17 +498,17 @@ let check_tallying_solution constr res =
 
 let tallying_infer poly noninfered constr =
     assert (TVarSet.inter poly noninfered |> TVarSet.is_empty) ;
-    Utils.log "Tallying (inference) instance initiated...@?" ;
+    Utils.log ~level:2 "Tallying (inference) instance initiated...@?" ;
     let var_order = TVarSet.destruct poly in
     let res = tallying ~var_order noninfered constr in
-    Utils.log " Done (%i sol).@." (List.length res) ;
+    Utils.log ~level:2 " Done (%i sol).@." (List.length res) ;
     res |> check_tallying_solution constr
 
 let tallying mono constr =
-    Utils.log "Tallying (no inference) instance initiated...@?" ;
+    Utils.log ~level:2 "Tallying (no inference) instance initiated...@?" ;
     let var_order = [] in
     let res = tallying ~var_order mono constr in
-    Utils.log " Done (%i sol).@." (List.length res) ;
+    Utils.log ~level:2 " Done (%i sol).@." (List.length res) ;
     res |> check_tallying_solution constr
 
 let subtype_poly mono t1 t2 =

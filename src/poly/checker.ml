@@ -288,7 +288,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     let (vs,tsubst,t) = fresh mono (Env.find v env) in
     let log_delta =
       TVarSet.inter noninferred (vars t) |> TVarSet.destruct in
-    log "Simple constraint: solving %a <= %a with delta=%a@."
+    log ~level:1 "Simple constraint: solving %a <= %a with delta=%a@."
       pp_typ t pp_typ s (pp_list pp_var) log_delta ;
     let res = tallying_infer vs noninferred [(t, s)] in
     let res = res |> List.map (fun sol ->
@@ -298,13 +298,13 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
   in
   let simple_constraint_check v str s sigma =
     need_var v str ;
-    log "Simple constraint: checking substitutions...@." ;
+    log ~level:1 "Simple constraint: checking substitutions...@." ;
     subtype (instantiate sigma (Env.find v env)) s
   in
   let lambda ~inferred v branches e =
-    Utils.log "Lambda for %s entered with %i branches.@."
+    log ~level:0 "Lambda for %s entered with %i branches.@."
       (Variable.show v) (List.length branches) ;
-    (*Utils.log "%a@." (pp_list pp_typ) (List.map fst branches) ;*)
+    (*log ~level:0 "%a@." (pp_list pp_typ) (List.map fst branches) ;*)
     let rec aux branches =
       match branches with
       | [] -> Ok []
@@ -336,7 +336,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
         end  
     in
     let res = aux branches in
-    Utils.log "Lambda for %s exited.@." (Variable.show v) ; res
+    log ~level:0 "Lambda for %s exited.@." (Variable.show v) ; res
   in
   try match a, annot_a with
   | Abstract _, NoneA | Const _, NoneA -> Ok NoneA
@@ -373,7 +373,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     let log_delta =
       TVarSet.inter noninferred (TVarSet.union (vars t1) (vars arrow_typ))
       |> TVarSet.destruct in
-    log "Application: solving %a <= %a with delta=%a@."
+    log ~level:1 "Application: solving %a <= %a with delta=%a@."
       pp_typ t1 pp_typ arrow_typ (pp_list pp_var) log_delta ;
     let res =
       tallying_infer poly noninferred [(t1, arrow_typ)]
@@ -383,16 +383,16 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
           Subst.compose (Subst.restrict sol vs2) subst2)
       in
       let mono_part = Subst.restrict sol mono in
-      (* log "%a@." Subst.pp (fst poly_part) ;
-      log "%a@." Subst.pp (snd poly_part) ;
-      log "%a@." Subst.pp (mono_part) ; *)
+      (* log ~level:1 "%a@." Subst.pp (fst poly_part) ;
+      log ~level:1 "%a@." Subst.pp (snd poly_part) ;
+      log ~level:1 "%a@." Subst.pp (mono_part) ; *)
       (mono_part, poly_part)
     ) |> regroup Subst.equiv in
     Subst res |> map_res (fun sigmas -> AppA (List.split sigmas))
   | App (v1, v2), AppA (sigma1, sigma2) ->
     need_var v1 "application" ;
     need_var v2 "application" ;
-    log "Application: checking substitutions...@." ;
+    log ~level:1 "Application: checking substitutions...@." ;
     let t1 = instantiate sigma1 (Env.find v1 env) in
     let t2 = instantiate sigma2 (Env.find v2 env) in
     let arrow_type = (mk_arrow (cons t2) any_node) in
@@ -420,7 +420,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     let branches = branches |> remove_empty_branches in
     begin match branches with
     | [] ->
-      log "Untypeable lambda for %s (no branch left).@." (Variable.show v) ;
+      log ~level:0 "Untypeable lambda for %s (no branch left).@." (Variable.show v) ;
       fail
     | branches ->
       let inferred = ua = Parsing.Ast.Unnanoted in
@@ -430,12 +430,12 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
   | _, _ -> assert false
   with
   | NeedVar (v, str) ->
-    log "Untypeable %s (---> need %s)" (Variable.show v) str ; fail
+    log ~level:0 "Untypeable %s (---> need %s)" (Variable.show v) str ; fail
 
 and infer_splits' tenv env mono noninferred v splits e =
   let t = Env.find v env in
   let splits = splits |> List.filter (fun (s, _) -> disjoint s t |> not) in
-  log "Splits for %s entered with %i branches.@."
+  log ~level:2 "Splits for %s entered with %i branches.@."
     (Variable.show v) (List.length splits);
   let rec aux splits =
     match splits with
@@ -462,13 +462,13 @@ and infer_splits' tenv env mono noninferred v splits e =
       end
   in
   let res = aux splits in
-  log "Splits for %s exited.@." (Variable.show v) ; res
+  log ~level:2 "Splits for %s exited.@." (Variable.show v) ; res
 
 and infer' tenv env mono noninferred annot e =
   match e, annot with
   | Var v, VarA ->
     if Env.mem v env then Ok(VarA)
-    else (log "Untypeable expression (--> need %s)@." (Variable.show v) ; fail)
+    else (log ~level:0 "Untypeable expression (--> need %s)@." (Variable.show v) ; fail)
   | Bind ((), v, a, e), UnkA (annot_a, s, k1, k2) ->
     let pos = Variable.get_locations v in
     let (req, opt) = analyze_dependencies env e in
@@ -479,9 +479,9 @@ and infer' tenv env mono noninferred annot e =
     let res =
       if skipped then fail
       else begin
-        log "(Re)Infering definition for %s...@." (Variable.show v) ;
+        log ~level:2 "(Re)Infering definition for %s...@." (Variable.show v) ;
         let res = infer_a_iterated pos tenv env mono noninferred annot_a a in
-        log "Done (definiton of %s).@." (Variable.show v) ; res
+        log ~level:2 "Done (definiton of %s).@." (Variable.show v) ; res
       end in
     begin match res, k1 with
     | Ok annot_a, _ ->
@@ -495,10 +495,10 @@ and infer' tenv env mono noninferred annot e =
         let annot = DoA (t, annot_a, splits) in
         infer' tenv env mono noninferred annot e
       | _, _ , _->
-        log "Definition is typeable, but its type cannot be handled.@." ; fail
+        log ~level:0 "Definition is typeable, but its type cannot be handled.@." ; fail
       end
     | Subst lst, Some k1 when skippable ->
-      log "The definition needs a substitution and is skippable. Adding a default branch...@." ;
+      log ~level:0 "The definition needs a substitution and is skippable. Adding a default branch...@." ;
       let res = (Subst lst) |> map_res (fun annot_a -> UnkA (annot_a, s, Some k1, k2)) in
       complete_fine_grained (SkipA k1) res
     | res, _ ->
@@ -525,7 +525,7 @@ and infer' tenv env mono noninferred annot e =
     ) in
     begin match refinements with
     | Some refinements ->
-      Utils.log "Splits must be propagated...@." ;
+      log ~level:2 "Splits must be propagated for variable %s...@." (Variable.show v) ;
       let res = refinements |> List.map (fun env' ->
         (env', DoA (t, annot_a, splits))) in
       Split res
@@ -537,7 +537,7 @@ and infer' tenv env mono noninferred annot e =
   | _, _ -> assert false
 
 and infer_a_iterated pos tenv env mono noninferred annot_a a =
-  (*log "Iteration...@." ;*)
+  (*log ~level:3 "Iteration...@." ;*)
   match infer_a' pos tenv env mono noninferred annot_a a with
   | Split [(env', annot_a)] when Env.leq env env' ->
     infer_a_iterated pos tenv env mono noninferred annot_a a
@@ -546,7 +546,7 @@ and infer_a_iterated pos tenv env mono noninferred annot_a a =
   | res -> res
 
 and infer_iterated tenv env mono noninferred annot e =
-  (*log "Iteration...@." ;*)
+  (*log ~level:3 "Iteration...@." ;*)
   match infer' tenv env mono noninferred annot e, e with
   | Split [(env', annot)], _ when Env.leq env env' ->
     infer_iterated tenv env mono noninferred annot e

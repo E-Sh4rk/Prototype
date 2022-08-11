@@ -3,7 +3,7 @@ open Parsing.Variable
 
 val partition : typ list-> typ list
 val regroup : ('a -> 'a -> bool) -> ('a * 'b) list -> ('a * ('b list)) list
-val remove_redundant_branches : (typ * 'a) list -> (typ * 'a) list
+val remove_redundant_branches : TVarSet.t -> (typ * 'a) list -> (typ * 'a) list
 val remove_empty_branches : (typ * 'a) list -> (typ * 'a) list
 
 module Refinements : sig

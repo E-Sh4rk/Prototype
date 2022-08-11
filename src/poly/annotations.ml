@@ -26,7 +26,7 @@ let regroup equiv res =
   let aux acc (k, o) = add_if_equiv [] acc k o in
   List.fold_left aux [] res
 
-let remove_redundant_branches lst =
+let remove_redundant_branches mono lst =
   let rec is_useful s rs others =
     if is_empty rs then false
     else match others with
@@ -45,7 +45,8 @@ let remove_redundant_branches lst =
       then aux ((s,v)::treated) current
       else aux treated current
   in
-  aux [] lst
+  lst |> List.map (fun (t,a) -> (clean_type ~pos:any ~neg:empty mono t,(t,a))) |>
+  aux [] |> List.map snd
 
 let remove_empty_branches lst =
   lst |> List.filter (fun (s,_) -> non_empty s)

@@ -37,3 +37,30 @@ let%test "neg_refs" [@tags "no-js"] =
   | [renv] when Ref_env.find v1 renv |> equiv (neg int_typ)
     && Ref_env.find v2 renv |> equiv (true_typ) -> true
   | _ -> false
+
+let%test "tallying" [@tags "no-js"] =
+  let u = mk_var "u" in
+  let input = mk_var "Input" in
+  let output = mk_var "Output" in
+  let poly1 = mk_var "p1" in
+  let poly2 = mk_var "p2" in
+  let right_udef = mk_arrow (var_typ input |> cons) (var_typ output |> cons) in
+  let udef = mk_arrow (var_typ u |> cons) (cap right_udef (var_typ poly1) |> cons) in
+  let udef = cap udef (var_typ poly2) in
+  let ut = rectype udef u in
+  let poly3 = (*mk_var "p3"*)poly1 in
+  let poly4 = (*mk_var "p4"*)poly2 in
+  let ut' = Subst.apply ([poly1, var_typ poly3; poly2, var_typ poly4] |> Subst.construct) ut in
+  let res = mk_var "r" |> var_typ in
+  let left_part = mk_arrow (cons ut) (cons res) in
+  let right_part = mk_arrow (cons ut') (cons res) in
+  let res2 = Types.Additions.fresh_var () in
+  let right_part = mk_arrow (cons right_part) (res2 |> var_typ |> cons) in
+  Format.printf "%a@.%a@." pp_typ left_part pp_typ right_part ;
+  let constr = [left_part, right_part] in
+  let poly = [poly1;poly2;poly3;poly4;res2] in
+  let sol = tallying ~var_order:poly TVarSet.empty constr in
+  Format.printf "Number of solutions: %i@." (List.length sol) ;
+  sol |> List.for_all (fun s ->
+    subtype (Subst.apply s left_part) (Subst.apply s right_part)
+  )

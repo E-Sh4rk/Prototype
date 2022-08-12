@@ -317,6 +317,8 @@ let need_var env v str =
   if Env.mem v env |> not
   then raise (NeedVar (v, str))
 
+(* TODO: in the tallting instance for projections and record update,
+   we should capture the output in a fresh variable. *)
 let rec infer_a' _ tenv env mono noninferred annot_a a =
   let need_var = need_var env in
   let simple_constraint_infer v str s =
@@ -326,7 +328,8 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
       TVarSet.inter noninferred (vars t) |> TVarSet.destruct in
     log ~level:1 "Simple constraint: solving %a <= %a with delta=%a@."
       pp_typ t pp_typ s (pp_list pp_var) log_delta ;
-    let res = tallying_infer vs noninferred [(t, s)] in
+    let poly = TVarSet.union (TVarSet.diff (vars s) mono) vs in
+    let res = tallying_infer poly noninferred [(t, s)] in
     let res = res |> List.map (fun sol ->
       (Subst.restrict sol mono, Subst.compose (Subst.restrict sol vs) tsubst)
     ) |> regroup Subst.equiv in

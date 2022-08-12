@@ -486,15 +486,26 @@ let fresh mono t =
     let (x, subst) = fresh_subst poly in
     (x, subst, Subst.apply subst t)
 
-let check_tallying_solution constr res =
+let check_tallying_solution var_order delta constr res =
     (* TODO: Investigate this Cduce issue. *)
-    res |> List.filter_map (fun s ->
+    let error = ref false in
+    let res =
+        res |> List.filter_map (fun s ->
         if (constr |> List.for_all (fun (l,r) ->
                 subtype (Subst.apply s l) (Subst.apply s r)
             ))
-        then Some s
-        else (Format.printf "WARNING: Cduce tallying issue." ; None)
+        then Some s else (error := true ; None)
     )
+    in
+    if !error then begin
+        Format.printf "WARNING: Cduce tallying issue.@.Constraints:@." ;
+        constr |> List.iter (fun (l,r) ->
+            Format.printf "(%a, %a)@." pp_typ l pp_typ r ;
+        );
+        Format.printf "With delta=%a and var order=%a@."
+            (Utils.pp_list pp_var) (TVarSet.destruct delta)
+            (Utils.pp_list pp_var) var_order ;
+    end ; res
 
 let tallying_infer poly noninfered constr =
     assert (TVarSet.inter poly noninfered |> TVarSet.is_empty) ;
@@ -502,14 +513,14 @@ let tallying_infer poly noninfered constr =
     let var_order = TVarSet.destruct poly in
     let res = tallying ~var_order noninfered constr in
     Utils.log ~level:2 " Done (%i sol).@." (List.length res) ;
-    res |> check_tallying_solution constr
+    res |> check_tallying_solution var_order noninfered constr
 
 let tallying mono constr =
     Utils.log ~level:2 "Tallying (no inference) instance initiated...@?" ;
     let var_order = [] in
     let res = tallying ~var_order mono constr in
     Utils.log ~level:2 " Done (%i sol).@." (List.length res) ;
-    res |> check_tallying_solution constr
+    res |> check_tallying_solution [] mono constr
 
 let subtype_poly mono t1 t2 =
     let (xs, _, t) = fresh mono t2 in

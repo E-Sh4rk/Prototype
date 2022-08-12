@@ -93,6 +93,7 @@ end
 module TVarSet : TVarSet
 
 val mk_var : string -> var
+val var_equal : var -> var -> bool
 val vars : typ -> TVarSet.t
 val top_vars : typ -> TVarSet.t
 val vars_with_polarity : typ -> (var * [ `Both | `Neg | `Pos ]) list

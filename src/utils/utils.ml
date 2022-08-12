@@ -78,3 +78,13 @@ let assert_with b msg =
 let fst3 (a,_,_) = a
 let snd3 (_,b,_) = b
 let trd3 (_,_,c) = c
+
+let pairs s1 s2 =
+  let rec aux s1 s2 =
+    match s1 with
+    | [] -> []
+    | a1::s1 ->
+      let pairs = aux s1 s2 in
+      (List.map (fun a2 -> (a1,a2)) s2) @ pairs
+  in
+  aux s1 s2

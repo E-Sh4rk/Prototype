@@ -28,8 +28,8 @@ let instantiate_check pos mono ss t =
   in
   if List.for_all check_s ss
   then instantiate ss t
-  else raise (Untypeable (pos, "Invalid instanciation: attempting to substitute a monomorphic variable."))  
-  
+  else raise (Untypeable (pos, "Invalid instanciation: attempting to substitute a monomorphic variable."))
+
 let rec typeof_a pos tenv env mono annot_a a =
   let type_lambda env annot v e =
     if annot = []
@@ -110,7 +110,7 @@ let rec typeof_a pos tenv env mono annot_a a =
     else raise (Untypeable (pos, "Invalid lambda: type does not match with user annotation."))
   | _, _ -> raise (Untypeable (pos, "Invalid annotations."))
   end
-  |> clean_type ~pos:empty ~neg:any mono |> simplify_typ
+  |> clean_type ~pos:empty ~neg:any mono |> hard_clean mono |> simplify_typ
 
 and typeof_splits tenv env mono v splits e =
   let pos = Variable.get_locations v in
@@ -139,7 +139,7 @@ and typeof tenv env mono annot e =
   | Bind (_, _, _, e), SkipA (annot) -> typeof tenv env mono annot e
   | _, _ -> raise (Untypeable ([], "Invalid annotations."))
   end
-  |> clean_type ~pos:empty ~neg:any mono |> simplify_typ
+  |> clean_type ~pos:empty ~neg:any mono |> hard_clean mono |> simplify_typ
 
 (* ===== REFINE ===== *)
 
@@ -401,7 +401,15 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     need_var v1 "application" ;
     need_var v2 "application" ;
     let (vs1,subst1,t1) = fresh mono (Env.find v1 env) in
-    let (vs2,subst2,t2) = fresh mono (Env.find v2 env) in
+    (* TODO: temporary... it seems to work better for typing things like fixpoint
+       and avoids trigerring a bug in Cduce implementation of tallying.
+       But theoretically t1 and t2 should have independent polymorphic variables. *)
+    let t2 = Env.find v2 env in
+    let subst2 = Subst.restrict subst1 (vars t2) in
+    let (vs2,subst2',t2) = fresh (TVarSet.union mono vs1) (Subst.apply subst2 t2) in
+    let vs2 = TVarSet.inter (TVarSet.union vs2 vs1) (vars t2) in
+    let subst2 = Subst.combine subst2 subst2' in
+    (*let (vs2,subst2,t2) = fresh mono (Env.find v2 env) in*)
     let alpha = fresh_var () in
     let poly = TVarSet.union vs1 vs2 |> TVarSet.add alpha in
     let arrow_typ = mk_arrow (cons t2) (cons (var_typ alpha)) in

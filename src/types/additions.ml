@@ -463,6 +463,18 @@ module Subst : Subst = struct
         then t else Subst.apply s t |> simplify_typ
 end
 
+let hard_clean mono t =
+    (* TODO: compute it in a more optimized way *)
+    let vs = TVarSet.diff (vars t) mono |> TVarSet.destruct in
+    Utils.pairs vs vs
+    |> List.filter (fun (v1, v2) -> var_equal v1 v2 |> not)
+    |> List.fold_left (fun t (v1, v2) ->
+      let subst = Subst.construct [(v1, var_typ v2)] in
+      let subst' = Subst.construct [(v2, cap (var_typ v1) (var_typ v2))] in
+      let t' = Subst.apply subst t in
+      if equiv (Subst.apply subst' t') t then t' else t
+    ) t
+
 let next_var_name = ref 0
 let fresh_var () =
     next_var_name := !next_var_name + 1 ;

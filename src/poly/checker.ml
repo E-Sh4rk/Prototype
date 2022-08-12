@@ -463,13 +463,16 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     else if subtype t (neg s) then (need_var v2 "typecase" ; Ok (IteA sigma))
     else assert false
   | Lambda ((), ua, v, e), LambdaA branches ->
-    let branches = branches |> (*remove_empty_branches*) remove_redundant_branches mono in
+    let inferred = ua = Parsing.Ast.Unnanoted in
+    let branches =
+      if inferred then
+        branches |> (*remove_empty_branches*) remove_redundant_branches mono
+      else branches in
     begin match branches with
     | [] ->
       log ~level:0 "Untypeable lambda for %s (no branch left).@." (Variable.show v) ;
       fail
     | branches ->
-      let inferred = ua = Parsing.Ast.Unnanoted in
       lambda ~inferred v branches e
       |> map_res (fun branches -> LambdaA branches)
     end

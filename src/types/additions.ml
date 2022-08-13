@@ -463,22 +463,34 @@ module Subst : Subst = struct
         then t else Subst.apply s t |> simplify_typ
 end
 
-let hard_clean mono t =
-    (* TODO: compute it in a more optimized way *)
-    let vs = TVarSet.diff (vars t) mono |> TVarSet.destruct in
-    Utils.pairs vs vs
-    |> List.filter (fun (v1, v2) -> var_equal v1 v2 |> not)
-    |> List.fold_left (fun t (v1, v2) ->
-      let subst = Subst.construct [(v1, var_typ v2)] in
-      let subst' = Subst.construct [(v2, cap (var_typ v1) (var_typ v2))] in
-      let t' = Subst.apply subst t in
-      if equiv (Subst.apply subst' t') t then t' else t
-    ) t
-
 let next_var_name = ref 0
 let fresh_var () =
     next_var_name := !next_var_name + 1 ;
     mk_var (string_of_int !next_var_name)
+
+let remove_redundant_vars mono t =
+    (* TODO: compute it in a more optimized way *)
+    let vs = TVarSet.diff (vars t) mono |> TVarSet.destruct in
+    Utils.pairs vs vs
+    |> List.filter (fun (v1, v2) -> var_equal v1 v2 |> not)
+    |> List.fold_left (fun (res, t) (v1, v2) ->
+      let v1' = fresh_var () in
+      let v2' = fresh_var () in
+      let subst1 = Subst.construct [(v1, var_typ v1');(v2, var_typ v2')] in
+      let subst2 = Subst.construct [(v1, var_typ v2');(v2, var_typ v1')] in
+      let t1 = Subst.apply subst1 t in
+      let t2 = Subst.apply subst2 t in
+      if equiv t1 t2
+      then
+        let subst = Subst.construct [(v1, var_typ v2)] in
+        (Subst.compose subst res, Subst.apply subst t)
+      else (res, t)
+    ) (Subst.identity, t)
+
+let hard_clean mono t =
+    let t = clean_type ~pos:empty ~neg:any mono t in
+    let (_,t) = remove_redundant_vars mono t in
+    t
 
 let instantiate ss t =
     List.map (fun s -> Subst.apply s t) ss

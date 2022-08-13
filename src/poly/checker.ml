@@ -110,7 +110,7 @@ let rec typeof_a pos tenv env mono annot_a a =
     else raise (Untypeable (pos, "Invalid lambda: type does not match with user annotation."))
   | _, _ -> raise (Untypeable (pos, "Invalid annotations."))
   end
-  |> clean_type ~pos:empty ~neg:any mono |> hard_clean mono |> simplify_typ
+  |> hard_clean mono |> simplify_typ
 
 and typeof_splits tenv env mono v splits e =
   let pos = Variable.get_locations v in
@@ -139,7 +139,7 @@ and typeof tenv env mono annot e =
   | Bind (_, _, _, e), SkipA (annot) -> typeof tenv env mono annot e
   | _, _ -> raise (Untypeable ([], "Invalid annotations."))
   end
-  |> clean_type ~pos:empty ~neg:any mono |> hard_clean mono |> simplify_typ
+  |> hard_clean mono |> simplify_typ
 
 (* ===== REFINE ===== *)
 
@@ -467,6 +467,10 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     let branches =
       if inferred then
         branches |> (*remove_empty_branches*) remove_redundant_branches mono
+        |> List.map (fun (t,splits) ->
+          let (subst, t) = remove_redundant_vars mono t in
+          (t, Annot.apply_subst_split subst splits)
+          )
       else branches in
     begin match branches with
     | [] ->

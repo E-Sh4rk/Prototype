@@ -431,7 +431,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
       let mono_part = Subst.restrict sol mono in
       (* log ~level:1 "%a@." Subst.pp (fst poly_part) ;
       log ~level:1 "%a@." Subst.pp (snd poly_part) ;
-      log ~level:1 "%a@." Subst.pp (mono_part) ;*)
+      log ~level:1 "%a@." Subst.pp (mono_part) ; *)
       (mono_part, poly_part)
     ) |> regroup Subst.equiv in
     Subst res |> map_res (fun sigmas -> AppA (List.split sigmas))
@@ -466,6 +466,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     let inferred = ua = Parsing.Ast.Unnanoted in
     let branches =
       if inferred then
+        (* TODO: remove redundant vars first, and then order by number of vars before removing redundant branches *)
         branches |> (*remove_empty_branches*) remove_redundant_branches mono
         |> List.map (fun (t,splits) ->
           let (subst, t) = remove_redundant_vars mono t in
@@ -488,8 +489,8 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
 and infer_splits' tenv env mono noninferred v splits e =
   let t = Env.find v env in
   let splits = splits |> List.filter (fun (s, _) -> disjoint s t |> not) in
-  log ~level:2 "Splits for %s entered with %i branches.@."
-    (Variable.show v) (List.length splits);
+  log ~level:2 "Splits for %s entered with %i branches:%a@."
+    (Variable.show v) (List.length splits) (pp_list pp_typ) (List.map fst splits) ;
   let rec aux splits =
     match splits with
     | [] -> Ok []

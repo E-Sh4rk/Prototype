@@ -48,6 +48,7 @@ let remove_redundant_branches mono lst =
       else aux treated current
   in
   lst |> List.map (fun (t,a) -> (clean_type ~pos:any ~neg:empty mono t,(t,a))) |>
+  (*(fun x -> Format.printf "remove_redundant_branches: %a@." (Utils.pp_list pp_typ) (List.map fst x) ; x) |>*)
   aux [] |> List.map snd
 
 let remove_empty_branches lst =

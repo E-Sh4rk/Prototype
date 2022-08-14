@@ -247,6 +247,7 @@ end
 
 let mk_var name = CD.Var.mk name
 let var_equal = CD.Var.equal
+let var_compare = CD.Var.compare
 let vars = CD.Types.Subst.vars
 let top_vars = CD.Types.Subst.top_vars
 let vars_with_polarity t = CD.Types.Subst.var_polarities t |> CD.Var.Map.get

@@ -472,7 +472,7 @@ let remove_redundant_vars mono t =
     (* TODO: compute it in a more optimized way *)
     let vs = TVarSet.diff (vars t) mono |> TVarSet.destruct in
     Utils.pairs vs vs
-    |> List.filter (fun (v1, v2) -> var_equal v1 v2 |> not)
+    |> List.filter (fun (v1, v2) -> var_compare v1 v2 < 0)
     |> List.fold_left (fun (res, t) (v1, v2) ->
       let v1' = fresh_var () in
       let v2' = fresh_var () in

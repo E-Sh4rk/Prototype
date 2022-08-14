@@ -83,12 +83,14 @@ module type TVarSet = sig
     val empty : t
     val construct : var list -> t
     val is_empty : t -> bool
+    val mem : t -> var -> bool
     val filter : (var -> bool) -> t -> t
     val union : t -> t -> t
     val add : var -> t -> t
     val inter : t -> t -> t
     val diff : t -> t -> t
     val destruct : t -> var list
+    val pp : Format.formatter -> t -> unit
 end
 module TVarSet : TVarSet
 

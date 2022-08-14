@@ -225,24 +225,29 @@ module type TVarSet = sig
   val empty : t
   val construct : var list -> t
   val is_empty : t -> bool
+  val mem : t -> var -> bool
   val filter : (var -> bool) -> t -> t
   val union : t -> t -> t
   val add : var -> t -> t
   val inter : t -> t -> t
   val diff : t -> t -> t
   val destruct : t -> var list
+  val pp : Format.formatter -> t -> unit
 end
 module TVarSet = struct
   type t = CD.Var.Set.t
   let empty = CD.Var.Set.empty
   let construct = CD.Var.Set.from_list
   let is_empty = CD.Var.Set.is_empty
+  let mem = CD.Var.Set.mem
   let filter = CD.Var.Set.filter
   let union = CD.Var.Set.cup
   let add = CD.Var.Set.add
   let inter = CD.Var.Set.cap
   let diff = CD.Var.Set.diff
   let destruct = CD.Var.Set.get
+  let pp fmt t =
+    destruct t |> Format.fprintf fmt "%a@." (Utils.pp_list pp_var)
 end
 
 let mk_var name = CD.Var.mk name

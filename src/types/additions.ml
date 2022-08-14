@@ -427,6 +427,7 @@ let remove_field_info t label =
 
 module type Subst = sig
     include Subst
+    val find' : t -> var -> typ
     val compose : t -> t -> t
     val compose_restr : t -> t -> t
     val combine : t -> t -> t
@@ -437,6 +438,8 @@ module type Subst = sig
 end
 module Subst : Subst = struct
     include Subst
+    let find' t v =
+        if mem t v then find t v else var_typ v
     let compose_restr_ s2 s1 =
         destruct s1 |>
             List.map (fun (v,t) -> (v, apply s2 t))
@@ -468,10 +471,10 @@ let fresh_var () =
     next_var_name := !next_var_name + 1 ;
     mk_var (string_of_int !next_var_name)
 
-let remove_redundant_vars mono t =
+let remove_redundant_vars_ext mono t =
     (*Format.printf "Started removing redundant vars in %a...@?" pp_typ t ;*)
     let res =
-        (* TODO: compute it in a more optimized way *)
+        (* TODO *)
         let vs = TVarSet.diff (vars t) mono |> TVarSet.destruct
         |> List.sort var_compare in
         Utils.pairs vs vs
@@ -491,6 +494,25 @@ let remove_redundant_vars mono t =
         ) (Subst.identity, t)
     in
     (*Format.printf " Done.@." ;*) res
+    (*ignore mono ; (Subst.identity, t)*)
+
+let remove_redundant_vars mono t =
+    let vs = TVarSet.diff (vars t) mono |> TVarSet.destruct in
+    Utils.pairs vs vs
+    |> List.filter (fun (v1, v2) -> var_compare v1 v2 < 0)
+    |> List.fold_left (fun (res, t) (v1, v2) ->
+        let v1' = fresh_var () in
+        let v2' = fresh_var () in
+        let subst1 = Subst.construct [(v1, var_typ v1');(v2, var_typ v2')] in
+        let subst2 = Subst.construct [(v1, var_typ v2');(v2, var_typ v1')] in
+        let t1 = Subst.apply subst1 t in
+        let t2 = Subst.apply subst2 t in
+        if equiv t1 t2
+        then
+        let subst = Subst.construct [(v1, var_typ v2)] in
+        (Subst.compose subst res, Subst.apply subst t)
+        else (res, t)
+    ) (Subst.identity, t)    
 
 let hard_clean mono t =
     let t = clean_type ~pos:empty ~neg:any mono t in

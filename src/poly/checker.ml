@@ -312,6 +312,34 @@ let complete_fine_grained default_annot res =
     ) with Error -> complete default_annot res end
   | _ -> assert false
 
+let simplify_tallying_result mono subst res =
+  (*Format.printf "Subst: %a@.Res: %a@.Mono: %a@."
+    Subst.pp subst pp_typ res TVarSet.pp mono ;*)
+  let res =
+    let keep = TVarSet.union mono (vars res) in
+    let keep = (Subst.destruct subst) |> List.fold_left (fun keep (_,t) ->
+        let vt = TVarSet.diff (top_vars t) mono in
+        if TVarSet.inter keep vt |> TVarSet.is_empty
+        then
+          match vt |> TVarSet.destruct with
+          | [] -> keep
+          | v::_ -> TVarSet.add v keep
+        else keep
+      ) keep
+    in
+    (Subst.destruct subst) |> List.fold_left (fun total_subst (_,t) ->
+      vars_with_polarity t |> List.fold_left (fun total_subst (v,p) ->
+        if TVarSet.mem keep v || TVarSet.mem (Subst.dom total_subst) v
+          || TVarSet.mem mono v then total_subst
+        else match p with
+        | `Neg -> Subst.construct [(v,empty)] |> Subst.combine total_subst
+        | `Pos -> Subst.construct [(v,any)] |> Subst.combine total_subst
+        | `Both -> Subst.construct [(v,any)] |> Subst.combine total_subst
+      ) total_subst
+    ) Subst.identity
+  in
+  (*Format.printf "Simplification: %a@." Subst.pp res ;*) res
+
 exception NeedVar of (Variable.t * string)
 let need_var env v str =
   if Env.mem v env |> not
@@ -424,15 +452,19 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     let res =
       tallying_infer poly noninferred [(t1, arrow_typ)]
       |> List.map (fun sol ->
-      let poly_part =
-        (Subst.compose (Subst.restrict sol vs1) subst1,
-          Subst.compose (Subst.restrict sol vs2) subst2)
-      in
+      let poly1_part = Subst.compose (Subst.restrict sol vs1) subst1 in
+      let poly2_part = Subst.compose (Subst.restrict sol vs2) subst2 in
       let mono_part = Subst.restrict sol mono in
-      (* log ~level:1 "%a@." Subst.pp (fst poly_part) ;
-      log ~level:1 "%a@." Subst.pp (snd poly_part) ;
-      log ~level:1 "%a@." Subst.pp (mono_part) ; *)
-      (mono_part, poly_part)
+      (*log ~level:1 "%a@." Subst.pp (poly1_part) ;
+      log ~level:1 "%a@." Subst.pp (poly2_part) ;
+      log ~level:1 "%a@." Subst.pp (mono_part) ;*)
+      let simpl =
+        simplify_tallying_result mono mono_part (Subst.find' sol alpha) in
+      let (mono_part, poly1_part, poly2_part) =
+        (Subst.compose_restr simpl mono_part,
+         Subst.compose_restr simpl poly1_part,
+         Subst.compose_restr simpl poly2_part) in
+      (mono_part, (poly1_part, poly2_part))
     ) |> regroup Subst.equiv in
     Subst res |> map_res (fun sigmas -> AppA (List.split sigmas))
   | App (v1, v2), AppA (sigma1, sigma2) ->

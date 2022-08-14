@@ -95,6 +95,7 @@ val remove_field_info : typ -> string -> typ
 
 module type Subst = sig
     include Subst
+    val find' : t -> var -> typ
     val compose : t -> t -> t
     val compose_restr : t -> t -> t
     val combine : t -> t -> t
@@ -105,6 +106,7 @@ module type Subst = sig
 end
 module Subst : Subst
 val remove_redundant_vars : TVarSet.t -> typ -> Subst.t * typ
+val remove_redundant_vars_ext : TVarSet.t -> typ -> Subst.t * typ
 val hard_clean : TVarSet.t -> typ -> typ
 val fresh_var : unit -> var
 val instantiate : Subst.t list -> typ -> typ

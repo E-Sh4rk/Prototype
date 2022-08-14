@@ -469,23 +469,28 @@ let fresh_var () =
     mk_var (string_of_int !next_var_name)
 
 let remove_redundant_vars mono t =
-    (* TODO: compute it in a more optimized way *)
-    let vs = TVarSet.diff (vars t) mono |> TVarSet.destruct in
-    Utils.pairs vs vs
-    |> List.filter (fun (v1, v2) -> var_compare v1 v2 < 0)
-    |> List.fold_left (fun (res, t) (v1, v2) ->
-      let v1' = fresh_var () in
-      let v2' = fresh_var () in
-      let subst1 = Subst.construct [(v1, var_typ v1');(v2, var_typ v2')] in
-      let subst2 = Subst.construct [(v1, var_typ v2');(v2, var_typ v1')] in
-      let t1 = Subst.apply subst1 t in
-      let t2 = Subst.apply subst2 t in
-      if equiv t1 t2
-      then
-        let subst = Subst.construct [(v1, var_typ v2)] in
-        (Subst.compose subst res, Subst.apply subst t)
-      else (res, t)
-    ) (Subst.identity, t)
+    (*Format.printf "Started removing redundant vars in %a...@?" pp_typ t ;*)
+    let res =
+        (* TODO: compute it in a more optimized way *)
+        let vs = TVarSet.diff (vars t) mono |> TVarSet.destruct
+        |> List.sort var_compare in
+        Utils.pairs vs vs
+        |> List.filter (fun (v1, v2) -> var_compare v1 v2 < 0)
+        |> List.fold_left (fun (total_subst, t) (v1, v2) ->
+        let v' = fresh_var () in
+        let mono = vars t in
+        let subst = Subst.construct [(v1, var_typ v');(v2, var_typ v')] in
+        let t' = Subst.apply subst t in
+        let res = tallying ~var_order:[] mono [(t,t') ; (t',t)] in
+        match res with
+        | [] -> (total_subst, t)
+        | _::_ ->
+            let total_subst = Subst.compose subst total_subst in
+            let norm_subst = Subst.construct [(v', var_typ v1)] in
+            (Subst.compose norm_subst total_subst, Subst.apply norm_subst t')
+        ) (Subst.identity, t)
+    in
+    (*Format.printf " Done.@." ;*) res
 
 let hard_clean mono t =
     let t = clean_type ~pos:empty ~neg:any mono t in

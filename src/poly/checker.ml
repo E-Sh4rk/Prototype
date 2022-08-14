@@ -444,7 +444,10 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     let arrow_type = (mk_arrow (cons t2) any_node) in
     if subtype t1 arrow_type
     then (Ok (AppA (sigma1, sigma2)))
-    else assert false
+    else (
+      Format.printf "BEFORE INSTANCIATION@.t1:%a   ;   t2:%a@." pp_typ (Env.find v1 env) pp_typ (Env.find v2 env) ;
+      Format.printf "AFTER INSTANCIATION@.t1:%a   ;   t2:%a@." pp_typ t1 pp_typ t2 ;
+      assert false)
   | Ite (v, s, _, _), IteA [] ->
     need_var v "typecase" ;
     let t = Env.find v env in
@@ -469,8 +472,10 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
         (* TODO: remove redundant vars first, and then order by number of vars before removing redundant branches *)
         branches |> (*remove_empty_branches*) remove_redundant_branches mono
         |> List.map (fun (t,splits) ->
-          let (subst, t) = remove_redundant_vars mono t in
-          (t, Annot.apply_subst_split subst splits)
+          let (subst, t') = remove_redundant_vars mono t in
+          (*Format.printf "Before: %a@.Subst: %a@.After: %a@." pp_typ t
+            Subst.pp subst pp_typ t' ;*)
+          (t', Annot.apply_subst_split subst splits)
           )
       else branches in
     begin match branches with

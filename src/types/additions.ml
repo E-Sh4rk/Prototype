@@ -545,7 +545,11 @@ let check_tallying_solution var_order delta constr res =
         if (constr |> List.for_all (fun (l,r) ->
                 subtype (Subst.apply s l) (Subst.apply s r)
             ))
-        then Some s else (error := true ; None)
+        then Some s else begin
+            error := true ;
+            Format.printf "INVALID SOLUTION REMOVED: %a@." Subst.pp s ;
+            None
+        end
     )
     in
     if !error then begin
@@ -559,12 +563,11 @@ let check_tallying_solution var_order delta constr res =
     end ; res
 
 let tallying_infer poly noninfered constr =
-    assert (TVarSet.inter poly noninfered |> TVarSet.is_empty) ;
+    assert (TVarSet.inter (TVarSet.construct poly) noninfered |> TVarSet.is_empty) ;
     Utils.log ~level:2 "Tallying (inference) instance initiated...@?" ;
-    let var_order = TVarSet.destruct poly in
-    let res = tallying ~var_order noninfered constr in
+    let res = tallying ~var_order:poly noninfered constr in
     Utils.log ~level:2 " Done (%i sol).@." (List.length res) ;
-    res |> check_tallying_solution var_order noninfered constr
+    res |> check_tallying_solution poly noninfered constr
 
 let tallying mono constr =
     Utils.log ~level:2 "Tallying (no inference) instance initiated...@?" ;
@@ -581,9 +584,9 @@ let subtype_poly mono t1 t2 =
 let triangle_poly mono t s =
     let (vt',_,t') = fresh mono t in
     let alpha = fresh_var () in
-    let alphat = var_typ alpha in
     let delta = TVarSet.union mono (vars s) in
-    let res = tallying_infer vt' delta [(t', mk_arrow (cons alphat) (cons s))] in
+    let res = tallying_infer (TVarSet.destruct vt') delta
+        [(t', mk_arrow (var_typ alpha |> cons) (cons s))] in
     res |> List.map (fun subst ->
         Subst.find subst alpha |> clean_type ~pos:any ~neg:empty delta
     )

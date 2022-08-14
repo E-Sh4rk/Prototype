@@ -357,7 +357,9 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     log ~level:1 "Simple constraint: solving %a <= %a with delta=%a@."
       pp_typ t pp_typ s (pp_list pp_var) log_delta ;
     let poly = TVarSet.union (TVarSet.diff (vars s) mono) vs in
-    let res = tallying_infer poly noninferred [(t, s)] in
+    let res =
+      tallying_infer (TVarSet.destruct poly) (* TODO: put result var in first *)
+      noninferred [(t, s)] in
     let res = res |> List.map (fun sol ->
       (Subst.restrict sol mono, Subst.compose (Subst.restrict sol vs) tsubst)
     ) |> regroup Subst.equiv in
@@ -442,7 +444,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     let subst2 = Subst.combine subst2 subst2' in
     (*let (vs2,subst2,t2) = fresh mono (Env.find v2 env) in*)
     let alpha = fresh_var () in
-    let poly = TVarSet.union vs1 vs2 |> TVarSet.add alpha in
+    let poly = TVarSet.union vs1 vs2 |> TVarSet.destruct in
     let arrow_typ = mk_arrow (cons t2) (cons (var_typ alpha)) in
     let log_delta =
       TVarSet.inter noninferred (TVarSet.union (vars t1) (vars arrow_typ))
@@ -450,7 +452,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     log ~level:1 "Application: solving %a <= %a with delta=%a@."
       pp_typ t1 pp_typ arrow_typ (pp_list pp_var) log_delta ;
     let res =
-      tallying_infer poly noninferred [(t1, arrow_typ)]
+      tallying_infer (alpha::poly) noninferred [(t1, arrow_typ)]
       |> List.map (fun sol ->
       let poly1_part = Subst.compose (Subst.restrict sol vs1) subst1 in
       let poly2_part = Subst.compose (Subst.restrict sol vs2) subst2 in

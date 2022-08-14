@@ -64,3 +64,37 @@ let%test "tallying" [@tags "no-js"] =
   sol |> List.for_all (fun s ->
     subtype (Subst.apply s left_part) (Subst.apply s right_part)
   )
+
+let%test "tallying2" [@tags "no-js"] =
+  let av = mk_var "a" in
+  let xv = mk_var "x" in
+  let resv = Types.Additions.fresh_var () in
+  let left_part = mk_times (var_typ av |> cons) any_node in
+  let left_part = mk_arrow (cons left_part) (var_typ av |> cons) in
+  let right_part = mk_arrow (var_typ xv |> cons) (var_typ resv |> cons) in
+  Format.printf "%a@.%a@." pp_typ left_part pp_typ right_part ;
+  let constr = [left_part, right_part] in
+  let sol = tallying ~var_order:[resv;av] TVarSet.empty constr in
+  Format.printf "Number of solutions: %i@." (List.length sol) ;
+  sol |> List.for_all (fun s ->
+    Format.printf "%a@." Subst.pp s ;
+    subtype (Subst.apply s left_part) (Subst.apply s right_part)
+  )
+
+let%test "tallying3" [@tags "no-js"] =
+  let av = mk_var "a" in
+  let xv = mk_var "x" in
+  let sxv = mk_var "sx" in
+  let resv = Types.Additions.fresh_var () in
+  let left_part = mk_times (var_typ av |> cons) any_node in
+  let left_part = mk_arrow (cons left_part) (var_typ av |> cons) in
+  let right_part = cap (mk_times any_node (var_typ sxv |> cons)) (var_typ xv) in
+  let right_part = mk_arrow (cons right_part) (var_typ resv |> cons) in
+  Format.printf "%a@.%a@." pp_typ left_part pp_typ right_part ;
+  let constr = [left_part, right_part] in
+  let sol = tallying ~var_order:[resv;av] (TVarSet.construct [sxv]) constr in
+  Format.printf "Number of solutions: %i@." (List.length sol) ;
+  sol |> List.for_all (fun s ->
+    Format.printf "%a@." Subst.pp s ;
+    subtype (Subst.apply s left_part) (Subst.apply s right_part)
+  )

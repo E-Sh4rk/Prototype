@@ -345,8 +345,6 @@ let need_var env v str =
   if Env.mem v env |> not
   then raise (NeedVar (v, str))
 
-(* TODO: in the tallting instance for projections and record update,
-   we should capture the output in a fresh variable. *)
 let rec infer_a' _ tenv env mono noninferred annot_a a =
   let need_var = need_var env in
   let simple_constraint_infer v str s =
@@ -410,13 +408,21 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
   | Pair (v1, v2), NoneA | Let (v1, v2), NoneA ->
     need_var v1 "pair" ; need_var v2 "pair" ; Ok NoneA
   | Projection (Parsing.Ast.Field label, v), ProjA [] ->
-    let res = simple_constraint_infer v "projection" (record_any_with label) in
+    let alpha = fresh_var () |> var_typ in
+    let s = mk_record true [label, cons alpha] in
+    let res = simple_constraint_infer v "projection" s in
     map_res (fun sigma -> ProjA sigma) res
   | Projection (Parsing.Ast.Field label, v), ProjA sigma ->
     if simple_constraint_check v "projection" (record_any_with label) sigma
     then Ok (ProjA sigma) else assert false
-  | Projection (_, v), ProjA [] ->
-    let res = simple_constraint_infer v "projection" pair_any in
+  | Projection (p, v), ProjA [] ->
+    let alpha = fresh_var () |> var_typ in
+    let s =
+      if p = Parsing.Ast.Fst
+      then mk_times (cons alpha) any_node
+      else mk_times any_node (cons alpha)
+    in
+    let res = simple_constraint_infer v "projection" s in
     map_res (fun sigma -> ProjA sigma) res
   | Projection (_, v), ProjA sigma ->
     if simple_constraint_check v "projection" pair_any sigma

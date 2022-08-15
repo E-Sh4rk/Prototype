@@ -356,10 +356,9 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
       TVarSet.inter noninferred (vars t) |> TVarSet.destruct in
     log ~level:1 "Simple constraint: solving %a <= %a with delta=%a@."
       pp_typ t pp_typ s (pp_list pp_var) log_delta ;
-    let poly = TVarSet.union (TVarSet.diff (vars s) mono) vs in
-    let res =
-      tallying_infer (TVarSet.destruct poly) (* TODO: put result var in first *)
-      noninferred [(t, s)] in
+    let poly_t = vs |> TVarSet.destruct in
+    let poly_s = TVarSet.diff (vars s) mono |> TVarSet.destruct in
+    let res = tallying_infer (poly_s@poly_t) noninferred [(t, s)] in
     let res = res |> List.map (fun sol ->
       (Subst.restrict sol mono, Subst.compose (Subst.restrict sol vs) tsubst)
     ) |> regroup Subst.equiv in

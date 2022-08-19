@@ -469,7 +469,7 @@ end
 let next_var_name = ref 0
 let fresh_var () =
     next_var_name := !next_var_name + 1 ;
-    mk_var (string_of_int !next_var_name)
+    mk_var (Format.sprintf "$%i" !next_var_name)
 
 let remove_redundant_vars_ext mono t =
     (*Format.printf "Started removing redundant vars in %a...@?" pp_typ t ;*)

@@ -496,8 +496,9 @@ let remove_redundant_vars_ext mono t =
     Utils.log ~level:1 " Done.@." ; res
 
 let remove_redundant_vars mono t =
+    Utils.log ~level:1 "Started removing redundant vars in %a...@?" pp_typ t ;
     let vs = TVarSet.diff (vars t) mono |> TVarSet.destruct in
-    Utils.pairs vs vs
+    let res = Utils.pairs vs vs
     |> List.filter (fun (v1, v2) -> var_compare v1 v2 < 0)
     |> List.fold_left (fun (res, t) (v1, v2) ->
         let v1' = fresh_var () in
@@ -511,7 +512,8 @@ let remove_redundant_vars mono t =
         let subst = Subst.construct [(v1, var_typ v2)] in
         (Subst.compose subst res, Subst.apply subst t)
         else (res, t)
-    ) (Subst.identity, t)    
+    ) (Subst.identity, t)
+    in Utils.log ~level:1 " Done.@." ;  res
 
 let hard_clean mono t =
     let t = clean_type ~pos:empty ~neg:any mono t in

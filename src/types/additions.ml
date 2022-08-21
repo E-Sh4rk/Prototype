@@ -497,7 +497,8 @@ let remove_redundant_vars_ext mono t =
 
 let remove_redundant_vars mono t =
     Utils.log ~level:1 "Started removing redundant vars in %a...@?" pp_typ t ;
-    let vs = TVarSet.diff (vars t) mono |> TVarSet.destruct in
+    let vs = TVarSet.diff (vars t) mono |> TVarSet.destruct
+    |> List.sort (fun v1 v2 -> var_compare v2 v1) in
     let res = Utils.pairs vs vs
     |> List.filter (fun (v1, v2) -> var_compare v1 v2 < 0)
     |> List.fold_left (fun (res, t) (v1, v2) ->

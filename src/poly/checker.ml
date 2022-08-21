@@ -316,7 +316,7 @@ let simplify_tallying_result mono subst vres =
   (*Format.printf "Subst: %a@.Vres: %a@.Mono: %a@."
     Subst.pp subst pp_var vres TVarSet.pp mono ;*)
   (* TODO: Is this useful at all ??? *)
-  let dom = Subst.dom subst in
+  (* let dom = Subst.dom subst in
   let keep =
     List.fold_left (fun mono v ->
       let t = Subst.find subst v in
@@ -354,8 +354,9 @@ let simplify_tallying_result mono subst vres =
         ) in
       Subst.combine res (Subst.construct ns)
     ) Subst.identity (TVarSet.diff dom mono |> TVarSet.destruct)
-  in
+  in *)
   (*Format.printf "Keep: %a@.Simplification: %a@." TVarSet.pp keep Subst.pp res ;*)
+  let res = Subst.identity in ignore (mono, subst, vres) ;
   res
 
 exception NeedVar of (Variable.t * string)

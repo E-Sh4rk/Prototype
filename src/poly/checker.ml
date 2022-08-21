@@ -315,6 +315,7 @@ let complete_fine_grained default_annot res =
 let simplify_tallying_result mono subst vres =
   (*Format.printf "Subst: %a@.Vres: %a@.Mono: %a@."
     Subst.pp subst pp_var vres TVarSet.pp mono ;*)
+  (* TODO: Is this useful at all ??? *)
   let dom = Subst.dom subst in
   let keep =
     List.fold_left (fun mono v ->

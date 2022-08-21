@@ -472,11 +472,11 @@ let fresh_var () =
     mk_var (Format.sprintf "$%i" !next_var_name)
 
 let remove_redundant_vars_ext mono t =
-    (*Format.printf "Started removing redundant vars in %a...@?" pp_typ t ;*)
+    Utils.log ~level:1 "Started removing redundant vars in %a...@?" pp_typ t ;
     let res =
-        (* TODO *)
+        (* TODO: sometimes makes weird merging... Merging of "close" vars should be encouraged. *)
         let vs = TVarSet.diff (vars t) mono |> TVarSet.destruct
-        |> List.sort var_compare in
+        |> List.sort (fun v1 v2 -> var_compare v2 v1) in
         Utils.pairs vs vs
         |> List.filter (fun (v1, v2) -> var_compare v1 v2 < 0)
         |> List.fold_left (fun (total_subst, t) (v1, v2) ->
@@ -493,8 +493,7 @@ let remove_redundant_vars_ext mono t =
             (Subst.compose norm_subst total_subst, Subst.apply norm_subst t')
         ) (Subst.identity, t)
     in
-    (*Format.printf " Done.@." ;*) res
-    (*ignore mono ; (Subst.identity, t)*)
+    Utils.log ~level:1 " Done.@." ; res
 
 let remove_redundant_vars mono t =
     let vs = TVarSet.diff (vars t) mono |> TVarSet.destruct in

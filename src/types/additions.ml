@@ -527,7 +527,7 @@ let fresh_subst vars =
     let x = ref TVarSet.empty in
     let subst =
         vars |> TVarSet.destruct |> List.map
-            (fun v -> (v, let v = mk_var (var_name v) in x := TVarSet.add v !x; var_typ v))
+            (fun v -> (v, let v = fresh_var () in x := TVarSet.add v !x; var_typ v))
         |> Subst.construct
     in
     (!x, subst)

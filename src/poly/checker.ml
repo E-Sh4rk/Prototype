@@ -313,17 +313,31 @@ let complete_fine_grained default_annot res =
   | _ -> assert false
 
 let simplify_tallying_result mono subst vres =
-  Format.printf "Subst: %a@.Vres: %a@.Mono: %a@."
-    Subst.pp subst pp_var vres TVarSet.pp mono ;
-
+  (*Format.printf "Subst: %a@.Vres: %a@.Mono: %a@."
+    Subst.pp subst pp_var vres TVarSet.pp mono ;*)
+  let dom = Subst.dom subst in
+  let keep =
+    List.fold_left (fun mono v ->
+      let t = Subst.find subst v in
+      let name = (var_name v)^(var_name v) in
+      let nmv = vars_with_polarity t
+      |> List.filter_map (fun (v', pol) ->
+        if var_name v' = name
+        then match pol with
+        | `Pos -> Some (v')
+        | `Neg | `Both ->
+          Format.printf "Unexpected tallying result cannot be simplified.@."
+          ; None
+        else None
+        ) in
+      TVarSet.union mono (TVarSet.construct nmv)
+    ) mono (TVarSet.inter dom mono |> TVarSet.destruct) in
   let vt = vars (Subst.find' subst vres) in
   let keep =
-    if TVarSet.inter vt mono |> TVarSet.is_empty
-    then vt else TVarSet.empty
+    if TVarSet.inter vt keep |> TVarSet.is_empty
+    then TVarSet.union vt keep else keep
   in
-  (* TODO *)
   let res =
-    let keep = TVarSet.union mono keep in
     List.fold_left (fun res v ->
       let t = Subst.find subst v in
       let name = (var_name v)^(var_name v) in
@@ -338,9 +352,10 @@ let simplify_tallying_result mono subst vres =
         else None
         ) in
       Subst.combine res (Subst.construct ns)
-    ) Subst.identity (TVarSet.diff (Subst.dom subst) mono |> TVarSet.destruct)
+    ) Subst.identity (TVarSet.diff dom mono |> TVarSet.destruct)
   in
-  Format.printf "Simplification: %a@." Subst.pp res ; res
+  (*Format.printf "Keep: %a@.Simplification: %a@." TVarSet.pp keep Subst.pp res ;*)
+  res
 
 exception NeedVar of (Variable.t * string)
 let need_var env v str =

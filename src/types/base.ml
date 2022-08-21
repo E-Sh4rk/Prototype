@@ -10,6 +10,7 @@ type var = CD.Var.t
 let register s = 
   let module U = Encodings.Utf8 in
   CD.Types.Print.register_global "" (Ns.Uri.mk (U.mk ""), U.mk s) ?params:None
+let dump_typ = CD.Types.dump
 let pp_typ = CD.Types.Print.print_noname
 let show_typ t = Format.asprintf "%a" pp_typ t
 let pp_var = CD.Var.print

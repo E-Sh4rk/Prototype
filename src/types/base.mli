@@ -5,6 +5,7 @@ type typ = CD.Types.t
 type node = CD.Types.Node.t
 type var = CD.Var.t
 
+val dump_typ : Format.formatter -> typ -> unit
 val pp_typ : Format.formatter -> typ -> unit
 val show_typ : typ -> string
 val pp_var : Format.formatter -> var -> unit

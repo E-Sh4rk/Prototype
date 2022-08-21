@@ -312,14 +312,16 @@ let complete_fine_grained default_annot res =
     ) with Error -> complete default_annot res end
   | _ -> assert false
 
-let new_vars_to_keep mono t =
-  let vt = vars t in
-  if TVarSet.inter vt mono |> TVarSet.is_empty
-  then vt else TVarSet.empty
+let simplify_tallying_result mono subst vres =
+  Format.printf "Subst: %a@.Vres: %a@.Mono: %a@."
+    Subst.pp subst pp_var vres TVarSet.pp mono ;
 
-let simplify_tallying_result mono subst keep =
-  (*Format.printf "Subst: %a@.Res: %a@.Mono: %a@."
-    Subst.pp subst pp_typ res TVarSet.pp mono ;*)
+  let vt = vars (Subst.find' subst vres) in
+  let keep =
+    if TVarSet.inter vt mono |> TVarSet.is_empty
+    then vt else TVarSet.empty
+  in
+  (* TODO *)
   let res =
     let keep = TVarSet.union mono keep in
     List.fold_left (fun res v ->
@@ -338,7 +340,7 @@ let simplify_tallying_result mono subst keep =
       Subst.combine res (Subst.construct ns)
     ) Subst.identity (TVarSet.diff (Subst.dom subst) mono |> TVarSet.destruct)
   in
-  (*Format.printf "Simplification: %a@." Subst.pp res ;*) res
+  Format.printf "Simplification: %a@." Subst.pp res ; res
 
 exception NeedVar of (Variable.t * string)
 let need_var env v str =
@@ -347,7 +349,7 @@ let need_var env v str =
 
 let rec infer_a' _ tenv env mono noninferred annot_a a =
   let need_var = need_var env in
-  let simple_constraint_infer v str s =
+  let simple_constraint_infer v str s resvar =
     need_var v str ;
     let (vs,tsubst,t) = fresh mono (Env.find v env) in
     let log_delta =
@@ -358,15 +360,13 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     let poly_s = TVarSet.diff (vars s) mono |> TVarSet.destruct in
     let res = tallying_infer (poly_s@poly_t) noninferred [(t, s)] in
     let res = res |> List.map (fun sol ->
+      let simpl =
+        match resvar with
+        | None -> Subst.identity
+        | Some resvar -> simplify_tallying_result mono sol resvar in
+      let sol = Subst.compose_restr simpl sol in
       let mono_part = Subst.restrict sol mono in
       let poly_part = Subst.compose (Subst.restrict sol vs) tsubst in
-      let keep = List.fold_left (fun acc v ->
-        TVarSet.union acc (Subst.find' sol v |> new_vars_to_keep mono)
-        ) TVarSet.empty poly_s in
-      let simpl =
-        simplify_tallying_result mono mono_part keep in
-      let mono_part = Subst.compose_restr simpl mono_part in
-      let poly_part = Subst.compose_restr simpl poly_part in
       (mono_part, poly_part)
     ) |> regroup Subst.equiv in
     Subst res
@@ -417,28 +417,28 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
   | Pair (v1, v2), NoneA | Let (v1, v2), NoneA ->
     need_var v1 "pair" ; need_var v2 "pair" ; Ok NoneA
   | Projection (Parsing.Ast.Field label, v), ProjA [] ->
-    let alpha = fresh_var () |> var_typ in
-    let s = mk_record true [label, cons alpha] in
-    let res = simple_constraint_infer v "projection" s in
+    let alpha = fresh_var () in
+    let s = mk_record true [label, var_typ alpha |> cons] in
+    let res = simple_constraint_infer v "projection" s (Some alpha) in
     map_res (fun sigma -> ProjA sigma) res
   | Projection (Parsing.Ast.Field label, v), ProjA sigma ->
     if simple_constraint_check v "projection" (record_any_with label) sigma
     then Ok (ProjA sigma) else assert false
   | Projection (p, v), ProjA [] ->
-    let alpha = fresh_var () |> var_typ in
+    let alpha = fresh_var () in
     let s =
       if p = Parsing.Ast.Fst
-      then mk_times (cons alpha) any_node
-      else mk_times any_node (cons alpha)
+      then mk_times (var_typ alpha |> cons) any_node
+      else mk_times any_node (var_typ alpha |> cons)
     in
-    let res = simple_constraint_infer v "projection" s in
+    let res = simple_constraint_infer v "projection" s (Some alpha) in
     map_res (fun sigma -> ProjA sigma) res
   | Projection (_, v), ProjA sigma ->
     if simple_constraint_check v "projection" pair_any sigma
     then Ok (ProjA sigma) else assert false
   | RecordUpdate (v, _, o), RecordUpdateA [] ->
     (match o with None -> () | Some v' -> need_var v' "record update") ;
-    let res = simple_constraint_infer v "record update" record_any in
+    let res = simple_constraint_infer v "record update" record_any None in
     map_res (fun sigma -> RecordUpdateA sigma) res
   | RecordUpdate (v, _, o), RecordUpdateA sigma ->
     (match o with None -> () | Some v' -> need_var v' "record update") ;
@@ -468,18 +468,14 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     let res =
       tallying_infer (alpha::poly) noninferred [(t1, arrow_typ)]
       |> List.map (fun sol ->
+      let simpl = simplify_tallying_result mono sol alpha in
+      let sol = Subst.compose_restr simpl sol in
       let poly1_part = Subst.compose (Subst.restrict sol vs1) subst1 in
       let poly2_part = Subst.compose (Subst.restrict sol vs2) subst2 in
       let mono_part = Subst.restrict sol mono in
       (*log ~level:1 "%a@." Subst.pp (poly1_part) ;
       log ~level:1 "%a@." Subst.pp (poly2_part) ;
       log ~level:1 "%a@." Subst.pp (mono_part) ;*)
-      let simpl =
-        simplify_tallying_result mono mono_part
-        (Subst.find' sol alpha |> new_vars_to_keep mono) in
-      let mono_part = Subst.compose_restr simpl mono_part in
-      let poly1_part = Subst.compose_restr simpl poly1_part in
-      let poly2_part = Subst.compose_restr simpl poly2_part in
       (mono_part, (poly1_part, poly2_part))
     ) |> regroup Subst.equiv in
     Subst res |> map_res (fun sigmas -> AppA (List.split sigmas))
@@ -502,7 +498,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     if (subtype t s || subtype t (neg s)) |> not
     then Split [(Env.singleton v s, IteA []) ; (Env.singleton v (neg s), IteA [])]
     else
-      let res = simple_constraint_infer v "typecase" empty in
+      let res = simple_constraint_infer v "typecase" empty None in
       map_res (fun sigma -> IteA sigma) res
       |> complete_fine_grained (IteA [Subst.identity])
       (*Subst [(Subst.identity, IteA [Subst.identity])]*)

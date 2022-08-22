@@ -59,7 +59,7 @@ val disj : typ list -> typ
 val conj_o : typ list -> typ
 val disj_o : typ list -> typ
 
-val remove_negative_arrows : typ -> typ
+val reconstruct : typ -> typ
 
 val simplify_dnf : (typ * typ) list list -> (typ * typ) list list
 val simplify_typ : typ -> typ

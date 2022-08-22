@@ -49,6 +49,10 @@ val mk_new_typ: unit -> node
 val define_typ: node -> typ -> unit
 (*val normalize_typ: typ -> typ*)
 
+module Iter = CD.Types.Iter
+module type Kind = CD.Types.Kind
+
+
 val mk_times : node -> node -> typ
 val pair_any : typ
 val pi1 : typ -> typ

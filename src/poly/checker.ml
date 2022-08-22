@@ -534,10 +534,8 @@ let rec infer_a' _ tenv env env_inf mono noninferred annot_a a =
         (* TODO: remove redundant vars first, and then order by number of vars before removing redundant branches *)
         branches |> (*remove_empty_branches*) remove_redundant_branches mono
         |> List.map (fun (t,splits) ->
-          let (subst, t') = remove_redundant_vars mono t in
-          (*Format.printf "Before: %a@.Subst: %a@.After: %a@." pp_typ t
-            Subst.pp subst pp_typ t' ;*)
-          (t', Annot.apply_subst_split subst splits)
+          let (subst, t) = remove_redundant_vars mono t in
+          (t, Annot.apply_subst_split subst splits)
           )
       else branches in
     begin match branches with

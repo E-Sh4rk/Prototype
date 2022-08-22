@@ -145,6 +145,9 @@ let define_typ = CD.Types.define
 
 (*let normalize_typ = CD.Types.normalize*)
 
+module Iter = CD.Types.Iter
+module type Kind = CD.Types.Kind
+
 
 let mk_times = CD.Types.times
 

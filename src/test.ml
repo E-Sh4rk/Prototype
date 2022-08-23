@@ -1,8 +1,18 @@
 
 let fst2 = <('a, Any) -> 'a>
 let snd2 = <(Any, 'a) -> 'a>
-debug 2 let and2_ = fun x ->
+let and2_ = fun x ->
   if fst2 x is True then if snd2 x is True then fst2 x else false else false
+
+(* ======================================= *)
+
+let typeof x =
+  if x is String then "String"
+  else if x is Char then "Char"
+  else if x is Int then "Number"
+  else if x is Bool then "Boolean"
+  else if x is Unit|Nil then "Nil"
+  else "Object"
 
 (* ======================================= *)
 

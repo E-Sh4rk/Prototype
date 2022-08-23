@@ -81,7 +81,6 @@ val arrow_any : typ
 val domain : typ -> typ
 val apply : typ -> typ -> typ
 val dnf : typ -> (typ * typ) list list
-val raw_dnf : typ -> ((var list * var list) * ((node * node) list * (node * node) list)) list
 
 module type TVarSet = sig
     type t

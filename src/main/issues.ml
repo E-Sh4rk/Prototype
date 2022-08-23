@@ -223,14 +223,6 @@ let apply t args =
 let dnf t =
   snd (CD.Types.Arrow.get t)
 
-let raw_dnf t =
-  let dnf = CD.Types.Function.get_vars t |> CD.Types.Function.Dnf.get_full in
-  dnf |> List.map (fun ((pvs, nvs), expl) ->
-    let pvs = List.map (CD.Types.var) pvs in
-    let nvs = List.map (CD.Types.var) nvs in
-    ((pvs, nvs), expl)
-  )
-
 module type TVarSet = sig
   type t
   val empty : t

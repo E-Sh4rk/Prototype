@@ -216,8 +216,6 @@ let apply t args =
 let dnf t =
   snd (CD.Types.Arrow.get t)
 
-let raw_dnf t = CD.Types.Function.get_vars t |> CD.Types.Function.Dnf.get_full
-
 module type TVarSet = sig
   type t
   val empty : t

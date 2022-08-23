@@ -14,15 +14,6 @@ exception Ill_typed of Position.t list * string
 
 let pp_splits = Utils.pp_list pp_typ
 
-(*let count_conjuncts t =
-  let f (_, (p,n)) = (List.length p) + (List.length n) in
-  raw_dnf t |> List.map f
-let sum_conjuncts t =
-  count_conjuncts t |> List.fold_left (fun acc i -> acc+i) 0
-let pp_splits fmt splits =
-  let pp_int fmt = Format.fprintf fmt "%i" in
-  (pp_list pp_int) fmt (List.map sum_conjuncts splits)*)
-
 let pp_lambda_splits fmt =
   let pp_lsplit fmt (s,(_,t,b)) =
     Format.fprintf fmt "%a -> %a (%b)" pp_typ s pp_typ t b

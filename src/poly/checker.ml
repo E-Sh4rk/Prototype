@@ -181,7 +181,7 @@ let refine_a env mono a t = (* empty possibilites are often omitted *)
 (* ===== VAR DEPENDENCY ANALYZER ===== *)
 
 let analyze_dependencies env e =
-  (* TODO: Fix (seems unsound) *)
+  (* TODO: Improve... *)
   let fv = Msc.fv_e e in
   let rec aux_a a =
     match a with
@@ -207,7 +207,7 @@ let analyze_dependencies env e =
           then
             let dep = VarSet.singleton v |> VarSet.add v2 in
             (dep, dep)
-          else (VarSet.singleton v, VarSet.singleton v)
+          else (VarSet.singleton v, VarSet.singleton v |> VarSet.add v1 |> VarSet.add v2)
         else (VarSet.singleton v, VarSet.singleton v)
       else (VarSet.singleton v, VarSet.singleton v |> VarSet.add v1 |> VarSet.add v2)
     | Lambda ((), _, _, e) -> aux e

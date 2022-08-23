@@ -207,7 +207,7 @@ let analyze_dependencies env e =
           then
             let dep = VarSet.singleton v |> VarSet.add v2 in
             (dep, dep)
-          else (VarSet.singleton v, VarSet.singleton v |> VarSet.add v1 |> VarSet.add v2)
+          else (VarSet.singleton v, VarSet.singleton v (*|> VarSet.add v1 |> VarSet.add v2*))
         else (VarSet.singleton v, VarSet.singleton v)
       else (VarSet.singleton v, VarSet.singleton v |> VarSet.add v1 |> VarSet.add v2)
     | Lambda ((), _, _, e) -> aux e
@@ -492,9 +492,9 @@ let rec infer_a' _ tenv env env_inf mono noninferred annot_a a =
       let poly1_part = Subst.compose (Subst.restrict sol vs1) subst1 in
       let poly2_part = Subst.compose (Subst.restrict sol vs2) subst2 in
       let mono_part = Subst.restrict sol mono in
-      (*log ~level:1 "%a@." Subst.pp (poly1_part) ;
-      log ~level:1 "%a@." Subst.pp (poly2_part) ;
-      log ~level:1 "%a@." Subst.pp (mono_part) ;*)
+      (* log ~level:0 "%a@." Subst.pp (poly1_part) ;
+      log ~level:0 "%a@." Subst.pp (poly2_part) ; *)
+      (* log ~level:0 "%a@." Subst.pp (mono_part) ; *)
       (mono_part, (poly1_part, poly2_part))
     ) |> regroup Subst.equiv in
     Subst res |> map_res (fun sigmas -> AppA (List.split sigmas))

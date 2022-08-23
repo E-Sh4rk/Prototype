@@ -16,7 +16,7 @@ let pp_splits = Utils.pp_list pp_typ
 
 (*let count_conjuncts t =
   let f (_, (p,n)) = (List.length p) + (List.length n) in
-  full_dnf t |> List.map f
+  raw_dnf t |> List.map f
 let sum_conjuncts t =
   count_conjuncts t |> List.fold_left (fun acc i -> acc+i) 0
 let pp_splits fmt splits =

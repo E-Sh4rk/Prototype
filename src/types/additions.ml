@@ -186,77 +186,14 @@ let branch_type lst =
     end
 
 let full_branch_type ((pvs, nvs), (ps, ns)) =
-    let pvs = pvs |> conj in
-    let nvs = nvs |> List.map neg |> conj in
+    let pvs = pvs |> List.map var_typ |> conj in
+    let nvs = nvs |> List.map var_typ |> List.map neg |> conj in
     let ps = ps |>
         List.map (fun (a, b) -> mk_arrow a b) |> conj in
     let ns = ns |>
         List.map (fun (a, b) -> mk_arrow a b |> neg) |> conj in
     let t = [pvs;nvs;ps;ns] |> conj in
     cap arrow_any t
-
-module NHT = Hashtbl.Make(CD.Types.Node)
-let reconstruct t =
-    let cache = NHT.create 5 in
-    let rec aux node =
-        match NHT.find_opt cache node with
-        | Some n -> n
-        | None ->
-            let n = mk_new_typ () in
-            NHT.add cache node n ;
-            let open Iter in
-            let t = fold (fun acc pack t ->
-                let t = match pack with
-                | Absent -> absent
-                | Abstract m | Char m | Int m | Atom m ->
-                    let module K = (val m : Kind) in
-                    K.get_vars t |> K.mk
-                | Times m ->
-                    let module K = (val m) in
-                    K.get_vars t |> K.Dnf.get_full |>
-                    List.map (fun ((pvs,nvs), (ps, ns)) ->
-                        let vars = cap (List.map var_typ pvs |> conj)
-                            (List.map var_typ nvs |> List.map neg |> conj) in
-                        let positive = List.map (fun (n1, n2) ->
-                            mk_times (aux n1) (aux n2)
-                            ) ps |> conj in
-                        let negative = List.map (fun (n1, n2) ->
-                            mk_times (aux n1) (aux n2) |> neg
-                            ) ns |> conj in
-                        conj [vars;positive;negative] |> cap pair_any
-                    ) |> disj
-                | Xml m ->
-                    let module K = (val m) in
-                    let dnf = K.get_vars t in
-                    (* TODO *)
-                    K.mk dnf
-                | Function m ->
-                    let module K = (val m) in
-                    K.get_vars t |> K.Dnf.get_full |>
-                    List.map (fun ((pvs,nvs), (ps, ns)) ->
-                        let vars = cap (List.map var_typ pvs |> conj)
-                            (List.map var_typ nvs |> List.map neg |> conj) in
-                        let positive = List.map (fun (n1, n2) ->
-                            mk_arrow (aux n1) (aux n2)
-                            ) ps |> conj in
-                        let negative = List.map (fun (n1, n2) ->
-                            mk_arrow (aux n1) (aux n2) |> neg
-                            ) ns |> conj in
-                        conj [vars;positive;negative] |> cap arrow_any
-                    ) |> disj
-                | Record m ->
-                    let module K = (val m) in
-                    let dnf = K.get_vars t in
-                    (* TODO *)
-                    K.mk dnf
-                in
-                cup acc t
-            ) empty (descr node) in
-            define_typ n t ; n
-    in
-    let res = aux (cons t) |> descr in
-    assert (equiv res t) ;
-    res
 
 let rec take_one lst =
     match lst with
@@ -335,7 +272,7 @@ let regroup_conjuncts ((pvs, nvs), (ps, ns)) =
         List.map (fun (a,b) -> (cons a, cons b)) in
     ((pvs, nvs), (ps, ns))
 
-let simplify_full_dnf dnf =
+let simplify_raw_dnf dnf =
     (* Remove useless conjuncts *)
     let rec aux (kept, kt) rem =
         match rem with
@@ -364,13 +301,6 @@ let simplify_full_dnf dnf =
     (* Regroup positive conjuncts with similar domain/codomain  *)
     List.map regroup_conjuncts dnf
 
-let simplify_typ t =
-    (*Utils.log ~level:2 "Simplifying type...@?" ;*)
-    let arrow = t |> full_dnf |> simplify_full_dnf |> List.map full_branch_type |> disj in
-    let non_arrow = diff t arrow_any in
-    let res = cup arrow non_arrow (*|> normalize_typ*) in
-    assert (equiv res t) (*; Utils.log ~level:2 " Done.@."*) ; res
-
 let is_test_type t =
     let is_non_trivial_arrow t =
         let arrow_part = cap t arrow_any in
@@ -390,6 +320,65 @@ let is_test_type t =
         end
     in
     aux t
+
+module NHT = Hashtbl.Make(CD.Types.Node)
+let simplify_typ t =
+    (*Utils.log ~level:2 "Simplifying type...@?" ;*)
+    let cache = NHT.create 5 in
+    let rec aux node =
+        match NHT.find_opt cache node with
+        | Some n -> n
+        | None ->
+            let n = mk_new_typ () in
+            NHT.add cache node n ;
+            let open Iter in
+            let t = fold (fun acc pack t ->
+                let t = match pack with
+                | Absent -> absent
+                | Abstract m | Char m | Int m | Atom m ->
+                    let module K = (val m : Kind) in
+                    K.get_vars t |> K.mk
+                | Times m ->
+                    let module K = (val m) in
+                    K.get_vars t |> K.Dnf.get_full |> (* TODO *)
+                    List.map (fun ((pvs,nvs), (ps, ns)) ->
+                        Format.printf "(%i,%i), (%i,%i)@." (List.length pvs)
+                        (List.length nvs) (List.length ps) (List.length ns);
+                        let vars = cap (List.map var_typ pvs |> conj)
+                            (List.map var_typ nvs |> List.map neg |> conj) in
+                        let positive = List.map (fun (n1, n2) ->
+                            mk_times (aux n1) (aux n2)
+                            ) ps |> conj in
+                        let negative = List.map (fun (n1, n2) ->
+                            mk_times (aux n1) (aux n2) |> neg
+                            ) ns |> conj in
+                        conj [vars;positive;negative] |> cap pair_any
+                    ) |> disj
+                | Xml m ->
+                    let module K = (val m) in
+                    let dnf = K.get_vars t in
+                    (* TODO *)
+                    K.mk dnf
+                | Function m ->
+                    let module K = (val m) in
+                    K.get_vars t |> K.Dnf.get_full |>
+                    List.map (fun ((pvs,nvs), (ps,ns)) ->
+                        ((pvs,nvs), (List.map (fun (a,b) -> (aux a, aux b)) ps,
+                        List.map (fun (a,b) -> (aux a, aux b)) ns))
+                    ) |> simplify_raw_dnf |> List.map full_branch_type |> disj
+                | Record m ->
+                    let module K = (val m) in
+                    let dnf = K.get_vars t in
+                    (* TODO *)
+                    K.mk dnf
+                in
+                cup acc t
+            ) empty (descr node) in
+            define_typ n t ; n
+    in
+    let res = aux (cons t) |> descr in
+    assert (equiv res t) ;(* Utils.log ~level:2 " Done.@." ;*)
+    res
 
 let square_approx f out =
     let res = dnf f |> List.map begin
@@ -564,10 +553,8 @@ let remove_redundant_vars mono t =
         let v2' = fresh_var () in
         let subst1 = Subst.construct [(v1, var_typ v1');(v2, var_typ v2')] in
         let subst2 = Subst.construct [(v1, var_typ v2');(v2, var_typ v1')] in
-        (* Format.printf "BEFORE: %a@." dump_typ t ; *)
         let t1 = Subst.apply subst1 t in
         let t2 = Subst.apply subst2 t in
-        (* Format.printf "AFTER: %a@." dump_typ t1 ; *)
         if equiv t1 t2
         then
         let subst = Subst.construct [(v1, var_typ v2)] in

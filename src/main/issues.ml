@@ -223,7 +223,7 @@ let apply t args =
 let dnf t =
   snd (CD.Types.Arrow.get t)
 
-let full_dnf t =
+let raw_dnf t =
   let dnf = CD.Types.Function.get_vars t |> CD.Types.Function.Dnf.get_full in
   dnf |> List.map (fun ((pvs, nvs), expl) ->
     let pvs = List.map (CD.Types.var) pvs in

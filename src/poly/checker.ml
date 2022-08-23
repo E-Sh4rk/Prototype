@@ -181,6 +181,7 @@ let refine_a env mono a t = (* empty possibilites are often omitted *)
 (* ===== VAR DEPENDENCY ANALYZER ===== *)
 
 let analyze_dependencies env e =
+  (* TODO: Fix (seems unsound) *)
   let fv = Msc.fv_e e in
   let rec aux_a a =
     match a with
@@ -511,28 +512,28 @@ let rec infer_a' _ tenv env env_inf mono noninferred annot_a a =
       Format.printf "AFTER INSTANCIATION@.t1:%a   ;   t2:%a@." pp_typ t1 pp_typ t2 ;
       assert false)
   | Ite (v, s, _, _), IteA [] ->
-    need_var v "typecase" ;
-    let t = Env.find v env in
-    if (subtype t s || subtype t (neg s)) |> not
-    then Split [(Env.singleton v s, IteA []) ; (Env.singleton v (neg s), IteA [])]
-    else
-      let res = simple_constraint_infer v "typecase" empty None in
+    let res1 = simple_constraint_infer v "typecase" s None in
+    let res2 = simple_constraint_infer v "typecase" (neg s) None in
+    begin match res1, res2 with
+    | Subst res1, Subst res2 ->
+      let res = Subst (res1@res2) in
       map_res (fun sigma -> IteA sigma) res
       |> complete_fine_grained (IteA [Subst.identity])
       (*Subst [(Subst.identity, IteA [Subst.identity])]*)
+    | _, _ -> assert false
+    end
   | Ite (v, s, v1, v2), IteA sigma ->
     need_var v "typecase" ;
     let t = instantiate sigma (Env.find v env) in
     if is_empty t then Ok (IteA sigma)
     else if subtype t s then (need_var v1 "typecase" ; Ok (IteA sigma))
     else if subtype t (neg s) then (need_var v2 "typecase" ; Ok (IteA sigma))
-    else assert false
+    else Split [(Env.singleton v s, IteA sigma) ; (Env.singleton v (neg s), IteA sigma)]
   | Lambda ((), ua, v, e), LambdaA branches ->
     let inferred = ua = Parsing.Ast.Unnanoted in
     let branches =
       if inferred then
-        (* TODO: remove redundant vars first, and then order by number of vars before removing redundant branches *)
-        branches |> (*remove_empty_branches*) remove_redundant_branches mono
+        branches |> remove_empty_branches (*remove_redundant_branches mono*)
         |> List.map (fun (t,splits) ->
           let (subst, t) = remove_redundant_vars mono t in
           (t, Annot.apply_subst_split subst splits)
@@ -615,10 +616,12 @@ and infer' tenv env env_inf mono noninferred annot e =
         let annot = DoA (t, annot_a, splits) in
         infer' tenv env env_inf mono noninferred annot e
       | _, _ , _->
-        log ~level:0 "Definition is typeable, but its type cannot be handled.@." ; fail
+        log ~level:0 "Definition %s is typeable, but its type cannot be handled.@."
+          (Variable.show v) ; fail
       end
     | Subst lst, Some k1 when skippable ->
-      log ~level:0 "The definition needs a substitution and is skippable. Adding a default branch...@." ;
+      log ~level:0 "The definition %s needs a substitution and is skippable. Adding a default branch...@."
+        (Variable.show v);
       let res = (Subst lst) |> map_res (fun annot_a -> UnkA (annot_a, s, Some k1, k2)) in
       complete_fine_grained (SkipA k1) res
     | res, _ ->

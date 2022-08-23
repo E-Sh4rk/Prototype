@@ -325,24 +325,26 @@ let simplify_raw_product_dnf ~open_nodes dnf =
     (* TODO *) ignore (open_nodes) ; dnf
 
 let is_test_type t =
-    let is_non_trivial_arrow t =
-        let arrow_part = cap t arrow_any in
-        (is_empty arrow_part || subtype arrow_any arrow_part) |> not
-    in
-    let memo = Hashtbl.create 10 in
-    let rec aux t =
-        try Hashtbl.find memo t
-        with Not_found -> begin
-            if is_non_trivial_arrow t
-            then (Hashtbl.add memo t false ; false)
-            else begin
-                Hashtbl.add memo t true ;
-                split_pair t |>
-                List.for_all (fun (x,y) -> aux x && aux y)
+    if vars t |> TVarSet.is_empty
+    then
+        let is_non_trivial_arrow t =
+            let arrow_part = cap t arrow_any in
+            (is_empty arrow_part || subtype arrow_any arrow_part) |> not
+        in
+        let memo = Hashtbl.create 10 in
+        let rec aux t =
+            try Hashtbl.find memo t
+            with Not_found -> begin
+                if is_non_trivial_arrow t
+                then (Hashtbl.add memo t false ; false)
+                else begin
+                    Hashtbl.add memo t true ;
+                    split_pair t |>
+                    List.for_all (fun (x,y) -> aux x && aux y)
+                end
             end
-        end
-    in
-    aux t
+        in aux t
+    else false
 
 let simplify_typ t =
     (*Utils.log ~level:2 "Simplifying type...@?" ;*)

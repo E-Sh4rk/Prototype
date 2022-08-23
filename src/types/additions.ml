@@ -201,14 +201,17 @@ let rec take_one lst =
     | e::lst ->
         (e, lst)::(List.map (fun (e',lst) -> (e',e::lst)) (take_one lst))
 
-let rec regroup_conjuncts conjuncts =
+module NHT = Hashtbl.Make(CD.Types.Node)
+let rec regroup_conjuncts ~open_nodes conjuncts =
     let rec aux (l,r) lst = match lst with
     | [] -> ((l,r), [])
     | (l',r')::lst ->
-        if equiv l l'
-        then aux (l, cap r r') lst
-        else if equiv r r'
-        then aux (cup l l', r) lst
+        if (NHT.mem open_nodes r |> not) && (NHT.mem open_nodes r' |> not)
+            && equiv (descr l) (descr l')
+        then aux (l, cap (descr r) (descr r') |> cons) lst
+        else if (NHT.mem open_nodes l |> not) && (NHT.mem open_nodes l' |> not)
+            && equiv (descr r) (descr r')
+        then aux (cup (descr l) (descr l') |> cons, r) lst
         else
             let ((l,r),lst) = aux (l,r) lst in
             ((l,r), (l',r')::lst)
@@ -217,7 +220,13 @@ let rec regroup_conjuncts conjuncts =
     | [] -> []
     | (l, r)::lst ->
         let ((l,r),lst) = aux (l,r) lst in
-        (l,r)::(regroup_conjuncts lst)
+        (l,r)::(regroup_conjuncts ~open_nodes lst)
+
+let regroup_conjuncts_descr ps =
+    ps |>
+    List.map (fun (a,b) -> (cons a, cons b)) |>
+    regroup_conjuncts ~open_nodes:(NHT.create 0) |>
+    List.map (fun (a,b) -> (descr a, descr b))
 
 let simplify_dnf dnf =
     let splits = List.map branch_type dnf in
@@ -235,7 +244,7 @@ let simplify_dnf dnf =
             rm (fun t ts -> subtype (conj ts) t) [] (* Remove redundant conjuncts *)
         in
         (* Regroup conjuncts with similar domain/codomain *)
-        conjuncts |> List.split |> fst |> regroup_conjuncts
+        conjuncts |> List.split |> fst |> regroup_conjuncts_descr
     in
     rm (fun t ts -> subtype t (disj ts)) [] splits
     |> List.map simplify_conjuncts        
@@ -265,14 +274,10 @@ let remove_useless_conjuncts dc ((pvs, nvs), (ps, ns)) =
     let ns = remove_useless_conjuncts ~n:true dc context ns in
     ((pvs, nvs), (ps, ns))
 
-let regroup_conjuncts ((pvs, nvs), (ps, ns)) =
-    let ps = ps |>
-        List.map (fun (a,b) -> (descr a, descr b)) |>
-        regroup_conjuncts |>
-        List.map (fun (a,b) -> (cons a, cons b)) in
-    ((pvs, nvs), (ps, ns))
-
-let simplify_raw_dnf dnf =
+let simplify_raw_dnf ~open_nodes dnf =
+    let regroup_conjuncts (vars, (ps, ns)) =
+        (vars, (regroup_conjuncts ~open_nodes ps, ns))
+    in
     (* Remove useless conjuncts *)
     let rec aux (kept, kt) rem =
         match rem with
@@ -321,7 +326,6 @@ let is_test_type t =
     in
     aux t
 
-module NHT = Hashtbl.Make(CD.Types.Node)
 let simplify_typ t =
     (*Utils.log ~level:2 "Simplifying type...@?" ;*)
     let cache = NHT.create 5 in
@@ -340,20 +344,9 @@ let simplify_typ t =
                     K.get_vars t |> K.mk
                 | Times m ->
                     let module K = (val m) in
-                    K.get_vars t |> K.Dnf.get_full |> (* TODO *)
-                    List.map (fun ((pvs,nvs), (ps, ns)) ->
-                        Format.printf "(%i,%i), (%i,%i)@." (List.length pvs)
-                        (List.length nvs) (List.length ps) (List.length ns);
-                        let vars = cap (List.map var_typ pvs |> conj)
-                            (List.map var_typ nvs |> List.map neg |> conj) in
-                        let positive = List.map (fun (n1, n2) ->
-                            mk_times (aux n1) (aux n2)
-                            ) ps |> conj in
-                        let negative = List.map (fun (n1, n2) ->
-                            mk_times (aux n1) (aux n2) |> neg
-                            ) ns |> conj in
-                        conj [vars;positive;negative] |> cap pair_any
-                    ) |> disj
+                    let dnf = K.get_vars t in
+                    (* TODO *)
+                    K.mk dnf
                 | Xml m ->
                     let module K = (val m) in
                     let dnf = K.get_vars t in
@@ -361,11 +354,13 @@ let simplify_typ t =
                     K.mk dnf
                 | Function m ->
                     let module K = (val m) in
-                    K.get_vars t |> K.Dnf.get_full |>
-                    List.map (fun ((pvs,nvs), (ps,ns)) ->
-                        ((pvs,nvs), (List.map (fun (a,b) -> (aux a, aux b)) ps,
+                    K.get_vars t |> K.Dnf.get_full
+                    |> simplify_raw_dnf ~open_nodes:cache
+                    |> List.map (fun (vars, (ps,ns)) ->
+                        (vars, (List.map (fun (a,b) -> (aux a, aux b)) ps,
                         List.map (fun (a,b) -> (aux a, aux b)) ns))
-                    ) |> simplify_raw_dnf |> List.map full_branch_type |> disj
+                        |> full_branch_type
+                    ) |> disj
                 | Record m ->
                     let module K = (val m) in
                     let dnf = K.get_vars t in

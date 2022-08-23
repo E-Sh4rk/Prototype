@@ -264,7 +264,7 @@ let complete_fine_grained default_annot res =
   match res with
   | Subst lst ->
     let substs = lst |> List.map fst in
-    (*log "Initial: %a@." Annot.pp_substs substs ;*)
+    (* log "Initial: %a@." Annot.pp_substs substs ; *)
     let rec choose lst = match lst with
     | [] -> [[]]
     | subst::lst ->
@@ -308,7 +308,7 @@ let complete_fine_grained default_annot res =
         else (s,a)::(filter defs)
     in
     let defs = filter defs in
-    (*log "Added: %a@." Annot.pp_substs (List.map fst defs) ;*)
+    (* log "Added: %a@." Annot.pp_substs (List.map fst defs) ; *)
     Subst (defs@lst)
     ) with Error -> complete default_annot res end
   | _ -> assert false
@@ -512,16 +512,19 @@ let rec infer_a' _ tenv env env_inf mono noninferred annot_a a =
       Format.printf "AFTER INSTANCIATION@.t1:%a   ;   t2:%a@." pp_typ t1 pp_typ t2 ;
       assert false)
   | Ite (v, s, _, _), IteA [] ->
-    let res1 = simple_constraint_infer v "typecase" s None in
-    let res2 = simple_constraint_infer v "typecase" (neg s) None in
-    begin match res1, res2 with
-    | Subst res1, Subst res2 ->
-      let res = Subst (res1@res2) in
+    need_var v "typecase" ;
+    let t = Env.find v env in
+    if subtype t s
+    then
+      let res = simple_constraint_infer v "typecase" s None in
       map_res (fun sigma -> IteA sigma) res
       |> complete_fine_grained (IteA [Subst.identity])
-      (*Subst [(Subst.identity, IteA [Subst.identity])]*)
-    | _, _ -> assert false
-    end
+    else if subtype t (neg s) then
+      let res = simple_constraint_infer v "typecase" (neg s) None in
+      map_res (fun sigma -> IteA sigma) res
+      |> complete_fine_grained (IteA [Subst.identity])
+    else
+      Split [(Env.singleton v s, IteA []) ; (Env.singleton v (neg s), IteA [])]
   | Ite (v, s, v1, v2), IteA sigma ->
     need_var v "typecase" ;
     let t = instantiate sigma (Env.find v env) in

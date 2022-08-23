@@ -603,8 +603,7 @@ let fresh mono t =
     let (x, subst) = fresh_subst poly in
     (x, subst, Subst.apply subst t)
 
-let check_tallying_solution var_order delta constr res =
-    (* TODO: Investigate this Cduce issue. *)
+(* let check_tallying_solution var_order delta constr res =
     let error = ref false in
     let res =
         res |> List.filter_map (fun s ->
@@ -626,21 +625,21 @@ let check_tallying_solution var_order delta constr res =
         Format.printf "With delta=%a and var order=%a@."
             (Utils.pp_list pp_var) (TVarSet.destruct delta)
             (Utils.pp_list pp_var) var_order ;
-    end ; res
+    end ; res *)
 
 let tallying_infer poly noninfered constr =
     assert (TVarSet.inter (TVarSet.construct poly) noninfered |> TVarSet.is_empty) ;
     Utils.log ~level:2 "Tallying (inference) instance initiated...@?" ;
     let res = tallying ~var_order:poly noninfered constr in
     Utils.log ~level:2 " Done (%i sol).@." (List.length res) ;
-    res |> check_tallying_solution poly noninfered constr
+    res (*|> check_tallying_solution poly noninfered constr*)
 
 let tallying mono constr =
     Utils.log ~level:2 "Tallying (no inference) instance initiated...@?" ;
     let var_order = [] in
     let res = tallying ~var_order mono constr in
     Utils.log ~level:2 " Done (%i sol).@." (List.length res) ;
-    res |> check_tallying_solution [] mono constr
+    res (*|> check_tallying_solution [] mono constr*)
 
 let subtype_poly mono t1 t2 =
     let (xs, _, t) = fresh mono t2 in

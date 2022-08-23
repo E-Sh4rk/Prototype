@@ -505,8 +505,6 @@ let rec infer_a' _ tenv env env_inf mono noninferred annot_a a =
       Format.printf "AFTER INSTANCIATION@.t1:%a   ;   t2:%a@." pp_typ t1 pp_typ t2 ;
       assert false)
   | Ite (v, s, _, _), IteA [] ->
-    (* NOTE: Differ from the formalism (avoids redundances) *)
-    (* TODO: Is it really the simplest? Maybe splits should't be ignored in this tallying instance. *)
     need_var v "typecase" ;
     let t = Env.find v env in
     if subtype t s
@@ -526,7 +524,8 @@ let rec infer_a' _ tenv env env_inf mono noninferred annot_a a =
     if is_empty t then Ok (IteA sigma)
     else if subtype t s then (need_var v1 "typecase" ; Ok (IteA sigma))
     else if subtype t (neg s) then (need_var v2 "typecase" ; Ok (IteA sigma))
-    else Split [(Env.singleton v s, IteA sigma) ; (Env.singleton v (neg s), IteA sigma)]
+    else assert false
+      (*Split [(Env.singleton v s, IteA sigma) ; (Env.singleton v (neg s), IteA sigma)]*)
   | Lambda ((), ua, v, e), LambdaA branches ->
     let inferred = ua = Parsing.Ast.Unnanoted in
     let branches =

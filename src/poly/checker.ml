@@ -251,15 +251,14 @@ let map_res f res =
   | Subst lst ->
     Subst (lst |> List.map (fun (s,a) -> (s, f a)))
 
-let complete default_annot res =
+(* let complete default_annot res =
   match res with
   | Subst lst ->
     if List.for_all (fun (sigma, _) -> Subst.is_identity sigma |> not) lst
     then Subst ((Subst.identity, default_annot)::lst)
     else res
-  | _ -> assert false
+  | _ -> assert false *)
 
-exception Error
 let complete_fine_grained default_annot res =
   match res with
   | Subst lst ->
@@ -274,14 +273,13 @@ let complete_fine_grained default_annot res =
       ) |> List.flatten
     in
     let possibilities = choose substs in
-    begin try (
     let defs =
       possibilities |> List.map (
         fun lst ->
           let parts = lst |> List.map (fun (v,t) ->
             let t = clean_type ~pos:any ~neg:empty TVarSet.empty t in
-            if (vars t) |> TVarSet.is_empty |> not then raise Error ;
-            (v, neg t)
+            if (vars t) |> TVarSet.is_empty
+            then (v, neg t) else (v, any)
           ) in
           let parts = List.fold_left (fun acc (v,t) ->
               if List.mem_assoc v acc
@@ -299,18 +297,12 @@ let complete_fine_grained default_annot res =
           in
           (subst, default_annot)
       ) in
-    let rec filter defs =
-      match defs with
-      | [] -> []
-      | (s,a)::defs ->
-        if Subst.is_identity s
-        then (s,a)::(List.filter (fun (s,_) -> Subst.is_identity s |> not) defs)
-        else (s,a)::(filter defs)
-    in
-    let defs = filter defs in
+    let defs = if List.exists (fun (s,_) -> Subst.is_identity s) defs
+      then [(Subst.identity, default_annot)] else defs in
+    let are_dupl (s1,_) (s2,_) = Subst.equiv s1 s2 in
+    let defs = remove_duplicates are_dupl defs in
     (* log "Added: %a@." Annot.pp_substs (List.map fst defs) ; *)
     Subst (defs@lst)
-    ) with Error -> complete default_annot res end
   | _ -> assert false
 
 let simplify_tallying_result mono subst vres =
@@ -492,9 +484,10 @@ let rec infer_a' _ tenv env env_inf mono noninferred annot_a a =
       let poly1_part = Subst.compose (Subst.restrict sol vs1) subst1 in
       let poly2_part = Subst.compose (Subst.restrict sol vs2) subst2 in
       let mono_part = Subst.restrict sol mono in
-      (* log ~level:0 "%a@." Subst.pp (poly1_part) ;
-      log ~level:0 "%a@." Subst.pp (poly2_part) ; *)
-      (* log ~level:0 "%a@." Subst.pp (mono_part) ; *)
+      (* log ~level:0 "Poly1:@.%a@." Subst.pp (poly1_part) ;
+      log ~level:0 "Poly2:@.%a@." Subst.pp (poly2_part) ; *)
+      (* log ~level:0 "Mono:@.%a@." Subst.pp (mono_part) ; *)
+      (* log ~level:0 "Result:@.%a@." pp_typ (Subst.find' sol alpha) ; *)
       (mono_part, (poly1_part, poly2_part))
     ) |> regroup Subst.equiv in
     Subst res |> map_res (fun sigmas -> AppA (List.split sigmas))
@@ -512,6 +505,8 @@ let rec infer_a' _ tenv env env_inf mono noninferred annot_a a =
       Format.printf "AFTER INSTANCIATION@.t1:%a   ;   t2:%a@." pp_typ t1 pp_typ t2 ;
       assert false)
   | Ite (v, s, _, _), IteA [] ->
+    (* NOTE: Differ from the formalism (avoids redundances) *)
+    (* TODO: Is it really the simplest? Maybe splits should't be ignored in this tallying instance. *)
     need_var v "typecase" ;
     let t = Env.find v env in
     if subtype t s
@@ -535,8 +530,9 @@ let rec infer_a' _ tenv env env_inf mono noninferred annot_a a =
   | Lambda ((), ua, v, e), LambdaA branches ->
     let inferred = ua = Parsing.Ast.Unnanoted in
     let branches =
-      if inferred then
-        branches |> remove_empty_branches (*remove_redundant_branches mono*)
+      if inferred then branches |>
+        (* remove_empty_branches *)
+        remove_redundant_branches mono
         |> List.map (fun (t,splits) ->
           let (subst, t) = remove_redundant_vars mono t in
           (t, Annot.apply_subst_split subst splits)

@@ -195,6 +195,16 @@ let full_branch_type ((pvs, nvs), (ps, ns)) =
     let t = [pvs;nvs;ps;ns] |> conj in
     cap arrow_any t
 
+let full_product_branch_type ((pvs, nvs), (ps, ns)) =
+    let pvs = pvs |> List.map var_typ |> conj in
+    let nvs = nvs |> List.map var_typ |> List.map neg |> conj in
+    let ps = ps |>
+        List.map (fun (a, b) -> mk_times a b) |> conj in
+    let ns = ns |>
+        List.map (fun (a, b) -> mk_times a b |> neg) |> conj in
+    let t = [pvs;nvs;ps;ns] |> conj in
+    cap pair_any t
+
 let rec take_one lst =
     match lst with
     | [] -> []
@@ -249,16 +259,17 @@ let simplify_dnf dnf =
     rm (fun t ts -> subtype t (disj ts)) [] splits
     |> List.map simplify_conjuncts        
 
-let remove_useless_conjuncts ~n dc cc lst =
-    let arrow_type (a,b) =
-        if n then mk_arrow a b |> neg else mk_arrow a b
+let remove_useless_conjuncts branch_type ~n dc cc lst =
+    let atom_type (a,b) =
+        if n then branch_type (([],[]),([],[(a,b)]))
+        else branch_type (([],[]),([(a,b)],[]))
     in
     let rec aux (kept, kt) rem =
         match rem with
         | [] -> (kept, kt)
         | c::rem ->
-            let ct = arrow_type c in
-            let rt = rem |> List.map arrow_type |> conj in
+            let ct = atom_type c in
+            let rt = rem |> List.map atom_type |> conj in
             let krt = cap kt rt in
             let t' = cup dc krt in
             let t  = cup dc (cap krt ct) in
@@ -267,26 +278,23 @@ let remove_useless_conjuncts ~n dc cc lst =
     in
     aux ([], cc) lst |> fst
 
-let remove_useless_conjuncts dc ((pvs, nvs), (ps, ns)) =
-    let context = full_branch_type ((pvs, nvs), ([], ns)) in
-    let ps = remove_useless_conjuncts ~n:false dc context ps in
-    let context = full_branch_type ((pvs, nvs), (ps, [])) in
-    let ns = remove_useless_conjuncts ~n:true dc context ns in
+let remove_useless_conjuncts branch_type dc ((pvs, nvs), (ps, ns)) =
+    let context = branch_type ((pvs, nvs), ([], ns)) in
+    let ps = remove_useless_conjuncts branch_type ~n:false dc context ps in
+    let context = branch_type ((pvs, nvs), (ps, [])) in
+    let ns = remove_useless_conjuncts branch_type ~n:true dc context ns in
     ((pvs, nvs), (ps, ns))
 
-let simplify_raw_dnf ~open_nodes dnf =
-    let regroup_conjuncts (vars, (ps, ns)) =
-        (vars, (regroup_conjuncts ~open_nodes ps, ns))
-    in
+let remove_useless_from_dnf branch_type dnf =
     (* Remove useless conjuncts *)
     let rec aux (kept, kt) rem =
         match rem with
         | [] -> (kept, kt)
         | c::rem ->
-            let rt = rem |> List.map full_branch_type |> disj in
+            let rt = rem |> List.map branch_type |> disj in
             let krt = cup kt rt in
-            let c = remove_useless_conjuncts krt c in
-            let ct = full_branch_type c in
+            let c = remove_useless_conjuncts branch_type krt c in
+            let ct = branch_type c in
             aux (c::kept, cup kt ct) rem
     in
     let dnf = aux ([], empty) dnf |> fst in
@@ -295,16 +303,26 @@ let simplify_raw_dnf ~open_nodes dnf =
         match rem with
         | [] -> (kept, kt)
         | c::rem ->
-            let ct = full_branch_type c in
-            let rt = rem |> List.map full_branch_type |> disj in
+            let ct = branch_type c in
+            let rt = rem |> List.map branch_type |> disj in
             let krt = cup kt rt in
             let t  = cup krt ct in
             if subtype t krt then aux (kept, kt) rem
             else aux (c::kept, cup kt ct) rem
     in
-    let dnf = aux ([], empty) dnf |> fst in
+    aux ([], empty) dnf |> fst
+
+let simplify_raw_dnf ~open_nodes dnf =
+    let regroup_conjuncts (vars, (ps, ns)) =
+        (vars, (regroup_conjuncts ~open_nodes ps, ns))
+    in
+    let dnf = remove_useless_from_dnf full_branch_type dnf in
     (* Regroup positive conjuncts with similar domain/codomain  *)
     List.map regroup_conjuncts dnf
+
+let simplify_raw_product_dnf ~open_nodes dnf =
+    let dnf = remove_useless_from_dnf full_product_branch_type dnf in
+    (* TODO *) ignore (open_nodes) ; dnf
 
 let is_test_type t =
     let is_non_trivial_arrow t =
@@ -344,9 +362,13 @@ let simplify_typ t =
                     K.get_vars t |> K.mk
                 | Times m ->
                     let module K = (val m) in
-                    let dnf = K.get_vars t in
-                    (* TODO *)
-                    K.mk dnf
+                    K.get_vars t |> K.Dnf.get_full
+                    |> simplify_raw_product_dnf ~open_nodes:cache
+                    |> List.map (fun (vars, (ps,ns)) ->
+                        (vars, (List.map (fun (a,b) -> (aux a, aux b)) ps,
+                        List.map (fun (a,b) -> (aux a, aux b)) ns))
+                        |> full_product_branch_type
+                    ) |> disj
                 | Xml m ->
                     let module K = (val m) in
                     let dnf = K.get_vars t in

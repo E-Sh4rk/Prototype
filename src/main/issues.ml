@@ -340,4 +340,30 @@ let test2 () =
     subtype (Subst.apply s left_part) (Subst.apply s right_part)
   )
 
-let _ = assert (test1 ())
+let next_var_name = ref 0
+let fresh_var () =
+    next_var_name := !next_var_name + 1 ;
+    mk_var (Format.sprintf "$%i" !next_var_name)
+
+let inter_new_pair x =
+  let a = fresh_var () in
+  let t = mk_times (var_typ a |> cons) any_node in
+  let t = cap t (var_typ x) in
+  (t, a)
+
+let identity t x a =
+  let (t', a') = inter_new_pair x in
+  let subst1 = Subst.construct [(x, t')] in
+  let t = Subst.apply subst1 t in
+  let subst2 = Subst.construct [(a', var_typ a)] in
+  Subst.apply subst2 t
+
+let test_subst () =
+  let x = mk_var "x" in
+  let (t,a) = inter_new_pair x in
+  let rec aux t n =
+    if n = 0 then t else aux (identity t x a) (n-1)
+  in
+  equiv (aux t 10) t
+
+let _ = assert (test_subst ())

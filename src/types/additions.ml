@@ -373,9 +373,7 @@ let simplify_typ t =
                     ) |> disj
                 | Xml m ->
                     let module K = (val m) in
-                    let dnf = K.get_vars t in
-                    (* TODO *)
-                    K.mk dnf
+                    K.get_vars t |> K.mk
                 | Function m ->
                     let module K = (val m) in
                     K.get_vars t |> K.Dnf.get_full

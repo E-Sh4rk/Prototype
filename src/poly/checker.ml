@@ -357,6 +357,10 @@ let need_var env v str =
   if Env.mem v env |> not
   then raise (NeedVar (v, str))
 
+(* TODO: Issues with env_inf :
+   (1) it will contain splits data in case of an alias bind y = x in ...
+   (2) the annotation left on the app (for polymorphic vars) gives a sub-optimal type
+   (as it ignores the splits). *)
 let rec infer_a' _ tenv env env_inf mono noninferred annot_a a =
   let need_var = need_var env in
   let simple_constraint_infer v str s resvar =
@@ -509,11 +513,11 @@ let rec infer_a' _ tenv env env_inf mono noninferred annot_a a =
     let t = Env.find v env in
     if subtype t s
     then
-      let res = simple_constraint_infer v "typecase" s None in
+      let res = simple_constraint_infer v "typecase" (neg s) None in
       map_res (fun sigma -> IteA sigma) res
       |> complete_fine_grained (IteA [Subst.identity])
     else if subtype t (neg s) then
-      let res = simple_constraint_infer v "typecase" (neg s) None in
+      let res = simple_constraint_infer v "typecase" s None in
       map_res (fun sigma -> IteA sigma) res
       |> complete_fine_grained (IteA [Subst.identity])
     else
@@ -599,12 +603,12 @@ and infer' tenv env env_inf mono noninferred annot e =
       if skipped then fail
       else begin
         log ~level:2 "(Re)Infering definition for %s...@." (Variable.show v) ;
-        let res = infer_a_iterated pos tenv env env_inf mono noninferred annot_a a in
-        log ~level:2 "Done (definiton of %s).@." (Variable.show v) ; res
+        infer_a_iterated pos tenv env env_inf mono noninferred annot_a a
       end in
     begin match res, k1 with
     | Ok annot_a, _ ->
       let t = typeof_a_nofail pos tenv env mono annot_a a in
+      log ~level:2 "Definition of %s typed: %a@." (Variable.show v) pp_typ t ;
       let e = Bind ((), v, a, e) in
       begin match s, k2, is_empty t with
       | _, Some annot, true ->
@@ -623,6 +627,7 @@ and infer' tenv env env_inf mono noninferred annot e =
       let res = (Subst lst) |> map_res (fun annot_a -> UnkA (annot_a, s, Some k1, k2)) in
       complete_fine_grained (SkipA k1) res
     | res, _ ->
+      log ~level:2 "Definition of %s needs to go up.@." (Variable.show v) ;
       map_res (fun annot_a -> UnkA (annot_a, s, k1, k2)) res
     end
   | Bind ((), _, _, e), SkipA annot ->

@@ -366,4 +366,29 @@ let test_subst () =
   in
   equiv (aux t 10) t
 
-let _ = assert (test_subst ())
+(* ====================== *)
+
+open CD.Types
+
+let check_tallying_sol lhs rhs substs =
+  substs |> List.for_all (fun s ->
+    (*Format.printf "%a@." Subst.pp s ;*)
+    subtype (Subst.apply s lhs) (Subst.apply s rhs)
+  )
+let true_typ = CD.Builtin_defs.true_type
+let false_typ = CD.Builtin_defs.false_type
+
+let issue_tally () =
+  let a = CD.Var.mk "a" in
+  let b = CD.Var.mk "b" in
+  let at = var a in
+  let bt = var b in
+  let t = cap true_typ at in
+  let t = arrow (cons t) (cons t) in
+  (* let t = cap t (arrow (neg true_typ |> cons) (cons false_typ)) in *)
+  let t' = arrow (cons bt) (cons true_typ) in
+  Format.printf "%a <= %a@." Print.print t Print.print t' ;
+  let sol = Tallying.tallying ~var_order:[a] CD.Var.Set.empty [(t,t')] in
+  check_tallying_sol t t' sol
+
+let _ = assert (issue_tally ())

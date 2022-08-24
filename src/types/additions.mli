@@ -61,6 +61,7 @@ val disj_o : typ list -> typ
 
 val simplify_dnf : (typ * typ) list list -> (typ * typ) list list
 val simplify_typ : typ -> typ
+val simplify_poly_typ : TVarSet.t -> typ -> typ
 
 val branch_type : (typ*typ) list -> typ
 

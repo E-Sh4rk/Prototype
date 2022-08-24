@@ -350,6 +350,7 @@ let simplify_typ t =
     (*Utils.log ~level:2 "Simplifying type...@?" ;*)
     let cache = NHT.create 5 in
     let rec aux node =
+        let aux_on_pair (a,b) = (aux a, aux b) in
         match NHT.find_opt cache node with
         | Some n -> n
         | None ->
@@ -367,8 +368,7 @@ let simplify_typ t =
                     K.get_vars t |> K.Dnf.get_full
                     |> simplify_raw_product_dnf ~open_nodes:cache
                     |> List.map (fun (vars, (ps,ns)) ->
-                        (vars, (List.map (fun (a,b) -> (aux a, aux b)) ps,
-                        List.map (fun (a,b) -> (aux a, aux b)) ns))
+                        (vars, (List.map aux_on_pair ps, List.map aux_on_pair ns))
                         |> full_product_branch_type
                     ) |> disj
                 | Xml m ->
@@ -379,8 +379,7 @@ let simplify_typ t =
                     K.get_vars t |> K.Dnf.get_full
                     |> simplify_raw_dnf ~open_nodes:cache
                     |> List.map (fun (vars, (ps,ns)) ->
-                        (vars, (List.map (fun (a,b) -> (aux a, aux b)) ps,
-                        List.map (fun (a,b) -> (aux a, aux b)) ns))
+                        (vars, (List.map aux_on_pair ps, List.map aux_on_pair ns))
                         |> full_branch_type
                     ) |> disj
                 | Record m ->
@@ -655,6 +654,69 @@ let triangle_poly mono t s =
     res |> List.map (fun subst ->
         Subst.find subst alpha |> clean_type ~pos:any ~neg:empty delta
     )
+
+let simplify_poly_typ non_infered t =
+    (* TODO: Instead of used_vars, take a list of t in parameters and solve them all at once *)
+    let top_level_master_var used_vars t =
+        let vs = TVarSet.diff (vars t) (TVarSet.union used_vars non_infered) in
+        TVarSet.destruct vs |> List.find_opt (fun v ->
+            subtype_poly non_infered (var_typ v) t
+        )
+    in
+    (*Utils.log ~level:2 "Simplifying polymorphic type...@?" ;*)
+    let cache = NHT.create 5 in
+    let rec aux used_vars node =
+        let aux_on_pair (a,b) =
+            (aux (TVarSet.union used_vars (descr b |> vars)) a,
+            aux (TVarSet.union used_vars (descr a |> vars)) b)
+        in
+        match NHT.find_opt cache node with
+        | Some n -> n
+        | None ->
+            let n = mk_new_typ () in
+            NHT.add cache node n ;
+            begin match top_level_master_var used_vars (descr node) with
+            | None ->
+                let open Iter in
+                let t = fold (fun acc pack t ->
+                    let t = match pack with
+                    | Absent -> absent
+                    | Abstract m | Char m | Int m | Atom m ->
+                        let module K = (val m : Kind) in
+                        K.get_vars t |> K.mk
+                    | Times m ->
+                        let module K = (val m) in
+                        K.get_vars t |> K.Dnf.get_full
+                        |> List.map (fun (vars, (ps,ns)) ->
+                            (vars, (List.map aux_on_pair ps, List.map aux_on_pair ns))
+                            |> full_product_branch_type
+                        ) |> disj
+                    | Xml m ->
+                        let module K = (val m) in
+                        K.get_vars t |> K.mk
+                    | Function m ->
+                        let module K = (val m) in
+                        K.get_vars t |> K.Dnf.get_full
+                        |> List.map (fun (vars, (ps,ns)) ->
+                            (vars, (List.map aux_on_pair ps, List.map aux_on_pair ns))
+                            |> full_branch_type
+                        ) |> disj
+                    | Record m ->
+                        let module K = (val m) in
+                        let dnf = K.get_vars t in
+                        (* TODO *)
+                        K.mk dnf
+                    in
+                    cup acc t
+                ) empty (descr node) in
+                define_typ n t ; n
+            | Some v ->
+                define_typ n (var_typ v) ; n
+            end
+    in
+    let res = aux TVarSet.empty (cons t) |> descr in
+    (* Utils.log ~level:2 " Done.@." ;*)
+    res    
 
 (* Operations on jokers (legacy) *)
 

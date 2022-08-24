@@ -1,3 +1,4 @@
+module PMsc = Msc
 open Types.Base
 open Types.Additions
 open Common.Msc
@@ -692,13 +693,16 @@ let infer tenv env mono e =
   let e = VarSet.fold (fun v acc ->
     Bind ((), v, Abstract (var_type [] v env), acc)
   ) fv e in
-  let annot =
-    match infer_iterated tenv Env.empty Env.empty mono mono (Annot.initial_e e) e with
-    | Subst [] -> raise (Untypeable ([], "Annotations inference failed."))
-    | Ok annot -> (e, annot)
-    | _ -> assert false
-  in
-  log "@." ; annot
+  if PMsc.contains_records e
+  then raise (Untypeable ([], "Records unsupported by the polymorphic system."))
+  else
+    let annot =
+      match infer_iterated tenv Env.empty Env.empty mono mono (Annot.initial_e e) e with
+      | Subst [] -> raise (Untypeable ([], "Annotations inference failed."))
+      | Ok annot -> (e, annot)
+      | _ -> assert false
+    in
+    log "@." ; annot
 
 let typeof_simple tenv env mono e =
   let (e, anns) = infer tenv env mono e in

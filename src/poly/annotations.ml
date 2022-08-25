@@ -47,6 +47,7 @@ let remove_redundant_branches mono lst =
       then aux ((s,v)::treated) current
       else aux treated current
   in
+  (* TODO: max_type instead of clean_type *)
   lst |> List.map (fun (t,a) -> (clean_type ~pos:any ~neg:empty mono t,(t,a))) |>
   (*(fun x -> Format.printf "remove_redundant_branches: %a@." (Utils.pp_list pp_typ) (List.map fst x) ; x) |>*)
   aux [] |> List.map snd
@@ -54,6 +55,7 @@ let remove_redundant_branches mono lst =
 let remove_empty_branches lst =
   lst |> List.filter (fun (s,_) -> non_empty s)
 
+(* TODO: Once propagate will use min_type, simplify split annots *)
 module Refinements = struct
   type t = Env.t list
   let dom lst =

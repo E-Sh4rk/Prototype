@@ -173,8 +173,8 @@ let refine_a env mono a t = (* empty possibilites are often omitted *)
       )
   | App (v1, v2) ->
     let t1 = Env.find v1 env in
-    triangle_poly mono t1 t
-    |> List.map (fun ti -> Env.singleton v2 ti)
+    triangle_split_poly mono t1 t
+    |> List.map (fun (t1, t2) -> Env.construct [(v1,t1);(v2,t2)])
   | Ite (v, s, v1, v2) ->
     [Env.construct [(v,s);(v1,t)] ; Env.construct [(v,neg s);(v2,t)]]
   | Let (_, v2) -> [Env.singleton v2 t]
@@ -278,6 +278,7 @@ let complete_fine_grained default_annot res =
       possibilities |> List.map (
         fun lst ->
           let parts = lst |> List.map (fun (v,t) ->
+            (* TODO: max_type instead of clean_type *)
             let t = clean_type ~pos:any ~neg:empty TVarSet.empty t in
             if (vars t) |> TVarSet.is_empty
             then (v, neg t) else (v, any)
@@ -596,7 +597,7 @@ and infer' tenv env mono noninferred annot e =
     (* Note: optimisation *)
     let skippable = VarSet.mem v req |> not in
     let skipped = skippable && (VarSet.mem v opt |> not) in
-    (*let (skippable, skipped) = (skippable || true, skipped && false) in*)
+    (* let (skippable, skipped) = (skippable || true, skipped && false) in *)
     let res =
       if skipped then fail
       else begin

@@ -350,7 +350,7 @@ let simplify_typ t =
     (*Utils.log ~level:2 "Simplifying type...@?" ;*)
     let cache = NHT.create 5 in
     let rec aux node =
-        let aux_on_pair (a,b) = (aux a, aux b) in
+        let aux' (a,b) = (aux a, aux b) in
         match NHT.find_opt cache node with
         | Some n -> n
         | None ->
@@ -368,7 +368,7 @@ let simplify_typ t =
                     K.get_vars t |> K.Dnf.get_full
                     |> simplify_raw_product_dnf ~open_nodes:cache
                     |> List.map (fun (vars, (ps,ns)) ->
-                        (vars, (List.map aux_on_pair ps, List.map aux_on_pair ns))
+                        (vars, (List.map aux' ps, List.map aux' ns))
                         |> full_product_branch_type
                     ) |> disj
                 | Xml m ->
@@ -379,7 +379,7 @@ let simplify_typ t =
                     K.get_vars t |> K.Dnf.get_full
                     |> simplify_raw_dnf ~open_nodes:cache
                     |> List.map (fun (vars, (ps,ns)) ->
-                        (vars, (List.map aux_on_pair ps, List.map aux_on_pair ns))
+                        (vars, (List.map aux' ps, List.map aux' ns))
                         |> full_branch_type
                     ) |> disj
                 | Record m ->
@@ -655,27 +655,28 @@ let triangle_poly mono t s =
         Subst.find subst alpha |> clean_type ~pos:any ~neg:empty delta
     )
 
-let simplify_poly_typ non_infered t =
-    (* TODO: Instead of used_vars, take a list of t in parameters and solve them all at once *)
-    let top_level_master_var used_vars t =
-        let vs = TVarSet.diff (vars t) (TVarSet.union used_vars non_infered) in
+let prune_poly_typ non_infered t =
+    (* TODO: Improve it... not really correct for vars with different polarities. *)
+    let top_level_master_var contra t =
+        let vs = TVarSet.diff (vars t) non_infered in
         TVarSet.destruct vs |> List.find_opt (fun v ->
-            subtype_poly non_infered (var_typ v) t
+            let vt = if contra then any else empty in
+            let s = Subst.construct [(v, vt)] in
+            let t = Subst.apply s t in
+            equiv t vt
         )
     in
     (*Utils.log ~level:2 "Simplifying polymorphic type...@?" ;*)
     let cache = NHT.create 5 in
-    let rec aux used_vars node =
-        let aux_on_pair (a,b) =
-            (aux (TVarSet.union used_vars (descr b |> vars)) a,
-            aux (TVarSet.union used_vars (descr a |> vars)) b)
-        in
+    let rec aux contra node =
+        let aux_on_arrow contra (a,b) = (aux (not contra) a, aux contra b) in
+        let aux_on_pair contra (a,b) = (aux contra a, aux contra b) in
         match NHT.find_opt cache node with
         | Some n -> n
         | None ->
             let n = mk_new_typ () in
             NHT.add cache node n ;
-            begin match top_level_master_var used_vars (descr node) with
+            begin match top_level_master_var contra (descr node) with
             | None ->
                 let open Iter in
                 let t = fold (fun acc pack t ->
@@ -688,7 +689,8 @@ let simplify_poly_typ non_infered t =
                         let module K = (val m) in
                         K.get_vars t |> K.Dnf.get_full
                         |> List.map (fun (vars, (ps,ns)) ->
-                            (vars, (List.map aux_on_pair ps, List.map aux_on_pair ns))
+                            (vars, (List.map (aux_on_pair contra) ps,
+                            List.map (aux_on_pair (not contra)) ns))
                             |> full_product_branch_type
                         ) |> disj
                     | Xml m ->
@@ -698,7 +700,8 @@ let simplify_poly_typ non_infered t =
                         let module K = (val m) in
                         K.get_vars t |> K.Dnf.get_full
                         |> List.map (fun (vars, (ps,ns)) ->
-                            (vars, (List.map aux_on_pair ps, List.map aux_on_pair ns))
+                            (vars, (List.map (aux_on_arrow contra) ps,
+                            List.map (aux_on_arrow (not contra)) ns))
                             |> full_branch_type
                         ) |> disj
                     | Record m ->
@@ -714,7 +717,7 @@ let simplify_poly_typ non_infered t =
                 define_typ n (var_typ v) ; n
             end
     in
-    let res = aux TVarSet.empty (cons t) |> descr in
+    let res = aux false (cons t) |> descr in
     (* Utils.log ~level:2 " Done.@." ;*)
     res    
 

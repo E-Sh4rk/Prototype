@@ -61,7 +61,6 @@ val disj_o : typ list -> typ
 
 val simplify_dnf : (typ * typ) list list -> (typ * typ) list list
 val simplify_typ : typ -> typ
-val simplify_poly_typ : TVarSet.t -> typ -> typ
 
 val branch_type : (typ*typ) list -> typ
 
@@ -115,6 +114,7 @@ val tallying_infer : var list (* Polymorphic *) -> TVarSet.t (* Non-inferred *) 
 val tallying : TVarSet.t (* Monomorphic *) -> (typ * typ) list -> Subst.t list
 val subtype_poly : TVarSet.t -> typ -> typ -> bool
 val triangle_poly : TVarSet.t -> typ -> typ -> typ list
+val prune_poly_typ : TVarSet.t -> typ -> typ
 
 (* Operations on jokers (legacy) *)
 

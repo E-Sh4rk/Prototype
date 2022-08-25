@@ -358,15 +358,11 @@ let need_var env v str =
   if Env.mem v env |> not
   then raise (NeedVar (v, str))
 
-(* TODO: Issues with env_inf :
-   (1) it will contain splits data in case of an alias bind y = x in ...
-   (2) the annotation left on the app (for polymorphic vars) gives a sub-optimal type
-   (as it ignores the splits). *)
-let rec infer_a' _ tenv env env_inf mono noninferred annot_a a =
+let rec infer_a' _ tenv env mono noninferred annot_a a =
   let need_var = need_var env in
   let simple_constraint_infer v str s resvar =
     need_var v str ;
-    let (vs,tsubst,t) = fresh mono (Env.find v env_inf) in
+    let (vs,tsubst,t) = fresh mono (Env.find v env) in
     let log_delta =
       TVarSet.inter noninferred (vars t) |> TVarSet.destruct in
     log ~level:1 "Simple constraint: solving %a <= %a with delta=%a@."
@@ -401,7 +397,6 @@ let rec infer_a' _ tenv env env_inf mono noninferred annot_a a =
         begin match aux branches with
         | Ok (branches) ->
           let env = Env.add v s env in
-          let env_inf = Env.add v s env_inf in
           let vs = vars s in
           let xs = TVarSet.diff vs mono in
           let mono = TVarSet.union mono vs in
@@ -409,7 +404,7 @@ let rec infer_a' _ tenv env env_inf mono noninferred annot_a a =
             if inferred then noninferred
             else TVarSet.union noninferred xs
           in
-          begin match infer_splits' tenv env env_inf mono noninferred v splits e with
+          begin match infer_splits' tenv env mono noninferred v splits e with
           | Subst lst ->
             let res =
               lst |> List.map (fun (sigma, splits) ->
@@ -463,16 +458,16 @@ let rec infer_a' _ tenv env env_inf mono noninferred annot_a a =
   | App (v1, v2), AppA ([], []) ->
     need_var v1 "application" ;
     need_var v2 "application" ;
-    let (vs1,subst1,t1) = fresh mono (Env.find v1 env_inf) in
+    let (vs1,subst1,t1) = fresh mono (Env.find v1 env) in
     (* TODO: temporary... it seems to work better for typing things like fixpoint
        and avoids trigerring a bug in Cduce implementation of tallying.
        But theoretically t1 and t2 should have independent polymorphic variables. *)
-    let t2 = Env.find v2 env_inf in
+    let t2 = Env.find v2 env in
     let subst2 = Subst.restrict subst1 (vars t2) in
     let (vs2,subst2',t2) = fresh (TVarSet.union mono vs1) (Subst.apply subst2 t2) in
     let vs2 = TVarSet.inter (TVarSet.union vs2 vs1) (vars t2) in
     let subst2 = Subst.combine subst2 subst2' in
-    (*let (vs2,subst2,t2) = fresh mono (Env.find v2 env_inf) in*)
+    (*let (vs2,subst2,t2) = fresh mono (Env.find v2 env) in*)
     let alpha = fresh_var () in
     let poly = TVarSet.union vs1 vs2 |> TVarSet.destruct in
     let arrow_typ = mk_arrow (cons t2) (cons (var_typ alpha)) in
@@ -555,7 +550,7 @@ let rec infer_a' _ tenv env env_inf mono noninferred annot_a a =
   | NeedVar (v, str) ->
     log ~level:0 "Untypeable %s (---> need %s)" (Variable.show v) str ; fail
 
-and infer_splits' tenv env env_inf mono noninferred v splits e =
+and infer_splits' tenv env mono noninferred v splits e =
   let t = Env.find v env in
   let splits = splits |> List.filter (fun (s, _) -> disjoint s t |> not) in
   log ~level:2 "Splits for %s entered with %i branches:%a@."
@@ -570,7 +565,7 @@ and infer_splits' tenv env env_inf mono noninferred v splits e =
         let vs = vars s in
         let noninferred = TVarSet.union noninferred (TVarSet.diff vs mono) in
         let mono = TVarSet.union mono vs in
-        begin match infer_iterated tenv env env_inf mono noninferred annot e with
+        begin match infer_iterated tenv env mono noninferred annot e with
         | Split lst ->
           let res =
             lst |> List.map (fun (env', annot) ->
@@ -588,7 +583,7 @@ and infer_splits' tenv env env_inf mono noninferred v splits e =
   let res = aux splits in
   log ~level:2 "Splits for %s exited.@." (Variable.show v) ; res
 
-and infer' tenv env env_inf mono noninferred annot e =
+and infer' tenv env mono noninferred annot e =
   match e, annot with
   | Var v, VarA ->
     if Env.mem v env then Ok(VarA)
@@ -604,7 +599,7 @@ and infer' tenv env env_inf mono noninferred annot e =
       if skipped then fail
       else begin
         log ~level:2 "(Re)Infering definition for %s...@." (Variable.show v) ;
-        infer_a_iterated pos tenv env env_inf mono noninferred annot_a a
+        infer_a_iterated pos tenv env mono noninferred annot_a a
       end in
     begin match res, k1 with
     | Ok annot_a, _ ->
@@ -614,10 +609,10 @@ and infer' tenv env env_inf mono noninferred annot e =
       begin match s, k2, is_empty t with
       | _, Some annot, true ->
         let annot = EmptyA (annot_a, annot) in
-        infer' tenv env env_inf mono noninferred annot e
+        infer' tenv env mono noninferred annot e
       | Some splits, _, false ->
         let annot = DoA (t, annot_a, splits) in
-        infer' tenv env env_inf mono noninferred annot e
+        infer' tenv env mono noninferred annot e
       | _, _ , _->
         log ~level:0 "Definition %s is typeable, but its type cannot be handled.@."
           (Variable.show v) ; fail
@@ -632,12 +627,11 @@ and infer' tenv env env_inf mono noninferred annot e =
       map_res (fun annot_a -> UnkA (annot_a, s, k1, k2)) res
     end
   | Bind ((), _, _, e), SkipA annot ->
-    let res = infer_iterated tenv env env_inf mono noninferred annot e in
+    let res = infer_iterated tenv env mono noninferred annot e in
     map_res (fun annot -> SkipA annot) res
   | Bind ((), v, _, e), EmptyA (annot_a, annot) ->
     let env = Env.add v empty env in
-    let env_inf = Env.add v empty env_inf in
-    let res = infer_iterated tenv env env_inf mono noninferred annot e in
+    let res = infer_iterated tenv env mono noninferred annot e in
     map_res (fun annot -> EmptyA (annot_a, annot)) res
   | Bind ((), v, a, e), DoA (t, annot_a, splits) ->
     let splits = List.map (fun (s,(b,a)) -> (s, (ref b, a))) splits in
@@ -662,28 +656,27 @@ and infer' tenv env env_inf mono noninferred annot e =
       Split res
     | None ->
       let env = Env.add v t env in
-      let env_inf = Env.add v t env_inf in
-      let res = infer_splits' tenv env env_inf mono noninferred v splits e in
+      let res = infer_splits' tenv env mono noninferred v splits e in
       map_res (fun splits -> DoA (t, annot_a, splits)) res
     end
   | _, _ -> assert false
 
-and infer_a_iterated pos tenv env env_inf mono noninferred annot_a a =
+and infer_a_iterated pos tenv env mono noninferred annot_a a =
   (*log ~level:3 "Iteration...@." ;*)
-  match infer_a' pos tenv env env_inf mono noninferred annot_a a with
+  match infer_a' pos tenv env mono noninferred annot_a a with
   | Split [(env', annot_a)] when Env.leq env env' ->
-    infer_a_iterated pos tenv env env_inf mono noninferred annot_a a
+    infer_a_iterated pos tenv env mono noninferred annot_a a
   | Subst [(subst, annot_a)] when Subst.is_identity subst ->
-    infer_a_iterated pos tenv env env_inf mono noninferred annot_a a
+    infer_a_iterated pos tenv env mono noninferred annot_a a
   | res -> res
 
-and infer_iterated tenv env env_inf mono noninferred annot e =
+and infer_iterated tenv env mono noninferred annot e =
   (*log ~level:3 "Iteration...@." ;*)
-  match infer' tenv env env_inf mono noninferred annot e, e with
+  match infer' tenv env mono noninferred annot e, e with
   | Split [(env', annot)], _ when Env.leq env env' ->
-    infer_iterated tenv env env_inf mono noninferred annot e
+    infer_iterated tenv env mono noninferred annot e
   | Subst [(subst, annot)], _ when Subst.is_identity subst ->
-    infer_iterated tenv env env_inf mono noninferred annot e
+    infer_iterated tenv env mono noninferred annot e
   | Split r, Bind (_, _, a, _) ->
     map_res (fun annot -> Annot.retype a annot) (Split r)
   | res, _ -> res
@@ -697,7 +690,7 @@ let infer tenv env mono e =
   then raise (Untypeable ([], "Records unsupported by the polymorphic system."))
   else
     let annot =
-      match infer_iterated tenv Env.empty Env.empty mono mono (Annot.initial_e e) e with
+      match infer_iterated tenv Env.empty mono mono (Annot.initial_e e) e with
       | Subst [] -> raise (Untypeable ([], "Annotations inference failed."))
       | Ok annot -> (e, annot)
       | _ -> assert false

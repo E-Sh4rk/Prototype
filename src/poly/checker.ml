@@ -362,7 +362,8 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
   let need_var = need_var env in
   let simple_constraint_infer v str s resvar =
     need_var v str ;
-    let (vs,tsubst,t) = fresh mono (Env.find v env) in
+    let t = Env.find v env |> prune_poly_typ noninferred in
+    let (vs,tsubst,t) = fresh mono t in
     let log_delta =
       TVarSet.inter noninferred (vars t) |> TVarSet.destruct in
     log ~level:1 "Simple constraint: solving %a <= %a with delta=%a@."
@@ -458,16 +459,17 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
   | App (v1, v2), AppA ([], []) ->
     need_var v1 "application" ;
     need_var v2 "application" ;
-    let (vs1,subst1,t1) = fresh mono (Env.find v1 env) in
+    let t1 = Env.find v1 env |> prune_poly_typ noninferred in
+    let (vs1,subst1,t1) = fresh mono t1 in
+    let t2 = Env.find v2 env |> prune_poly_typ noninferred in
     (* TODO: temporary... it seems to work better for typing things like fixpoint
        and avoids trigerring a bug in Cduce implementation of tallying.
        But theoretically t1 and t2 should have independent polymorphic variables. *)
-    let t2 = Env.find v2 env in
     let subst2 = Subst.restrict subst1 (vars t2) in
     let (vs2,subst2',t2) = fresh (TVarSet.union mono vs1) (Subst.apply subst2 t2) in
     let vs2 = TVarSet.inter (TVarSet.union vs2 vs1) (vars t2) in
     let subst2 = Subst.combine subst2 subst2' in
-    (*let (vs2,subst2,t2) = fresh mono (Env.find v2 env) in*)
+    (*let (vs2,subst2,t2) = fresh mono t2 in*)
     let alpha = fresh_var () in
     let poly = TVarSet.union vs1 vs2 |> TVarSet.destruct in
     let arrow_typ = mk_arrow (cons t2) (cons (var_typ alpha)) in

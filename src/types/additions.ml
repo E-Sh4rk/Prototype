@@ -658,7 +658,7 @@ let triangle_poly mono t s =
 let prune_poly_typ non_infered t =
     (* TODO: Improve it... not really correct for vars with different polarities. *)
     let top_level_master_var contra t =
-        let vs = TVarSet.diff (vars t) non_infered in
+        let vs = TVarSet.diff (top_vars t) non_infered in
         TVarSet.destruct vs |> List.find_opt (fun v ->
             let vt = if contra then any else empty in
             let s = Subst.construct [(v, vt)] in
@@ -666,7 +666,7 @@ let prune_poly_typ non_infered t =
             equiv t vt
         )
     in
-    (*Utils.log ~level:2 "Simplifying polymorphic type...@?" ;*)
+    (* Utils.log "Pruning polymorphic type %a...@." pp_typ t ; *)
     let cache = NHT.create 5 in
     let rec aux contra node =
         let aux_on_arrow contra (a,b) = (aux (not contra) a, aux contra b) in
@@ -718,7 +718,7 @@ let prune_poly_typ non_infered t =
             end
     in
     let res = aux false (cons t) |> descr in
-    (* Utils.log ~level:2 " Done.@." ;*)
+    (* Utils.log "Done: %a@." pp_typ res ; *)
     res    
 
 (* Operations on jokers (legacy) *)

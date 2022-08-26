@@ -55,7 +55,6 @@ let remove_redundant_branches mono lst =
 let remove_empty_branches lst =
   lst |> List.filter (fun (s,_) -> non_empty s)
 
-(* TODO: Once propagate will use sup_type, simplify split annots *)
 module Refinements = struct
   type t = Env.t list
   let dom lst =
@@ -162,12 +161,12 @@ module Annot = struct
         let initial_s = [(any, (false, initial_e))] in
         UnkA (initial_a, Some initial_s, Some initial_e, Some initial_e)
 
-  let retype a t =
+  let retype a e t =
     let a = initial_a a in
     match t with
     | VarA -> VarA
     | UnkA (_,s,t1,t2) -> UnkA (a,s,t1,t2)
     | SkipA (t) -> UnkA (a, Some [(any,(false,t))], Some t, Some t)
-    | DoA (_, _, s) -> UnkA (a, Some s, None, None)
+    | DoA (_, _, s) -> UnkA (a, Some s, None, Some (initial_e e))
     | EmptyA (_, t) -> UnkA (a, None, None, Some t)
 end

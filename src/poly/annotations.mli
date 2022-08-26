@@ -16,6 +16,8 @@ end
 
 module Annot : sig
     type substs = Subst.t list
+    (* NOTE: the bool is just an optimisation for keeping track of splits
+       that have already been propagated. *)
     type split = (typ*(bool*t)) list
     and a =
         | NoneA | ProjA of substs | IteA of substs | AppA of (substs * substs)
@@ -37,5 +39,5 @@ module Annot : sig
     val initial_a : Msc.a -> a
     val initial_e : Msc.e -> t
 
-    val retype : Msc.a -> t -> t
+    val retype : Msc.a -> Msc.e -> t -> t
 end

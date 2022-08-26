@@ -408,6 +408,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
             if inferred then noninferred
             else TVarSet.union noninferred xs
           in
+          log ~level:2 "Exploring branch %a for variable %s.@." pp_typ s (Variable.show v) ;
           begin match infer_splits' tenv env mono noninferred v splits e with
           | Subst lst ->
             let res =
@@ -570,6 +571,7 @@ and infer_splits' tenv env mono noninferred v splits e =
         let vs = vars s in
         let noninferred = TVarSet.union noninferred (TVarSet.diff vs mono) in
         let mono = TVarSet.union mono vs in
+        log ~level:2 "Exploring split %a for variable %s.@." pp_typ s (Variable.show v) ;
         begin match infer_iterated tenv env mono noninferred annot e with
         | Split lst ->
           let res =
@@ -682,8 +684,8 @@ and infer_iterated tenv env mono noninferred annot e =
     infer_iterated tenv env mono noninferred annot e
   | Subst [(subst, annot)], _ when Subst.is_identity subst ->
     infer_iterated tenv env mono noninferred annot e
-  | Split r, Bind (_, _, a, _) ->
-    map_res (fun annot -> Annot.retype a annot) (Split r)
+  | Split r, Bind (_, _, a, e) ->
+    map_res (fun annot -> Annot.retype a e annot) (Split r)
   | res, _ -> res
 
 let infer tenv env mono e =

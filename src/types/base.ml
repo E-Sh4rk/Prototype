@@ -295,6 +295,9 @@ module Subst = struct
   let pp = CD.Types.Subst.print
 end
 
+let inf_typ = CD.Types.Subst.min_type (* TODO: This implem is not optimal *)
+let sup_typ = CD.Types.Subst.max_type (* TODO: This implem is not optimal *)
+
 (* Tallying *)
 let clean_type ~pos ~neg vars t =
   CD.Types.Subst.clean_type ~pos ~neg vars t

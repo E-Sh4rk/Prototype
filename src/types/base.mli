@@ -128,6 +128,9 @@ val subtype  : typ -> typ -> bool
 val disjoint : typ -> typ -> bool
 val equiv : typ -> typ -> bool
 
+val inf_typ : TVarSet.t -> typ -> typ
+val sup_typ : TVarSet.t -> typ -> typ
+
 (* Tallying *)
 val clean_type : pos:typ -> neg:typ -> TVarSet.t -> typ -> typ
 val rectype : typ -> var -> typ (* [rectype t u] returns the type corresponding to the equation u=t *)

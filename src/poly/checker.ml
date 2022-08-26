@@ -182,7 +182,7 @@ let refine_a env mono a t = (* empty possibilites are often omitted *)
 (* ===== VAR DEPENDENCY ANALYZER ===== *)
 
 let analyze_dependencies env e =
-  (* TODO: Improve... *)
+  (* TODO: Improve dependencies analysis... *)
   let fv = Msc.fv_e e in
   let rec aux_a a =
     match a with

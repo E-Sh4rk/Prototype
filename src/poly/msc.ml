@@ -22,6 +22,6 @@ let contains_records e =
     | Projection (Parsing.Ast.Field _, _)
     | RecordUpdate _ -> true
     | App _ | Pair _ | Projection _ | Let _ -> false
-  and aux_t _ = false (* TODO *)
+  and aux_t _ = false (* TODO: Implement contains_records for types *)
   in
   aux e

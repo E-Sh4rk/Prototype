@@ -322,7 +322,8 @@ let simplify_raw_dnf ~open_nodes dnf =
 
 let simplify_raw_product_dnf ~open_nodes dnf =
     let dnf = remove_useless_from_dnf full_product_branch_type dnf in
-    (* TODO *) ignore (open_nodes) ; dnf
+    (* TODO: More advanced simplifications for records *)
+    ignore (open_nodes) ; dnf
 
 let is_test_type t =
     if vars t |> TVarSet.is_empty
@@ -385,7 +386,7 @@ let simplify_typ t =
                 | Record m ->
                     let module K = (val m) in
                     let dnf = K.get_vars t in
-                    (* TODO *)
+                    (* TODO: Implement simplify_typ for records *)
                     K.mk dnf
                 in
                 cup acc t
@@ -434,7 +435,7 @@ let square_split f out =
             (t, res)
     end
 
-(* TODO: Optimize... *)
+(* TODO: Optimize triangle exact... *)
 let triangle_exact f out =
     let res = dnf f |> List.map begin
         fun lst ->
@@ -645,7 +646,7 @@ let subtype_poly mono t1 t2 =
     let res = tallying (TVarSet.union mono xs) [(t1,t)] in
     res <> []
 
-let triangle_poly mono t s = (* TODO: max_type instead of clean_type *)
+let triangle_poly mono t s =
     (* Utils.log "Triangle_poly with t=%a and s=%a@." pp_typ t pp_typ s ; *)
     let (vt',_,t') = fresh mono t in
     let alpha = fresh_var () in
@@ -653,18 +654,18 @@ let triangle_poly mono t s = (* TODO: max_type instead of clean_type *)
     let res = tallying_infer (TVarSet.destruct vt') delta
         [(t', mk_arrow (var_typ alpha |> cons) (cons s))] in
     res |> List.map (fun subst ->
-        let res = Subst.find' subst alpha |> clean_type ~pos:any ~neg:empty delta in
+        let res = Subst.find' subst alpha |> sup_typ delta in
         (* Utils.log "Solution:%a@." pp_typ res ; *)
         res
     )
 
-let triangle_split_poly mono f out = (* TODO: max_type instead of clean_type *)
+let triangle_split_poly mono f out =
     dnf f |>
     List.map begin
         fun lst ->
             let t = branch_type lst in
             let (_,_,t) = fresh mono t in
-            let t = clean_type ~pos:any ~neg:empty mono t in
+            let t = sup_typ mono t in
             triangle_poly mono t out
             |> List.map (fun res -> (t, res))
     end |> List.flatten
@@ -721,7 +722,7 @@ let prune_poly_typ non_infered t =
                     | Record m ->
                         let module K = (val m) in
                         let dnf = K.get_vars t in
-                        (* TODO *)
+                        (* TODO: Implement prune_poly_typ for records *)
                         K.mk dnf
                     in
                     cup acc t

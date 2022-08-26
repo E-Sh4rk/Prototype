@@ -278,10 +278,12 @@ let complete_fine_grained default_annot res =
       possibilities |> List.map (
         fun lst ->
           let parts = lst |> List.map (fun (v,t) ->
-            (* TODO: max_type instead of clean_type *)
             let t = clean_type ~pos:any ~neg:empty TVarSet.empty t in
-            if (vars t) |> TVarSet.is_empty
-            then (v, neg t) else (v, any)
+            let t =
+              if (vars t) |> TVarSet.is_empty
+              then neg t
+              else inf_typ TVarSet.empty t |> neg
+            in (v, t)
           ) in
           let parts = List.fold_left (fun acc (v,t) ->
               if List.mem_assoc v acc
@@ -464,7 +466,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     let (vs1,subst1,t1) = fresh mono t1 in
     let t2 = Env.find v2 env |> prune_poly_typ noninferred in
     (* TODO: temporary... it seems to work better for typing things like fixpoint
-       and avoids trigerring a bug in Cduce implementation of tallying.
+       combinator and avoids trigerring a bug in Cduce implementation of tallying.
        But theoretically t1 and t2 should have independent polymorphic variables. *)
     let subst2 = Subst.restrict subst1 (vars t2) in
     let (vs2,subst2',t2) = fresh (TVarSet.union mono vs1) (Subst.apply subst2 t2) in

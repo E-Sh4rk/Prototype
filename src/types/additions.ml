@@ -657,7 +657,7 @@ let triangle_poly mono t s =
         let res = Subst.find' subst alpha |> sup_typ delta in
         (* Utils.log "Solution:%a@." pp_typ res ; *)
         res
-    )
+    ) |> disj
 
 let triangle_split_poly mono f out =
     dnf f |>
@@ -665,10 +665,8 @@ let triangle_split_poly mono f out =
         fun lst ->
             let t = branch_type lst in
             let (_,_,t) = fresh mono t in
-            let t = sup_typ mono t in
-            triangle_poly mono t out
-            |> List.map (fun res -> (t, res))
-    end |> List.flatten
+            (sup_typ mono t, triangle_poly mono t out)
+    end
 
 let prune_poly_typ non_infered t =
     (* TODO: Improve it... not really correct for vars with different polarities. *)

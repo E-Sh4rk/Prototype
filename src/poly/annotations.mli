@@ -21,7 +21,8 @@ module Annot : sig
     type split = (typ*(bool*t)) list
     and a =
         | NoneA | ProjA of substs | IteA of substs | AppA of (substs * substs)
-        | RecordUpdateA of substs | LambdaA of (typ * split) list
+        | RecordUpdateA of substs
+        | LambdaA of (typ * split) list (* By decreasing order of importance *)
     and t =
         | VarA | DoA of (typ * a * split) | SkipA of t | EmptyA of (a * t)
         | UnkA of (a * (split option) * (t option) * (t option))

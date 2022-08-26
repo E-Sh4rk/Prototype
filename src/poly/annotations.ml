@@ -20,16 +20,14 @@ let regroup equiv res =
     match lst with
     | [] -> (k,[o])::treated
     | (k', os)::lst when equiv k k' ->
-      ((k, o::os)::lst)@treated
+      (List.rev lst)@((k, o::os)::treated)
     | elt::lst -> add_if_equiv (elt::treated) lst k o
   in
   let aux acc (k, o) = add_if_equiv [] acc k o in
-  List.fold_left aux [] res
+  List.fold_left aux [] res |> List.rev |>
+  List.map (fun (k,v) -> (k, List.rev v))
 
 let remove_redundant_branches mono lst =
-  (* TODO: We should use tallying to compare branches with non-cleanable vars,
-     (but it does not seem needed for now).
-     We could do a separate filtering that removes equivalent branches. *)
   let rec is_useful s rs others =
     if is_empty rs then false
     else match others with
@@ -48,9 +46,9 @@ let remove_redundant_branches mono lst =
       then aux ((s,v)::treated) current
       else aux treated current
   in
-  lst |> List.map (fun (t,a) -> (clean_type ~pos:any ~neg:empty mono t,(t,a))) |>
-  (*(fun x -> Format.printf "remove_redundant_branches: %a@." (Utils.pp_list pp_typ) (List.map fst x) ; x) |>*)
-  aux [] |> List.map snd
+  lst |> List.map (fun (t,a) -> (sup_typ mono t,(t,a))) |>
+  (* (fun x -> Utils.log "remove_redundant_branches: %a@." (Utils.pp_list pp_typ) (List.map fst x) ; x) |> *)
+  List.rev |> aux [] |> List.map snd
 
 let remove_empty_branches lst =
   lst |> List.filter (fun (s,_) -> non_empty s)

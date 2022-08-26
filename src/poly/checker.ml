@@ -252,15 +252,9 @@ let map_res f res =
   | Subst lst ->
     Subst (lst |> List.map (fun (s,a) -> (s, f a)))
 
-(* let complete default_annot res =
-  match res with
-  | Subst lst ->
-    if List.for_all (fun (sigma, _) -> Subst.is_identity sigma |> not) lst
-    then Subst ((Subst.identity, default_annot)::lst)
-    else res
-  | _ -> assert false *)
-
-let complete_fine_grained default_annot res =
+let complete default_annot res =
+  (* TODO: Is it still required with the new remove_redundant_branches ??
+     Or is remove_redundant_branch enough (together with branches ordering)? *)
   match res with
   | Subst lst ->
     let substs = lst |> List.map fst in
@@ -274,16 +268,13 @@ let complete_fine_grained default_annot res =
       ) |> List.flatten
     in
     let possibilities = choose substs in
-    let defs =
+    let defaults =
       possibilities |> List.map (
         fun lst ->
           let parts = lst |> List.map (fun (v,t) ->
-            let t = clean_type ~pos:any ~neg:empty TVarSet.empty t in
-            let t =
-              if (vars t) |> TVarSet.is_empty
-              then neg t
-              else inf_typ TVarSet.empty t |> neg
-            in (v, t)
+            (* NOTE: As the substitutions themselves are applied on monomorphic variables,
+               we take the sup over ALL type variables (not only over polymorphic vars) *)
+            (v, sup_typ TVarSet.empty t |> neg)
           ) in
           let parts = List.fold_left (fun acc (v,t) ->
               if List.mem_assoc v acc
@@ -301,60 +292,16 @@ let complete_fine_grained default_annot res =
           in
           (subst, default_annot)
       ) in
-    let defs = if List.exists (fun (s,_) -> Subst.is_identity s) defs
-      then [(Subst.identity, default_annot)] else defs in
+    let defaults = if List.exists (fun (s,_) -> Subst.is_identity s) defaults
+      then [(Subst.identity, default_annot)] else defaults in
     let are_dupl (s1,_) (s2,_) = Subst.equiv s1 s2 in
-    let defs = remove_duplicates are_dupl defs in
+    let defaults = remove_duplicates are_dupl defaults in
     (* log "Added: %a@." Annot.pp_substs (List.map fst defs) ; *)
-    Subst (defs@lst)
+    Subst (lst@defaults)
   | _ -> assert false
 
-let simplify_tallying_result mono subst vres =
-  (*Format.printf "Subst: %a@.Vres: %a@.Mono: %a@."
-    Subst.pp subst pp_var vres TVarSet.pp mono ;*)
-  (* TODO: Is this useful at all ??? *)
-  (* let dom = Subst.dom subst in
-  let keep =
-    List.fold_left (fun mono v ->
-      let t = Subst.find subst v in
-      let name = (var_name v)^(var_name v) in
-      let nmv = vars_with_polarity t
-      |> List.filter_map (fun (v', pol) ->
-        if var_name v' = name
-        then match pol with
-        | `Pos -> Some (v')
-        | `Neg | `Both ->
-          Format.printf "Unexpected tallying result cannot be simplified.@."
-          ; None
-        else None
-        ) in
-      TVarSet.union mono (TVarSet.construct nmv)
-    ) mono (TVarSet.inter dom mono |> TVarSet.destruct) in
-  let vt = vars (Subst.find' subst vres) in
-  let keep =
-    if TVarSet.inter vt keep |> TVarSet.is_empty
-    then TVarSet.union vt keep else keep
-  in
-  let res =
-    List.fold_left (fun res v ->
-      let t = Subst.find subst v in
-      let name = (var_name v)^(var_name v) in
-      let ns = vars_with_polarity t
-      |> List.filter_map (fun (v', pol) ->
-        if not (TVarSet.mem keep v') && var_name v' = name
-        then match pol with
-        | `Pos -> Some (v', any)
-        | `Neg | `Both ->
-          Format.printf "Unexpected tallying result cannot be simplified.@."
-          ; None
-        else None
-        ) in
-      Subst.combine res (Subst.construct ns)
-    ) Subst.identity (TVarSet.diff dom mono |> TVarSet.destruct)
-  in *)
-  (*Format.printf "Keep: %a@.Simplification: %a@." TVarSet.pp keep Subst.pp res ;*)
-  let res = Subst.identity in ignore (mono, subst, vres) ;
-  res
+let simplify_tallying_results mono vres sols =
+  ignore (mono, vres) ; sols
 
 exception NeedVar of (Variable.t * string)
 let need_var env v str =
@@ -374,12 +321,11 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     let poly_t = vs |> TVarSet.destruct in
     let poly_s = TVarSet.diff (vars s) mono |> TVarSet.destruct in
     let res = tallying_infer (poly_s@poly_t) noninferred [(t, s)] in
+    let res = match resvar with
+    | None -> res
+    | Some resvar -> simplify_tallying_results mono resvar res
+    in
     let res = res |> List.map (fun sol ->
-      let simpl =
-        match resvar with
-        | None -> Subst.identity
-        | Some resvar -> simplify_tallying_result mono sol resvar in
-      let sol = Subst.compose_restr simpl sol in
       let mono_part = Subst.restrict sol mono in
       let poly_part = Subst.compose (Subst.restrict sol vs) tsubst in
       (mono_part, poly_part)
@@ -419,7 +365,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
               |> regroup Subst.equiv
             in
             map_res (fun splits -> splits@branches) (Subst res)
-            |> complete_fine_grained branches
+            |> complete branches
           | res -> map_res (fun splits -> (s, splits)::branches) res
           end
         | res -> map_res (fun branches -> (s, splits)::branches) res
@@ -484,9 +430,8 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
       pp_typ t1 pp_typ arrow_typ (pp_list pp_var) log_delta ;
     let res =
       tallying_infer (alpha::poly) noninferred [(t1, arrow_typ)]
+      |> simplify_tallying_results mono alpha
       |> List.map (fun sol ->
-      let simpl = simplify_tallying_result mono sol alpha in
-      let sol = Subst.compose_restr simpl sol in
       let poly1_part = Subst.compose (Subst.restrict sol vs1) subst1 in
       let poly2_part = Subst.compose (Subst.restrict sol vs2) subst2 in
       let mono_part = Subst.restrict sol mono in
@@ -517,11 +462,11 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     then
       let res = simple_constraint_infer v "typecase" (neg s) None in
       map_res (fun sigma -> IteA sigma) res
-      |> complete_fine_grained (IteA [Subst.identity])
+      |> complete (IteA [Subst.identity])
     else if subtype t (neg s) then
       let res = simple_constraint_infer v "typecase" s None in
       map_res (fun sigma -> IteA sigma) res
-      |> complete_fine_grained (IteA [Subst.identity])
+      |> complete (IteA [Subst.identity])
     else
       Split [(Env.singleton v s, IteA []) ; (Env.singleton v (neg s), IteA [])]
   | Ite (v, s, v1, v2), IteA sigma ->
@@ -628,7 +573,7 @@ and infer' tenv env mono noninferred annot e =
       log ~level:0 "The definition %s needs a substitution and is skippable. Adding a default branch...@."
         (Variable.show v);
       let res = (Subst lst) |> map_res (fun annot_a -> UnkA (annot_a, s, Some k1, k2)) in
-      complete_fine_grained (SkipA k1) res
+      complete (SkipA k1) res
     | res, _ ->
       log ~level:2 "Definition of %s needs to go up.@." (Variable.show v) ;
       map_res (fun annot_a -> UnkA (annot_a, s, k1, k2)) res

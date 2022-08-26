@@ -391,4 +391,23 @@ let issue_tally () =
   let sol = Tallying.tallying ~var_order:[a] CD.Var.Set.empty [(t,t')] in
   check_tallying_sol t t' sol
 
-let _ = assert (issue_tally ())
+let issue_tally2 () =
+  let c = CD.Var.mk "c" in
+  let a = CD.Var.mk "a" in
+  let b = CD.Var.mk "b" in
+  let ct = var c in
+  let at = var a in
+  let bt = var b in
+  let arr0 = cap true_typ ct in
+  let arr0 = arrow (cons arr0) (cons ct) in
+  let arr1 = cap true_typ at in
+  let arr1 = arrow (cons arr1) (cons arr1) in
+  let arr2 = arrow (cons any) (cons false_typ) in
+  let lhs = cup (cap arr1 arr0) arr2 in
+  let rhs = cap true_typ at in
+  let rhs = arrow (cons rhs) (cons bt) in
+  Format.printf "%a <= %a@." Print.print lhs Print.print rhs ;
+  let sol = Tallying.tallying ~var_order:[b;c] (CD.Var.Set.singleton a) [(lhs, rhs)] in
+  check_tallying_sol lhs rhs sol
+
+let _ = assert (issue_tally2 ())

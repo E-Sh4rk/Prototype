@@ -288,10 +288,11 @@ module Subst = struct
     let s1 = normalize s1 in
     let s2 = normalize s2 in
     CD.Var.Map.equal equiv s1 s2
-  let pp_entry fmt (v,t) =
+  (* let pp_entry fmt (v,t) =
     Format.fprintf fmt "%a ===> %a" pp_var v pp_typ t
   let pp fmt t =
-    Format.fprintf fmt "%a@." (Utils.pp_long_list pp_entry) (destruct t)
+    Format.fprintf fmt "%a@." (Utils.pp_long_list pp_entry) (destruct t) *)
+  let pp = CD.Types.Subst.print
 end
 
 (* Tallying *)

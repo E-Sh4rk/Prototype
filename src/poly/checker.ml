@@ -252,15 +252,15 @@ let map_res f res =
   | Subst lst ->
     Subst (lst |> List.map (fun (s,a) -> (s, f a)))
 
-(* let complete default_annot res =
+let complete default_annot res =
   match res with
   | Subst lst ->
     if List.for_all (fun (sigma, _) -> Subst.is_identity sigma |> not) lst
-    then Subst ((Subst.identity, default_annot)::lst)
+    then Subst (lst@[Subst.identity, default_annot])
     else res
-  | _ -> assert false *)
+  | _ -> assert false
 
-let complete default_annot res =
+(* let complete default_annot res =
   (* TODO: Is it still required with the new remove_redundant_branches ??
      Or is remove_redundant_branch enough (together with branches ordering)? *)
   match res with
@@ -306,7 +306,7 @@ let complete default_annot res =
     let defaults = remove_duplicates are_dupl defaults in
     (* log "Added: %a@." Annot.pp_substs (List.map fst defs) ; *)
     Subst (lst@defaults)
-  | _ -> assert false
+  | _ -> assert false *)
 
 let simplify_tallying_results mono vres sols =
   ignore (mono, vres) ; sols
@@ -484,6 +484,8 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
       (*Split [(Env.singleton v s, IteA sigma) ; (Env.singleton v (neg s), IteA sigma)]*)
   | Lambda ((), ua, v, e), LambdaA branches ->
     let inferred = ua = Parsing.Ast.Unnanoted in
+    (* log ~level:0 "Lambda for %s entered with %i raw branches:%a@."
+    (Variable.show v) (List.length branches) (pp_list pp_typ) (List.map fst branches) ; *)
     let branches =
       if inferred then branches |>
         (* remove_empty_branches *)

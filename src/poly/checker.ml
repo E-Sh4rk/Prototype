@@ -252,6 +252,14 @@ let map_res f res =
   | Subst lst ->
     Subst (lst |> List.map (fun (s,a) -> (s, f a)))
 
+(* let complete default_annot res =
+  match res with
+  | Subst lst ->
+    if List.for_all (fun (sigma, _) -> Subst.is_identity sigma |> not) lst
+    then Subst ((Subst.identity, default_annot)::lst)
+    else res
+  | _ -> assert false *)
+
 let complete default_annot res =
   (* TODO: Is it still required with the new remove_redundant_branches ??
      Or is remove_redundant_branch enough (together with branches ordering)? *)
@@ -344,32 +352,29 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
       match branches with
       | [] -> Ok []
       | (s, splits)::branches ->
-        begin match aux branches with
-        | Ok (branches) ->
-          let env = Env.add v s env in
-          let vs = vars s in
-          let xs = TVarSet.diff vs mono in
-          let mono = TVarSet.union mono vs in
-          let noninferred =
-            if inferred then noninferred
-            else TVarSet.union noninferred xs
+        let env = Env.add v s env in
+        let vs = vars s in
+        let xs = TVarSet.diff vs mono in
+        let mono = TVarSet.union mono vs in
+        let noninferred =
+          if inferred then noninferred
+          else TVarSet.union noninferred xs
+        in
+        log ~level:2 "Exploring branch %a for variable %s.@." pp_typ s (Variable.show v) ;
+        begin match infer_splits' tenv env mono noninferred v splits e with
+        | Ok splits -> aux branches |> map_res (fun branches -> (s,splits)::branches)
+        | Subst lst ->
+          let res =
+            lst |> List.map (fun (sigma, splits) ->
+              let sigmaxs = Subst.restrict sigma xs in
+              (Subst.remove sigma xs,
+              (Subst.apply_simplify sigmaxs s, Annot.apply_subst_split sigmaxs splits)))
+            |> regroup Subst.equiv
           in
-          log ~level:2 "Exploring branch %a for variable %s.@." pp_typ s (Variable.show v) ;
-          begin match infer_splits' tenv env mono noninferred v splits e with
-          | Subst lst ->
-            let res =
-              lst |> List.map (fun (sigma, splits) ->
-                let sigmaxs = Subst.restrict sigma xs in
-                (Subst.remove sigma xs,
-                (Subst.apply_simplify sigmaxs s, Annot.apply_subst_split sigmaxs splits)))
-              |> regroup Subst.equiv
-            in
-            map_res (fun splits -> splits@branches) (Subst res)
-            |> complete branches
-          | res -> map_res (fun splits -> (s, splits)::branches) res
-          end
-        | res -> map_res (fun branches -> (s, splits)::branches) res
-        end  
+          map_res (fun splits -> splits@branches) (Subst res)
+          |> complete branches
+        | res -> map_res (fun splits -> (s, splits)::branches) res
+        end
     in
     let res = aux branches in
     log ~level:0 "Lambda for %s exited.@." (Variable.show v) ; res
@@ -510,26 +515,23 @@ and infer_splits' tenv env mono noninferred v splits e =
     match splits with
     | [] -> Ok []
     | (s, (b, annot))::splits ->
-      begin match aux splits with
-      | Ok (splits) ->
-        let env = Env.strengthen v s env in
-        let vs = vars s in
-        let noninferred = TVarSet.union noninferred (TVarSet.diff vs mono) in
-        let mono = TVarSet.union mono vs in
-        log ~level:2 "Exploring split %a for variable %s.@." pp_typ s (Variable.show v) ;
-        begin match infer_iterated tenv env mono noninferred annot e with
-        | Split lst ->
-          let res =
-            lst |> List.map (fun (env', annot) ->
-              let b = b || Env.mem v env' in
-              let env' = Env.strengthen v s env' in
-              (Env.rm v env', (Env.find v env', (b, annot))))
-            |> regroup Env.equiv
-          in
-          map_res (fun splits' -> splits'@splits) (Split res)
-        | res -> map_res (fun annot -> (s,(b,annot))::splits) res
-        end
-      | res -> map_res (fun splits -> (s,(b,annot))::splits) res
+      let env = Env.strengthen v s env in
+      let vs = vars s in
+      let noninferred = TVarSet.union noninferred (TVarSet.diff vs mono) in
+      let mono = TVarSet.union mono vs in
+      log ~level:2 "Exploring split %a for variable %s.@." pp_typ s (Variable.show v) ;
+      begin match infer_iterated tenv env mono noninferred annot e with
+      | Ok annot -> aux splits |> map_res (fun splits -> (s,(b,annot))::splits)
+      | Split lst ->
+        let res =
+          lst |> List.map (fun (env', annot) ->
+            let b = b || Env.mem v env' in
+            let env' = Env.strengthen v s env' in
+            (Env.rm v env', (Env.find v env', (b, annot))))
+          |> regroup Env.equiv
+        in
+        map_res (fun splits' -> splits'@splits) (Split res)
+      | res -> map_res (fun annot -> (s,(b,annot))::splits) res
       end
   in
   let res = aux splits in

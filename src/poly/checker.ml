@@ -360,7 +360,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
           if inferred then noninferred
           else TVarSet.union noninferred xs
         in
-        log ~level:2 "Exploring branch %a for variable %s.@." pp_typ s (Variable.show v) ;
+        log ~level:0 "Exploring branch %a for variable %s.@." pp_typ s (Variable.show v) ;
         begin match infer_splits' tenv env mono noninferred v splits e with
         | Ok splits -> aux branches |> map_res (fun branches -> (s,splits)::branches)
         | Subst lst ->

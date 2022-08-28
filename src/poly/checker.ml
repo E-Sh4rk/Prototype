@@ -590,7 +590,7 @@ and infer' tenv env mono noninferred annot e =
 and infer_a_iterated pos tenv env mono noninferred annot_a a =
   (*log ~level:3 "Iteration...@." ;*)
   match infer_a' pos tenv env mono noninferred annot_a a with
-  | Split [(env', annot_a)] when Env.leq env env' ->
+  | Split [(_, annot_a)] ->
     infer_a_iterated pos tenv env mono noninferred annot_a a
   | Subst [(subst, annot_a)] when Subst.is_identity subst ->
     infer_a_iterated pos tenv env mono noninferred annot_a a
@@ -598,12 +598,12 @@ and infer_a_iterated pos tenv env mono noninferred annot_a a =
 
 and infer_iterated tenv env mono noninferred annot e =
   (*log ~level:3 "Iteration...@." ;*)
-  match infer' tenv env mono noninferred annot e, e with
-  | Split [(env', annot)], _ when Env.leq env env' ->
+  match infer' tenv env mono noninferred annot e with
+  | Split [(_, annot)] ->
     infer_iterated tenv env mono noninferred annot e
-  | Subst [(subst, annot)], _ when Subst.is_identity subst ->
+  | Subst [(subst, annot)] when Subst.is_identity subst ->
     infer_iterated tenv env mono noninferred annot e
-  | res, _ -> res
+  | res -> res
 
 let infer tenv env mono e =
   let fv = fv_e e in

@@ -35,7 +35,7 @@ let fixpoint = fun f ->
 
 (* ============== RECURSIVE ============= *)
 
-let (-) = <Int->Int->Int>
+(* let (-) = <Int->Int->Int>
 let ( * ) = <Int->Int->Int>
 
 let fact fact n =
@@ -47,7 +47,7 @@ let map map f lst =
   if lst is Nil then nil
   else (f (fst lst), map f (snd lst))
 
-let map = fixpoint map
+let map = fixpoint map *)
 
 (*************************************************
 *          Tobin-Hochstadt & Felleisen           *

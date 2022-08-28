@@ -244,6 +244,11 @@ type 'a result =
 
 let fail = Subst []
 
+let nontrivial_split res =
+  match res with
+  | Split (_::_::_) -> true
+  | _ -> false
+
 let map_res f res =
   match res with
   | Ok a -> Ok (f a)
@@ -269,7 +274,7 @@ let need_var env v str =
   if Env.mem v env |> not
   then raise (NeedVar (v, str))
 
-(* TODO: Implement new annotunk and retype system *)
+(* TODO: Debug failing examples in test.ml *)
 (* TODO: Apply substitutions progressively when going up *)
 
 let rec infer_a' _ tenv env mono noninferred annot_a a =
@@ -500,7 +505,7 @@ and infer' tenv env mono noninferred annot e =
   | Var v, VarA ->
     if Env.mem v env then Ok(VarA)
     else (log ~level:0 "Untypeable expression (--> need %s)@." (Variable.show v) ; fail)
-  | Bind ((), v, a, e), UnkA (annot_a, s, k1, k2) ->
+  | Bind ((), v, a, e), UnkA (annot_a, s) ->
     let pos = Variable.get_locations v in
     let (req, opt) = analyze_dependencies env e in
     (* Note: optimisation *)
@@ -513,34 +518,39 @@ and infer' tenv env mono noninferred annot e =
         log ~level:2 "(Re)Infering definition for %s...@." (Variable.show v) ;
         infer_a_iterated pos tenv env mono noninferred annot_a a
       end in
-    begin match res, k1 with
+    begin match res, s with
     | Ok annot_a, _ ->
       let t = typeof_a_nofail pos tenv env mono annot_a a in
       log ~level:2 "Definition of %s typed: %a@." (Variable.show v) pp_typ t ;
       let e = Bind ((), v, a, e) in
-      begin match s, k2, is_empty t with
-      | _, Some annot, true ->
+      begin match s, is_empty t with
+      | (_,(_, annot))::_, true ->
         let annot = EmptyA (annot_a, annot) in
         infer' tenv env mono noninferred annot e
-      | Some splits, _, false ->
+      | splits, false ->
         let annot = DoA (t, annot_a, splits) in
         infer' tenv env mono noninferred annot e
-      | _, _ , _->
-        log ~level:0 "Definition %s is typeable, but its type cannot be handled.@."
-          (Variable.show v) ; fail
+      | [], true-> assert false
       end
-    | Subst lst, Some k1 when skippable ->
-      log ~level:0 "The definition %s needs a substitution and is skippable. Adding a default branch...@."
+    | Subst lst, [(t,(_, annot))] when skippable && subtype any t ->
+      log ~level:0 "The definition %s needs to go up. Adding a default branch...@."
         (Variable.show v);
-      let res = (Subst lst) |> map_res (fun annot_a -> UnkA (annot_a, s, Some k1, k2)) in
-      complete (SkipA k1) res
+      let res = (Subst lst) |> map_res (fun annot_a -> UnkA (annot_a, s)) in
+      complete (SkipA annot) res
+    | res, _ when nontrivial_split res ->
+      log ~level:2 "Definition of %s needs to go up. Erasing...@." (Variable.show v) ;
+      map_res (fun _ -> UnkA (Annot.initial_a a, s)) res
     | res, _ ->
       log ~level:2 "Definition of %s needs to go up.@." (Variable.show v) ;
-      map_res (fun annot_a -> UnkA (annot_a, s, k1, k2)) res
+      map_res (fun annot_a -> UnkA (annot_a, s)) res
     end
-  | Bind ((), _, _, e), SkipA annot ->
+  | Bind ((), _, a, e), SkipA annot ->
     let res = infer_iterated tenv env mono noninferred annot e in
-    map_res (fun annot -> SkipA annot) res
+    if nontrivial_split res
+    then
+      let annot_a = Annot.initial_a a in
+      map_res (fun annot -> UnkA (annot_a, [(any, (false, annot))])) res
+    else map_res (fun annot -> SkipA annot) res
   | Bind ((), v, _, e), EmptyA (annot_a, annot) ->
     let env = Env.add v empty env in
     let res = infer_iterated tenv env mono noninferred annot e in
@@ -569,7 +579,11 @@ and infer' tenv env mono noninferred annot e =
     | None ->
       let env = Env.add v t env in
       let res = infer_splits' tenv env mono noninferred v splits e in
-      map_res (fun splits -> DoA (t, annot_a, splits)) res
+      if nontrivial_split res
+      then
+        let annot_a = Annot.initial_a a in
+        map_res (fun splits -> UnkA (annot_a, splits)) res
+      else map_res (fun splits -> DoA (t, annot_a, splits)) res
     end
   | _, _ -> assert false
 
@@ -589,8 +603,6 @@ and infer_iterated tenv env mono noninferred annot e =
     infer_iterated tenv env mono noninferred annot e
   | Subst [(subst, annot)], _ when Subst.is_identity subst ->
     infer_iterated tenv env mono noninferred annot e
-  | Split r, Bind (_, _, a, e) ->
-    map_res (fun annot -> Annot.retype a e annot) (Split r)
   | res, _ -> res
 
 let infer tenv env mono e =

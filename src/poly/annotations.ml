@@ -102,7 +102,7 @@ module Annot = struct
 
   and t =
       | VarA | DoA of (typ * a * split) | SkipA of t | EmptyA of (a * t)
-      | UnkA of (a * (split option) * (t option) * (t option))
+      | UnkA of (a * split)
       [@@deriving show]
 
   let rec apply_subst_split s lst =
@@ -124,9 +124,8 @@ module Annot = struct
     DoA (Subst.apply_simplify s ty, apply_subst_a s a, apply_subst_split s split)
   | SkipA t -> SkipA (apply_subst s t)
   | EmptyA (a,t) -> EmptyA (apply_subst_a s a, apply_subst s t)
-  | UnkA (a, so, to1, to2) ->
-    UnkA (apply_subst_a s a, Option.map (apply_subst_split s) so,
-      Option.map (apply_subst s) to1, Option.map (apply_subst s) to2)
+  | UnkA (a, split) ->
+    UnkA (apply_subst_a s a, apply_subst_split s split)
 
   let rec initial_a a =
     let open Msc in match a with
@@ -155,16 +154,6 @@ module Annot = struct
       | Var _ -> VarA
       | Bind (_, _, a, e) ->
         let initial_a = initial_a a in
-        let initial_e = initial_e e in
-        let initial_s = [(any, (false, initial_e))] in
-        UnkA (initial_a, Some initial_s, Some initial_e, Some initial_e)
-
-  let retype a e t =
-    let a = initial_a a in
-    match t with
-    | VarA -> VarA
-    | UnkA (_,s,t1,t2) -> UnkA (a,s,t1,t2)
-    | SkipA (t) -> UnkA (a, Some [(any,(false,t))], Some t, Some t)
-    | DoA (_, _, s) -> UnkA (a, Some s, None, Some (initial_e e))
-    | EmptyA (_, t) -> UnkA (a, None, None, Some t)
+        let initial_s = [(any, (false, initial_e e))] in
+        UnkA (initial_a, initial_s)
 end

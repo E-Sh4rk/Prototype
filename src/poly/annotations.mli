@@ -25,7 +25,7 @@ module Annot : sig
         | LambdaA of (typ * split) list (* By decreasing order of importance *)
     and t =
         | VarA | DoA of (typ * a * split) | SkipA of t | EmptyA of (a * t)
-        | UnkA of (a * (split option) * (t option) * (t option))
+        | UnkA of (a * split)
 
     val pp_substs : Format.formatter -> substs -> unit
     val pp_split : Format.formatter -> split -> unit
@@ -39,6 +39,4 @@ module Annot : sig
 
     val initial_a : Msc.a -> a
     val initial_e : Msc.e -> t
-
-    val retype : Msc.a -> Msc.e -> t -> t
 end

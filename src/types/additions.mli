@@ -104,7 +104,6 @@ module type Subst = sig
 end
 module Subst : Subst
 val remove_redundant_vars : TVarSet.t -> typ -> Subst.t * typ
-val remove_redundant_vars_ext : TVarSet.t -> typ -> Subst.t * typ
 val hard_clean : TVarSet.t -> typ -> typ
 val fresh_var : unit -> var
 val instantiate : Subst.t list -> typ -> typ

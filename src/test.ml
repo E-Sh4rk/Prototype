@@ -33,6 +33,22 @@ let fixpoint = fun f ->
      f ( fun  v -> ( x x v ))
    in delta delta
 
+(* ============== RECURSIVE ============= *)
+
+let (-) = <Int->Int->Int>
+let ( * ) = <Int->Int->Int>
+
+let fact fact n =
+  if n is 0 then 1 else (fact (n-1))*n
+
+let fact = fixpoint fact
+
+let map map f lst =
+  if lst is Nil then nil
+  else (f (fst lst), map f (snd lst))
+
+let map = fixpoint map
+
 (*************************************************
 *          Tobin-Hochstadt & Felleisen           *
 *     exampleX = EXPLICITLY ANNOTATED VERSIONS   *
@@ -246,3 +262,4 @@ fun extra ->
  else if is_int (fst extra) is True then
      add (strlen input) (fst extra)
  else 0
+

@@ -274,7 +274,6 @@ let need_var env v str =
   if Env.mem v env |> not
   then raise (NeedVar (v, str))
 
-(* TODO: Debug failing examples in test.ml *)
 (* TODO: Apply substitutions progressively when going up *)
 
 let rec infer_a' _ tenv env mono noninferred annot_a a =
@@ -574,7 +573,8 @@ and infer' tenv env mono noninferred annot e =
     | Some refinements ->
       log ~level:2 "Splits must be propagated for variable %s...@." (Variable.show v) ;
       let res = refinements |> List.map (fun env' ->
-        (env', DoA (t, annot_a, splits))) in
+        let annot_a = Annot.initial_a a in
+        (env', UnkA (annot_a, splits))) in
       Split res
     | None ->
       let env = Env.add v t env in

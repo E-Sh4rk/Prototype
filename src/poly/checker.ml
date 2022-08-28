@@ -231,11 +231,11 @@ let analyze_dependencies env e =
 
 let typeof_a_nofail pos tenv env mono annot_a a =
   try typeof_a pos tenv env mono annot_a a
-  with Untypeable _ -> assert false
+  with Untypeable _ -> Format.printf "%a@." PMsc.pp_a a ; assert false
 
-let typeof_nofail tenv env mono annot_a a =
-  try typeof tenv env mono annot_a a
-  with Untypeable _ -> assert false
+let typeof_nofail tenv env mono annot e =
+  try typeof tenv env mono annot e
+  with Untypeable _ -> Format.printf "%a@." PMsc.pp_e e ; assert false
 
 type 'a result =
   | Ok of 'a

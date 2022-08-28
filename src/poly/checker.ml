@@ -309,6 +309,7 @@ let complete default_annot res =
   | _ -> assert false *)
 
 let simplify_tallying_results mono vres sols =
+  (* TODO: Idea for simplifying tallying results *)
   ignore (mono, vres) ; sols
 
 exception NeedVar of (Variable.t * string)
@@ -316,6 +317,7 @@ let need_var env v str =
   if Env.mem v env |> not
   then raise (NeedVar (v, str))
 
+(* TODO: Apply substitutions progressively when going up? *)
 let rec infer_a' _ tenv env mono noninferred annot_a a =
   let need_var = need_var env in
   let simple_constraint_infer v str s resvar =

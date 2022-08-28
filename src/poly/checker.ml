@@ -260,54 +260,6 @@ let complete default_annot res =
     else res
   | _ -> assert false
 
-(* let complete default_annot res =
-  (* TODO: Is it still required with the new remove_redundant_branches ??
-     Or is remove_redundant_branch enough (together with branches ordering)? *)
-  match res with
-  | Subst lst ->
-    let substs = lst |> List.map fst in
-    (* log "Initial: %a@." Annot.pp_substs substs ; *)
-    let rec choose lst = match lst with
-    | [] -> [[]]
-    | subst::lst ->
-      let res = choose lst in
-      Subst.dom subst |> TVarSet.destruct |> List.map (fun x ->
-        List.map (fun lst -> (x, Subst.find subst x)::lst) res
-      ) |> List.flatten
-    in
-    let possibilities = choose substs in
-    let defaults =
-      possibilities |> List.map (
-        fun lst ->
-          let parts = lst |> List.map (fun (v,t) ->
-            (* NOTE: As the substitutions themselves are applied on monomorphic variables,
-               we take the sup over ALL type variables (not only over polymorphic vars) *)
-            (v, sup_typ TVarSet.empty t |> neg)
-          ) in
-          let parts = List.fold_left (fun acc (v,t) ->
-              if List.mem_assoc v acc
-              then
-                let t' = List.assoc v acc in
-                let acc = List.remove_assoc v acc in
-                (v, cap_o t t')::acc
-              else
-                (v,t)::acc
-            ) [] parts in
-          let subst =
-            parts
-            |> List.map (fun (v,t) -> (v,cap t (var_typ v)))
-            |> Subst.construct
-          in
-          (subst, default_annot)
-      ) in
-    let defaults = if List.exists (fun (s,_) -> Subst.is_identity s) defaults
-      then [(Subst.identity, default_annot)] else defaults in
-    let are_dupl (s1,_) (s2,_) = Subst.equiv s1 s2 in
-    let defaults = remove_duplicates are_dupl defaults in
-    (* log "Added: %a@." Annot.pp_substs (List.map fst defs) ; *)
-    Subst (lst@defaults)
-  | _ -> assert false *)
-
 let simplify_tallying_results mono vres sols =
   (* TODO: Idea for simplifying tallying results *)
   ignore (mono, vres) ; sols
@@ -317,7 +269,9 @@ let need_var env v str =
   if Env.mem v env |> not
   then raise (NeedVar (v, str))
 
-(* TODO: Apply substitutions progressively when going up? *)
+(* TODO: Implement new annotunk and retype system *)
+(* TODO: Apply substitutions progressively when going up *)
+
 let rec infer_a' _ tenv env mono noninferred annot_a a =
   let need_var = need_var env in
   let simple_constraint_infer v str s resvar =

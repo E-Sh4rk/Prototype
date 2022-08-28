@@ -375,7 +375,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
           in
           map_res (fun splits -> splits@branches) (Subst res)
           |> complete branches
-        | res -> map_res (fun splits -> (s, splits)::branches) res
+        | Split lst -> map_res (fun splits -> (s, splits)::branches) (Split lst)
         end
     in
     let res = aux branches in
@@ -535,7 +535,7 @@ and infer_splits' tenv env mono noninferred v splits e =
           |> regroup Env.equiv
         in
         map_res (fun splits' -> splits'@splits) (Split res)
-      | res -> map_res (fun annot -> (s,(b,annot))::splits) res
+      | Subst lst -> map_res (fun annot -> (s,(b,annot))::splits) (Subst lst)
       end
   in
   let res = aux splits in

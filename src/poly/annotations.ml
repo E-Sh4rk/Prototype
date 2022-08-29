@@ -28,6 +28,8 @@ let regroup equiv res =
   List.map (fun (k,v) -> (k, List.rev v))
 
 let remove_redundant_branches mono lst =
+  (* TODO: Remember which branches come from a "complete". Only remove those ones.
+     When one of those branches is taken, unmark it. *)
   let rec is_useful s rs others =
     if is_empty rs then false
     else match others with

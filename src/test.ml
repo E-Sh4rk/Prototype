@@ -28,12 +28,12 @@ let land = fun a -> fun b ->
 let test_1 = fun x -> fun y ->
   if land (lor x (lnot x)) (lor (lnot y) y) then true else false
 
+(* ============== RECURSIVE ============= *)
+
 let fixpoint = fun f ->
   let delta = fun x ->
      f ( fun  v -> ( x x v ))
    in delta delta
-
-(* ============== RECURSIVE ============= *)
 
 (* let (-) = <Int->Int->Int>
 let ( * ) = <Int->Int->Int>
@@ -42,6 +42,11 @@ let fact fact n =
   if n is 0 then 1 else (fact (n-1))*n
 
 let fact = fixpoint fact
+
+let length length lst =
+  if lst is (Any,Any) then succ (length (snd lst)) else 0
+
+let length = fixpoint length
 
 let map map f lst =
   if lst is Nil then nil

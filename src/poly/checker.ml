@@ -265,9 +265,9 @@ let complete default_annot res =
     else res
   | _ -> assert false
 
-let simplify_tallying_results mono vres sols =
+let simplify_tallying_results env mono sols =
   (* TODO: Idea for simplifying tallying results *)
-  ignore (mono, vres) ; sols
+  ignore (env, mono) ; sols
 
 exception NeedVar of (Variable.t * string)
 let need_var env v str =
@@ -278,7 +278,7 @@ let need_var env v str =
 
 let rec infer_a' _ tenv env mono noninferred annot_a a =
   let need_var = need_var env in
-  let simple_constraint_infer v str s resvar =
+  let simple_constraint_infer v str s =
     need_var v str ;
     let t = Env.find v env |> prune_poly_typ noninferred in
     let (vs,tsubst,t) = fresh mono t in
@@ -288,12 +288,10 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
       pp_typ t pp_typ s (pp_list pp_var) log_delta ;
     let poly_t = vs |> TVarSet.destruct in
     let poly_s = TVarSet.diff (vars s) mono |> TVarSet.destruct in
-    let res = tallying_infer (poly_s@poly_t) noninferred [(t, s)] in
-    let res = match resvar with
-    | None -> res
-    | Some resvar -> simplify_tallying_results mono resvar res
-    in
-    let res = res |> List.map (fun sol ->
+    let res =
+      tallying_infer (poly_s@poly_t) noninferred [(t, s)]
+      |> simplify_tallying_results env mono
+      |> List.map (fun sol ->
       let mono_part = Subst.restrict sol mono in
       let poly_part = Subst.compose (Subst.restrict sol vs) tsubst in
       (mono_part, poly_part)
@@ -346,7 +344,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
   | Projection (Parsing.Ast.Field label, v), ProjA [] ->
     let alpha = fresh_var () in
     let s = mk_record true [label, var_typ alpha |> cons] in
-    let res = simple_constraint_infer v "projection" s (Some alpha) in
+    let res = simple_constraint_infer v "projection" s in
     map_res (fun sigma -> ProjA sigma) res
   | Projection (Parsing.Ast.Field label, v), ProjA sigma ->
     if simple_constraint_check v "projection" (record_any_with label) sigma
@@ -358,14 +356,14 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
       then mk_times (var_typ alpha |> cons) any_node
       else mk_times any_node (var_typ alpha |> cons)
     in
-    let res = simple_constraint_infer v "projection" s (Some alpha) in
+    let res = simple_constraint_infer v "projection" s in
     map_res (fun sigma -> ProjA sigma) res
   | Projection (_, v), ProjA sigma ->
     if simple_constraint_check v "projection" pair_any sigma
     then Ok (ProjA sigma) else assert false
   | RecordUpdate (v, _, o), RecordUpdateA [] ->
     (match o with None -> () | Some v' -> need_var v' "record update") ;
-    let res = simple_constraint_infer v "record update" record_any None in
+    let res = simple_constraint_infer v "record update" record_any in
     map_res (fun sigma -> RecordUpdateA sigma) res
   | RecordUpdate (v, _, o), RecordUpdateA sigma ->
     (match o with None -> () | Some v' -> need_var v' "record update") ;
@@ -395,7 +393,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
       pp_typ t1 pp_typ arrow_typ (pp_list pp_var) log_delta ;
     let res =
       tallying_infer (alpha::poly) noninferred [(t1, arrow_typ)]
-      |> simplify_tallying_results mono alpha
+      |> simplify_tallying_results env mono
       |> List.map (fun sol ->
       let poly1_part = Subst.compose (Subst.restrict sol vs1) subst1 in
       let poly2_part = Subst.compose (Subst.restrict sol vs2) subst2 in
@@ -425,11 +423,11 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     let t = Env.find v env in
     if subtype t s
     then
-      let res = simple_constraint_infer v "typecase" (neg s) None in
+      let res = simple_constraint_infer v "typecase" (neg s) in
       map_res (fun sigma -> IteA sigma) res
       |> complete (IteA [Subst.identity])
     else if subtype t (neg s) then
-      let res = simple_constraint_infer v "typecase" s None in
+      let res = simple_constraint_infer v "typecase" s in
       map_res (fun sigma -> IteA sigma) res
       |> complete (IteA [Subst.identity])
     else

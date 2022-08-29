@@ -109,15 +109,16 @@ module Annot = struct
 
   let rec apply_subst_split s lst =
     lst |> List.map (fun (ty,(b,t)) -> (Subst.apply_simplify s ty, (b, apply_subst s t)))
+  and apply_subst_branches s lst =
+    let aux (ty, split) = (Subst.apply_simplify s ty, apply_subst_split s split) in
+    List.map aux lst
   and apply_subst_a s a = match a with
   | NoneA -> NoneA
   | ProjA ss -> ProjA (apply_subst_substs s ss)
   | IteA ss -> IteA (apply_subst_substs s ss)
   | AppA (ss1, ss2) -> AppA (apply_subst_substs s ss1, apply_subst_substs s ss2)
   | RecordUpdateA ss -> RecordUpdateA (apply_subst_substs s ss)
-  | LambdaA lst ->
-    let aux (ty, split) = (Subst.apply_simplify s ty, apply_subst_split s split) in
-    LambdaA (List.map aux lst)
+  | LambdaA lst -> LambdaA (apply_subst_branches s lst)
   and apply_subst s t =
   if Subst.is_identity s then t
   else match t with

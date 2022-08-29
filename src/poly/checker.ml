@@ -257,6 +257,14 @@ let map_res f res =
   | Subst lst ->
     Subst (lst |> List.map (fun (s,a) -> (s, f a)))
 
+let map_res' f res =
+  match res with
+  | Ok a -> Ok (f Subst.identity a)
+  | Split lst ->
+    Split (lst |> List.map (fun (e,a) -> (e, f Subst.identity a)))
+  | Subst lst ->
+    Subst (lst |> List.map (fun (s,a) -> (s, f s a)))
+
 let complete default_annot res =
   match res with
   | Subst lst ->
@@ -273,8 +281,6 @@ exception NeedVar of (Variable.t * string)
 let need_var env v str =
   if Env.mem v env |> not
   then raise (NeedVar (v, str))
-
-(* TODO: Apply substitutions progressively when going up *)
 
 let rec infer_a' _ tenv env mono noninferred annot_a a =
   let need_var = need_var env in
@@ -320,16 +326,16 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
         in
         log ~level:0 "Exploring branch %a for variable %s.@." pp_typ s (Variable.show v) ;
         begin match infer_splits' tenv env mono noninferred v splits e with
-        | Ok splits -> aux branches |> map_res (fun branches -> (s,splits)::branches)
+        | Ok splits -> aux branches |> map_res' (fun sigma branches ->
+          (Subst.apply_simplify sigma s, Annot.apply_subst_split sigma splits)::branches)
         | Subst lst ->
           let res =
             lst |> List.map (fun (sigma, splits) ->
-              let sigmaxs = Subst.restrict sigma xs in
-              (Subst.remove sigma xs,
-              (Subst.apply_simplify sigmaxs s, Annot.apply_subst_split sigmaxs splits)))
+              (Subst.remove sigma xs, (Subst.apply_simplify sigma s, splits)))
             |> regroup Subst.equiv
           in
-          map_res (fun splits -> splits@branches) (Subst res)
+          map_res' (fun sigma splits ->
+            splits@(Annot.apply_subst_branches sigma branches)) (Subst res)
           |> complete branches
         | Split lst -> map_res (fun splits -> (s, splits)::branches) (Split lst)
         end
@@ -481,7 +487,8 @@ and infer_splits' tenv env mono noninferred v splits e =
       let mono = TVarSet.union mono vs in
       log ~level:2 "Exploring split %a for variable %s.@." pp_typ s (Variable.show v) ;
       begin match infer_iterated tenv env mono noninferred annot e with
-      | Ok annot -> aux splits |> map_res (fun splits -> (s,(b,annot))::splits)
+      | Ok annot -> aux splits |> map_res' (fun sigma splits ->
+        (Subst.apply_simplify sigma s,(b,Annot.apply_subst sigma annot))::splits)
       | Split lst ->
         let res =
           lst |> List.map (fun (env', annot) ->
@@ -491,7 +498,9 @@ and infer_splits' tenv env mono noninferred v splits e =
           |> regroup Env.equiv
         in
         map_res (fun splits' -> splits'@splits) (Split res)
-      | Subst lst -> map_res (fun annot -> (s,(b,annot))::splits) (Subst lst)
+      | Subst lst -> map_res' (fun sigma annot ->
+        (Subst.apply_simplify sigma s,(b,annot))::(Annot.apply_subst_split sigma splits))
+        (Subst lst)
       end
   in
   let res = aux splits in
@@ -532,14 +541,15 @@ and infer' tenv env mono noninferred annot e =
     | Subst lst, [(t,(_, annot))] when skippable && subtype any t ->
       log ~level:0 "The definition %s needs to go up. Adding a default branch...@."
         (Variable.show v);
-      let res = (Subst lst) |> map_res (fun annot_a -> UnkA (annot_a, s)) in
+      let res = (Subst lst) |> map_res' (fun sigma annot_a ->
+        UnkA (annot_a, Annot.apply_subst_split sigma s)) in
       complete (SkipA annot) res
     | res, _ when nontrivial_split res ->
       log ~level:2 "Definition of %s needs to go up. Erasing...@." (Variable.show v) ;
       map_res (fun _ -> UnkA (Annot.initial_a a, s)) res
     | res, _ ->
       log ~level:2 "Definition of %s needs to go up.@." (Variable.show v) ;
-      map_res (fun annot_a -> UnkA (annot_a, s)) res
+      map_res' (fun sigma annot_a -> UnkA (annot_a, Annot.apply_subst_split sigma s)) res
     end
   | Bind ((), _, a, e), SkipA annot ->
     let res = infer_iterated tenv env mono noninferred annot e in
@@ -551,7 +561,7 @@ and infer' tenv env mono noninferred annot e =
   | Bind ((), v, _, e), EmptyA (annot_a, annot) ->
     let env = Env.add v empty env in
     let res = infer_iterated tenv env mono noninferred annot e in
-    map_res (fun annot -> EmptyA (annot_a, annot)) res
+    map_res' (fun sigma annot -> EmptyA (Annot.apply_subst_a sigma annot_a, annot)) res
   | Bind ((), v, a, e), DoA (t, annot_a, splits) ->
     let splits = List.map (fun (s,(b,a)) -> (s, (ref b, a))) splits in
     let refinements = splits |> List.find_map (fun (s,(b,_)) ->
@@ -581,7 +591,8 @@ and infer' tenv env mono noninferred annot e =
       then
         let annot_a = Annot.initial_a a in
         map_res (fun splits -> UnkA (annot_a, splits)) res
-      else map_res (fun splits -> DoA (t, annot_a, splits)) res
+      else map_res' (fun sigma splits -> DoA (Subst.apply_simplify sigma t,
+        Annot.apply_subst_a sigma annot_a, splits)) res
     end
   | _, _ -> assert false
 

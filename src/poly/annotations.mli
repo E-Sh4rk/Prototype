@@ -33,6 +33,7 @@ module Annot : sig
     val pp : Format.formatter -> t -> unit
 
     val apply_subst_substs : Subst.t -> substs -> substs
+    val apply_subst_branches : Subst.t -> (typ * split) list -> (typ * split) list
     val apply_subst_split : Subst.t -> split -> split
     val apply_subst_a : Subst.t -> a -> a
     val apply_subst : Subst.t -> t -> t

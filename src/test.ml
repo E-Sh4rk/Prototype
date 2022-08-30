@@ -45,7 +45,7 @@ let fact fact n =
 let fact = fixpoint fact
 
 let length length lst =
-  if lst is (Any,Any) then succ (length (snd lst)) else 0
+  if lst is Nil then 0 else succ (length (snd lst))
 
 let length = fixpoint length
 

@@ -201,13 +201,9 @@ let analyze_dependencies env e =
           if is_empty t
           then (VarSet.singleton v, VarSet.singleton v)
           else if subtype t s
-          then
-            let dep = VarSet.singleton v |> VarSet.add v1 in
-            (dep, dep)
+          then (VarSet.singleton v, VarSet.singleton v |> VarSet.add v1)
           else if subtype t (neg s)
-          then
-            let dep = VarSet.singleton v |> VarSet.add v2 in
-            (dep, dep)
+          then (VarSet.singleton v, VarSet.singleton v |> VarSet.add v2)
           else (VarSet.singleton v, VarSet.singleton v (*|> VarSet.add v1 |> VarSet.add v2*))
         else (VarSet.singleton v, VarSet.singleton v)
       else (VarSet.singleton v, VarSet.singleton v |> VarSet.add v1 |> VarSet.add v2)
@@ -273,9 +269,42 @@ let complete default_annot res =
     else res
   | _ -> assert false
 
-let simplify_tallying_results env mono sols =
-  (* TODO: Idea for simplifying tallying results *)
-  ignore (env, mono) ; sols
+let simplify_tallying_results ~rm_empty env mono sols =
+  log ~level:2 "Simplifying solutions...@." ;
+  (* log "BEFORE:@.%a@." pp_substs sols ; *)
+  let sols = sols |>
+    List.filter_map (fun sol ->
+      let sol_mono = Subst.restrict sol mono in
+      let mono_dom = Subst.dom sol_mono in
+      let ts = Env.bindings env |> List.map snd |> List.filter (fun t ->
+        let t = simplify_typ t in (* TODO *)
+        let vt = vars t in
+        TVarSet.inter vt mono_dom |> TVarSet.is_empty |> not
+        && TVarSet.diff vt mono |> TVarSet.is_empty && non_empty t) in
+      let ts = List.map (fun t -> (t, Subst.apply sol_mono t)) ts in
+      (* Remove a solution if it makes a var empty *)
+      if rm_empty && List.exists (fun (_,t') -> is_empty t') ts
+      then None
+      else
+        (* TODO: try to simplify each monomorphic substitution separately
+           (some could have simplifications and others not) *)
+        (* Try to "unify" new solution with existing monomorphic variables *)
+        (*let constr = ts@(List.map (fun (a,b) -> (b,a)) ts) in
+        let res = tallying mono constr in
+        let res = res |> List.map (fun res ->
+          (* We don't want to turn a new var into an unprecise type *)
+          res |> Subst.destruct |> List.filter (fun (_,t) ->
+          vars t |> TVarSet.is_empty |> not)
+        ) |> List.sort (fun lst1 lst2 -> compare (List.length lst2) (List.length lst1)) in
+        match res with
+        | [] -> Some sol
+        | r::_ ->
+          let simpl = Subst.construct r in
+          Some (Subst.compose_restr simpl sol)*)Some sol
+    )
+  in
+  (* log "AFTER:@.%a@." pp_substs sols ; *)
+  log ~level:2 "Solutions simplified!@." ; sols
 
 exception NeedVar of (Variable.t * string)
 let need_var env v str =
@@ -284,7 +313,7 @@ let need_var env v str =
 
 let rec infer_a' _ tenv env mono noninferred annot_a a =
   let need_var = need_var env in
-  let simple_constraint_infer v str s =
+  let simple_constraint_infer ~rm_empty v str s =
     need_var v str ;
     let t = Env.find v env |> prune_poly_typ noninferred in
     let (vs,tsubst,t) = fresh mono t in
@@ -296,7 +325,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     let poly_s = TVarSet.diff (vars s) mono |> TVarSet.destruct in
     let res =
       tallying_infer (poly_s@poly_t) noninferred [(t, s)]
-      |> simplify_tallying_results env mono
+      |> simplify_tallying_results ~rm_empty env mono
       |> List.map (fun sol ->
       let mono_part = Subst.restrict sol mono in
       let poly_part = Subst.compose (Subst.restrict sol vs) tsubst in
@@ -355,7 +384,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
   | Projection (Parsing.Ast.Field label, v), ProjA [] ->
     let alpha = fresh_var () in
     let s = mk_record true [label, var_typ alpha |> cons] in
-    let res = simple_constraint_infer v "projection" s in
+    let res = simple_constraint_infer ~rm_empty:true v "projection" s in
     map_res (fun sigma -> ProjA sigma) res
   | Projection (Parsing.Ast.Field label, v), ProjA sigma ->
     if simple_constraint_check v "projection" (record_any_with label) sigma
@@ -367,14 +396,14 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
       then mk_times (var_typ alpha |> cons) any_node
       else mk_times any_node (var_typ alpha |> cons)
     in
-    let res = simple_constraint_infer v "projection" s in
+    let res = simple_constraint_infer ~rm_empty:true v "projection" s in
     map_res (fun sigma -> ProjA sigma) res
   | Projection (_, v), ProjA sigma ->
     if simple_constraint_check v "projection" pair_any sigma
     then Ok (ProjA sigma) else assert false
   | RecordUpdate (v, _, o), RecordUpdateA [] ->
     (match o with None -> () | Some v' -> need_var v' "record update") ;
-    let res = simple_constraint_infer v "record update" record_any in
+    let res = simple_constraint_infer ~rm_empty:true v "record update" record_any in
     map_res (fun sigma -> RecordUpdateA sigma) res
   | RecordUpdate (v, _, o), RecordUpdateA sigma ->
     (match o with None -> () | Some v' -> need_var v' "record update") ;
@@ -404,7 +433,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
       pp_typ t1 pp_typ arrow_typ (pp_list pp_var) log_delta ;
     let res =
       tallying_infer (alpha::poly) noninferred [(t1, arrow_typ)]
-      |> simplify_tallying_results env mono
+      |> simplify_tallying_results ~rm_empty:true env mono
       |> List.map (fun sol ->
       let poly1_part = Subst.compose (Subst.restrict sol vs1) subst1 in
       let poly2_part = Subst.compose (Subst.restrict sol vs2) subst2 in
@@ -434,11 +463,11 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     let t = Env.find v env in
     if subtype t s
     then
-      let res = simple_constraint_infer v "typecase" (neg s) in
+      let res = simple_constraint_infer ~rm_empty:false v "typecase" (neg s) in
       map_res (fun sigma -> IteA sigma) res
       |> complete (IteA [Subst.identity])
     else if subtype t (neg s) then
-      let res = simple_constraint_infer v "typecase" s in
+      let res = simple_constraint_infer ~rm_empty:false v "typecase" s in
       map_res (fun sigma -> IteA sigma) res
       |> complete (IteA [Subst.identity])
     else

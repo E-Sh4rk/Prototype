@@ -253,6 +253,7 @@ let vars = CD.Types.Subst.vars
 let top_vars = CD.Types.Subst.top_vars
 let vars_with_polarity t = CD.Types.Subst.var_polarities t |> CD.Var.Map.get
 let var_name = CD.Var.name
+let check_var = CD.Types.Subst.check_var
 
 type subst = CD.Types.Subst.t
 module type Subst = sig

@@ -105,6 +105,7 @@ val vars : typ -> TVarSet.t
 val top_vars : typ -> TVarSet.t
 val vars_with_polarity : typ -> (var * [ `Both | `Neg | `Pos ]) list
 val var_name : var -> string
+val check_var : typ -> [ `Not_var | `Pos of var | `Neg of var ]
 
 type subst
 module type Subst = sig

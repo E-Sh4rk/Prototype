@@ -579,6 +579,15 @@ let fresh mono t =
     let (x, subst) = fresh_subst poly in
     (x, subst, Subst.apply subst t)
 
+let print_tallying_instance var_order delta constr =
+    Format.printf "Constraints:@." ;
+    constr |> List.iter (fun (l,r) ->
+        Format.printf "(%a, %a)@." pp_typ l pp_typ r ;
+    );
+    Format.printf "With delta=%a and var order=%a@."
+        (Utils.pp_list pp_var) (TVarSet.destruct delta)
+        (Utils.pp_list pp_var) var_order
+
 let check_tallying_solution var_order delta constr res =
     let error = ref false in
     let res =
@@ -594,13 +603,8 @@ let check_tallying_solution var_order delta constr res =
     )
     in
     if !error then begin
-        Format.printf "WARNING: Cduce tallying issue.@.Constraints:@." ;
-        constr |> List.iter (fun (l,r) ->
-            Format.printf "(%a, %a)@." pp_typ l pp_typ r ;
-        );
-        Format.printf "With delta=%a and var order=%a@."
-            (Utils.pp_list pp_var) (TVarSet.destruct delta)
-            (Utils.pp_list pp_var) var_order ;
+        Format.printf "WARNING: Cduce tallying issue.@." ;
+        print_tallying_instance var_order delta constr
     end ; res
 
 let tallying_infer poly noninfered constr =

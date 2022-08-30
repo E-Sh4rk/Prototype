@@ -286,11 +286,12 @@ let simplify_tallying_results ~rm_empty env mono sols =
       if rm_empty && List.exists (fun (_,t') -> is_empty t') ts
       then None
       else
-        (* TODO: try to simplify each monomorphic substitution separately
-           (some could have simplifications and others not) *)
+        (* TODO *)
         (* Try to "unify" new solution with existing monomorphic variables *)
-        (*let constr = ts@(List.map (fun (a,b) -> (b,a)) ts) in
+        (* let constr = ts@(List.map (fun (a,b) -> (b,a)) ts) in
+        print_tallying_instance [] mono constr ;
         let res = tallying mono constr in
+        log "TALLYING SOL: %a@." pp_substs res ;
         let res = res |> List.map (fun res ->
           (* We don't want to turn a new var into an unprecise type *)
           res |> Subst.destruct |> List.filter (fun (_,t) ->
@@ -300,7 +301,8 @@ let simplify_tallying_results ~rm_empty env mono sols =
         | [] -> Some sol
         | r::_ ->
           let simpl = Subst.construct r in
-          Some (Subst.compose_restr simpl sol)*)Some sol
+          let sol = Subst.compose_restr simpl sol in *)
+          Some sol
     )
   in
   (* log "AFTER:@.%a@." pp_substs sols ; *)

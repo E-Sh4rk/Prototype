@@ -109,6 +109,7 @@ val fresh_var : unit -> var
 val instantiate : Subst.t list -> typ -> typ
 val fresh_subst : TVarSet.t -> TVarSet.t * Subst.t
 val fresh : TVarSet.t -> typ -> TVarSet.t * Subst.t * typ
+val print_tallying_instance : var list -> TVarSet.t -> (typ * typ) list -> unit
 val tallying_infer : var list (* Polymorphic *) -> TVarSet.t (* Non-inferred *) -> (typ * typ) list -> Subst.t list
 val tallying : TVarSet.t (* Monomorphic *) -> (typ * typ) list -> Subst.t list
 val subtype_poly : TVarSet.t -> typ -> typ -> bool

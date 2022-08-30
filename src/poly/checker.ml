@@ -36,7 +36,7 @@ let rec typeof_a pos tenv env mono annot_a a =
     if annot = []
     then raise (Untypeable (pos, "Invalid lambda: empty annotations."))
     else
-      annot |> List.map (fun (s, annot) ->
+      annot |> List.map (fun (s, (_,annot)) ->
         let env = Env.add v s env in
         let mono = TVarSet.union mono (vars s) in
         let t = typeof_splits tenv env mono v annot e in
@@ -240,7 +240,7 @@ let typeof_nofail tenv env mono annot e =
 type 'a result =
   | Ok of 'a
   | Split of (Env.t * 'a) list
-  | Subst of (Subst.t * 'a) list
+  | Subst of (Subst.t * bool * 'a) list
 
 let fail = Subst []
 
@@ -255,7 +255,7 @@ let map_res f res =
   | Split lst ->
     Split (lst |> List.map (fun (e,a) -> (e, f a)))
   | Subst lst ->
-    Subst (lst |> List.map (fun (s,a) -> (s, f a)))
+    Subst (lst |> List.map (fun (s,b,a) -> (s, b, f a)))
 
 let map_res' f res =
   match res with
@@ -263,13 +263,13 @@ let map_res' f res =
   | Split lst ->
     Split (lst |> List.map (fun (e,a) -> (e, f Subst.identity a)))
   | Subst lst ->
-    Subst (lst |> List.map (fun (s,a) -> (s, f s a)))
+    Subst (lst |> List.map (fun (s,b,a) -> (s, b, f s a)))
 
 let complete default_annot res =
   match res with
   | Subst lst ->
-    if List.for_all (fun (sigma, _) -> Subst.is_identity sigma |> not) lst
-    then Subst (lst@[Subst.identity, default_annot])
+    if List.for_all (fun (sigma, _, _) -> Subst.is_identity sigma |> not) lst
+    then Subst (lst@[Subst.identity, true, default_annot])
     else res
   | _ -> assert false
 
@@ -301,7 +301,8 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
       let mono_part = Subst.restrict sol mono in
       let poly_part = Subst.compose (Subst.restrict sol vs) tsubst in
       (mono_part, poly_part)
-    ) |> regroup Subst.equiv in
+    ) |> regroup Subst.equiv
+    |> List.map (fun (a,b) -> (a, false, b)) in
     Subst res
   in
   let simple_constraint_check v str s sigma =
@@ -315,7 +316,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
     let rec aux branches =
       match branches with
       | [] -> Ok []
-      | (s, splits)::branches ->
+      | (s, (_, splits))::branches ->
         let env = Env.add v s env in
         let vs = vars s in
         let xs = TVarSet.diff vs mono in
@@ -327,17 +328,21 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
         log ~level:0 "Exploring branch %a for variable %s.@." pp_typ s (Variable.show v) ;
         begin match infer_splits' tenv env mono noninferred v splits e with
         | Ok splits -> aux branches |> map_res' (fun sigma branches ->
-          (Subst.apply_simplify sigma s, Annot.apply_subst_split sigma splits)::branches)
+          (Subst.apply_simplify sigma s, (false, Annot.apply_subst_split sigma splits))::branches)
         | Subst lst ->
           let res =
-            lst |> List.map (fun (sigma, splits) ->
-              (Subst.remove sigma xs, (Subst.apply_simplify sigma s, splits)))
+            lst |> List.map (fun (sigma, b, splits) ->
+              (Subst.remove sigma xs, (Subst.apply_simplify sigma s, (b, splits))))
             |> regroup Subst.equiv
+            |> List.map (fun (a,lst) ->
+              let b = List.for_all (fun (_, (b, _)) -> b) lst in
+              (a,b,lst)
+            )
           in
           map_res' (fun sigma splits ->
             splits@(Annot.apply_subst_branches sigma branches)) (Subst res)
           |> complete branches
-        | Split lst -> map_res (fun splits -> (s, splits)::branches) (Split lst)
+        | Split lst -> map_res (fun splits -> (s, (false, splits))::branches) (Split lst)
         end
     in
     let res = aux branches in
@@ -409,7 +414,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
       (* log ~level:0 "Mono:@.%a@." Subst.pp (mono_part) ; *)
       (* log ~level:0 "Result:@.%a@." pp_typ (Subst.find' sol alpha) ; *)
       (mono_part, (poly1_part, poly2_part))
-    ) |> regroup Subst.equiv in
+    ) |> regroup Subst.equiv |> List.map (fun (a,b) -> (a,false,b)) in
     Subst res |> map_res (fun sigmas -> AppA (List.split sigmas))
   | App (v1, v2), AppA (sigma1, sigma2) ->
     need_var v1 "application" ;
@@ -454,9 +459,9 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
       if inferred then branches |>
         (* remove_empty_branches *)
         remove_redundant_branches mono
-        |> List.map (fun (t,splits) ->
+        |> List.map (fun (t,(b,splits)) ->
           let (subst, t) = remove_redundant_vars mono t in
-          (t, Annot.apply_subst_split subst splits)
+          (t, (b,Annot.apply_subst_split subst splits))
           )
       else branches in
     begin match branches with
@@ -601,7 +606,7 @@ and infer_a_iterated pos tenv env mono noninferred annot_a a =
   match infer_a' pos tenv env mono noninferred annot_a a with
   | Split [(_, annot_a)] ->
     infer_a_iterated pos tenv env mono noninferred annot_a a
-  | Subst [(subst, annot_a)] when Subst.is_identity subst ->
+  | Subst [(subst, _, annot_a)] when Subst.is_identity subst ->
     infer_a_iterated pos tenv env mono noninferred annot_a a
   | res -> res
 
@@ -610,7 +615,7 @@ and infer_iterated tenv env mono noninferred annot e =
   match infer' tenv env mono noninferred annot e with
   | Split [(_, annot)] ->
     infer_iterated tenv env mono noninferred annot e
-  | Subst [(subst, annot)] when Subst.is_identity subst ->
+  | Subst [(subst, _, annot)] when Subst.is_identity subst ->
     infer_iterated tenv env mono noninferred annot e
   | res -> res
 

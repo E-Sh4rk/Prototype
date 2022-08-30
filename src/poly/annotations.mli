@@ -1,11 +1,6 @@
 open Types.Base
 open Parsing.Variable
 
-val partition : typ list-> typ list
-val regroup : ('a -> 'a -> bool) -> ('a * 'b) list -> ('a * ('b list)) list
-val remove_redundant_branches : TVarSet.t -> (typ * 'a) list -> (typ * 'a) list
-val remove_empty_branches : (typ * 'a) list -> (typ * 'a) list
-
 module Refinements : sig
     type t = Common.Env.t list
     val dom : t -> Variable.t list
@@ -19,10 +14,14 @@ module Annot : sig
     (* NOTE: the bool is just an optimisation for keeping track of splits
        that have already been propagated. *)
     type split = (typ*(bool*t)) list
+    (* By decreasing order of importance *)
+    (* NOTE: the bool is just a marker for remembering which branches
+       are issued from a "complete". *)
+    and branches = (typ*(bool*split)) list
     and a =
         | NoneA | ProjA of substs | IteA of substs | AppA of (substs * substs)
         | RecordUpdateA of substs
-        | LambdaA of (typ * split) list (* By decreasing order of importance *)
+        | LambdaA of branches
     and t =
         | VarA | DoA of (typ * a * split) | SkipA of t | EmptyA of (a * t)
         | UnkA of (a * split)
@@ -33,7 +32,7 @@ module Annot : sig
     val pp : Format.formatter -> t -> unit
 
     val apply_subst_substs : Subst.t -> substs -> substs
-    val apply_subst_branches : Subst.t -> (typ * split) list -> (typ * split) list
+    val apply_subst_branches : Subst.t -> branches -> branches
     val apply_subst_split : Subst.t -> split -> split
     val apply_subst_a : Subst.t -> a -> a
     val apply_subst : Subst.t -> t -> t
@@ -41,3 +40,8 @@ module Annot : sig
     val initial_a : Msc.a -> a
     val initial_e : Msc.e -> t
 end
+
+val partition : typ list-> typ list
+val regroup : ('a -> 'a -> bool) -> ('a * 'b) list -> ('a * ('b list)) list
+val remove_redundant_branches : TVarSet.t ->  Annot.branches ->  Annot.branches
+val remove_empty_branches : Annot.branches -> Annot.branches

@@ -35,8 +35,9 @@ let fixpoint = fun f ->
      f ( fun  v -> ( x x v ))
    in delta delta
 
-(* let (-) = <Int->Int->Int>
+let (-) = <Int->Int->Int>
 let ( * ) = <Int->Int->Int>
+let succ = <Int->Int>
 
 let fact fact n =
   if n is 0 then 1 else (fact (n-1))*n
@@ -48,7 +49,7 @@ let length length lst =
 
 let length = fixpoint length
 
-let map map f lst =
+(*let map map f lst =
   if lst is Nil then nil
   else (f (fst lst), map f (snd lst))
 

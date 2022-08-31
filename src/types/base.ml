@@ -263,6 +263,7 @@ module type Subst = sig
   val is_identity : t -> bool
   val dom : t -> TVarSet.t
   val mem : t -> var -> bool
+  val rm: var -> t -> t
   val find : t -> var -> typ
   val equiv : t -> t -> bool
   val apply : t -> typ -> typ
@@ -284,6 +285,7 @@ module Subst = struct
   let apply = CD.Types.Subst.apply
   let dom s = CD.Var.Map.domain s
   let mem s v = CD.Var.Set.mem (dom s) v
+  let rm = CD.Var.Map.remove
   let find s v = CD.Var.Map.assoc v s
   let equiv s1 s2 =
     let s1 = normalize s1 in

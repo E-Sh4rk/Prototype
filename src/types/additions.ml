@@ -648,7 +648,7 @@ let triangle_split_poly mono f out =
             (sup_typ mono t, triangle_poly mono t out)
     end
 
-let prune_poly_typ non_infered t =
+(* let prune_poly_typ non_infered t =
     (* TODO: Improve it... not really correct for vars with different polarities. *)
     let top_level_master_var contra t =
         let vs = TVarSet.diff (top_vars t) non_infered in
@@ -712,7 +712,7 @@ let prune_poly_typ non_infered t =
     in
     let res = aux false (cons t) |> descr in
     (* Utils.log "Done: %a@." pp_typ res ; *)
-    res    
+    res     *)
 
 (* Operations on jokers (legacy) *)
 

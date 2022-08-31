@@ -115,6 +115,7 @@ module type Subst = sig
     val is_identity : t -> bool
     val dom : t -> TVarSet.t
     val mem : t -> var -> bool
+    val rm: var -> t -> t
     val find : t -> var -> typ
     val equiv : t -> t -> bool
     val apply : t -> typ -> typ

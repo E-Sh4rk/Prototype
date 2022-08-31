@@ -103,7 +103,7 @@ module type Subst = sig
     val apply_simplify : t -> typ -> typ
 end
 module Subst : Subst
-val remove_redundant_vars : TVarSet.t -> typ -> Subst.t * typ
+(* val remove_redundant_vars : TVarSet.t -> typ -> Subst.t * typ *)
 val hard_clean : TVarSet.t -> typ -> typ
 val fresh_var : unit -> var
 val instantiate : Subst.t list -> typ -> typ
@@ -115,7 +115,7 @@ val tallying : TVarSet.t (* Monomorphic *) -> (typ * typ) list -> Subst.t list
 val subtype_poly : TVarSet.t -> typ -> typ -> bool
 val triangle_poly : TVarSet.t -> typ -> typ -> typ
 val triangle_split_poly : TVarSet.t -> typ -> typ -> (typ * typ) list
-val prune_poly_typ : TVarSet.t -> typ -> typ
+(* val prune_poly_typ : TVarSet.t -> typ -> typ *)
 
 (* Operations on jokers (legacy) *)
 

@@ -561,6 +561,19 @@ let hard_clean mono t =
     let (_,t) = remove_redundant_vars mono t in
     t
 
+let clean_type_ext ~pos ~neg mono t =
+    let subst =
+        vars_with_polarity t |>
+        List.filter_map (fun (v,p) ->
+            if TVarSet.mem mono v then None
+            else match p with
+            | `Pos -> Some (v, pos)
+            | `Neg -> Some (v, neg)
+            | `Both -> None
+        )
+    in
+    Subst.construct subst
+
 let instantiate ss t =
     List.map (fun s -> Subst.apply s t) ss
     |> conj

@@ -43,5 +43,5 @@ end
 
 val partition : typ list-> typ list
 val regroup : ('a -> 'a -> bool) -> ('a * 'b) list -> ('a * ('b list)) list
-val remove_redundant_branches : TVarSet.t ->  Annot.branches ->  Annot.branches
+val remove_redundant_default_branches : TVarSet.t ->  Annot.branches ->  Annot.branches
 val remove_empty_branches : Annot.branches -> Annot.branches

@@ -105,6 +105,7 @@ end
 module Subst : Subst
 (* val remove_redundant_vars : TVarSet.t -> typ -> Subst.t * typ *)
 val hard_clean : TVarSet.t -> typ -> typ
+val clean_type_ext : pos:typ -> neg:typ -> TVarSet.t -> typ -> subst
 val fresh_var : unit -> var
 val instantiate : Subst.t list -> typ -> typ
 val fresh_subst : TVarSet.t -> TVarSet.t * Subst.t

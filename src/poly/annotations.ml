@@ -27,7 +27,7 @@ let regroup equiv res =
   List.fold_left aux [] res |> List.rev |>
   List.map (fun (k,v) -> (k, List.rev v))
 
-let remove_redundant_branches mono lst =
+let remove_redundant_default_branches mono lst =
   let rec is_useful s rs others =
     if is_empty rs then false
     else match others with
@@ -49,7 +49,7 @@ let remove_redundant_branches mono lst =
     | c::current -> aux (c::treated) current
   in
   lst |> List.map (fun (t,(b,a)) -> (sup_typ mono t,b,(t,(b,a)))) |>
-  (* (fun x -> Utils.log "remove_redundant_branches: %a@." (Utils.pp_list pp_typ) (List.map fst x) ; x) |> *)
+  (* (fun x -> Utils.log "remove_redundant_default_branches: %a@." (Utils.pp_list pp_typ) (List.map fst x) ; x) |> *)
   List.rev |> aux [] |> List.map Utils.trd3
 
 let remove_empty_branches lst =

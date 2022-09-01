@@ -275,44 +275,59 @@ let simplify_tallying_results mono result_var sols =
   (* log "BEFORE:@.%a@." pp_substs sols ; *)
   let sols = sols |>
     List.filter_map (fun sol ->
-      (* Try to obtain the desired result *)
-      let sol =
+      (* Simplify the monomorphic substitutions as most as we can
+         (as long as it does not make the result too unprecise) *)
+      let var_to_preserve =
         match result_var with
-        | None -> sol
-        | Some (r, target) ->
-          let tr = Subst.find' sol r in
-          let constr = [(var_typ target, tr);(tr, var_typ target)] in
-          begin match tallying (TVarSet.add target mono) constr with
-          | [] -> sol
-          | res::_ -> Subst.compose_restr res sol
-          end
+        | None -> None
+        | Some (r,r') ->
+          if subtype_poly TVarSet.empty (Subst.find' sol r) (var_typ r')
+          then Some (r,r') else None
       in
-      (* Simplify the monomorphic substitutions as most as we can *)
       let sol =
         List.fold_left (fun sol (v,t) ->
           if TVarSet.mem mono v |> not then sol
           else
             let constr = [(var_typ v, t);(t, var_typ v)] in
             (* print_tallying_instance [] mono constr ; *)
-            match tallying mono constr with
-            | [] -> sol
-            | res::_ ->
-              (* Format.printf "SOLUTION:%a@." Subst.pp res ; *)
-              let complete = ref true in
-              let res = Subst.destruct res |> List.filter (fun (v', t') ->
-                (* Do not substitue the result var by something unprecise *)
-                match result_var with
-                | Some (_,target) when var_equal target v'
-                  && TVarSet.is_empty (vars t') -> complete := false ; false
-                | _ -> true
-              ) |> Subst.construct in
-              let sol = Subst.compose_restr res sol in
-              if !complete then Subst.rm v sol else sol
-        ) sol (Subst.destruct sol) in
+            let res = tallying mono constr
+            |> List.map (fun res -> Subst.compose_restr res sol)
+            |> List.find_opt (fun sol -> (* Is it precise enough? *)
+              match var_to_preserve with
+              | None -> true
+              | Some (r,r') ->
+                subtype_poly TVarSet.empty (Subst.find' sol r) (var_typ r')
+            )
+            in
+            match res with
+            | None -> sol
+            | Some sol -> Subst.rm v sol
+          ) sol (Subst.destruct sol) in
+      (* Try to obtain the desired result *)
+      let sol =
+        match result_var with
+        | None -> sol
+        | Some (r, target) ->
+          let tr = Subst.find' sol r in
+          let constr = [(tr, var_typ target)] in
+          let mono = TVarSet.add target mono in
+          (* print_tallying_instance [] mono constr ; *)
+          begin match tallying mono constr with
+          | [] -> sol
+          | res::_ ->
+            (* log "SOLUTION:%a@." Subst.pp res ; *)
+            let sol = Subst.compose_restr res sol in
+            (* Clean vars in the result so that it maximizes it *)
+            let clean = clean_type_ext ~pos:any ~neg:empty mono (Subst.find' sol r) in
+            Subst.compose_restr clean sol
+          end
+      in
       (* Remove a solution if it contains a substitution to empty *)
       if List.exists (fun (_,t') -> is_empty t') (Subst.destruct sol) then None
       else Some sol
       (* TODO: remove redundant solutions... needed for example and2_. *)
+      (* TODO: also remove solutions that make an env var empty? *)
+      (* TODO: make sure the toplevel var does not get renamed... (in particular for typecase) *)
     )
   in
   (* log "AFTER:@.%a@." pp_substs sols ; *)
@@ -513,8 +528,8 @@ let rec infer_a' vardef tenv env mono noninferred annot_a a =
     (Variable.show v) (List.length branches) (pp_list pp_typ) (List.map fst branches) ; *)
     let branches =
       if inferred then branches |>
-        (* remove_empty_branches *)
-        remove_redundant_branches mono
+        remove_empty_branches |>
+        remove_redundant_default_branches mono
         (* |> List.map (fun (t,(b,splits)) ->
           let (subst, t) = remove_redundant_vars mono t in
           (t, (b,Annot.apply_subst_split subst splits))

@@ -536,7 +536,7 @@ let fresh_var () =
     mk_var (Format.sprintf "$%i" !next_var_name)
 
 let remove_redundant_vars mono t =
-    Utils.log ~level:1 "Started removing redundant vars in %a...@?" pp_typ t ;
+    (* Utils.log ~level:2 "Started removing redundant vars in %a...@?" pp_typ t ; *)
     let vs = TVarSet.diff (vars t) mono |> TVarSet.destruct
     |> List.sort (fun v1 v2 -> var_compare v2 v1) in
     let res = Utils.pairs vs vs
@@ -554,7 +554,7 @@ let remove_redundant_vars mono t =
         (Subst.compose subst res, Subst.apply subst t)
         else (res, t)
     ) (Subst.identity, t)
-    in Utils.log ~level:1 " Done.@." ;  res
+    in (* Utils.log ~level:2 " Done.@." ; *) res
 
 let hard_clean mono t =
     let t = clean_type ~pos:empty ~neg:any mono t in

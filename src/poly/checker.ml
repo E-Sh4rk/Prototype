@@ -270,41 +270,49 @@ let complete default_annot res =
     else res
   | _ -> assert false
 
-let simplify_tallying_results mono result_vars sols =
+let simplify_tallying_results mono result_var sols =
   log ~level:2 "Simplifying solutions...@." ;
   (* log "BEFORE:@.%a@." pp_substs sols ; *)
   let sols = sols |>
     List.filter_map (fun sol ->
-      let ts = Subst.destruct sol in
+      (* Try to obtain the desired result *)
+      let sol =
+        match result_var with
+        | None -> sol
+        | Some (r, target) ->
+          let tr = Subst.find' sol r in
+          let constr = [(var_typ target, tr);(tr, var_typ target)] in
+          begin match tallying (TVarSet.add target mono) constr with
+          | [] -> sol
+          | res::_ -> Subst.compose_restr res sol
+          end
+      in
+      (* Simplify the monomorphic substitutions as most as we can *)
+      let sol =
+        List.fold_left (fun sol (v,t) ->
+          if TVarSet.mem mono v |> not then sol
+          else
+            let constr = [(var_typ v, t);(t, var_typ v)] in
+            (* print_tallying_instance [] mono constr ; *)
+            match tallying mono constr with
+            | [] -> sol
+            | res::_ ->
+              (* Format.printf "SOLUTION:%a@." Subst.pp res ; *)
+              let complete = ref true in
+              let res = Subst.destruct res |> List.filter (fun (v', t') ->
+                (* Do not substitue the result var by something unprecise *)
+                match result_var with
+                | Some (_,target) when var_equal target v'
+                  && TVarSet.is_empty (vars t') -> complete := false ; false
+                | _ -> true
+              ) |> Subst.construct in
+              let sol = Subst.compose_restr res sol in
+              if !complete then Subst.rm v sol else sol
+        ) sol (Subst.destruct sol) in
       (* Remove a solution if it contains a substitution to empty *)
-      if List.exists (fun (_,t') -> is_empty t') ts then None
-      else
-        (* Compute the list of "result" variables which we should
-           not substitute to something unprecise *)
-        let result_vars =
-          List.fold_left (fun acc v ->
-            TVarSet.union acc (Subst.find' sol v |> vars)
-          ) TVarSet.empty (TVarSet.destruct result_vars) in
-        (* Simplify the monomorphic substitutions as most as we can *)
-        let sol =
-          List.fold_left (fun sol (v,t) ->
-            if TVarSet.mem mono v |> not then sol
-            else
-              let constr = [(var_typ v, t);(t, var_typ v)] in
-              (* print_tallying_instance [] mono constr ; *)
-              match tallying mono constr with
-              | [] -> sol
-              | res::_ ->
-                (* Format.printf "SOLUTION:%a@." Subst.pp res ; *)
-                let complete = ref true in
-                let res = Subst.destruct res |> List.filter (fun (v', t') ->
-                  if TVarSet.mem result_vars v' && TVarSet.is_empty (vars t')
-                  then (complete := false ; false) else true
-                ) |> Subst.construct in
-                let sol = Subst.compose_restr res sol in
-                if !complete then Subst.rm v sol else sol
-          ) sol ts in
-        Some sol
+      if List.exists (fun (_,t') -> is_empty t') (Subst.destruct sol) then None
+      else Some sol
+      (* TODO: remove redundant solutions... needed for example and2_. *)
     )
   in
   (* log "AFTER:@.%a@." pp_substs sols ; *)
@@ -315,22 +323,30 @@ let need_var env v str =
   if Env.mem v env |> not
   then raise (NeedVar (v, str))
 
-let rec infer_a' _ tenv env mono noninferred annot_a a =
+let rec infer_a' vardef tenv env mono noninferred annot_a a =
   let need_var = need_var env in
   let simple_constraint_infer v str s =
     need_var v str ;
     (* let t = Env.find v env |> prune_poly_typ noninferred in *)
     let t = Env.find v env in
-    let result_vars = TVarSet.diff (vars s) mono in
+    let result_var =
+      match TVarSet.diff (vars s) mono |> TVarSet.destruct with
+      | [] -> None
+      | [r] -> Some (r, Variable.to_typevar vardef)
+      | _ -> assert false
+    in
     let (vs,tsubst,t) = fresh mono t in
     let log_delta =
       TVarSet.inter noninferred (vars t) |> TVarSet.destruct in
     log ~level:1 "Simple constraint: solving %a <= %a with delta=%a@."
       pp_typ t pp_typ s (pp_list pp_var) log_delta ;
-    let poly = (result_vars |> TVarSet.destruct)@(vs |> TVarSet.destruct) in
+    let poly = match result_var with
+      | None -> vs |> TVarSet.destruct
+      | Some (r,_) -> r::(vs |> TVarSet.destruct)
+    in
     let res =
       tallying_infer poly noninferred [(t, s)]
-      |> simplify_tallying_results mono result_vars
+      |> simplify_tallying_results mono result_var
       |> List.map (fun sol ->
       let mono_part = Subst.restrict sol mono in
       let poly_part = Subst.compose (Subst.restrict sol vs) tsubst in
@@ -440,7 +456,7 @@ let rec infer_a' _ tenv env mono noninferred annot_a a =
       pp_typ t1 pp_typ arrow_typ (pp_list pp_var) log_delta ;
     let res =
       tallying_infer (alpha::poly) noninferred [(t1, arrow_typ)]
-      |> simplify_tallying_results mono (TVarSet.construct [alpha])
+      |> simplify_tallying_results mono (Some (alpha, Variable.to_typevar vardef))
       |> List.map (fun sol ->
       let poly1_part = Subst.compose (Subst.restrict sol vs1) subst1 in
       let poly2_part = Subst.compose (Subst.restrict sol vs2) subst2 in

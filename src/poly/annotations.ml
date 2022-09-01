@@ -37,17 +37,16 @@ let remove_redundant_branches mono lst =
       then is_useful s (diff rs o) others
       else is_useful s rs others
   in
-  (* TODO: disable removing of non-default branches ?? *)
   let rec aux treated current =
     match current with
     | [] -> treated
-    (* | (s,(true as b),v)::current -> *)
-    | (s,b,v)::current ->
+    | (s,(true as b),v)::current ->
+    (* | (s,b,v)::current -> *)
       let others = treated@current |> List.map Utils.fst3 in
       if is_useful s s others
       then aux ((s,b,v)::treated) current
       else aux treated current
-    (* | c::current -> aux (c::treated) current *)
+    | c::current -> aux (c::treated) current
   in
   lst |> List.map (fun (t,(b,a)) -> (sup_typ mono t,b,(t,(b,a)))) |>
   (* (fun x -> Utils.log "remove_redundant_branches: %a@." (Utils.pp_list pp_typ) (List.map fst x) ; x) |> *)

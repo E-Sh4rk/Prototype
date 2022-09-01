@@ -17,11 +17,11 @@ let typeof_const_atom tenv c =
   | Parsing.Ast.Atom str -> get_type tenv str
   | c -> Parsing.Ast.const_to_typ c
 
-let unbound_variable pos v =
-  raise (Untypeable (pos, "Unbound variable "^(Variable.show v)^"."))
+let unbound_variable v =
+  raise (Untypeable (Variable.get_locations v, "Unbound variable "^(Variable.show v)^"."))
   
-let var_type pos v env =
-  if Env.mem v env then Env.find v env else unbound_variable pos v
+let var_type v env =
+  if Env.mem v env then Env.find v env else unbound_variable v
 
 let instantiate_check pos mono ss t =
   let check_s s =
@@ -31,7 +31,8 @@ let instantiate_check pos mono ss t =
   then instantiate ss t
   else raise (Untypeable (pos, "Invalid instanciation: attempting to substitute a monomorphic variable."))
 
-let rec typeof_a pos tenv env mono annot_a a =
+let rec typeof_a vardef tenv env mono annot_a a =
+  let pos = Variable.get_locations vardef in
   let type_lambda env annot v e =
     if annot = []
     then raise (Untypeable (pos, "Invalid lambda: empty annotations."))
@@ -47,11 +48,11 @@ let rec typeof_a pos tenv env mono annot_a a =
   | Abstract t, NoneA -> t
   | Const c, NoneA -> typeof_const_atom tenv c
   | Pair (v1, v2), NoneA ->
-    let t1 = var_type pos v1 env in
-    let t2 = var_type pos v2 env in
+    let t1 = var_type v1 env in
+    let t2 = var_type v2 env in
     mk_times (cons t1) (cons t2)
   | Projection (Field label, v), ProjA ss ->
-    let t = var_type pos v env |> instantiate_check pos mono ss in
+    let t = var_type v env |> instantiate_check pos mono ss in
     if subtype t record_any
     then
       try get_field t label
@@ -59,25 +60,25 @@ let rec typeof_a pos tenv env mono annot_a a =
         raise (Untypeable (pos, "Invalid projection: missing label " ^ label ^ "."))
     else raise (Untypeable (pos, "Invalid projection: not a record."))
   | Projection (p, v), ProjA ss ->
-    let t = var_type pos v env |> instantiate_check pos mono ss in
+    let t = var_type v env |> instantiate_check pos mono ss in
     if subtype t pair_any
     then (if p = Fst then pi1 t else pi2 t)
     else raise (Untypeable (pos, "Invalid projection: not a pair."))
   | RecordUpdate (v, label, op), RecordUpdateA ss -> 
-    let t = var_type pos v env |> instantiate_check pos mono ss in
+    let t = var_type v env |> instantiate_check pos mono ss in
     if subtype t record_any
     then
       begin match op with
       | None -> remove_field t label
       | Some v' ->
-        let t' = var_type pos v' env in
+        let t' = var_type v' env in
         let right_record = mk_record false [label, cons t'] in
         merge_records t right_record  
       end
     else raise (Untypeable (pos, "Invalid field update: not a record."))
   | App (v1, v2), AppA (ss1, ss2) ->
-    let t1 = var_type pos v1 env |> instantiate_check pos mono ss1 in
-    let t2 = var_type pos v2 env |> instantiate_check pos mono ss2 in
+    let t1 = var_type v1 env |> instantiate_check pos mono ss1 in
+    let t2 = var_type v2 env |> instantiate_check pos mono ss2 in
     if subtype t1 arrow_any
     then
       if subtype t2 (domain t1)
@@ -85,17 +86,17 @@ let rec typeof_a pos tenv env mono annot_a a =
       else raise (Untypeable (pos, "Invalid application: argument not in the domain."))
     else raise (Untypeable (pos, "Invalid application: not a function."))
   | Ite (v, s, v1, v2), IteA ss ->
-    let t = var_type pos v env |> instantiate_check pos mono ss in
+    let t = var_type v env |> instantiate_check pos mono ss in
     if is_empty t
     then empty
     else if subtype t s
-    then var_type pos v1 env
+    then var_type v1 env
     else if subtype t (neg s)
-    then var_type pos v2 env
+    then var_type v2 env
     else raise (Untypeable (pos, "Invalid typecase: multiple branches possible."))
   | Let (v1, v2), NoneA ->
     if Env.mem v1 env
-    then var_type pos v2 env
+    then var_type v2 env
     else raise (Untypeable (pos, "Invalid let binding: definition has been skipped."))
   | Lambda (_, Parsing.Ast.Unnanoted, v, e), LambdaA annot ->
     type_lambda env annot v e
@@ -126,15 +127,15 @@ and typeof_splits tenv env mono v splits e =
 
 and typeof tenv env mono annot e =
   begin match e, annot with
-  | Var v, VarA -> var_type (Variable.get_locations v) v env
+  | Var v, VarA -> var_type v env
   | Bind (_, v, a, e), EmptyA (annot_a, annot) ->
-    let t = typeof_a (Variable.get_locations v) tenv env mono annot_a a in
+    let t = typeof_a v tenv env mono annot_a a in
     let env = Env.add v t env in
     if is_empty t
     then typeof tenv env mono annot e
     else raise (Untypeable ([], "Invalid binding: does not cover the whole domain."))
   | Bind (_, v, a, e), DoA (_, annot_a, annot_split) ->
-    let t = typeof_a (Variable.get_locations v) tenv env mono annot_a a in
+    let t = typeof_a v tenv env mono annot_a a in
     let env = Env.add v t env in
     typeof_splits tenv env mono v annot_split e
   | Bind (_, _, _, e), SkipA (annot) -> typeof tenv env mono annot e
@@ -225,8 +226,8 @@ let analyze_dependencies env e =
 
 (* ===== INFER ===== *)
 
-let typeof_a_nofail pos tenv env mono annot_a a =
-  try typeof_a pos tenv env mono annot_a a
+let typeof_a_nofail vardef tenv env mono annot_a a =
+  try typeof_a vardef tenv env mono annot_a a
   with Untypeable _ -> Format.printf "%a@." PMsc.pp_a a ; assert false
 
 let typeof_nofail tenv env mono annot e =
@@ -556,7 +557,6 @@ and infer' tenv env mono noninferred annot e =
     if Env.mem v env then Ok(VarA)
     else (log ~level:0 "Untypeable expression (--> need %s)@." (Variable.show v) ; fail)
   | Bind ((), v, a, e), UnkA (annot_a, s) ->
-    let pos = Variable.get_locations v in
     let (req, opt) = analyze_dependencies env e in
     (* Note: optimisation *)
     let skippable = VarSet.mem v req |> not in
@@ -566,11 +566,11 @@ and infer' tenv env mono noninferred annot e =
       if skipped then fail
       else begin
         log ~level:2 "(Re)Infering definition for %s...@." (Variable.show v) ;
-        infer_a_iterated pos tenv env mono noninferred annot_a a
+        infer_a_iterated v tenv env mono noninferred annot_a a
       end in
     begin match res, s with
     | Ok annot_a, _ ->
-      let t = typeof_a_nofail pos tenv env mono annot_a a in
+      let t = typeof_a_nofail v tenv env mono annot_a a in
       log ~level:2 "Definition of %s typed: %a@." (Variable.show v) pp_typ t ;
       let e = Bind ((), v, a, e) in
       begin match s, is_empty t with
@@ -640,13 +640,13 @@ and infer' tenv env mono noninferred annot e =
     end
   | _, _ -> assert false
 
-and infer_a_iterated pos tenv env mono noninferred annot_a a =
+and infer_a_iterated vardef tenv env mono noninferred annot_a a =
   (*log ~level:3 "Iteration...@." ;*)
-  match infer_a' pos tenv env mono noninferred annot_a a with
+  match infer_a' vardef tenv env mono noninferred annot_a a with
   | Split [(_, annot_a)] ->
-    infer_a_iterated pos tenv env mono noninferred annot_a a
+    infer_a_iterated vardef tenv env mono noninferred annot_a a
   | Subst [(subst, _, annot_a)] when Subst.is_identity subst ->
-    infer_a_iterated pos tenv env mono noninferred annot_a a
+    infer_a_iterated vardef tenv env mono noninferred annot_a a
   | res -> res
 
 and infer_iterated tenv env mono noninferred annot e =
@@ -661,7 +661,7 @@ and infer_iterated tenv env mono noninferred annot e =
 let infer tenv env mono e =
   let fv = fv_e e in
   let e = VarSet.fold (fun v acc ->
-    Bind ((), v, Abstract (var_type [] v env), acc)
+    Bind ((), v, Abstract (var_type v env), acc)
   ) fv e in
   if PMsc.contains_records e
   then raise (Untypeable ([], "Records unsupported by the polymorphic system."))

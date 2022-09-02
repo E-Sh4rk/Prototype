@@ -324,9 +324,22 @@ let simplify_tallying_results mono result_var sols =
       in
       (* Remove a solution if it contains a substitution to empty *)
       if List.exists (fun (_,t') -> is_empty t') (Subst.destruct sol) then None
-      else Some sol
+      else (* Rename toplevel variables *)
+        let sol =
+          List.fold_left (fun sol (v,t) ->
+            if TVarSet.mem mono v |> not then sol
+            else
+              let expected_name = (var_name v)^(var_name v) in
+              let simpl = top_vars t |>
+                TVarSet.filter (fun v -> String.equal (var_name v) expected_name)
+                |> TVarSet.destruct |> List.map (fun v' ->
+                  (v', var_typ v)
+                ) |> Subst.construct
+              in
+              Subst.compose simpl sol
+            ) sol (Subst.destruct sol)
+        in Some sol
       (* TODO: remove solutions that make an env var empty? *)
-      (* TODO: make sure the toplevel var does not get renamed... (in particular for typecase) *)
     )
   in
   (* log "AFTER:@.%a@." pp_substs sols ; *)
@@ -527,8 +540,8 @@ let rec infer_a' vardef tenv env mono noninferred annot_a a =
     (Variable.show v) (List.length branches) (pp_list pp_typ) (List.map fst branches) ; *)
     let branches =
       if inferred then branches |>
-        remove_empty_branches |>
-        remove_redundant_default_branches mono
+        (* remove_empty_branches |> *)
+        remove_redundant_branches
         (* |> List.map (fun (t,(b,splits)) ->
           let (subst, t) = remove_redundant_vars mono t in
           (t, (b,Annot.apply_subst_split subst splits))

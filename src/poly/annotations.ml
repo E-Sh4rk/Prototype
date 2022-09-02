@@ -27,7 +27,7 @@ let regroup equiv res =
   List.fold_left aux [] res |> List.rev |>
   List.map (fun (k,v) -> (k, List.rev v))
 
-let remove_redundant_default_branches mono lst =
+let remove_redundant_branches lst =
   let rec is_useful s rs others =
     if is_empty rs then false
     else match others with
@@ -37,20 +37,18 @@ let remove_redundant_default_branches mono lst =
       then is_useful s (diff rs o) others
       else is_useful s rs others
   in
-  let rec aux treated current = (* TODO: disable removing of unmarked branches *)
+  let rec aux treated current =
     match current with
     | [] -> treated
-    (* | (s,(true as b),v)::current -> *)
-    | (s,b,v)::current ->
-      let others = treated@current |> List.map Utils.fst3 in
+    | (s,v)::current ->
+      let others = treated@current |> List.map fst in
       if is_useful s s others
-      then aux ((s,b,v)::treated) current
+      then aux ((s,v)::treated) current
       else aux treated current
-    (* | c::current -> aux (c::treated) current *)
   in
-  lst |> List.map (fun (t,(b,a)) -> (sup_typ mono t,b,(t,(b,a)))) |>
-  (* (fun x -> Utils.log "remove_redundant_default_branches: %a@." (Utils.pp_list pp_typ) (List.map fst x) ; x) |> *)
-  List.rev |> aux [] |> List.map Utils.trd3
+  lst |> List.map (fun (t,(b,a)) -> (t,(t,(b,a)))) |>
+  (* (fun x -> Utils.log "remove_redundant_branches: %a@." (Utils.pp_list pp_typ) (List.map fst x) ; x) |> *)
+  List.rev |> aux [] |> List.map snd
 
 let remove_empty_branches lst =
   lst |> List.filter (fun (s,_) -> non_empty s)

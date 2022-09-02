@@ -17,6 +17,7 @@ module Annot : sig
     (* By decreasing order of importance *)
     (* NOTE: the bool is just a marker for remembering which branches
        are issued from a "complete". *)
+    (* TODO: remove this marker... (not used anymore) *)
     and branches = (typ*(bool*split)) list
     and a =
         | NoneA | ProjA of substs | IteA of substs | AppA of (substs * substs)
@@ -43,5 +44,5 @@ end
 
 val partition : typ list-> typ list
 val regroup : ('a -> 'a -> bool) -> ('a * 'b) list -> ('a * ('b list)) list
-val remove_redundant_default_branches : TVarSet.t ->  Annot.branches ->  Annot.branches
+val remove_redundant_branches : Annot.branches ->  Annot.branches
 val remove_empty_branches : Annot.branches -> Annot.branches

@@ -291,7 +291,7 @@ let simplify_tallying_results mono result_var sols =
             let constr = [(var_typ v, t);(t, var_typ v)] in
             (* print_tallying_instance [] mono constr ; *)
             let res = tallying mono constr
-            |> List.map (fun res -> Subst.compose_restr res sol)
+            |> List.map (fun res -> Subst.compose res sol)
             |> List.find_opt (fun sol -> (* Is it precise enough? *)
               match var_to_preserve with
               | None -> true
@@ -316,17 +316,16 @@ let simplify_tallying_results mono result_var sols =
           | [] -> sol
           | res::_ ->
             (* log "SOLUTION:%a@." Subst.pp res ; *)
-            let sol = Subst.compose_restr res sol in
+            let sol = Subst.compose res sol in
             (* Clean vars in the result so that it maximizes it *)
             let clean = clean_type_ext ~pos:any ~neg:empty mono (Subst.find' sol r) in
-            Subst.compose_restr clean sol
+            Subst.compose clean sol
           end
       in
       (* Remove a solution if it contains a substitution to empty *)
       if List.exists (fun (_,t') -> is_empty t') (Subst.destruct sol) then None
       else Some sol
-      (* TODO: remove redundant solutions... needed for example and2_. *)
-      (* TODO: also remove solutions that make an env var empty? *)
+      (* TODO: remove solutions that make an env var empty? *)
       (* TODO: make sure the toplevel var does not get renamed... (in particular for typecase) *)
     )
   in

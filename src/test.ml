@@ -39,7 +39,7 @@ let (-) = <Int->Int->Int>
 let ( * ) = <Int->Int->Int>
 let succ = <Int->Int>
 
-let fact fact n =
+let fact fact n = (* TODO: Improve result...*)
   if n is 0 then 1 else (fact (n-1))*n
 
 let fact = fixpoint fact

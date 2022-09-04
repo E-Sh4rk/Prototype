@@ -6,7 +6,7 @@ open Annotations
 open Annot
 open Common
 open Parsing.Variable
-(* open Utils *)
+open Utils
 
 exception Untypeable of Position.t list * string
 
@@ -135,8 +135,132 @@ and typeof tenv env mono annot e =
 
 (* ===== REFINE ===== *)
 
+let refine_a env mono a t = (* empty possibilites are often omitted *)
+  match a with
+  | Abstract _ | Const _ | Lambda _ -> []
+  | Pair (v1, v2) ->
+    split_pair t
+    |> List.map (
+      fun (t1, t2) -> Env.construct [(v1,t1) ; (v2, t2)]
+    )
+  | Projection (Fst, v) -> [Env.singleton v (mk_times (cons t) any_node)]
+  | Projection (Snd, v) -> [Env.singleton v (mk_times any_node (cons t))]
+  | Projection (Field label, v) ->
+    [Env.singleton v (mk_record true [(label, cons t)])]
+  | RecordUpdate (v, label, None) ->
+    let t = cap t (record_any_without label) in
+    split_record t
+    |> List.map (
+      fun ti -> Env.singleton v (remove_field_info ti label)
+    )
+  | RecordUpdate (v, label, Some x) ->
+    let t = cap t (record_any_with label) in
+    split_record t
+    |> List.map (
+      fun ti ->
+        let field_type = get_field_assuming_not_absent ti label in
+        let ti = remove_field_info ti label in
+        Env.construct [(v, ti) ; (x, field_type)]
+      )
+  | App (v1, v2) ->
+    let t1 = Env.find v1 env in
+    triangle_split_poly mono t1 t
+    |> List.map (fun (t1, t2) -> Env.construct [(v1,t1);(v2,t2)])
+  | Ite (v, s, v1, v2) ->
+    [Env.construct [(v,s);(v1,t)] ; Env.construct [(v,neg s);(v2,t)]]
+  | Let (_, v2) -> [Env.singleton v2 t]
+
 (* ===== INFER ===== *)
 
-let infer _ = failwith "TODO"
+let typeof_a_nofail vardef tenv env mono annot_a a =
+  try typeof_a vardef tenv env mono annot_a a
+  with Untypeable _ -> Format.printf "%a@." PMsc.pp_a a ; assert false
 
-let typeof_simple _ = failwith "TODO"
+let typeof_nofail tenv env mono annot e =
+  try typeof tenv env mono annot e
+  with Untypeable _ -> Format.printf "%a@." PMsc.pp_e e ; assert false
+
+type 'a result =
+| Ok of 'a
+| Split of (Env.t * 'a) list
+| Subst of (Subst.t * 'a) list
+| NeedVar of (Variable.t * 'a * 'a option)
+
+let map_res' f res =
+  match res with
+  | Ok a -> Ok (f Subst.identity a)
+  | Split lst ->
+    Split (lst |> List.map (fun (e,a) -> (e, f Subst.identity a)))
+  | Subst lst ->
+    Subst (lst |> List.map (fun (s,a) -> (s, f s a)))
+  | NeedVar (v, a, ao) ->
+    NeedVar (v, f Subst.identity a, Option.map (f Subst.identity) ao)
+
+let map_res f =
+  map_res' (fun _ -> f)
+
+let complete default_annot res =
+  match res with
+  | Subst lst ->
+    if List.for_all (fun (sigma, _) -> Subst.is_identity sigma |> not) lst
+    then Subst (lst@[Subst.identity, default_annot])
+    else res
+  | NeedVar (v, a, None) -> NeedVar (v, a, Some default_annot)
+  | res -> res
+
+exception NeedVar of (Variable.t * string)
+let need_var env v str =
+  if Env.mem v env |> not
+  then raise (NeedVar (v, str))
+
+let rec infer_a' vardef tenv env mono annot_a a =
+  ignore (vardef, tenv, env, mono, annot_a, a) ;
+  failwith "TODO"
+
+and infer_splits' tenv env mono v splits e =
+  ignore (tenv, env, mono, v, splits, e, infer_splits',
+    typeof_a_nofail, complete, need_var, map_res,
+    infer_a_iterated, refine_a, infer_a') ;
+  failwith "TODO"
+
+and infer' tenv env mono annot e =
+  ignore (tenv, env, mono, annot, e, infer', infer_splits') ;
+  failwith "TODO"
+
+and infer_a_iterated vardef tenv env mono annot_a a =
+  (*log ~level:3 "Iteration...@." ;*)
+  match infer_a' vardef tenv env mono annot_a a with
+  | Split [(_, annot_a)] ->
+    infer_a_iterated vardef tenv env mono annot_a a
+  | Subst [(subst, annot_a)] when Subst.is_identity subst ->
+    infer_a_iterated vardef tenv env mono annot_a a
+  | res -> res
+
+and infer_iterated tenv env mono annot e =
+  (*log ~level:3 "Iteration...@." ;*)
+  match infer' tenv env mono annot e with
+  | Split [(_, annot)] ->
+    infer_iterated tenv env mono annot e
+  | Subst [(subst, annot)] when Subst.is_identity subst ->
+    infer_iterated tenv env mono annot e
+  | res -> res
+
+  let infer tenv env mono e =
+    let fv = fv_e e in
+    let e = VarSet.fold (fun v acc ->
+      Bind ((), v, Abstract (var_type v env), acc)
+    ) fv e in
+    if PMsc.contains_records e
+    then raise (Untypeable ([], "Records unsupported by the polymorphic system."))
+    else
+      let annot =
+        match infer_iterated tenv Env.empty mono (Annot.initial_e e) e with
+        | Subst [] -> raise (Untypeable ([], "Annotations inference failed."))
+        | Ok annot -> (e, annot)
+        | _ -> assert false
+      in
+      log "@." ; annot  
+
+let typeof_simple tenv env mono e =
+  let (e, anns) = infer tenv env mono e in
+  typeof_nofail tenv Env.empty mono anns e  

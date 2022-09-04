@@ -1,4 +1,5 @@
 open Types.Base
+open Types.Additions
 open Common
 open Parsing.Variable
 
@@ -57,5 +58,76 @@ module Refinements = struct
 end
 
 module Annot = struct
-  type t = unit
+  type substs = Subst.t list
+  let pp_substs fmt ss =
+    ss |> List.iteri (fun i s ->
+      Format.fprintf fmt "----- Subst %i -----@.%a@." i Subst.pp s
+    )
+  let apply_subst_substs s ss =
+    List.map (fun s' -> Subst.compose_restr s s') ss
+
+  type split = (typ*(bool*t)) list
+  [@@deriving show]
+
+  and branches = (typ*split) list
+  [@@deriving show]
+
+  and a =
+    | NoneA | ProjA of substs | IteA of substs | AppA of (substs * substs)
+    | RecordUpdateA of substs
+    | LambdaA of branches (* Fully Explored *) * branches (* Remaining *)
+    [@@deriving show]
+
+  and t =
+    | VarA | DoA of (a * split) | SkipA of t | DoSkipA of (a * split * t)
+    [@@deriving show]
+
+  let rec apply_subst_split s lst =
+    lst |> List.map (fun (ty,(b,t)) -> (Subst.apply_simplify s ty, (b, apply_subst s t)))
+  and apply_subst_branches s lst =
+    let aux (ty, split) = (Subst.apply_simplify s ty, apply_subst_split s split) in
+    List.map aux lst
+  and apply_subst_a s a = match a with
+  | NoneA -> NoneA
+  | ProjA ss -> ProjA (apply_subst_substs s ss)
+  | IteA ss -> IteA (apply_subst_substs s ss)
+  | AppA (ss1, ss2) -> AppA (apply_subst_substs s ss1, apply_subst_substs s ss2)
+  | RecordUpdateA ss -> RecordUpdateA (apply_subst_substs s ss)
+  | LambdaA (b1,b2) -> LambdaA (apply_subst_branches s b1, apply_subst_branches s b2)
+  and apply_subst s t =
+  if Subst.is_identity s then t
+  else match t with
+  | VarA -> VarA
+  | DoA (a, split) ->
+    DoA (apply_subst_a s a, apply_subst_split s split)
+  | SkipA t -> SkipA (apply_subst s t)
+  | DoSkipA (a, split, t) ->
+    DoSkipA (apply_subst_a s a, apply_subst_split s split, apply_subst s t)
+
+  let rec initial_a a =
+    let open Msc in match a with
+    | Abstract _ | Const _ | Pair _ | Let _ -> NoneA
+    | Ite _ -> IteA []
+    | Projection _ -> ProjA []
+    | RecordUpdate _ -> RecordUpdateA []
+    | App _ -> AppA ([], [])
+    | Lambda (_, Parsing.Ast.Unnanoted, v, e) ->
+      let initial_s = [(any, (false, initial_e e))] in
+      let v = Variable.to_typevar v |> var_typ in
+      LambdaA ([], [(v, initial_s)])
+    | Lambda (_, Parsing.Ast.ADomain dt, _, e) ->
+      let initial_s = [(any, (false, initial_e e))] in
+      LambdaA ([], [(dt, initial_s)])
+    | Lambda (_, Parsing.Ast.AArrow t, _, e) ->
+      let initial_s = [(any, (false, initial_e e))] in
+      let branches =
+        dnf t |> List.map (List.map fst) |> List.flatten
+        |> List.map (fun s -> (s, initial_s))
+      in
+      LambdaA ([],branches)
+
+  and initial_e e =
+      let open Msc in match e with
+      | Var _ -> VarA
+      | Bind (_, _, _, e) -> SkipA (initial_e e)
 end

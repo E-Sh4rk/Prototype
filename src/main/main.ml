@@ -44,7 +44,7 @@ let type_check_program
         Utils.log "%a@." Poly.Msc.pp_e nf_expr ;
         let typ =
           if use_poly ()
-          then Poly.Checker.typeof_simple tenv env TVarSet.empty nf_expr
+          then Poly.Old_checker.typeof_simple tenv env TVarSet.empty nf_expr
           else Legacy.Checker.typeof_simple tenv env nf_expr_ann
         in
         let time2 = Unix.gettimeofday () in
@@ -67,7 +67,7 @@ let type_check_program
           end ;
         (varm, env)
       end with Legacy.Checker.Ill_typed (pos, str)
-      | Poly.Checker.Untypeable (pos, str) ->
+      | Poly.Old_checker.Untypeable (pos, str) ->
         pr_ill_typed (pos, str);
         if compare_to_popl () then
           begin match typ_legacy with

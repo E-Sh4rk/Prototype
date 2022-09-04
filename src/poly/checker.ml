@@ -208,10 +208,10 @@ let complete default_annot res =
   | NeedVar (v, a, None) -> NeedVar (v, a, Some default_annot)
   | res -> res
 
-exception NeedVar of (Variable.t * string)
+exception NeedVarE of (Variable.t * string)
 let need_var env v str =
   if Env.mem v env |> not
-  then raise (NeedVar (v, str))
+  then raise (NeedVarE (v, str))
 
 let rec infer_a' vardef tenv env mono annot_a a =
   ignore (vardef, tenv, env, mono, annot_a, a) ;
@@ -219,13 +219,71 @@ let rec infer_a' vardef tenv env mono annot_a a =
 
 and infer_splits' tenv env mono v splits e =
   ignore (tenv, env, mono, v, splits, e, infer_splits',
-    typeof_a_nofail, complete, need_var, map_res,
+    complete, need_var, map_res,
     infer_a_iterated, refine_a, infer_a') ;
   failwith "TODO"
 
 and infer' tenv env mono annot e =
-  ignore (tenv, env, mono, annot, e, infer', infer_splits') ;
-  failwith "TODO"
+  match e, annot with
+  | Var v, VarA ->
+    if Env.mem v env then Ok VarA
+    else NeedVar (v, VarA, None)
+  | Bind ((), v, a, e), SkipA annot ->
+    begin match infer_iterated tenv env mono annot e with
+    | NeedVar (v', annot, None) when Variable.equals v v' ->
+      let split = [(any, (false, annot))] in
+      let annot = DoA (Annot.initial_a a, split) in
+      let e = Bind ((), v, a, e) in
+      infer' tenv env mono annot e
+    | NeedVar (v', annot, Some default) when Variable.equals v v' ->
+      let split = [(any, (false, annot))] in
+      let annot = DoSkipA (Annot.initial_a a, split, default) in
+      let e = Bind ((), v, a, e) in
+      infer' tenv env mono annot e
+    | res -> map_res (fun annot -> SkipA annot) res
+    end
+  | Bind ((), v, a, e), DoSkipA (annot_a, splits, default) ->
+    begin match infer_a_iterated v tenv env mono annot_a a with
+    | Ok annot_a ->
+      let annot = DoA (annot_a, splits) in
+      let e = Bind ((), v, a, e) in
+      infer' tenv env mono annot e
+    | res ->
+      let res = res |> map_res' (fun s annot_a ->
+        DoSkipA (annot_a, apply_subst_split s splits, apply_subst s default)) in
+      complete (SkipA default) res
+    end
+  | Bind ((), v, a, e), DoA (annot_a, splits) ->
+    begin match infer_a_iterated v tenv env mono annot_a a with
+    | Ok annot_a ->
+      let t = typeof_a_nofail v tenv env mono annot_a a in
+      let splits = List.map (fun (s,(b,a)) -> (s, (ref b, a))) splits in
+      let refinements = splits |> List.find_map (fun (s,(b,_)) ->
+        if disjoint s t || not !b then None
+        else
+          let refinements =
+            refine_a env mono a (neg s) |> Refinements.partition
+            |> Refinements.compatibles env
+          in
+          b := false ;
+          if List.length refinements > 1
+          then Some refinements
+          else None
+      ) in
+      let splits = List.map (fun (s,(b,a)) -> (s,(!b, a))) splits in
+      begin match refinements with
+      | Some refinements ->
+        log ~level:2 "Splits must be propagated for variable %s...@." (Variable.show v) ;
+        Split (refinements |> List.map (fun envr -> (envr, DoA (annot_a, splits))))
+      | None ->
+        let env = Env.add v t env in
+        infer_splits' tenv env mono v splits e
+        |> map_res' (fun sigma splits -> DoA (apply_subst_a sigma annot_a, splits))
+      end  
+    | res ->
+      map_res' (fun s annot_a -> DoA (annot_a, apply_subst_split s splits)) res
+    end
+  | _, _ -> assert false
 
 and infer_a_iterated vardef tenv env mono annot_a a =
   (*log ~level:3 "Iteration...@." ;*)
@@ -245,21 +303,21 @@ and infer_iterated tenv env mono annot e =
     infer_iterated tenv env mono annot e
   | res -> res
 
-  let infer tenv env mono e =
-    let fv = fv_e e in
-    let e = VarSet.fold (fun v acc ->
-      Bind ((), v, Abstract (var_type v env), acc)
-    ) fv e in
-    if PMsc.contains_records e
-    then raise (Untypeable ([], "Records unsupported by the polymorphic system."))
-    else
-      let annot =
-        match infer_iterated tenv Env.empty mono (Annot.initial_e e) e with
-        | Subst [] -> raise (Untypeable ([], "Annotations inference failed."))
-        | Ok annot -> (e, annot)
-        | _ -> assert false
-      in
-      log "@." ; annot  
+let infer tenv env mono e =
+  let fv = fv_e e in
+  let e = VarSet.fold (fun v acc ->
+    Bind ((), v, Abstract (var_type v env), acc)
+  ) fv e in
+  if PMsc.contains_records e
+  then raise (Untypeable ([], "Records unsupported by the polymorphic system."))
+  else
+    let annot =
+      match infer_iterated tenv Env.empty mono (Annot.initial_e e) e with
+      | Subst [] -> raise (Untypeable ([], "Annotations inference failed."))
+      | Ok annot -> (e, annot)
+      | _ -> assert false
+    in
+    log "@." ; annot  
 
 let typeof_simple tenv env mono e =
   let (e, anns) = infer tenv env mono e in

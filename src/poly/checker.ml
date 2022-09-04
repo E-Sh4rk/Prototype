@@ -257,29 +257,35 @@ and infer' tenv env mono annot e =
     begin match infer_a_iterated v tenv env mono annot_a a with
     | Ok annot_a ->
       let t = typeof_a_nofail v tenv env mono annot_a a in
-      let splits = List.map (fun (s,(b,a)) -> (s, (ref b, a))) splits in
-      let refinements = splits |> List.find_map (fun (s,(b,_)) ->
-        if disjoint s t || not !b then None
-        else
-          let refinements =
-            refine_a env mono a (neg s) |> Refinements.partition
-            |> Refinements.compatibles env
-          in
-          b := false ;
-          if List.length refinements > 1
-          then Some refinements
-          else None
-      ) in
-      let splits = List.map (fun (s,(b,a)) -> (s,(!b, a))) splits in
-      begin match refinements with
-      | Some refinements ->
-        log ~level:2 "Splits must be propagated for variable %s...@." (Variable.show v) ;
-        Split (refinements |> List.map (fun envr -> (envr, DoA (annot_a, splits))))
-      | None ->
-        let env = Env.add v t env in
-        infer_splits' tenv env mono v splits e
-        |> map_res' (fun sigma splits -> DoA (apply_subst_a sigma annot_a, splits))
-      end  
+      let rec after_def splits =
+        let splits = List.map (fun (s,(b,a)) -> (s, (ref b, a))) splits in
+        let refinements = splits |> List.find_map (fun (s,(b,_)) ->
+          if disjoint s t || not !b then None
+          else
+            let refinements =
+              refine_a env mono a (neg s) |> Refinements.partition
+              |> Refinements.compatibles env
+            in
+            b := false ;
+            if List.length refinements > 1
+            then Some refinements
+            else None
+        ) in
+        let splits = List.map (fun (s,(b,a)) -> (s,(!b, a))) splits in
+        begin match refinements with
+        | Some refinements ->
+          log ~level:2 "Splits must be propagated for variable %s...@." (Variable.show v) ;
+          Split (refinements |> List.map (fun envr -> (envr, DoA (annot_a, splits))))
+        | None ->
+          let env = Env.add v t env in
+          begin match infer_splits' tenv env mono v splits e with
+          | Split [(_, splits)] -> after_def splits (* Optimisation *)
+          | res -> res |>
+            map_res' (fun sigma splits -> DoA (apply_subst_a sigma annot_a, splits))
+          end
+        end  
+      in
+      after_def splits
     | res ->
       map_res' (fun s annot_a -> DoA (annot_a, apply_subst_split s splits)) res
     end

@@ -487,6 +487,11 @@ let rec infer_a' vardef tenv env mono annot_a a =
     else if subtype t (neg s) then (need_var v2 "typecase" ; Ok (IteA sigma))
     else assert false
       (*Split [(Env.singleton v s, IteA sigma) ; (Env.singleton v (neg s), IteA sigma)]*)
+  | Lambda ((), _, v, e), LambdaA (b1,b2) ->
+    (* log ~level:0 "Lambda for %s entered with %i raw unexplored branches:%a@."
+    (Variable.show v) (List.length b2) (pp_list pp_typ) (List.map fst b2) ; *)
+    if b1@b2 |> List.for_all (fun (s,_) -> is_empty s)
+    then Subst [] else lambda v (b1,b2) e
   | _, _ -> assert false
   with NeedVarE (v, _) ->
     log ~level:2 "Variable %s needed. Going up.@." (Variable.show v) ;

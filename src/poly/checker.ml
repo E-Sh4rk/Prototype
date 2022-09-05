@@ -393,7 +393,9 @@ let rec infer_a' vardef tenv env mono annot_a a =
           Subst res |> map_res' (fun sigma splits ->
             ([], splits@(Annot.apply_subst_branches sigma branches)))
           |> complete ([], branches)
-        | res -> map_res (fun splits -> ([], (s, splits)::branches)) res
+        | res ->
+          map_res (fun splits -> ([], (s, splits)::branches)) res
+          |> complete ([], branches)
         end
     in
     let res =

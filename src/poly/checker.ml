@@ -491,7 +491,7 @@ let rec infer_a' vardef tenv env mono annot_a a =
     then Subst [] else lambda v (b1,b2) e
   | _, _ -> assert false
   with NeedVarE (v, _) ->
-    log ~level:2 "Variable %s needed. Going up.@." (Variable.show v) ;
+    log ~level:1 "Variable %s needed. Going up.@." (Variable.show v) ;
     NeedVar (v, annot_a, None)
 
 and infer_splits' tenv env mono v splits e =
@@ -501,7 +501,7 @@ and infer_splits' tenv env mono v splits e =
   | [] -> [List.hd splits]
   | splits -> splits
   in
-  log ~level:2 "Splits for %s entered with %i branches:%a@."
+  log ~level:1 "Splits for %s entered with %i branches:%a@."
     (Variable.show v) (List.length splits) (pp_list pp_typ) (List.map fst splits) ;
   let rec aux splits =
     match splits with
@@ -509,7 +509,7 @@ and infer_splits' tenv env mono v splits e =
     | (s, (b, annot))::splits ->
       let env = Env.strengthen v s env in
       assert (TVarSet.diff (vars s) mono |> TVarSet.is_empty) ;
-      log ~level:2 "Exploring split %a for variable %s.@." pp_typ s (Variable.show v) ;
+      log ~level:1 "Exploring split %a for variable %s.@." pp_typ s (Variable.show v) ;
       begin match infer_iterated tenv env mono annot e with
       | Ok annot -> aux splits |> map_res' (fun sigma splits ->
         (Subst.apply_simplify sigma s,(b,Annot.apply_subst sigma annot))::splits)
@@ -527,7 +527,7 @@ and infer_splits' tenv env mono v splits e =
       end
   in
   let res = aux splits in
-  log ~level:2 "Splits for %s exited.@." (Variable.show v) ; res
+  log ~level:1 "Splits for %s exited.@." (Variable.show v) ; res
 
 and infer' tenv env mono annot e =
   match e, annot with
@@ -549,22 +549,24 @@ and infer' tenv env mono annot e =
     | res -> map_res (fun annot -> SkipA annot) res
     end
   | Bind ((), v, a, e), DoSkipA (annot_a, splits, default) ->
+    log ~level:1 "Trying to type definition for %s...@." (Variable.show v) ;
     begin match infer_a_iterated v tenv env mono annot_a a with
     | Ok annot_a ->
       let annot = DoA (annot_a, splits) in
       let e = Bind ((), v, a, e) in
       infer' tenv env mono annot e
     | res ->
+      log ~level:1 "Definition of %s needs to go up (completed with default branch).@." (Variable.show v) ;
       let res = res |> map_res' (fun s annot_a ->
         DoSkipA (annot_a, apply_subst_split s splits, apply_subst s default)) in
       complete (SkipA default) res
     end
   | Bind ((), v, a, e), DoA (annot_a, splits) ->
-    log ~level:2 "Trying to type definition for %s...@." (Variable.show v) ;
+    log ~level:1 "Typing definition for %s...@." (Variable.show v) ;
     begin match infer_a_iterated v tenv env mono annot_a a with
     | Ok annot_a ->
       let t = typeof_a_nofail v tenv env mono annot_a a in
-      log ~level:2 "Definition of %s typed: %a@." (Variable.show v) pp_typ t ;
+      log ~level:1 "Definition of %s typed: %a@." (Variable.show v) pp_typ t ;
       let rec after_def splits =
         let splits = List.map (fun (s,(b,a)) -> (s, (ref b, a))) splits in
         let refinements = splits |> List.find_map (fun (s,(b,_)) ->
@@ -582,7 +584,7 @@ and infer' tenv env mono annot e =
         let splits = List.map (fun (s,(b,a)) -> (s,(!b, a))) splits in
         begin match refinements with
         | Some refinements ->
-          log ~level:2 "Splits must be propagated for variable %s...@." (Variable.show v) ;
+          log ~level:1 "Splits must be propagated for variable %s...@." (Variable.show v) ;
           Split (refinements |> List.map (fun envr -> (envr, DoA (annot_a, splits))))
         | None ->
           let env = Env.add v t env in
@@ -595,13 +597,12 @@ and infer' tenv env mono annot e =
       in
       after_def splits
     | res ->
-      log ~level:2 "Definition of %s needs to go up.@." (Variable.show v) ;
+      log ~level:1 "Definition of %s needs to go up.@." (Variable.show v) ;
       map_res' (fun s annot_a -> DoA (annot_a, apply_subst_split s splits)) res
     end
   | _, _ -> assert false
 
 and infer_a_iterated vardef tenv env mono annot_a a =
-  (*log ~level:3 "Iteration...@." ;*)
   match infer_a' vardef tenv env mono annot_a a with
   | Split [(_, annot_a)] ->
     infer_a_iterated vardef tenv env mono annot_a a
@@ -610,7 +611,6 @@ and infer_a_iterated vardef tenv env mono annot_a a =
   | res -> res
 
 and infer_iterated tenv env mono annot e =
-  (*log ~level:3 "Iteration...@." ;*)
   match infer' tenv env mono annot e with
   | Split [(_, annot)] ->
     infer_iterated tenv env mono annot e

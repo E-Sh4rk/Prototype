@@ -372,7 +372,7 @@ let rec infer_a' vardef tenv env mono annot_a a =
       | [] -> Ok ([], [])
       | branches ->
         let f (s, _) others =
-          List.for_all (fun (s', _) -> subtype s' s |> not) others
+          List.for_all (fun (s', _) -> (subtype s' s |> not) || subtype s s') others
         in
         let ((s, splits), branches) = find_remove f branches |> Option.get in
         let env = Env.add v s env in

@@ -326,17 +326,16 @@ let rec infer_a' vardef tenv env mono annot_a a =
     Subst res
   in
   let simple_constraint v str s =
-    assert (TVarSet.diff (vars s) mono |> TVarSet.is_empty) ;
     need_var v str ;
     let t = Env.find v env in
-    let (_,tsubst,t) = fresh mono t in
+    let (vs,tsubst,t) = fresh mono t in
     let res =
       tallying mono [(t, s)]
-      |> List.map (fun sol -> Subst.compose sol tsubst)
+      |> List.map (fun sol -> Subst.compose (Subst.restrict sol vs) tsubst)
     in
     match res with [] -> None | res -> Some res
   in
-  let app_fresh_args v1 v2 =
+  let app_constraints v1 v2 =
     need_var v1 "application" ;
     need_var v2 "application" ;
     let t1 = Env.find v1 env in
@@ -350,7 +349,11 @@ let rec infer_a' vardef tenv env mono annot_a a =
     let vs2 = TVarSet.inter (TVarSet.union vs2 vs1) (vars t2) in
     let subst2 = Subst.combine subst2 subst2' in
     (*let (vs2,subst2,t2) = fresh mono t2 in*)
-    ((vs1,subst1,t1),(vs2,subst2,t2))
+    let alpha = fresh_var () in
+    let arrow_typ = mk_arrow (cons t2) (cons (var_typ alpha)) in
+    log ~level:1 "Application: solving %a <= %a@." pp_typ t1 pp_typ arrow_typ ;
+    let constraints = [(t1, arrow_typ)] in
+    (constraints,(vs1,subst1),(vs2,subst2),alpha)
   in
   let lambda v (branches1, branches2) e =
     log ~level:0 "Lambda for %s entered with %i non-explored branches:%a@."
@@ -410,24 +413,28 @@ let rec infer_a' vardef tenv env mono annot_a a =
   | Pair (v1, v2), NoneA | Let (v1, v2), NoneA ->
     need_var v1 "pair" ; need_var v2 "pair" ; Ok NoneA
   | Projection (Parsing.Ast.Field label, v), ProjA [] ->
-    let alpha = fresh_var () in
-    let s = mk_record true [label, var_typ alpha |> cons] in
+    let s = mk_record true [label, fresh_var () |> var_typ |> cons] in
     let res = simple_constraint_infer v "projection" s in
     map_res (fun sigma -> ProjA sigma) res
   | Projection (Parsing.Ast.Field label, v), ProjA _ ->
-    begin match simple_constraint v "projection" (record_any_with label)
+    let s = mk_record true [label, fresh_var () |> var_typ |> cons] in
+    begin match simple_constraint v "projection" s
     with None -> assert false | Some s -> Ok (ProjA s) end
   | Projection (p, v), ProjA [] ->
-    let alpha = fresh_var () in
     let s =
       if p = Parsing.Ast.Fst
-      then mk_times (var_typ alpha |> cons) any_node
-      else mk_times any_node (var_typ alpha |> cons)
+      then mk_times (fresh_var () |> var_typ |> cons) any_node
+      else mk_times any_node (fresh_var () |> var_typ |> cons)
     in
     let res = simple_constraint_infer v "projection" s in
     map_res (fun sigma -> ProjA sigma) res
-  | Projection (_, v), ProjA _ ->
-    begin match simple_constraint v "projection" pair_any
+  | Projection (p, v), ProjA _ ->
+    let s =
+      if p = Parsing.Ast.Fst
+      then mk_times (fresh_var () |> var_typ |> cons) any_node
+      else mk_times any_node (fresh_var () |> var_typ |> cons)
+    in
+    begin match simple_constraint v "projection" s
     with None -> assert false | Some s -> Ok (ProjA s) end
   | RecordUpdate (v, _, o), RecordUpdateA [] ->
     (match o with None -> () | Some v' -> need_var v' "record update") ;
@@ -438,14 +445,10 @@ let rec infer_a' vardef tenv env mono annot_a a =
     begin match simple_constraint v "record update" record_any
     with None -> assert false | Some s -> Ok (ProjA s) end
   | App (v1, v2), AppA ([], []) ->
-    let ((vs1,subst1,t1),(vs2,subst2,t2)) = app_fresh_args v1 v2 in
-    let alpha = fresh_var () in
+    let (constraints,(vs1,subst1),(vs2,subst2),alpha) = app_constraints v1 v2 in
     let poly = TVarSet.union vs1 vs2 |> TVarSet.destruct in
-    let arrow_typ = mk_arrow (cons t2) (cons (var_typ alpha)) in
-    log ~level:1 "Application: solving %a <= %a with delta=[]@."
-      pp_typ t1 pp_typ arrow_typ ;
     let res =
-      tallying_infer (alpha::poly) TVarSet.empty [(t1, arrow_typ)]
+      tallying_infer (alpha::poly) TVarSet.empty constraints
       |> simplify_tallying_results mono (Some (alpha, Variable.to_typevar vardef))
       |> List.map (fun sol ->
       let poly1_part = Subst.compose (Subst.restrict sol vs1) subst1 in
@@ -459,9 +462,9 @@ let rec infer_a' vardef tenv env mono annot_a a =
     ) |> regroup Subst.equiv in
     Subst res |> map_res (fun sigmas -> AppA (List.split sigmas))
   | App (v1, v2), _ ->
-    let ((vs1,subst1,t1),(vs2,subst2,t2)) = app_fresh_args v1 v2 in
+    let (constraints,(vs1,subst1),(vs2,subst2),_) = app_constraints v1 v2 in
     let res =
-      tallying mono [(t1, mk_arrow (cons t2) any_node)]
+      tallying mono constraints
       |> List.map (fun sol ->
         let poly1_part = Subst.compose (Subst.restrict sol vs1) subst1 in
         let poly2_part = Subst.compose (Subst.restrict sol vs2) subst2 in

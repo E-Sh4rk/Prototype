@@ -254,10 +254,10 @@ let simplify_tallying_results mono result_var sols =
           | [] -> sol
           | res::_ ->
             (* log "SOLUTION:%a@." Subst.pp res ; *)
-            let sol = Subst.compose res sol in
-            (* Clean vars in the result so that it maximizes it *)
-            let clean = clean_type_ext ~pos:any ~neg:empty mono (Subst.find' sol r) in
-            Subst.compose clean sol
+            let to_maximize = Subst.apply res tr in
+            let clean = clean_type_ext ~pos:any ~neg:empty mono to_maximize in
+            let res = Subst.compose clean res in
+            Subst.compose res sol
           end
       in
       (* Remove a solution if it contains a substitution to empty *)

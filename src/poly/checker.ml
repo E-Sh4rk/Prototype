@@ -338,8 +338,56 @@ let rec infer_a' vardef tenv env mono annot_a a =
     in
     match res with [] -> None | res -> Some res
   in
-  let rec lambda v branches e =
-    ignore (v, branches, e, lambda) ; failwith "TODO"
+  let lambda v (branches1, branches2) e =
+    log ~level:0 "Lambda for %s entered with %i non-explored branches:%a@."
+      (Variable.show v) (List.length branches2) (pp_list pp_typ) (List.map fst branches2) ;
+    (* Update finished branches *)
+    let branches1 = branches1 |> List.map (fun (s, splits) ->
+      let env = Env.add v s env in
+      let mono = TVarSet.union mono (vars s) in
+      match infer_splits' tenv env mono v splits e with
+      | Ok splits -> (s, splits)
+      | _ -> assert false
+    ) in
+    let domain_explored = branches1 |> List.map fst |> disj in
+    (* Explore new branches *)
+    let rec aux domain_explored branches =
+      let branches = branches |> List.filter
+        (fun (s,_) -> subtype s domain_explored |> not) in
+      match branches with
+      | [] -> Ok ([], [])
+      | branches ->
+        let f (s, _) others =
+          List.for_all (fun (s', _) -> subtype s' s |> not) others
+        in
+        let ((s, splits), branches) = find_remove f branches |> Option.get in
+        let env = Env.add v s env in
+        let vs = vars s in
+        let mono = TVarSet.union mono vs in
+        let xs = TVarSet.diff vs mono in
+        log ~level:0 "Exploring branch %a for variable %s.@." pp_typ s (Variable.show v) ;
+        begin match infer_splits' tenv env mono v splits e with
+        | Ok splits ->
+          aux (cup domain_explored s) branches
+          |> map_res (fun (b1, b2) -> ((s, splits)::b1, b2))
+        | Subst lst ->
+          let res =
+            lst |> List.map (fun (sigma, splits) ->
+              (Subst.remove sigma xs, (Subst.apply_simplify sigma s, splits)))
+            |> regroup Subst.equiv
+          in
+          Subst res |> map_res' (fun sigma splits ->
+            ([], splits@(Annot.apply_subst_branches sigma branches)))
+          |> complete ([], branches)
+        | res -> map_res (fun splits -> ([], (s, splits)::branches)) res
+        end
+    in
+    let res =
+      aux domain_explored branches2 |> map_res' (fun s (b1, b2) ->
+        let b1 = branches1@b1 |> apply_subst_branches s in
+        LambdaA (b1, b2)
+      ) in
+    log ~level:0 "Lambda for %s exited.@." (Variable.show v) ; res
   in
   try
     ignore (simple_constraint_infer, simple_constraint, vardef,

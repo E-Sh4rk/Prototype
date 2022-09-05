@@ -88,3 +88,12 @@ let pairs s1 s2 =
       (List.map (fun a2 -> (a1,a2)) s2) @ pairs
   in
   aux s1 s2
+
+let find_remove pred lst =
+  let rec aux treated lst =
+    match lst with
+    | [] -> None
+    | a::lst ->
+      let others = treated@lst in
+      if pred a others then Some (a, others) else aux (treated@[a]) lst
+  in aux [] lst

@@ -308,7 +308,7 @@ let rec infer_a' vardef tenv env mono annot_a a =
       | _ -> assert false
     in
     let (vs,tsubst,t) = fresh mono t in
-    log ~level:1 "Simple constraint: solving %a <= %a with delta=[]@."
+    log ~level:1 "Inference: solving %a <= %a with delta=[]@."
       pp_typ t pp_typ s ;
     let poly = match result_var with
       | None -> vs |> TVarSet.destruct
@@ -330,8 +330,6 @@ let rec infer_a' vardef tenv env mono annot_a a =
     need_var v str ;
     let t = Env.find v env in
     let (_,tsubst,t) = fresh mono t in
-    log ~level:1 "Simple constraint: solving %a <= %a with delta=[]@."
-      pp_typ t pp_typ s ;
     let res =
       tallying mono [(t, s)]
       |> List.map (fun sol -> Subst.compose sol tsubst)
@@ -421,6 +419,57 @@ let rec infer_a' vardef tenv env mono annot_a a =
     (match o with None -> () | Some v' -> need_var v' "record update") ;
     begin match simple_constraint v "record update" record_any
     with None -> assert false | Some s -> Ok (ProjA s) end
+  | App (v1, v2), AppA ([], []) ->
+    need_var v1 "application" ;
+    need_var v2 "application" ;
+    (* let t1 = Env.find v1 env |> prune_poly_typ noninferred in *)
+    let t1 = Env.find v1 env in
+    let (vs1,subst1,t1) = fresh mono t1 in
+    (* let t2 = Env.find v2 env |> prune_poly_typ noninferred in *)
+    let t2 = Env.find v2 env in
+    (* TODO: temporary... it seems to work better for typing things like fixpoint
+        combinator and avoids trigerring a bug in Cduce implementation of tallying.
+        But theoretically t1 and t2 should have independent polymorphic variables. *)
+    let subst2 = Subst.restrict subst1 (vars t2) in
+    let (vs2,subst2',t2) = fresh (TVarSet.union mono vs1) (Subst.apply subst2 t2) in
+    let vs2 = TVarSet.inter (TVarSet.union vs2 vs1) (vars t2) in
+    let subst2 = Subst.combine subst2 subst2' in
+    (*let (vs2,subst2,t2) = fresh mono t2 in*)
+    let alpha = fresh_var () in
+    let poly = TVarSet.union vs1 vs2 |> TVarSet.destruct in
+    let arrow_typ = mk_arrow (cons t2) (cons (var_typ alpha)) in
+    log ~level:1 "Application: solving %a <= %a with delta=[]@."
+      pp_typ t1 pp_typ arrow_typ ;
+    let res =
+      tallying_infer (alpha::poly) TVarSet.empty [(t1, arrow_typ)]
+      |> simplify_tallying_results mono (Some (alpha, Variable.to_typevar vardef))
+      |> List.map (fun sol ->
+      let poly1_part = Subst.compose (Subst.restrict sol vs1) subst1 in
+      let poly2_part = Subst.compose (Subst.restrict sol vs2) subst2 in
+      let mono_part = Subst.restrict sol mono in
+      (* log ~level:0 "Poly1:@.%a@." Subst.pp (poly1_part) ;
+      log ~level:0 "Poly2:@.%a@." Subst.pp (poly2_part) ; *)
+      (* log ~level:0 "Mono:@.%a@." Subst.pp (mono_part) ; *)
+      (* log ~level:0 "Result:@.%a@." pp_typ (Subst.find' sol alpha) ; *)
+      (mono_part, (poly1_part, poly2_part))
+    ) |> regroup Subst.equiv in
+    Subst res |> map_res (fun sigmas -> AppA (List.split sigmas))
+  | App (v1, v2), _ ->
+    need_var v1 "application" ;
+    need_var v2 "application" ;
+    let t1 = Env.find v1 env in
+    let (vs1,subst1,t1) = fresh mono t1 in
+    let t2 = Env.find v2 env in
+    let (vs2,subst2,t2) = fresh mono t2 in
+    let res =
+      tallying mono [(t1, mk_arrow (cons t2) any_node)]
+      |> List.map (fun sol ->
+        let poly1_part = Subst.compose (Subst.restrict sol vs1) subst1 in
+        let poly2_part = Subst.compose (Subst.restrict sol vs2) subst2 in
+        (poly1_part, poly2_part)
+      )
+    in
+    (match res with [] -> assert false | res -> Ok (AppA (List.split res)))
   | _, _ -> assert false
   with NeedVarE (v, _) ->
     log ~level:2 "Variable %s needed. Going up.@." (Variable.show v) ;

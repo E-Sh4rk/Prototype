@@ -292,6 +292,10 @@ let need_var env v str =
   if Env.mem v env |> not
   then raise (NeedVarE (v, str))
 
+(* TODO: when typing an atom, first try simple_constraint,
+   and then if it does not give a result strong enough (with a var, etc),
+   then try simple_constraint_infer by imposing a monomorphic variable as result.
+   This would allow to make simplify_tallying_results more simple. *)
 let rec infer_a' vardef tenv env mono annot_a a =
   let need_var = need_var env in
   let simple_constraint_infer v str s =
@@ -321,7 +325,21 @@ let rec infer_a' vardef tenv env mono annot_a a =
     in
     Subst res
   in
-  ignore (simple_constraint_infer, vardef, tenv, env, mono, annot_a, a, need_var) ;
+  let simple_constraint v str s =
+    assert (TVarSet.diff (vars s) mono |> TVarSet.is_empty) ;
+    need_var v str ;
+    let t = Env.find v env in
+    let (_,tsubst,t) = fresh mono t in
+    log ~level:1 "Simple constraint: solving %a <= %a with delta=[]@."
+      pp_typ t pp_typ s ;
+    let res =
+      tallying mono [(t, s)]
+      |> List.map (fun sol -> Subst.compose sol tsubst)
+    in
+    match res with [] -> None | res -> Some res
+  in
+  ignore (simple_constraint_infer, simple_constraint, vardef,
+  tenv, env, mono, annot_a, a, need_var) ;
   failwith "TODO"
 
 and infer_splits' tenv env mono v splits e =

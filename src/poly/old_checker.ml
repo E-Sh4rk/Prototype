@@ -339,6 +339,8 @@ let simplify_tallying_results mono result_var sols =
               Subst.compose simpl sol
             ) sol (Subst.destruct sol)
         in Some sol
+      (* TODO: clean polymorphic variables so that it maximises the type
+         of the involved variables (to be added as parameter)? *)
       (* TODO: remove solutions that make an env var empty? *)
       (* TODO: make it deterministic even for polymorphic vars
          (that could appear in a monomorphic substitution). How? *)

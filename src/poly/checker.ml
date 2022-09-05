@@ -336,6 +336,22 @@ let rec infer_a' vardef tenv env mono annot_a a =
     in
     match res with [] -> None | res -> Some res
   in
+  let app_fresh_args v1 v2 =
+    need_var v1 "application" ;
+    need_var v2 "application" ;
+    let t1 = Env.find v1 env in
+    let (vs1,subst1,t1) = fresh mono t1 in
+    let t2 = Env.find v2 env in
+    (* TODO: temporary... it seems to work better for typing things like fixpoint
+        combinator and avoids trigerring a bug in Cduce implementation of tallying.
+        But theoretically t1 and t2 should have independent polymorphic variables. *)
+    let subst2 = Subst.restrict subst1 (vars t2) in
+    let (vs2,subst2',t2) = fresh (TVarSet.union mono vs1) (Subst.apply subst2 t2) in
+    let vs2 = TVarSet.inter (TVarSet.union vs2 vs1) (vars t2) in
+    let subst2 = Subst.combine subst2 subst2' in
+    (*let (vs2,subst2,t2) = fresh mono t2 in*)
+    ((vs1,subst1,t1),(vs2,subst2,t2))
+  in
   let lambda v (branches1, branches2) e =
     log ~level:0 "Lambda for %s entered with %i non-explored branches:%a@."
       (Variable.show v) (List.length branches2) (pp_list pp_typ) (List.map fst branches2) ;
@@ -361,8 +377,8 @@ let rec infer_a' vardef tenv env mono annot_a a =
         let ((s, splits), branches) = find_remove f branches |> Option.get in
         let env = Env.add v s env in
         let vs = vars s in
-        let mono = TVarSet.union mono vs in
         let xs = TVarSet.diff vs mono in
+        let mono = TVarSet.union mono vs in
         log ~level:0 "Exploring branch %a for variable %s.@." pp_typ s (Variable.show v) ;
         begin match infer_splits' tenv env mono v splits e with
         | Ok splits ->
@@ -420,21 +436,7 @@ let rec infer_a' vardef tenv env mono annot_a a =
     begin match simple_constraint v "record update" record_any
     with None -> assert false | Some s -> Ok (ProjA s) end
   | App (v1, v2), AppA ([], []) ->
-    need_var v1 "application" ;
-    need_var v2 "application" ;
-    (* let t1 = Env.find v1 env |> prune_poly_typ noninferred in *)
-    let t1 = Env.find v1 env in
-    let (vs1,subst1,t1) = fresh mono t1 in
-    (* let t2 = Env.find v2 env |> prune_poly_typ noninferred in *)
-    let t2 = Env.find v2 env in
-    (* TODO: temporary... it seems to work better for typing things like fixpoint
-        combinator and avoids trigerring a bug in Cduce implementation of tallying.
-        But theoretically t1 and t2 should have independent polymorphic variables. *)
-    let subst2 = Subst.restrict subst1 (vars t2) in
-    let (vs2,subst2',t2) = fresh (TVarSet.union mono vs1) (Subst.apply subst2 t2) in
-    let vs2 = TVarSet.inter (TVarSet.union vs2 vs1) (vars t2) in
-    let subst2 = Subst.combine subst2 subst2' in
-    (*let (vs2,subst2,t2) = fresh mono t2 in*)
+    let ((vs1,subst1,t1),(vs2,subst2,t2)) = app_fresh_args v1 v2 in
     let alpha = fresh_var () in
     let poly = TVarSet.union vs1 vs2 |> TVarSet.destruct in
     let arrow_typ = mk_arrow (cons t2) (cons (var_typ alpha)) in
@@ -455,12 +457,7 @@ let rec infer_a' vardef tenv env mono annot_a a =
     ) |> regroup Subst.equiv in
     Subst res |> map_res (fun sigmas -> AppA (List.split sigmas))
   | App (v1, v2), _ ->
-    need_var v1 "application" ;
-    need_var v2 "application" ;
-    let t1 = Env.find v1 env in
-    let (vs1,subst1,t1) = fresh mono t1 in
-    let t2 = Env.find v2 env in
-    let (vs2,subst2,t2) = fresh mono t2 in
+    let ((vs1,subst1,t1),(vs2,subst2,t2)) = app_fresh_args v1 v2 in
     let res =
       tallying mono [(t1, mk_arrow (cons t2) any_node)]
       |> List.map (fun sol ->

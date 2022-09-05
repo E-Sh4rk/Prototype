@@ -470,6 +470,23 @@ let rec infer_a' vardef tenv env mono annot_a a =
       )
     in
     (match res with [] -> assert false | res -> Ok (AppA (List.split res)))
+  | Ite (v, s, _, _), IteA [] ->
+    need_var v "typecase" ;
+    let t = Env.find v env in
+    if subtype t s || subtype t (neg s) then
+        let res = simple_constraint_infer v "typecase" empty in
+        map_res (fun sigma -> IteA sigma) res
+        |> complete (IteA [Subst.identity])
+    else
+      Split [(Env.singleton v s, IteA []) ; (Env.singleton v (neg s), IteA [])]
+  | Ite (v, s, v1, v2), IteA sigma ->
+    need_var v "typecase" ;
+    let t = instantiate sigma (Env.find v env) in
+    if is_empty t then Ok (IteA sigma)
+    else if subtype t s then (need_var v1 "typecase" ; Ok (IteA sigma))
+    else if subtype t (neg s) then (need_var v2 "typecase" ; Ok (IteA sigma))
+    else assert false
+      (*Split [(Env.singleton v s, IteA sigma) ; (Env.singleton v (neg s), IteA sigma)]*)
   | _, _ -> assert false
   with NeedVarE (v, _) ->
     log ~level:2 "Variable %s needed. Going up.@." (Variable.show v) ;

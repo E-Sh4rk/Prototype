@@ -389,10 +389,39 @@ let rec infer_a' vardef tenv env mono annot_a a =
       ) in
     log ~level:0 "Lambda for %s exited.@." (Variable.show v) ; res
   in
-  try
-    ignore (simple_constraint_infer, simple_constraint, vardef,
-    tenv, env, mono, annot_a, a, need_var, lambda) ;
-    failwith "TODO"
+  try match a, annot_a with
+  | Abstract _, NoneA | Const _, NoneA -> Ok NoneA
+  | Pair (v1, v2), NoneA | Let (v1, v2), NoneA ->
+    need_var v1 "pair" ; need_var v2 "pair" ; Ok NoneA
+  | Projection (Parsing.Ast.Field label, v), ProjA [] ->
+    let alpha = fresh_var () in
+    let s = mk_record true [label, var_typ alpha |> cons] in
+    let res = simple_constraint_infer v "projection" s in
+    map_res (fun sigma -> ProjA sigma) res
+  | Projection (Parsing.Ast.Field label, v), ProjA _ ->
+    begin match simple_constraint v "projection" (record_any_with label)
+    with None -> assert false | Some s -> Ok (ProjA s) end
+  | Projection (p, v), ProjA [] ->
+    let alpha = fresh_var () in
+    let s =
+      if p = Parsing.Ast.Fst
+      then mk_times (var_typ alpha |> cons) any_node
+      else mk_times any_node (var_typ alpha |> cons)
+    in
+    let res = simple_constraint_infer v "projection" s in
+    map_res (fun sigma -> ProjA sigma) res
+  | Projection (_, v), ProjA _ ->
+    begin match simple_constraint v "projection" pair_any
+    with None -> assert false | Some s -> Ok (ProjA s) end
+  | RecordUpdate (v, _, o), RecordUpdateA [] ->
+    (match o with None -> () | Some v' -> need_var v' "record update") ;
+    let res = simple_constraint_infer v "record update" record_any in
+    map_res (fun sigma -> RecordUpdateA sigma) res
+  | RecordUpdate (v, _, o), RecordUpdateA _ ->
+    (match o with None -> () | Some v' -> need_var v' "record update") ;
+    begin match simple_constraint v "record update" record_any
+    with None -> assert false | Some s -> Ok (ProjA s) end
+  | _, _ -> assert false
   with NeedVarE (v, _) ->
     log ~level:2 "Variable %s needed. Going up.@." (Variable.show v) ;
     NeedVar (v, annot_a, None)

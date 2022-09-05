@@ -340,6 +340,8 @@ let simplify_tallying_results mono result_var sols =
             ) sol (Subst.destruct sol)
         in Some sol
       (* TODO: remove solutions that make an env var empty? *)
+      (* TODO: make it deterministic even for polymorphic vars
+         (that could appear in a monomorphic substitution). How? *)
     )
   in
   (* log "AFTER:@.%a@." pp_substs sols ; *)

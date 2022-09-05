@@ -214,14 +214,43 @@ let need_var env v str =
   then raise (NeedVarE (v, str))
 
 let rec infer_a' vardef tenv env mono annot_a a =
-  ignore (vardef, tenv, env, mono, annot_a, a) ;
+  ignore (vardef, tenv, env, mono, annot_a, a, need_var) ;
   failwith "TODO"
 
 and infer_splits' tenv env mono v splits e =
-  ignore (tenv, env, mono, v, splits, e, infer_splits',
-    complete, need_var, map_res,
-    infer_a_iterated, refine_a, infer_a') ;
-  failwith "TODO"
+  assert (splits <> []) ;
+  let t = Env.find v env in
+  let splits = match List.filter (fun (s, _) -> disjoint s t |> not) splits with
+  | [] -> [List.hd splits]
+  | splits -> splits
+  in
+  log ~level:2 "Splits for %s entered with %i branches:%a@."
+    (Variable.show v) (List.length splits) (pp_list pp_typ) (List.map fst splits) ;
+  let rec aux splits =
+    match splits with
+    | [] -> Ok []
+    | (s, (b, annot))::splits ->
+      let env = Env.strengthen v s env in
+      assert (TVarSet.diff (vars s) mono |> TVarSet.is_empty) ;
+      log ~level:2 "Exploring split %a for variable %s.@." pp_typ s (Variable.show v) ;
+      begin match infer_iterated tenv env mono annot e with
+      | Ok annot -> aux splits |> map_res' (fun sigma splits ->
+        (Subst.apply_simplify sigma s,(b,Annot.apply_subst sigma annot))::splits)
+      | Split lst ->
+        let res =
+          lst |> List.map (fun (env', annot) ->
+            let b = b || Env.mem v env' in
+            let env' = Env.strengthen v s env' in
+            (Env.rm v env', (Env.find v env', (b, annot))))
+          |> regroup Env.equiv
+        in
+        map_res (fun splits' -> splits'@splits) (Split res)
+      | res -> res |> map_res' (fun sigma annot ->
+        (Subst.apply_simplify sigma s,(b,annot))::(Annot.apply_subst_split sigma splits))
+      end
+  in
+  let res = aux splits in
+  log ~level:2 "Splits for %s exited.@." (Variable.show v) ; res
 
 and infer' tenv env mono annot e =
   match e, annot with

@@ -116,7 +116,6 @@ val tallying : TVarSet.t (* Monomorphic *) -> (typ * typ) list -> Subst.t list
 val subtype_poly : TVarSet.t -> typ -> typ -> bool
 val triangle_poly : TVarSet.t -> typ -> typ -> typ
 val triangle_split_poly : TVarSet.t -> typ -> typ -> (typ * typ) list
-(* val prune_poly_typ : TVarSet.t -> typ -> typ *)
 
 (* Operations on jokers (legacy) *)
 

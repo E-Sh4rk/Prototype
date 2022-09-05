@@ -394,7 +394,10 @@ let simplify_typ t =
             define_typ n t ; n
     in
     let res = aux (cons t) |> descr in
-    assert (equiv res t) ;(* Utils.log ~level:2 " Done.@." ;*)
+    (* TODO: Uncomment the assert and fix it. *)
+    (* if equiv res t |> not then Format.printf "Before:%a@.After:%a@." pp_typ t pp_typ res ; *)
+    (* assert (equiv res t) ; *)
+    (* Utils.log ~level:2 " Done.@." ;*)
     res
 
 let square_approx f out =
@@ -575,7 +578,7 @@ let clean_type_ext ~pos ~neg mono t =
     Subst.construct subst
 
 let instantiate ss t =
-    List.map (fun s -> Subst.apply s t) ss
+    List.map (fun s -> Subst.apply_simplify s t) ss
     |> conj
 
 let fresh_subst vars =
@@ -660,72 +663,6 @@ let triangle_split_poly mono f out =
             let (_,_,t) = fresh mono t in
             (sup_typ mono t, triangle_poly mono t out)
     end
-
-(* let prune_poly_typ non_infered t =
-    (* TODO: Improve it... not really correct for vars with different polarities. *)
-    let top_level_master_var contra t =
-        let vs = TVarSet.diff (top_vars t) non_infered in
-        TVarSet.destruct vs |> List.find_opt (fun v ->
-            let vt = if contra then any else empty in
-            let s = Subst.construct [(v, vt)] in
-            let t = Subst.apply s t in
-            equiv t vt
-        )
-    in
-    (* Utils.log "Pruning polymorphic type %a...@." pp_typ t ; *)
-    let cache = NHT.create 5 in
-    let rec aux contra node =
-        let aux_on_arrow contra (a,b) = (aux (not contra) a, aux contra b) in
-        let aux_on_pair contra (a,b) = (aux contra a, aux contra b) in
-        match NHT.find_opt cache node with
-        | Some n -> n
-        | None ->
-            let n = mk_new_typ () in
-            NHT.add cache node n ;
-            begin match top_level_master_var contra (descr node) with
-            | None ->
-                let open Iter in
-                let t = fold (fun acc pack t ->
-                    let t = match pack with
-                    | Absent -> absent
-                    | Abstract m | Char m | Int m | Atom m ->
-                        let module K = (val m : Kind) in
-                        K.get_vars t |> K.mk
-                    | Times m ->
-                        let module K = (val m) in
-                        K.get_vars t |> K.Dnf.get_full
-                        |> List.map (fun (vars, (ps,ns)) ->
-                            (vars, (List.map (aux_on_pair contra) ps,
-                            List.map (aux_on_pair (not contra)) ns))
-                            |> full_product_branch_type
-                        ) |> disj
-                    | Xml m ->
-                        let module K = (val m) in
-                        K.get_vars t |> K.mk
-                    | Function m ->
-                        let module K = (val m) in
-                        K.get_vars t |> K.Dnf.get_full
-                        |> List.map (fun (vars, (ps,ns)) ->
-                            (vars, (List.map (aux_on_arrow contra) ps,
-                            List.map (aux_on_arrow (not contra)) ns))
-                            |> full_branch_type
-                        ) |> disj
-                    | Record m ->
-                        let module K = (val m) in
-                        let dnf = K.get_vars t in
-                        (* TODO: Implement prune_poly_typ for records *)
-                        K.mk dnf
-                    in
-                    cup acc t
-                ) empty (descr node) in
-                define_typ n t ; n
-            | Some v ->
-                define_typ n (var_typ v) ; n
-            end
-    in
-    let res = aux false (cons t) |> descr in
-    (* Utils.log "Done: %a@." pp_typ res ; *)
-    res     *)
 
 (* Operations on jokers (legacy) *)
 

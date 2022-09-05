@@ -47,13 +47,13 @@ let fact = fixpoint fact
 let length length lst =
   if lst is Nil then 0 else succ (length (snd lst))
 
-(* let length = fixpoint length *)
+let length = fixpoint length
 
 let map map f lst =
   if lst is Nil then nil
   else (f (fst lst), map f (snd lst))
 
-(* let map = fixpoint map *)
+let map = fixpoint map
 
 (*************************************************
 *          Tobin-Hochstadt & Felleisen           *

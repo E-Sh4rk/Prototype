@@ -338,9 +338,16 @@ let rec infer_a' vardef tenv env mono annot_a a =
     in
     match res with [] -> None | res -> Some res
   in
-  ignore (simple_constraint_infer, simple_constraint, vardef,
-  tenv, env, mono, annot_a, a, need_var) ;
-  failwith "TODO"
+  let rec lambda v branches e =
+    ignore (v, branches, e, lambda) ; failwith "TODO"
+  in
+  try
+    ignore (simple_constraint_infer, simple_constraint, vardef,
+    tenv, env, mono, annot_a, a, need_var, lambda) ;
+    failwith "TODO"
+  with NeedVarE (v, _) ->
+    log ~level:2 "Variable %s needed. Going up.@." (Variable.show v) ;
+    NeedVar (v, annot_a, None)
 
 and infer_splits' tenv env mono v splits e =
   assert (splits <> []) ;

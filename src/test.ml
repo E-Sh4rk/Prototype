@@ -278,7 +278,14 @@ fun extra ->
      add input (fst extra)
  else if is_int (fst extra) is True then
      add (strlen input) (fst extra)
- else 0
+else 0
 
-let ifthenelse (b : (('a -> 'b -> 'a) |  ('a -> 'b -> 'b)) )  x y = b x y 
+(* expected type for the follwoing function
+ *   (TRUE -> 'c -> 'd -> 'c)
+ * & (FALSE -> 'c -> 'd -> 'd) 
+*)
+type TRUE  =  'a -> 'b -> 'a
+type FALSE =  'a -> 'b -> 'b
+
+let ifthenelse (b : (TRUE | FALSE) )  x y = b x y 
 

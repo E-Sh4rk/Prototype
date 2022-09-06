@@ -10,9 +10,9 @@ Once `opam` is installed, CDuce needs to be installed before the prototype.
 ### Installing CDuce
 
 ```
-opam pin add cduce-types 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#polymorphic'
+opam pin add cduce-types 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#tallying-with-custom-order'
 
-opam pin add cduce 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#polymorphic'
+opam pin add cduce 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#tallying-with-custom-order'
 
 opam install cduce-types cduce
 ```

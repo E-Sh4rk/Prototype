@@ -280,3 +280,5 @@ fun extra ->
      add (strlen input) (fst extra)
  else 0
 
+let ifthenelse (b : (('a -> 'b -> 'a) |  ('a -> 'b -> 'b)) )  x y = b x y 
+

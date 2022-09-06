@@ -280,12 +280,69 @@ fun extra ->
      add (strlen input) (fst extra)
 else 0
 
-(* expected type for the follwoing function
- *   (TRUE -> 'c -> 'd -> 'c)
- * & (FALSE -> 'c -> 'd -> 'd) 
+
+     
+(*******************************
+ *                             *
+ *  Examples for polymorphism  *
+ *                             *
+ *******************************)
+
+
+type Falsy = False | "" | 0
+type Truthy = ~Falsy
+
+let succ = <Int -> Int>
+
+let and_ = fun x -> fun y ->
+  if x is Falsy then x else y
+
+(* expected type:    
+      ('a & Falsy -> Any -> 'a & Falsy)
+     &(Truthy -> 'b -> 'b)
 *)
+
+
+
+let and_ = fun x -> fun y ->
+  if x is Falsy then x else (y, succ x)
+
+(* expected type:
+      ('a & Falsy -> Any -> 'a & Falsy)
+     &(Truthy&(Int\0) -> 'b -> ('b,Int))
+*)
+
+
+ let test = fun x ->
+   if fst x is Falsy then (fst x) + (snd x) else succ (fst x)
+
+(* expected type
+    (0,Int) | (Int\0,Any) -> Int
+*)
+
+
+let concat concat x y =
+   if x is Nil then y else (fst x, (concat (snd x) y) ) 
+
+let concat = fixpoint concat 
+
+
+let flatten flatten x = 
+   if x is Nil then nil else
+   if x is (Any, Any) then concat(flatten (fst x)) (flatten (snd x)) else
+   (x,nil)
+   
+let flatten = fixpoint flatten   
+
 type TRUE  =  'a -> 'b -> 'a
 type FALSE =  'a -> 'b -> 'b
 
 let ifthenelse (b : (TRUE | FALSE) )  x y = b x y 
+
+(* expected type for the follwoing function
+ *   (TRUE -> 'c -> 'd -> 'c)
+ * & (FALSE -> 'c -> 'd -> 'd) 
+*)
+
+
 

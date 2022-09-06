@@ -1,8 +1,20 @@
 
-let fst2 = <('a, Any) -> 'a>
-let snd2 = <(Any, 'a) -> 'a>
-let and2_ = fun x ->
-  if fst2 x is True then if snd2 x is True then fst2 x else false else false
+let (-) = <Int->Int->Int>
+let (+) = <Int->Int->Int>
+let ( * ) = <Int->Int->Int>
+let succ = <Int->Int>
+
+let impossible_branch = fun x ->
+    if x is Int then x + 1 else (42 3)
+
+let impossible_branch2 = fun x -> fun y ->
+  if y is Int then y+1 else x+1
+
+let switch1 f s a b =
+    if s then f a else f b
+
+let switch2 s f a b =
+    if s then f a else f b
 
 (* ======================================= *)
 
@@ -34,10 +46,6 @@ let fixpoint = fun f ->
   let delta = fun x ->
      f ( fun  v -> ( x x v ))
    in delta delta
-
-let (-) = <Int->Int->Int>
-let ( * ) = <Int->Int->Int>
-let succ = <Int->Int>
 
 let fact fact n =
   if n is 0 then 1 else (fact (n-1))*n
@@ -83,7 +91,10 @@ atom no
 
 let and_ = fun x -> fun y ->
      if x is True then if y is True then y else false else false
-
+let fst2 = <('a, Any) -> 'a>
+let snd2 = <(Any, 'a) -> 'a>
+let and2_ = fun x ->
+  if fst2 x is True then if snd2 x is True then fst2 x else false else false
 let and2_ = fun x ->
      if fst x is True then if snd x is True then fst x else false else false
 

@@ -264,19 +264,20 @@ let remove_useless_conjuncts branch_type ~n dc cc lst =
         if n then branch_type (([],[]),([],[(a,b)]))
         else branch_type (([],[]),([(a,b)],[]))
     in
-    let rec aux (kept, kt) rem =
+    let rec aux kept rem =
         match rem with
-        | [] -> (kept, kt)
+        | [] -> kept
         | c::rem ->
             let ct = atom_type c in
             let rt = rem |> List.map atom_type |> conj in
-            let krt = cap kt rt in
-            let t' = cup dc krt in
-            let t  = cup dc (cap krt ct) in
-            if subtype t' t then aux (kept, kt) rem
-            else aux (c::kept, cap kt ct) rem
+            let kt = kept |> List.map atom_type |> conj in
+            let others = conj [kt ; rt ; cc] in
+            let t' = cup dc others in
+            let t  = cup dc (cap others ct) in
+            if subtype t' t then aux kept rem
+            else aux (c::kept) rem
     in
-    aux ([], cc) lst |> fst
+    aux [] lst
 
 let remove_useless_conjuncts branch_type dc ((pvs, nvs), (ps, ns)) =
     let context = branch_type ((pvs, nvs), ([], ns)) in
@@ -287,29 +288,30 @@ let remove_useless_conjuncts branch_type dc ((pvs, nvs), (ps, ns)) =
 
 let remove_useless_from_dnf branch_type dnf =
     (* Remove useless conjuncts *)
-    let rec aux (kept, kt) rem =
+    let rec aux treated rem =
         match rem with
-        | [] -> (kept, kt)
+        | [] -> treated
         | c::rem ->
             let rt = rem |> List.map branch_type |> disj in
-            let krt = cup kt rt in
-            let c = remove_useless_conjuncts branch_type krt c in
-            let ct = branch_type c in
-            aux (c::kept, cup kt ct) rem
+            let tt = treated |> List.map branch_type |> disj in
+            let others = cup tt rt in
+            let c = remove_useless_conjuncts branch_type others c in
+            aux (c::treated) rem
     in
-    let dnf = aux ([], empty) dnf |> fst in
+    let dnf = aux [] dnf in
     (* Remove useless disjuncts *)
-    let rec aux (kept, kt) rem =
+    let rec aux kept rem =
         match rem with
-        | [] -> (kept, kt)
+        | [] -> kept
         | c::rem ->
             let ct = branch_type c in
             let rt = rem |> List.map branch_type |> disj in
-            let krt = cup kt rt in
-            if subtype ct krt then aux (kept, kt) rem
-            else aux (c::kept, cup kt ct) rem
+            let kt = kept |> List.map branch_type |> disj in
+            let others = cup kt rt in
+            if subtype ct others then aux kept rem
+            else aux (c::kept) rem
     in
-    aux ([], empty) dnf |> fst
+    aux [] dnf
 
 let simplify_raw_dnf ~open_nodes dnf =
     let regroup_conjuncts (vars, (ps, ns)) =

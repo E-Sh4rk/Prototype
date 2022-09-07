@@ -324,8 +324,9 @@ let simplify_tallying_results mono result_var sols =
             Subst.compose res sol
           end
       in
-      (* Remove a solution if it contains a substitution to empty *)
-      if List.exists (fun (_,t') -> is_empty t') (Subst.destruct sol) then None
+      (* Remove a solution if it contains a substitution to empty for a mono var *)
+      if List.exists (fun (v,t') -> TVarSet.mem mono v && is_empty t')
+        (Subst.destruct sol) then None
       else (* Rename toplevel variables *)
         let sol =
           List.fold_left (fun sol (v,t) ->

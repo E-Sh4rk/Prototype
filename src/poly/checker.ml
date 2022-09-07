@@ -223,9 +223,10 @@ let simplify_tallying_results mono result_var sols =
           then Some (r,r') else None
       in
       let sol =
-        List.fold_left (fun sol (v,t) ->
+        List.fold_left (fun sol v ->
           if TVarSet.mem mono v |> not then sol
           else
+            let t = Subst.find' sol v in
             let constr = [(var_typ v, t);(t, var_typ v)] in
             (* print_tallying_instance [] mono constr ; *)
             let res = tallying mono constr
@@ -240,7 +241,8 @@ let simplify_tallying_results mono result_var sols =
             match res with
             | None -> sol
             | Some sol -> Subst.rm v sol
-          ) sol (Subst.destruct sol) in
+          ) sol (Subst.dom sol |> TVarSet.destruct) in
+      (* log "AFTER STEP 1:%a@." Subst.pp sol; *)
       (* Try to obtain the desired result *)
       let sol =
         match result_var with

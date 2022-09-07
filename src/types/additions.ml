@@ -306,8 +306,7 @@ let remove_useless_from_dnf branch_type dnf =
             let ct = branch_type c in
             let rt = rem |> List.map branch_type |> disj in
             let krt = cup kt rt in
-            let t  = cup krt ct in
-            if subtype t krt then aux (kept, kt) rem
+            if subtype ct krt then aux (kept, kt) rem
             else aux (c::kept, cup kt ct) rem
     in
     aux ([], empty) dnf |> fst

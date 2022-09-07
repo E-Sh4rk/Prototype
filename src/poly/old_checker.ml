@@ -276,7 +276,7 @@ let simplify_tallying_results mono result_var sols =
   let sols = sols |>
     List.filter_map (fun sol ->
       (* Simplify the monomorphic substitutions as most as we can
-         (as long as it does not make the result too unprecise) *)
+          (as long as it does not make the result too unprecise) *)
       let var_to_preserve =
         match result_var with
         | None -> None
@@ -285,9 +285,10 @@ let simplify_tallying_results mono result_var sols =
           then Some (r,r') else None
       in
       let sol =
-        List.fold_left (fun sol (v,t) ->
+        List.fold_left (fun sol v ->
           if TVarSet.mem mono v |> not then sol
           else
+            let t = Subst.find' sol v in
             let constr = [(var_typ v, t);(t, var_typ v)] in
             (* print_tallying_instance [] mono constr ; *)
             let res = tallying mono constr
@@ -302,7 +303,8 @@ let simplify_tallying_results mono result_var sols =
             match res with
             | None -> sol
             | Some sol -> Subst.rm v sol
-          ) sol (Subst.destruct sol) in
+          ) sol (Subst.dom sol |> TVarSet.destruct) in
+      (* log "AFTER STEP 1:%a@." Subst.pp sol; *)
       (* Try to obtain the desired result *)
       let sol =
         match result_var with
@@ -340,10 +342,10 @@ let simplify_tallying_results mono result_var sols =
             ) sol (Subst.destruct sol)
         in Some sol
       (* TODO: clean polymorphic variables so that it maximises the type
-         of the involved variables (to be added as parameter)? *)
+          of the involved variables (to be added as parameter)? *)
       (* TODO: remove solutions that make an env var empty? *)
       (* TODO: make it deterministic even for polymorphic vars
-         (that could appear in a monomorphic substitution). How? *)
+          (that could appear in a monomorphic substitution). How? *)
     )
   in
   (* log "AFTER:@.%a@." pp_substs sols ; *)

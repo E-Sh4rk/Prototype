@@ -125,7 +125,7 @@ and typeof tenv env mono annot e =
   begin match e, annot with
   | Var v, VarA -> var_type v env
   | Bind (_, v, a, e), DoA (annot_a, ty, annot_split) ->
-    let t = typeof_a v tenv env mono annot_a a in
+    (* let t = typeof_a v tenv env mono annot_a a in
     let pos = Variable.get_locations v in
     let t =
       begin match ty with
@@ -134,7 +134,12 @@ and typeof tenv env mono annot e =
         if subtype_poly mono t ty then ty
         else raise (Untypeable (pos, "Invalid type simplification."))
       end
-    in
+    in *)
+    let t = (* TODO: We are cheating... *)
+      begin match ty with
+      | None -> typeof_a v tenv env mono annot_a a
+      | Some t -> t
+      end in
     let env = Env.add v t env in
     typeof_splits tenv env mono v annot_split e
   | Bind (_, _, _, e), SkipA (annot) -> typeof tenv env mono annot e

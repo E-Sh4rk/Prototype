@@ -124,8 +124,17 @@ and typeof_splits tenv env mono v splits e =
 and typeof tenv env mono annot e =
   begin match e, annot with
   | Var v, VarA -> var_type v env
-  | Bind (_, v, a, e), DoA (annot_a, annot_split) ->
+  | Bind (_, v, a, e), DoA (annot_a, ty, annot_split) ->
     let t = typeof_a v tenv env mono annot_a a in
+    let pos = Variable.get_locations v in
+    let t =
+      begin match ty with
+      | None -> t
+      | Some ty ->
+        if subtype_poly mono t ty then ty
+        else raise (Untypeable (pos, "Invalid type simplification."))
+      end
+    in
     let env = Env.add v t env in
     typeof_splits tenv env mono v annot_split e
   | Bind (_, _, _, e), SkipA (annot) -> typeof tenv env mono annot e
@@ -568,7 +577,7 @@ and infer' tenv env mono annot e =
     begin match infer_iterated tenv env mono annot e with
     | NeedVar (v', annot, None) when Variable.equals v v' ->
       let split = [(any, (false, annot))] in
-      let annot = DoA (Annot.initial_a a, split) in
+      let annot = DoA (Annot.initial_a a, None, split) in
       let e = Bind ((), v, a, e) in
       infer' tenv env mono annot e
     | NeedVar (v', annot, Some default) when Variable.equals v v' ->
@@ -582,7 +591,7 @@ and infer' tenv env mono annot e =
     log ~level:1 "Trying to type definition for %s...@." (Variable.show v) ;
     begin match infer_a_iterated v tenv env mono annot_a a with
     | Ok annot_a ->
-      let annot = DoA (annot_a, splits) in
+      let annot = DoA (annot_a, None, splits) in
       let e = Bind ((), v, a, e) in
       infer' tenv env mono annot e
     | res ->
@@ -591,11 +600,12 @@ and infer' tenv env mono annot e =
         DoSkipA (annot_a, apply_subst_split s splits, apply_subst s default)) in
       complete (SkipA default) res
     end
-  | Bind ((), v, a, e), DoA (annot_a, splits) ->
+  | Bind ((), v, a, e), DoA (annot_a, _, splits) ->
     log ~level:1 "Typing definition for %s...@." (Variable.show v) ;
     begin match infer_a_iterated v tenv env mono annot_a a with
     | Ok annot_a ->
       let t = typeof_a_nofail v tenv env mono annot_a a in
+      (* TODO: advanced simplification of t *)
       log ~level:1 "Definition of %s typed: %a@." (Variable.show v) pp_typ t ;
       let rec after_def splits =
         let splits = List.map (fun (s,(b,a)) -> (s, (ref b, a))) splits in
@@ -615,20 +625,20 @@ and infer' tenv env mono annot e =
         begin match refinements with
         | Some refinements ->
           log ~level:1 "Splits must be propagated for variable %s...@." (Variable.show v) ;
-          Split (refinements |> List.map (fun envr -> (envr, DoA (annot_a, splits))))
+          Split (refinements |> List.map (fun envr -> (envr, DoA (annot_a, Some t, splits))))
         | None ->
           let env = Env.add v t env in
           begin match infer_splits' tenv env mono v splits e with
           | Split [(_, splits)] -> after_def splits (* Optimisation *)
           | res -> res |>
-            map_res' (fun sigma splits -> DoA (apply_subst_a sigma annot_a, splits))
+            map_res' (fun sigma splits -> DoA (apply_subst_a sigma annot_a, Some t, splits))
           end
         end  
       in
       after_def splits
     | res ->
       log ~level:1 "Definition of %s needs to go up.@." (Variable.show v) ;
-      map_res' (fun s annot_a -> DoA (annot_a, apply_subst_split s splits)) res
+      map_res' (fun s annot_a -> DoA (annot_a, None, apply_subst_split s splits)) res
     end
   | _, _ -> assert false
 

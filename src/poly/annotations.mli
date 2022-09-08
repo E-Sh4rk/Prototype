@@ -20,7 +20,7 @@ module Annot : sig
         | RecordUpdateA of substs
         | LambdaA of branches (* Fully Explored *) * branches (* Remaining *)
     and t =
-        | VarA | DoA of (a * split) | SkipA of t | DoSkipA of (a * split * t)
+        | VarA | DoA of (a * typ option * split) | SkipA of t | DoSkipA of (a * split * t)
 
     val pp_substs : Format.formatter -> substs -> unit
     val pp_split : Format.formatter -> split -> unit

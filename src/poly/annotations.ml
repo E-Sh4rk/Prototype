@@ -79,7 +79,7 @@ module Annot = struct
     [@@deriving show]
 
   and t =
-    | VarA | DoA of (a * split) | SkipA of t | DoSkipA of (a * split * t)
+    | VarA | DoA of (a * typ option * split) | SkipA of t | DoSkipA of (a * split * t)
     [@@deriving show]
 
   let rec apply_subst_split s lst =
@@ -98,8 +98,9 @@ module Annot = struct
   if Subst.is_identity s then t
   else match t with
   | VarA -> VarA
-  | DoA (a, split) ->
-    DoA (apply_subst_a s a, apply_subst_split s split)
+  | DoA (a, ty, split) ->
+    DoA (apply_subst_a s a, Option.map (Subst.apply_simplify s) ty,
+      apply_subst_split s split)
   | SkipA t -> SkipA (apply_subst s t)
   | DoSkipA (a, split, t) ->
     DoSkipA (apply_subst_a s a, apply_subst_split s split, apply_subst s t)

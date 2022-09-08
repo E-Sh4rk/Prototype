@@ -208,7 +208,7 @@ let complete default_annot res =
   | NeedVar (v, a, None) -> NeedVar (v, a, Some default_annot)
   | res -> res
 
-let simplify_tallying_results mono result_var sols =
+let simplify_inference_solutions mono result_var sols =
   log ~level:2 "Simplifying solutions...@." ;
   (* log "BEFORE:@.%a@." pp_substs sols ; *)
   let sols = sols |>
@@ -290,6 +290,20 @@ let simplify_tallying_results mono result_var sols =
   (* log "AFTER:@.%a@." pp_substs sols ; *)
   log ~level:2 "Solutions simplified!@." ; sols
 
+let simplify_solutions mono result_var sols =
+  match result_var with
+  | None -> sols
+  | Some r ->
+    let sols = sols |> List.filter_map (fun s ->
+      let t = Subst.find' s r in
+      let clean = clean_type_ext ~pos:empty ~neg:any mono t in
+      let s = Subst.compose clean s in
+      (* log "Res: %a@." pp_typ (Subst.find' s r) ; *)
+      (* TODO: More simplifications ?? *)
+      Some s
+      ) in
+    sols
+
 exception NeedVarE of (Variable.t * string)
 let need_var env v str =
   if Env.mem v env |> not
@@ -298,7 +312,7 @@ let need_var env v str =
 (* TODO: when typing an atom, first try simple_constraint,
    and then if it does not give a result strong enough (with a var, etc),
    then try simple_constraint_infer by imposing a monomorphic variable as result.
-   This would allow to make simplify_tallying_results more simple. *)
+   This would allow to make simplify_inference_solutions more simple. *)
 let rec infer_a' vardef tenv env mono annot_a a =
   let need_var = need_var env in
   let simple_constraint_infer v str s =
@@ -319,7 +333,7 @@ let rec infer_a' vardef tenv env mono annot_a a =
     in
     let res =
       tallying_infer poly TVarSet.empty [(t, s)]
-      |> simplify_tallying_results mono result_var
+      |> simplify_inference_solutions mono result_var
       |> List.map (fun sol ->
       let mono_part = Subst.restrict sol mono in
       let poly_part = Subst.compose (Subst.restrict sol vs) tsubst in
@@ -331,9 +345,16 @@ let rec infer_a' vardef tenv env mono annot_a a =
   let simple_constraint v str s =
     need_var v str ;
     let t = Env.find v env in
+    let result_var =
+      match TVarSet.diff (vars s) mono |> TVarSet.destruct with
+      | [] -> None
+      | [r] -> Some r
+      | _ -> assert false
+    in
     let (vs,tsubst,t) = fresh mono t in
     let res =
       tallying mono [(t, s)]
+      |> simplify_solutions mono result_var
       |> List.map (fun sol -> Subst.compose (Subst.restrict sol vs) tsubst)
     in
     match res with [] -> None | res -> Some res
@@ -452,7 +473,7 @@ let rec infer_a' vardef tenv env mono annot_a a =
     let poly = TVarSet.union vs1 vs2 |> TVarSet.destruct in
     let res =
       tallying_infer (alpha::poly) TVarSet.empty constraints
-      |> simplify_tallying_results mono (Some (alpha, Variable.to_typevar vardef))
+      |> simplify_inference_solutions mono (Some (alpha, Variable.to_typevar vardef))
       |> List.map (fun sol ->
       let poly1_part = Subst.compose (Subst.restrict sol vs1) subst1 in
       let poly2_part = Subst.compose (Subst.restrict sol vs2) subst2 in
@@ -465,9 +486,10 @@ let rec infer_a' vardef tenv env mono annot_a a =
     ) |> regroup Subst.equiv in
     Subst res |> map_res (fun sigmas -> AppA (List.split sigmas))
   | App (v1, v2), _ ->
-    let (constraints,(vs1,subst1),(vs2,subst2),_) = app_constraints v1 v2 in
+    let (constraints,(vs1,subst1),(vs2,subst2),alpha) = app_constraints v1 v2 in
     let res =
       tallying mono constraints
+      |> simplify_solutions mono (Some alpha)
       |> List.map (fun sol ->
         let poly1_part = Subst.compose (Subst.restrict sol vs1) subst1 in
         let poly2_part = Subst.compose (Subst.restrict sol vs2) subst2 in

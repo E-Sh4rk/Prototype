@@ -679,25 +679,31 @@ let triangle_split_poly mono f out =
 (* Simplification of polymorphic types *)
 
 let remove_redundant_vars mono t =
-    (* Utils.log ~level:2 "Started removing redundant vars in %a...@?" pp_typ t ; *)
-    let vs = TVarSet.diff (vars t) mono |> TVarSet.destruct
-    |> List.sort (fun v1 v2 -> var_compare v2 v1) in
-    let res = Utils.pairs vs vs
-    |> List.filter (fun (v1, v2) -> var_compare v1 v2 < 0)
-    |> List.fold_left (fun (res, t) (v1, v2) ->
-        let v1' = fresh_var () in
-        let v2' = fresh_var () in
-        let subst1 = Subst.construct [(v1, var_typ v1');(v2, var_typ v2')] in
-        let subst2 = Subst.construct [(v1, var_typ v2');(v2, var_typ v1')] in
-        let t1 = Subst.apply subst1 t in
-        let t2 = Subst.apply subst2 t in
-        if equiv t1 t2
-        then
-        let subst = Subst.construct [(v1, var_typ v2)] in
-        (Subst.compose subst res, Subst.apply subst t)
-        else (res, t)
-    ) (Subst.identity, t)
-    in (* Utils.log ~level:2 " Done.@." ; *) res    
+    let compose_res (s,t) res = match res with
+    | None -> (Subst.identity, t)
+    | Some (s', t') -> (Subst.compose s' s, t')
+    in
+    let rec aux t =
+        let vs = TVarSet.diff (vars t) mono |> TVarSet.destruct in
+        Utils.pairs vs vs
+        |> List.filter (fun (v1, v2) -> var_compare v1 v2 < 0)
+        |> List.find_opt (fun (v1, v2) ->
+            let v1' = fresh_var () in
+            let v2' = fresh_var () in
+            let subst1 = Subst.construct [(v1, var_typ v1');(v2, var_typ v2')] in
+            let subst2 = Subst.construct [(v1, var_typ v2');(v2, var_typ v1')] in
+            let t1 = Subst.apply subst1 t in
+            let t2 = Subst.apply subst2 t in
+            equiv t1 t2
+        )
+        |> Option.map (fun (v1, v2) ->
+            let subst = Subst.construct [(v1, var_typ v2)] in
+            let t = Subst.apply subst t in
+            let res = aux t in
+            compose_res (subst, t) res
+        )
+    in
+    aux t |> compose_res (Subst.identity, t)
 
 let simplify_poly_dnf mono ~open_nodes dnf =
     (* TODO: Implement poly DNF simplification *)

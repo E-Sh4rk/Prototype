@@ -705,12 +705,28 @@ let remove_redundant_vars mono t =
     in
     aux t |> compose_res (Subst.identity, t)
 
+let remove_useless_poly_conjuncts mono branch_type lst =
+    let atom_type (a,b) = branch_type (([],[]),([(a,b)],[])) in
+    let rec aux kept rem =
+        match rem with
+        | [] -> kept
+        | c::rem ->
+            let ct = atom_type c in
+            let rt = rem |> List.map atom_type |> conj in
+            let kt = kept |> List.map atom_type |> conj in
+            let others = conj [kt ; rt] in
+            if subtype_poly mono others ct then aux kept rem
+            else aux (c::kept) rem
+    in
+    aux [] lst
+
 let [@warning "-27"] simplify_poly_dnf mono ~open_nodes ~contravar dnf =
     let aux mono ((pvs,nvs),(ps,ns)) =
         let tvars = TVarSet.construct (pvs@nvs) in
         let tvars = TVarSet.diff tvars mono in
         if TVarSet.is_empty tvars || contravar
-        then ((pvs,nvs),(ps,ns))
+        then ((pvs,nvs),
+            (remove_useless_poly_conjuncts mono full_branch_type ps, ns))
         else ((pvs,nvs),([],[]))
     in
     Utils.add_others dnf |> List.map (fun (branch, others) ->

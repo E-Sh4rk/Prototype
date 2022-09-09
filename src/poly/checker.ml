@@ -318,6 +318,20 @@ let simplify_solutions mono result_var sols =
       ) in
     sols
 
+let decorrelate_branches mono annot_a =
+  let rename_vars (t, splits) =
+    let new_vars = TVarSet.diff (vars t) mono in
+    let subst = new_vars |> TVarSet.destruct |> List.map (fun v ->
+      (v, mk_var (var_name v) |> var_typ)
+    ) |> Subst.construct in
+    (Subst.apply_simplify subst t, apply_subst_split subst splits)
+  in
+  match annot_a with
+  | LambdaA (branches, []) ->
+    LambdaA (List.map rename_vars branches, [])
+  | LambdaA _ -> assert false
+  | annot_a -> annot_a
+
 exception NeedVarE of (Variable.t * string)
 let need_var env v str =
   if Env.mem v env |> not
@@ -609,6 +623,7 @@ and infer' tenv env mono annot e =
     log ~level:1 "Typing definition for %s...@." (Variable.show v) ;
     begin match infer_a_iterated v tenv env mono annot_a a with
     | Ok annot_a ->
+      let annot_a = decorrelate_branches mono annot_a in
       let t = typeof_a_nofail v tenv env mono annot_a a in
       let t = simplify_poly_typ mono t in
       log ~level:1 "Definition of %s typed: %a@." (Variable.show v) pp_typ t ;

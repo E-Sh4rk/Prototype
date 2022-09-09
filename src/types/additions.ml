@@ -705,40 +705,12 @@ let remove_redundant_vars mono t =
     in
     aux t |> compose_res (Subst.identity, t)
 
-let rename_branch mono ~open_nodes (a,b) =
-    (* TODO: Infinite loop for recursive functions... *)
-    let apply_subst_node subst n =
-        if NHT.mem open_nodes n
-        then n
-        else Subst.apply subst (descr n) |> cons
-    in
-    let rec_vars_of_node n =
-        if NHT.mem open_nodes n
-        then (descr n |> vars)
-        else TVarSet.empty
-    in
-    let vs = pair_vars (a,b) in
-    let mono = mono
-        |> TVarSet.union (rec_vars_of_node a)
-        |> TVarSet.union (rec_vars_of_node b)
-    in
-    let vs = TVarSet.diff vs mono |> TVarSet.destruct in
-    let subst = vs |> List.map (fun v ->
-        (v, mk_var (var_name v) |> var_typ)
-    ) |> Subst.construct in
-    (apply_subst_node subst a, apply_subst_node subst b)
-
-let simplify_poly_dnf mono ~open_nodes ~contravar dnf =
-    ignore (rename_branch, open_nodes) ;
+let [@warning "-27"] simplify_poly_dnf mono ~open_nodes ~contravar dnf =
     let aux mono ((pvs,nvs),(ps,ns)) =
         let tvars = TVarSet.construct (pvs@nvs) in
         let tvars = TVarSet.diff tvars mono in
         if TVarSet.is_empty tvars || contravar
-        then
-            (* let mono = TVarSet.union tvars mono in
-            let ps = List.map (rename_branch mono ~open_nodes) ps in
-            let ns = List.map (rename_branch mono ~open_nodes) ns in *)
-            ((pvs,nvs),(ps,ns))
+        then ((pvs,nvs),(ps,ns))
         else ((pvs,nvs),([],[]))
     in
     Utils.add_others dnf |> List.map (fun (branch, others) ->

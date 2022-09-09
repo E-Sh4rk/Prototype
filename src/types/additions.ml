@@ -348,29 +348,31 @@ let is_test_type t =
         in aux t
     else false
 
+let pair_vars (a,b) = TVarSet.union (vars (descr a)) (vars (descr b))
+let pairs_vars lst =
+    lst |> List.map pair_vars |>
+    List.fold_left TVarSet.union TVarSet.empty
+let branch_vars ((pvs, nvs), (ps,ns)) =
+    TVarSet.construct (pvs@nvs) |>
+    TVarSet.union (pairs_vars ps) |>
+    TVarSet.union (pairs_vars ns)
+let branches_vars lst =
+    lst |> List.map branch_vars |>
+    List.fold_left TVarSet.union TVarSet.empty
+
 let simplify_typ_aux simplify_arrow simplify_product mono t =
     (*Utils.log ~level:2 "Simplifying type...@?" ;*)
     let cache = NHT.create 5 in
     let rec aux mono node =
-        let pair_vars (a,b) = TVarSet.union (vars (descr a)) (vars (descr b)) in
         let aux_pair mono (a,b) =
             let monoa = TVarSet.union mono (vars (descr a)) in
             let monob = TVarSet.union mono (vars (descr b)) in
             (aux monob a, aux monoa b) in
-        let pairs_vars lst =
-            lst |> List.map pair_vars |>
-            List.fold_left TVarSet.union TVarSet.empty
-        in
         let aux_pairs mono ps =
             ps |> Utils.add_others |> List.map (fun (ps, others) ->
                 let vs = pairs_vars others in
                 aux_pair (TVarSet.union mono vs) ps
             )
-        in
-        let branch_vars ((pvs, nvs), (ps,ns)) =
-            TVarSet.construct (pvs@nvs) |>
-            TVarSet.union (pairs_vars ps) |>
-            TVarSet.union (pairs_vars ns)
         in
         let aux_branch mono ((pvs, nvs), (ps,ns)) =
             let mono = TVarSet.construct (pvs@nvs) |> TVarSet.union mono in
@@ -380,14 +382,10 @@ let simplify_typ_aux simplify_arrow simplify_product mono t =
             let ns = aux_pairs (TVarSet.union mono ps_vars) ns in
             ((pvs,nvs),(ps,ns))
         in
-        let branches_vars lst =
-            lst |> List.map branch_vars |>
-            List.fold_left TVarSet.union TVarSet.empty
-        in
         let aux_branches mono lst =
-            lst |> Utils.add_others |> List.map (fun (branches, others) ->
+            lst |> Utils.add_others |> List.map (fun (branch, others) ->
                 let vs = branches_vars others in
-                aux_branch (TVarSet.union mono vs) branches
+                aux_branch (TVarSet.union mono vs) branch
             )
         in
         match NHT.find_opt cache node with
@@ -706,14 +704,53 @@ let remove_redundant_vars mono t =
     aux t |> compose_res (Subst.identity, t)
 
 let simplify_poly_dnf mono ~open_nodes dnf =
-    (* TODO: Implement poly DNF simplification *)
-    ignore (open_nodes, mono, remove_redundant_vars) ; dnf
+    let apply_subst_node subst n =
+        if NHT.mem open_nodes n
+        then n
+        else Subst.apply subst (descr n) |> cons
+    in
+    let rec_vars_of_node n =
+        if NHT.mem open_nodes n
+        then (descr n |> vars)
+        else TVarSet.empty
+    in
+    let rename_vars mono (a,b) =
+        let vs = pair_vars (a,b) in
+        let mono = mono
+            |> TVarSet.union (rec_vars_of_node a)
+            |> TVarSet.union (rec_vars_of_node b)
+        in
+        let vs = TVarSet.diff vs mono |> TVarSet.destruct in
+        let subst = vs |> List.map (fun v ->
+            (v, mk_var (var_name v) |> var_typ)
+        ) |> Subst.construct in
+        (apply_subst_node subst a, apply_subst_node subst b)
+    in
+    let aux mono ((pvs,nvs),(ps,ns)) =
+        let tvars = TVarSet.construct (pvs@nvs) in
+        let tvars = TVarSet.diff tvars mono in
+        if TVarSet.is_empty tvars
+        then
+            let ps = List.map (rename_vars mono) ps in
+            let ns = List.map (rename_vars mono) ns in
+            ((pvs,nvs),(ps,ns))
+        else ((pvs,nvs),([],[]))
+    in
+    Utils.add_others dnf |> List.map (fun (branch, others) ->
+        let mono = TVarSet.union mono (branches_vars others) in
+        aux mono branch
+    )
 
 let simplify_poly_product_dnf mono ~open_nodes dnf =
     ignore (open_nodes, mono) ; dnf
 
-let simplify_poly_typ =
-    simplify_typ_aux simplify_poly_dnf simplify_poly_product_dnf    
+let simplify_poly_typ mono t =
+    (* let t = simplify_typ_aux simplify_poly_dnf simplify_poly_product_dnf mono t in *)
+    (* TODO: Fix simplification and restore *)
+    ignore (simplify_poly_dnf, simplify_poly_product_dnf) ;
+    let t = clean_poly_vars mono t in
+    let (_, t) = remove_redundant_vars mono t in
+    t
 
 (* Operations on jokers (legacy) *)
 

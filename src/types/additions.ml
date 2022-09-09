@@ -326,13 +326,6 @@ let simplify_raw_product_dnf _ ~open_nodes dnf =
     (* TODO: More advanced simplifications for records *)
     ignore (open_nodes) ; dnf
 
-let simplify_poly_dnf mono ~open_nodes dnf =
-    (* TODO: Implement poly DNF simplification *)
-    ignore (open_nodes, mono) ; dnf
-
-let simplify_poly_product_dnf mono ~open_nodes dnf =
-    ignore (open_nodes, mono) ; dnf
-
 let is_test_type t =
     if vars t |> TVarSet.is_empty
     then
@@ -441,9 +434,6 @@ let simplify_typ_aux simplify_arrow simplify_product mono t =
 
 let simplify_typ = simplify_typ_aux
     simplify_raw_dnf simplify_raw_product_dnf TVarSet.empty
-
-let simplify_poly_typ =
-    simplify_typ_aux simplify_poly_dnf simplify_poly_product_dnf
 
 let square_approx f out =
     let res = dnf f |> List.map begin
@@ -583,31 +573,8 @@ let fresh_var () =
     next_var_name := !next_var_name + 1 ;
     mk_var (Format.sprintf "$%i" !next_var_name)
 
-let remove_redundant_vars mono t =
-    (* Utils.log ~level:2 "Started removing redundant vars in %a...@?" pp_typ t ; *)
-    let vs = TVarSet.diff (vars t) mono |> TVarSet.destruct
-    |> List.sort (fun v1 v2 -> var_compare v2 v1) in
-    let res = Utils.pairs vs vs
-    |> List.filter (fun (v1, v2) -> var_compare v1 v2 < 0)
-    |> List.fold_left (fun (res, t) (v1, v2) ->
-        let v1' = fresh_var () in
-        let v2' = fresh_var () in
-        let subst1 = Subst.construct [(v1, var_typ v1');(v2, var_typ v2')] in
-        let subst2 = Subst.construct [(v1, var_typ v2');(v2, var_typ v1')] in
-        let t1 = Subst.apply subst1 t in
-        let t2 = Subst.apply subst2 t in
-        if equiv t1 t2
-        then
-        let subst = Subst.construct [(v1, var_typ v2)] in
-        (Subst.compose subst res, Subst.apply subst t)
-        else (res, t)
-    ) (Subst.identity, t)
-    in (* Utils.log ~level:2 " Done.@." ; *) res
-
-let hard_clean mono t =
-    let t = clean_type ~pos:empty ~neg:any mono t in
-    let (_,t) = remove_redundant_vars mono t in
-    t
+let clean_poly_vars mono t =
+    clean_type ~pos:empty ~neg:any mono t
 
 let clean_type_ext ~pos ~neg mono t =
     let subst =
@@ -708,6 +675,39 @@ let triangle_split_poly mono f out =
             let (_,_,t) = fresh mono t in
             (sup_typ mono t, triangle_poly mono t out)
     end
+
+(* Simplification of polymorphic types *)
+
+let remove_redundant_vars mono t =
+    (* Utils.log ~level:2 "Started removing redundant vars in %a...@?" pp_typ t ; *)
+    let vs = TVarSet.diff (vars t) mono |> TVarSet.destruct
+    |> List.sort (fun v1 v2 -> var_compare v2 v1) in
+    let res = Utils.pairs vs vs
+    |> List.filter (fun (v1, v2) -> var_compare v1 v2 < 0)
+    |> List.fold_left (fun (res, t) (v1, v2) ->
+        let v1' = fresh_var () in
+        let v2' = fresh_var () in
+        let subst1 = Subst.construct [(v1, var_typ v1');(v2, var_typ v2')] in
+        let subst2 = Subst.construct [(v1, var_typ v2');(v2, var_typ v1')] in
+        let t1 = Subst.apply subst1 t in
+        let t2 = Subst.apply subst2 t in
+        if equiv t1 t2
+        then
+        let subst = Subst.construct [(v1, var_typ v2)] in
+        (Subst.compose subst res, Subst.apply subst t)
+        else (res, t)
+    ) (Subst.identity, t)
+    in (* Utils.log ~level:2 " Done.@." ; *) res    
+
+let simplify_poly_dnf mono ~open_nodes dnf =
+    (* TODO: Implement poly DNF simplification *)
+    ignore (open_nodes, mono, remove_redundant_vars) ; dnf
+
+let simplify_poly_product_dnf mono ~open_nodes dnf =
+    ignore (open_nodes, mono) ; dnf
+
+let simplify_poly_typ =
+    simplify_typ_aux simplify_poly_dnf simplify_poly_product_dnf    
 
 (* Operations on jokers (legacy) *)
 

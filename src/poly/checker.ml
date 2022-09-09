@@ -105,7 +105,7 @@ let rec typeof_a vardef tenv env mono annot_a a =
   | Lambda (_, _, v, e), LambdaA (annot, _) -> type_lambda env annot v e
   | _, _ -> raise (Untypeable (pos, "Invalid annotations."))
   end
-  |> hard_clean mono |> simplify_typ
+  |> clean_poly_vars mono |> simplify_typ
 
 and typeof_splits tenv env mono v splits e =
   let pos = Variable.get_locations v in
@@ -145,7 +145,7 @@ and typeof tenv env mono annot e =
   | Bind (_, _, _, e), SkipA (annot) -> typeof tenv env mono annot e
   | _, _ -> raise (Untypeable ([], "Invalid annotations."))
   end
-  |> hard_clean mono |> simplify_typ
+  |> clean_poly_vars mono |> simplify_typ
 
 (* ===== REFINE ===== *)
 

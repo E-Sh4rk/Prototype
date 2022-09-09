@@ -415,7 +415,7 @@ let rec infer_a' vardef tenv env mono annot_a a =
         let f (s, _) others =
           List.for_all (fun (s', _) -> (subtype s' s |> not) || subtype s s') others
         in
-        let ((s, splits), branches) = find_remove f branches |> Option.get in
+        let ((s, splits), branches) = find_among_others f branches |> Option.get in
         let env = Env.add v s env in
         let vs = vars s in
         let xs = TVarSet.diff vs mono in
@@ -610,7 +610,7 @@ and infer' tenv env mono annot e =
     begin match infer_a_iterated v tenv env mono annot_a a with
     | Ok annot_a ->
       let t = typeof_a_nofail v tenv env mono annot_a a in
-      (* TODO: advanced simplification of t *)
+      let t = simplify_poly_typ mono t in
       log ~level:1 "Definition of %s typed: %a@." (Variable.show v) pp_typ t ;
       let rec after_def splits =
         let splits = List.map (fun (s,(b,a)) -> (s, (ref b, a))) splits in

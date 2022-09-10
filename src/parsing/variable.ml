@@ -50,6 +50,16 @@ module Variable = struct
       let tv = mk_var (show v) in
       Hashtbl.add typevars v tv ;
       tv
+
+  let typevars_ext = Hashtbl.create 100
+
+  let get_typevar v i =
+    if Hashtbl.mem typevars_ext (v,i)
+    then Hashtbl.find typevars_ext (v,i)
+    else
+      let tv = mk_var ((show v)^"_"^(string_of_int i)) in
+      Hashtbl.add typevars_ext (v,i) tv ;
+      tv
 end
 
 let predefined_vars = Hashtbl.create 100

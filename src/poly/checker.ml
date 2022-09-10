@@ -222,7 +222,7 @@ let complete default_annot res =
   | NeedVar (v, a, None) -> NeedVar (v, a, Some default_annot)
   | res -> res
 
-let simplify_inference_solutions mono result_var sols =
+let simplify_inference_solutions mono result_var vars_to_use sols =
   log ~level:2 "Simplifying solutions...@." ;
   (* log "BEFORE:@.%a@." pp_substs sols ; *)
   let sols = sols |>
@@ -267,7 +267,13 @@ let simplify_inference_solutions mono result_var sols =
           let mono = TVarSet.add target mono in
           (* print_tallying_instance [] mono constr ; *)
           begin match tallying mono constr with
-          | [] -> sol
+          | [] ->
+            (* "Simplify" the result (or at least make it more deterministic) *)
+            let poly_vars = TVarSet.diff (vars tr) mono in
+            let subst = poly_vars |> TVarSet.destruct |> List.sort var_compare
+            |> List.mapi (fun i v -> (v, vars_to_use i |> var_typ))
+            |> Subst.construct in
+            Subst.compose subst sol
           | res::_ ->
             (* log "SOLUTION:%a@." Subst.pp res ; *)
             let to_maximize = Subst.apply res tr in
@@ -297,8 +303,6 @@ let simplify_inference_solutions mono result_var sols =
       (* TODO: clean polymorphic variables so that it maximises the type
          of the involved variables (to be added as parameter)? *)
       (* TODO: remove solutions that make an env var empty? *)
-      (* TODO: make it deterministic even for polymorphic vars
-         (that could appear in a monomorphic substitution). How? *)
     )
   in
   (* log "AFTER:@.%a@." pp_substs sols ; *)
@@ -361,7 +365,7 @@ let rec infer_a' vardef tenv env mono annot_a a =
     in
     let res =
       tallying_infer poly TVarSet.empty [(t, s)]
-      |> simplify_inference_solutions mono result_var
+      |> simplify_inference_solutions mono result_var (Variable.get_typevar vardef)
       |> List.map (fun sol ->
       let mono_part = Subst.restrict sol mono in
       let poly_part = Subst.compose (Subst.restrict sol vs) tsubst in
@@ -501,7 +505,8 @@ let rec infer_a' vardef tenv env mono annot_a a =
     let poly = TVarSet.union vs1 vs2 |> TVarSet.destruct in
     let res =
       tallying_infer (alpha::poly) TVarSet.empty constraints
-      |> simplify_inference_solutions mono (Some (alpha, Variable.to_typevar vardef))
+      |> simplify_inference_solutions mono
+      (Some (alpha, Variable.to_typevar vardef)) (Variable.get_typevar vardef)
       |> List.map (fun sol ->
       let poly1_part = Subst.compose (Subst.restrict sol vs1) subst1 in
       let poly2_part = Subst.compose (Subst.restrict sol vs2) subst2 in

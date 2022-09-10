@@ -725,8 +725,9 @@ let [@warning "-27"] simplify_poly_dnf mono ~open_nodes ~contravar dnf =
         let tvars = TVarSet.construct (pvs@nvs) in
         let tvars = TVarSet.diff tvars mono in
         if TVarSet.is_empty tvars || contravar
-        then ((pvs,nvs),
-            (remove_useless_poly_conjuncts mono full_branch_type ps, ns))
+        then
+            (* (ignore remove_useless_poly_conjuncts ; ((pvs,nvs),(ps,ns))) *)
+            ((pvs,nvs), (remove_useless_poly_conjuncts mono full_branch_type ps, ns))
         else ((pvs,nvs),([],[]))
     in
     Utils.add_others dnf |> List.map (fun (branch, others) ->

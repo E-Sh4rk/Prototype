@@ -11,6 +11,7 @@ module Variable : sig
   val get_locations : t -> Position.t list
   val get_name : t -> string option
   val to_typevar : t -> var
+  val get_typevar : t -> int -> var
 end
 
 val get_predefined_var : int -> Variable.t

@@ -712,11 +712,15 @@ let remove_useless_poly_conjuncts mono branch_type lst =
         | [] -> kept
         | c::rem ->
             let ct = atom_type c in
-            let rt = rem |> List.map atom_type |> conj in
+            (* let rt = rem |> List.map atom_type |> conj in
             let kt = kept |> List.map atom_type |> conj in
             let others = conj [kt ; rt] in
-            if subtype_poly mono others ct then aux kept rem
-            else aux (c::kept) rem
+            if subtype_poly mono others ct *)
+            let rt = rem |> List.map atom_type in
+            let kt = kept |> List.map atom_type in
+            let others = kt@rt in
+            if List.exists (fun other -> subtype_poly mono other ct) others
+            then aux kept rem else aux (c::kept) rem
     in
     aux [] lst
 

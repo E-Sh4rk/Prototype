@@ -98,18 +98,9 @@ let rec typeof_a vardef tenv env mono annot_a a =
     if Env.mem v1 env
     then var_type v2 env
     else raise (Untypeable (pos, "Invalid let binding: definition has been skipped."))
-  | Lambda (_, Parsing.Ast.Unnanoted, v, e), LambdaA annot ->
-    type_lambda env annot v e
-  | Lambda (_, Parsing.Ast.ADomain dt, v, e), LambdaA annot ->
-    let t = type_lambda env annot v e in
-    if equiv (domain t) dt
-    then t
-    else raise (Untypeable (pos, "Invalid lambda: domain does not match with user annotation."))
-  | Lambda (_, Parsing.Ast.AArrow t, v, e), LambdaA annot ->
-    let t' = type_lambda env annot v e in
-    if subtype t' t
-    then t
-    else raise (Untypeable (pos, "Invalid lambda: type does not match with user annotation."))
+  | Lambda (_, Parsing.Ast.AArrow _, _, _), LambdaA _ ->
+    raise (Untypeable (pos, "Invalid lambda: explicitely typed lambdas not supported."))
+  | Lambda (_, _, v, e), LambdaA annot -> type_lambda env annot v e
   | _, _ -> raise (Untypeable (pos, "Invalid annotations."))
   end
   |> clean_poly_vars mono |> simplify_typ

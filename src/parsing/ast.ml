@@ -27,7 +27,7 @@ type const =
 type projection = Fst | Snd | Field of string
 [@@deriving show, ord]
 
-type 'typ type_annot = Unnanoted | ADomain of 'typ | AArrow of 'typ
+type 'typ type_annot = Unnanoted | ADomain of 'typ list | AArrow of 'typ
 [@@deriving show, ord]
 
 type ('a, 'typ, 'v) ast =
@@ -111,9 +111,13 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
         | Lambda (t,str,e) ->
             let (t, vtenv) = match t with
             | Unnanoted -> (Unnanoted, vtenv)
-            | ADomain t ->
-                let (t, vtenv) = type_expr_to_typ tenv vtenv t in
-                (ADomain (t), vtenv)
+            | ADomain ts ->
+                let vtenv = ref vtenv in
+                let ts = List.map (fun t ->
+                    let (t, vtenv') = type_expr_to_typ tenv !vtenv t in
+                    vtenv := vtenv' ; t
+                ) ts in
+                (ADomain (ts), !vtenv)
             | AArrow t ->
                 let (t, vtenv) = type_expr_to_typ tenv vtenv t in
                 (AArrow (t), vtenv)

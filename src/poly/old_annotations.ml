@@ -93,9 +93,9 @@ module Annot = struct
       let initial_s = [(any, (false, initial_e e))] in
       let v = Variable.to_typevar v |> var_typ in
       LambdaA [(v, (false, initial_s))]
-    | Lambda (_, Parsing.Ast.ADomain dt, _, e) ->
+    | Lambda (_, Parsing.Ast.ADomain dts, _, e) ->
       let initial_s = [(any, (false, initial_e e))] in
-      LambdaA [(dt, (false, initial_s))]
+      LambdaA (List.map (fun dt -> (dt, (false, initial_s))) dts)
     | Lambda (_, Parsing.Ast.AArrow t, _, e) ->
       let initial_s = [(any, (false, initial_e e))] in
       let branches =

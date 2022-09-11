@@ -181,7 +181,8 @@ lint:
 
 %inline annoted_identifier:
   arg = identifier { (Unnanoted, arg) }
-| LPAREN arg = identifier COLON ty = typ RPAREN { (ADomain ty, arg) }
+| LPAREN arg = identifier COLON tys = separated_nonempty_list(SEMICOLON, typ) RPAREN
+{ (ADomain tys, arg) }
 
 %inline definition:
   LET i=identifier ais=annoted_identifier* EQUAL t=term

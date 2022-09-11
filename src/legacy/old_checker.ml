@@ -99,9 +99,10 @@ let rec typeof_a ~legacy pos tenv env a =
     else if subtype tv (neg t)
     then var_type pos x2 env
     else raise (Ill_typed (pos, "Cannot select a branch for the typecase."))
-  | Lambda (va, Ast.ADomain s, v, e) ->
+  | Lambda (va, Ast.ADomain ss, v, e) ->
     let inferred_t = type_lambda env va v e in
     let dom = domain inferred_t in
+    let s = disj ss in
     if equiv s dom
     then inferred_t
     else raise (Ill_typed (pos,
@@ -448,7 +449,8 @@ and infer_legacy_a' (*pos*)_ tenv env a t =
         [Ref_env.refine_old v1 any ; Ref_env.refine_old v2 t ]]
       |> filter_options in
       (a, gammas, false)
-  | Lambda (va, (Ast.ADomain s as lt), v, e) ->
+  | Lambda (va, (Ast.ADomain ss as lt), v, e) ->
+    let s = disj ss in
     let t = cap_o t (mk_arrow (cons s) any_node) in
     type_lambda va lt v e t ~maxdom:s
   | Lambda (va, (Ast.Unnanoted as lt), v, e) ->
@@ -659,7 +661,8 @@ let rec infer_a' pos tenv env a t =
           [Ref_env.refine v1 any ; Ref_env.refine v2 t ]]
         |> filter_options in
         (a, gammas, false)
-    | Lambda (va, (Ast.ADomain s as lt), v, e) ->
+    | Lambda (va, (Ast.ADomain ss as lt), v, e) ->
+      let s = disj ss in
       let t = cap_o t (mk_arrow (cons s) any_node) in
       type_lambda va lt v e t ~maxdom:s
     | Lambda (va, (Ast.Unnanoted as lt), v, e) ->

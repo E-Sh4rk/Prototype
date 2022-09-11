@@ -242,20 +242,17 @@ let restore_name_of_mono_vars mono sol =
       ) [] (Subst.destruct sol) |> Subst.construct in
   Subst.compose subst sol
 
-(* TODO: Make result_var required (not an option) *)
-let simplify_inference_solutions mono result_var to_maximize vars_to_use sols =
+let simplify_inference_solutions mono (r,r') to_maximize vars_to_use sols =
   log ~level:2 "Simplifying solutions...@." ;
   (* log "BEFORE:@.%a@." pp_substs sols ; *)
   let sols = sols |>
     List.filter_map (fun sol ->
       (* Simplify the monomorphic substitutions as most as we can
           (as long as it does not make the result too unprecise) *)
-      let var_to_preserve =
-        match result_var with
-        | None -> None
-        | Some (r,r') ->
-          if subtype_poly TVarSet.empty (Subst.find' sol r) (var_typ r')
-          then Some (r,r') else None
+      let is_precise =
+        if subtype_poly TVarSet.empty (Subst.find' sol r) (var_typ r')
+        then (fun sol -> subtype_poly TVarSet.empty (Subst.find' sol r) (var_typ r'))
+        else (fun _ -> true)
       in
       let sol =
         List.fold_left (fun sol v ->
@@ -266,12 +263,7 @@ let simplify_inference_solutions mono result_var to_maximize vars_to_use sols =
             (* print_tallying_instance [] mono constr ; *)
             let res = tallying mono constr
             |> List.map (fun res -> Subst.compose res sol)
-            |> List.find_opt (fun sol -> (* Is it precise enough? *)
-              match var_to_preserve with
-              | None -> true
-              | Some (r,r') ->
-                subtype_poly TVarSet.empty (Subst.find' sol r) (var_typ r')
-            )
+            |> List.find_opt is_precise
             in
             match res with
             | None -> sol
@@ -280,28 +272,25 @@ let simplify_inference_solutions mono result_var to_maximize vars_to_use sols =
       (* log "AFTER STEP 1:%a@." Subst.pp sol; *)
       (* Try to obtain the desired result *)
       let sol =
-        match result_var with
-        | None -> sol
-        | Some (r, target) ->
-          let tr = Subst.find' sol r in
-          let constr = [(tr, var_typ target)] in
-          let mono = TVarSet.add target mono in
-          (* print_tallying_instance [] mono constr ; *)
-          begin match tallying mono constr with
-          | [] ->
-            (* "Simplify" the result (or at least make it more deterministic) *)
-            let poly_vars = TVarSet.diff (vars tr) mono in
-            let subst = poly_vars |> TVarSet.destruct |> List.sort var_compare
-            |> List.mapi (fun i v -> (v, vars_to_use i |> var_typ))
-            |> Subst.construct in
-            Subst.compose subst sol
-          | res::_ ->
-            (* log "SOLUTION:%a@." Subst.pp res ; *)
-            let to_maximize = Subst.apply res tr in
-            let clean = clean_type_ext ~pos:any ~neg:empty mono to_maximize in
-            let res = Subst.compose clean res in
-            Subst.compose res sol
-          end
+        let tr = Subst.find' sol r in
+        let constr = [(tr, var_typ r')] in
+        let mono = TVarSet.add r' mono in
+        (* print_tallying_instance [] mono constr ; *)
+        begin match tallying mono constr with
+        | [] ->
+          (* "Simplify" the result (or at least make it more deterministic) *)
+          let poly_vars = TVarSet.diff (vars tr) mono in
+          let subst = poly_vars |> TVarSet.destruct |> List.sort var_compare
+          |> List.mapi (fun i v -> (v, vars_to_use i |> var_typ))
+          |> Subst.construct in
+          Subst.compose subst sol
+        | res::_ ->
+          (* log "SOLUTION:%a@." Subst.pp res ; *)
+          let to_maximize = Subst.apply res tr in
+          let clean = clean_type_ext ~pos:any ~neg:empty mono to_maximize in
+          let res = Subst.compose clean res in
+          Subst.compose res sol
+        end
       in
       (* Remove a solution if it contains a substitution to empty for a mono var,
          or if it makes a to_maximize type empty *)
@@ -311,26 +300,22 @@ let simplify_inference_solutions mono result_var to_maximize vars_to_use sols =
         (fun t -> is_empty t |> not && Subst.apply sol t |> is_empty)
       then None
       else Some (restore_name_of_mono_vars mono sol)
-      (* TODO: clean polymorphic variables so that it maximises the type
-         of the involved variables (to be added as parameter)? *)
+      (* TODO: clean polymorphic variables so that it maximises to_maximize ? *)
     )
   in
   (* log "AFTER:@.%a@." pp_substs sols ; *)
   log ~level:2 "Solutions simplified!@." ; sols
 
 let simplify_solutions mono result_var sols =
-  match result_var with
-  | None -> sols
-  | Some r ->
-    let sols = sols |> List.filter_map (fun s ->
-      let t = Subst.find' s r in
-      let clean = clean_type_ext ~pos:empty ~neg:any mono t in
-      let s = Subst.compose clean s in
-      (* log "Res: %a@." pp_typ (Subst.find' s r) ; *)
-      (* TODO: More simplifications ?? *)
-      Some s
-      ) in
-    sols
+  let sols = sols |> List.filter_map (fun s ->
+    let t = Subst.find' s result_var in
+    let clean = clean_type_ext ~pos:empty ~neg:any mono t in
+    let s = Subst.compose clean s in
+    (* log "Res: %a@." pp_typ (Subst.find' s r) ; *)
+    (* TODO: more simplifications ?? *)
+    Some s
+    ) in
+  sols
 
 let decorrelate_branches mono annot_a =
   let rename_vars (t, splits) =
@@ -351,56 +336,38 @@ let need_var env v str =
   if Env.mem v env |> not
   then raise (NeedVarE (v, str))
 
-(* TODO: when typing an atom, first try simple_constraint,
-   and then if it does not give a result strong enough (with a var, etc),
-   then try simple_constraint_infer by imposing a monomorphic variable as result.
-   This would allow to make simplify_inference_solutions more simple. *)
 let rec infer_a' vardef tenv env mono annot_a a =
   let need_var = need_var env in
-  let simple_constraint_infer v str s =
+  let simple_constraint_infer v str s r =
     need_var v str ;
     let t = Env.find v env in
-    let to_maximize = if is_empty s then [] else [t] in
-    let result_var =
-      match TVarSet.diff (vars s) mono |> TVarSet.destruct with
-      | [] -> None
-      | [r] -> Some (r, Variable.to_typevar vardef)
-      | _ -> assert false
-    in
+    let result_var = (r, Variable.to_typevar vardef) in
+    let to_maximize = [t] in
+    let vars_to_use = Variable.get_typevar vardef in
     let (vs,tsubst,t) = fresh mono t in
     log ~level:1 "Inference: solving %a <= %a with delta=[]@."
       pp_typ t pp_typ s ;
-    let poly = match result_var with
-      | None -> vs |> TVarSet.destruct
-      | Some (r,_) -> r::(vs |> TVarSet.destruct)
-    in
+    let poly = r::(vs |> TVarSet.destruct) in
     let res =
       tallying_infer poly TVarSet.empty [(t, s)]
-      |> simplify_inference_solutions mono result_var to_maximize (Variable.get_typevar vardef)
+      |> simplify_inference_solutions mono result_var to_maximize vars_to_use
       |> List.map (fun sol ->
       let mono_part = Subst.restrict sol mono in
       let poly_part = Subst.compose (Subst.restrict sol vs) tsubst in
       (mono_part, poly_part)
     ) |> regroup Subst.equiv
-    in
-    Subst res
+    in Subst res
   in
-  let simple_constraint v str s =
+  let simple_constraint v str s r =
     need_var v str ;
     let t = Env.find v env in
-    let result_var =
-      match TVarSet.diff (vars s) mono |> TVarSet.destruct with
-      | [] -> None
-      | [r] -> Some r
-      | _ -> assert false
-    in
     let (vs,tsubst,t) = fresh mono t in
     let res =
       tallying mono [(t, s)]
-      |> simplify_solutions mono result_var
+      |> simplify_solutions mono r
       |> List.map (fun sol -> Subst.compose (Subst.restrict sol vs) tsubst)
     in
-    match res with [] -> None | res -> Some res
+    assert (res <> []) ; res
   in
   let app_constraints v1 v2 =
     need_var v1 "application" ;
@@ -480,43 +447,44 @@ let rec infer_a' vardef tenv env mono annot_a a =
   | Pair (v1, v2), NoneA | Let (v1, v2), NoneA ->
     need_var v1 "pair" ; need_var v2 "pair" ; Ok NoneA
   | Projection (Parsing.Ast.Field label, v), ProjA [] ->
-    let s = mk_record true [label, fresh_var () |> var_typ |> cons] in
-    let res = simple_constraint_infer v "projection" s in
+    let alpha = fresh_var () in
+    let s = mk_record true [label, alpha |> var_typ |> cons] in
+    let res = simple_constraint_infer v "projection" s alpha in
     map_res (fun sigma -> ProjA sigma) res
   | Projection (Parsing.Ast.Field label, v), ProjA _ ->
-    let s = mk_record true [label, fresh_var () |> var_typ |> cons] in
-    begin match simple_constraint v "projection" s
-    with None -> assert false | Some s -> Ok (ProjA s) end
+    let alpha = fresh_var () in
+    let s = mk_record true [label, alpha |> var_typ |> cons] in
+    Ok (ProjA (simple_constraint v "projection" s alpha))
   | Projection (p, v), ProjA [] ->
+    let alpha = fresh_var () in
     let s =
       if p = Parsing.Ast.Fst
-      then mk_times (fresh_var () |> var_typ |> cons) any_node
-      else mk_times any_node (fresh_var () |> var_typ |> cons)
+      then mk_times (alpha |> var_typ |> cons) any_node
+      else mk_times any_node (alpha |> var_typ |> cons)
     in
-    let res = simple_constraint_infer v "projection" s in
+    let res = simple_constraint_infer v "projection" s alpha in
     map_res (fun sigma -> ProjA sigma) res
   | Projection (p, v), ProjA _ ->
+    let alpha = fresh_var () in
     let s =
       if p = Parsing.Ast.Fst
-      then mk_times (fresh_var () |> var_typ |> cons) any_node
-      else mk_times any_node (fresh_var () |> var_typ |> cons)
+      then mk_times (alpha |> var_typ |> cons) any_node
+      else mk_times any_node (alpha |> var_typ |> cons)
     in
-    begin match simple_constraint v "projection" s
-    with None -> assert false | Some s -> Ok (ProjA s) end
+    Ok (ProjA (simple_constraint v "projection" s alpha))
   | RecordUpdate (v, _, o), RecordUpdateA [] ->
     (match o with None -> () | Some v' -> need_var v' "record update") ;
-    let res = simple_constraint_infer v "record update" record_any in
+    let res = simple_constraint_infer v "record update" record_any (fresh_var ()) in
     map_res (fun sigma -> RecordUpdateA sigma) res
   | RecordUpdate (v, _, o), RecordUpdateA _ ->
     (match o with None -> () | Some v' -> need_var v' "record update") ;
-    begin match simple_constraint v "record update" record_any
-    with None -> assert false | Some s -> Ok (ProjA s) end
+    Ok (ProjA (simple_constraint v "record update" record_any (fresh_var ())))
   | App (v1, v2), AppA ([], []) ->
     let (constraints,(vs1,subst1),(vs2,subst2),alpha) = app_constraints v1 v2 in
     let poly = TVarSet.union vs1 vs2 |> TVarSet.destruct in
     let res =
       tallying_infer (alpha::poly) TVarSet.empty constraints
-      |> simplify_inference_solutions mono (Some (alpha, Variable.to_typevar vardef))
+      |> simplify_inference_solutions mono (alpha, Variable.to_typevar vardef)
       [Env.find v1 env; Env.find v2 env] (Variable.get_typevar vardef)
       |> List.map (fun sol ->
       let poly1_part = Subst.compose (Subst.restrict sol vs1) subst1 in
@@ -533,7 +501,7 @@ let rec infer_a' vardef tenv env mono annot_a a =
     let (constraints,(vs1,subst1),(vs2,subst2),alpha) = app_constraints v1 v2 in
     let res =
       tallying mono constraints
-      |> simplify_solutions mono (Some alpha)
+      |> simplify_solutions mono alpha
       |> List.map (fun sol ->
         let poly1_part = Subst.compose (Subst.restrict sol vs1) subst1 in
         let poly2_part = Subst.compose (Subst.restrict sol vs2) subst2 in

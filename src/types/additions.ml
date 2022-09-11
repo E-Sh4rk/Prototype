@@ -165,7 +165,7 @@ let define_types (tenv, aenv) venv defs =
     let (res, venv) = derecurse_types tenv venv defs in
     let tenv = List.fold_left
         (fun acc (name, params, typ) ->
-            register name typ; 
+            if params = [] then register name typ ;
             StrMap.add name (params, cons typ) acc)
         tenv
         res

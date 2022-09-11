@@ -8,6 +8,12 @@ open Common
 open Parsing.Variable
 open Utils
 
+(*
+TODO: rec keyword
+TODO: non-inferred type vars (starts with _ ?)
+TODO: syntax for providing several initial branches for a parameter (not just one)   
+*)
+
 exception Untypeable of Position.t list * string
 
 (* ===== TYPEOF ===== *)

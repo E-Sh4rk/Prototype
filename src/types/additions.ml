@@ -323,7 +323,7 @@ let [@warning "-27"] simplify_raw_dnf _ ~open_nodes ~contravar dnf =
 
 let [@warning "-27"] simplify_raw_product_dnf _ ~open_nodes ~contravar dnf =
     let dnf = remove_useless_from_dnf full_product_branch_type dnf in
-    (* TODO: More advanced simplifications for records *)
+    (* TODO: More advanced simplifications for products *)
     dnf
 
 let is_test_type t =
@@ -473,7 +473,6 @@ let square_split f out =
             (t, res)
     end
 
-(* TODO: Optimize triangle exact... *)
 let triangle_exact f out =
     let res = dnf f |> List.map begin
         fun lst ->
@@ -728,11 +727,12 @@ let [@warning "-27"] simplify_poly_dnf mono ~open_nodes ~contravar dnf =
     let aux mono ((pvs,nvs),(ps,ns)) =
         let tvars = TVarSet.construct (pvs@nvs) in
         let tvars = TVarSet.diff tvars mono in
-        if TVarSet.is_empty tvars || contravar
-        then
+        if TVarSet.is_empty tvars |> not && not contravar
+        then ((pvs,nvs),([],[]))
+        else if not contravar then
             (* (ignore remove_useless_poly_conjuncts ; ((pvs,nvs),(ps,ns))) *)
             ((pvs,nvs), (remove_useless_poly_conjuncts mono full_branch_type ps, ns))
-        else ((pvs,nvs),([],[]))
+        else ((pvs,nvs),(ps,ns))
     in
     Utils.add_others dnf |> List.map (fun (branch, others) ->
         let mono = TVarSet.union mono (branches_vars others) in
@@ -740,9 +740,12 @@ let [@warning "-27"] simplify_poly_dnf mono ~open_nodes ~contravar dnf =
     )
 
 let [@warning "-27"] simplify_poly_product_dnf mono ~open_nodes ~contravar dnf =
+    (* TODO: poly simplifications for products *)
     dnf
 
 let simplify_poly_typ mono t =
+    let t = clean_poly_vars mono t in
+    (* let (_, t) = remove_redundant_vars mono t in *)
     let t = simplify_typ_aux simplify_poly_dnf simplify_poly_product_dnf mono t in
     let t = clean_poly_vars mono t in
     let (_, t) = remove_redundant_vars mono t in

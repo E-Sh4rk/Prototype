@@ -9,8 +9,8 @@ open Parsing.Variable
 open Utils
 
 (*
-TODO: rec keyword
-TODO: non-inferred type vars (starts with _ ?)
+TODO: let rec (with optional type annotation for the whole definition)
+TODO: non-inferred type vars (starts with _ ?) + fix scope of type variables
 TODO: syntax for providing several initial branches for a parameter (not just one)   
 *)
 

@@ -228,6 +228,20 @@ let complete default_annot res =
   | NeedVar (v, a, None) -> NeedVar (v, a, Some default_annot)
   | res -> res
 
+let restore_name_of_mono_vars mono sol =
+  let subst =
+    List.fold_left (fun acc (v,t) ->
+      if TVarSet.mem mono v |> not then acc
+      else
+        let expected_name = (var_name v)^(var_name v) in
+        let renaming = top_vars t |>
+          TVarSet.filter (fun v -> String.equal (var_name v) expected_name)
+          |> TVarSet.destruct |> List.map (fun v' -> (v', var_typ v))
+        in
+        renaming@acc
+      ) [] (Subst.destruct sol) |> Subst.construct in
+  Subst.compose subst sol
+
 (* TODO: Make result_var required (not an option) *)
 let simplify_inference_solutions mono result_var to_maximize vars_to_use sols =
   log ~level:2 "Simplifying solutions...@." ;
@@ -296,25 +310,9 @@ let simplify_inference_solutions mono result_var to_maximize vars_to_use sols =
       else if to_maximize |> List.exists
         (fun t -> is_empty t |> not && Subst.apply sol t |> is_empty)
       then None
-      else
-        (* Rename toplevel variables *)
-        let sol =
-          List.fold_left (fun sol (v,t) ->
-            if TVarSet.mem mono v |> not then sol
-            else
-              let expected_name = (var_name v)^(var_name v) in
-              let simpl = top_vars t |>
-                TVarSet.filter (fun v -> String.equal (var_name v) expected_name)
-                |> TVarSet.destruct |> List.map (fun v' ->
-                  (v', var_typ v)
-                ) |> Subst.construct
-              in
-              Subst.compose simpl sol
-            ) sol (Subst.destruct sol)
-        in Some sol
+      else Some (restore_name_of_mono_vars mono sol)
       (* TODO: clean polymorphic variables so that it maximises the type
          of the involved variables (to be added as parameter)? *)
-      (* TODO: remove solutions that make an env var empty? *)
     )
   in
   (* log "AFTER:@.%a@." pp_substs sols ; *)
@@ -544,13 +542,20 @@ let rec infer_a' vardef tenv env mono annot_a a =
     in
     (match res with [] -> assert false | res -> Ok (AppA (List.split res)))
   | Ite (v, s, _, _), IteA [] ->
-    (* TODO: Do not use simple_constraint_infer here (no simplification) *)
     need_var v "typecase" ;
     let t = Env.find v env in
     if subtype t s || subtype t (neg s) then
-        let res = simple_constraint_infer v "typecase" empty in
-        map_res (fun sigma -> IteA sigma) res
-        |> complete (IteA [Subst.identity])
+      let poly = TVarSet.diff (vars t) mono in
+      let res = tallying_infer (TVarSet.destruct poly) TVarSet.empty [(t, empty)]
+        |> List.map (fun sol ->
+        let sol = restore_name_of_mono_vars mono sol in
+        let mono_part = Subst.restrict sol mono in
+        let poly_part = Subst.restrict sol poly in
+        (mono_part, poly_part)
+      ) |> regroup Subst.equiv
+      in
+      map_res (fun sigma -> IteA sigma) (Subst res)
+      |> complete (IteA [Subst.identity])
     else
       Split [(Env.singleton v s, IteA []) ; (Env.singleton v (neg s), IteA [])]
   | Ite (v, s, v1, v2), IteA sigma ->

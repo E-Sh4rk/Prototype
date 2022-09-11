@@ -74,7 +74,7 @@ let instantiate pos mono ss t =
 
 let typeof_const_atom tenv c =
   match c with
-  | Ast.Atom str -> get_type tenv str
+  | Ast.Atom str -> get_atom_type tenv str
   | c -> Ast.const_to_typ c
 
 let rec typeof_a pos tenv env mono anns a =

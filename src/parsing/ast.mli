@@ -68,7 +68,7 @@ val const_to_typ : const -> typ
 type parser_element =
 | Definition of (int (* log level *) * (string * parser_expr))
 | Atoms of string list
-| Types of (string * type_expr) list
+| Types of (string * string list * type_expr) list
 
 type parser_program = parser_element list
 

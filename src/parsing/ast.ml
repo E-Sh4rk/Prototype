@@ -250,6 +250,6 @@ let const_to_typ c =
 type parser_element =
 | Definition of (int * (string * parser_expr))
 | Atoms of string list
-| Types of (string * type_expr) list
+| Types of (string * string list * type_expr) list
 
 type parser_program = parser_element list

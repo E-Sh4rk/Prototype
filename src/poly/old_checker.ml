@@ -14,7 +14,7 @@ exception Untypeable of Position.t list * string
 
 let typeof_const_atom tenv c =
   match c with
-  | Parsing.Ast.Atom str -> get_type tenv str
+  | Parsing.Ast.Atom str -> get_atom_type tenv str
   | c -> Parsing.Ast.const_to_typ c
 
 let unbound_variable v =

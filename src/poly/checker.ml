@@ -10,7 +10,8 @@ open Utils
 
 (*
 TODO: let rec (with optional type annotation for the whole definition)
-TODO: non-inferred type vars (starts with _ ?) + fix scope of type variables
+TODO: non-inferred type vars (starts with _ ?)
+TODO: Add parameters to type aliases
 *)
 
 exception Untypeable of Position.t list * string
@@ -18,7 +19,7 @@ exception Untypeable of Position.t list * string
 (* ===== TYPEOF ===== *)
 let typeof_const_atom tenv c =
   match c with
-  | Parsing.Ast.Atom str -> get_type tenv str
+  | Parsing.Ast.Atom str -> get_atom_type tenv str
   | c -> Parsing.Ast.const_to_typ c
 
 let unbound_variable v =

@@ -108,7 +108,7 @@ atoms: ATOMS a=ID* { a }
 
 types_def: TYPE ts=separated_nonempty_list(TYPE_AND, name_and_typ) { ts }
 
-name_and_typ: name=TID EQUAL t=typ { (name, t) }
+name_and_typ: name=TID EQUAL t=typ { (name, [], t) }
 
 term:
   a=abstraction { a }
@@ -222,7 +222,7 @@ typ:
 
 atomic_typ:
   x=type_constant { TBase x }
-| s=TID { TCustom s }
+| s=TID { TCustom ([], s) }
 | s=TVAR { TVar s }
 | LPAREN lhs=typ COMMA rhs=typ RPAREN { TPair (lhs, rhs) }
 | LPAREN t=typ RPAREN { t }

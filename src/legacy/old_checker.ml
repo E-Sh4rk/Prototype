@@ -29,7 +29,7 @@ let var_type pos v env =
 
 let typeof_const_atom tenv c =
   match c with
-  | Ast.Atom str -> get_type tenv str
+  | Ast.Atom str -> get_atom_type tenv str
   | c -> Ast.const_to_typ c
 
 let rec typeof_a ~legacy pos tenv env a =

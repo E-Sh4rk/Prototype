@@ -103,11 +103,8 @@ let rec typeof_a vardef tenv env mono annot_a a =
     if Env.mem v1 env
     then var_type v2 env
     else raise (Untypeable (pos, "Invalid let binding: definition has been skipped."))
-  | Lambda (_, Parsing.Ast.AArrow t, v, e), LambdaA (annot, _) ->
-    let t' = type_lambda env annot v e in
-    if subtype t' t
-    then t
-    else raise (Untypeable (pos, "Invalid lambda: type does not match with user annotation."))  
+  | Lambda (_, Parsing.Ast.AArrow _, _, _), LambdaA _ ->
+    raise (Untypeable (pos, "Invalid lambda: explicitely typed lambdas not supported."))
   | Lambda (_, _, v, e), LambdaA (annot, _) -> type_lambda env annot v e
   | _, _ -> raise (Untypeable (pos, "Invalid annotations."))
   end

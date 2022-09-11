@@ -119,13 +119,8 @@ module Annot = struct
     | Lambda (_, Parsing.Ast.ADomain dt, _, e) ->
       let initial_s = [(any, (false, initial_e e))] in
       LambdaA ([], [(dt, initial_s)])
-    | Lambda (_, Parsing.Ast.AArrow t, _, e) ->
-      let initial_s = [(any, (false, initial_e e))] in
-      let branches =
-        dnf t |> List.map (List.map fst) |> List.flatten
-        |> List.map (fun s -> (s, initial_s))
-      in
-      LambdaA ([],branches)
+    | Lambda (_, Parsing.Ast.AArrow _, _, _) ->
+      LambdaA ([],[]) (* Not supported *)
 
   and initial_e e =
       let open Msc in match e with

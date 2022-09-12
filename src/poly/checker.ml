@@ -9,6 +9,8 @@ open Parsing.Variable
 open Utils
 
 (*
+TODO: Make simplify_inference_solutions and simplify_solutions take
+an arbitrary type as solution.
 TODO: let rec (with optional type annotation for the whole definition)
 *)
 

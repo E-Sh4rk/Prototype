@@ -199,12 +199,13 @@ let typeof_nofail tenv env mono annot e =
   try typeof tenv env mono annot e
   with Untypeable _ -> Format.printf "%a@." PMsc.pp_e e ; assert false
 
-let tallying_infer poly constr =
+let tallying_infer poly mono constr =
   let mono = constr |> List.map (fun (a,b) ->
       vars a |> TVarSet.union (vars b) |> TVarSet.filter (fun v ->
         var_name v |> String.starts_with ~prefix:static_tvar_prefix
       )
-    ) |> List.fold_left TVarSet.union TVarSet.empty in
+    ) |> List.fold_left TVarSet.union TVarSet.empty
+  |> TVarSet.inter mono in
   tallying_infer poly mono constr
 
 type 'a result =
@@ -356,7 +357,7 @@ let rec infer_a' vardef tenv env mono annot_a a =
       pp_typ t pp_typ s ;
     let poly = r::(vs |> TVarSet.destruct) in
     let res =
-      tallying_infer poly [(t, s)]
+      tallying_infer poly mono [(t, s)]
       |> simplify_inference_solutions mono result_var to_maximize vars_to_use
       |> List.map (fun sol ->
       let mono_part = Subst.restrict sol mono in
@@ -490,7 +491,7 @@ let rec infer_a' vardef tenv env mono annot_a a =
     let (constraints,(vs1,subst1),(vs2,subst2),alpha) = app_constraints v1 v2 in
     let poly = TVarSet.union vs1 vs2 |> TVarSet.destruct in
     let res =
-      tallying_infer (alpha::poly) constraints
+      tallying_infer (alpha::poly) mono constraints
       |> simplify_inference_solutions mono (alpha, Variable.to_typevar vardef)
       [Env.find v1 env; Env.find v2 env] (Variable.get_typevar vardef)
       |> List.map (fun sol ->
@@ -521,7 +522,7 @@ let rec infer_a' vardef tenv env mono annot_a a =
     let t = Env.find v env in
     if subtype t s || subtype t (neg s) then
       let poly = TVarSet.diff (vars t) mono in
-      let res = tallying_infer (TVarSet.destruct poly) [(t, empty)]
+      let res = tallying_infer (TVarSet.destruct poly) mono [(t, empty)]
         |> List.map (fun sol ->
         let sol = restore_name_of_mono_vars mono sol in
         let mono_part = Subst.restrict sol mono in

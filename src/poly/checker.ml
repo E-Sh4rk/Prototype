@@ -11,7 +11,6 @@ open Utils
 (*
 TODO: let rec (with optional type annotation for the whole definition)
 TODO: non-inferred type vars (starts with _ ?)
-TODO: Add parameters to type aliases
 *)
 
 exception Untypeable of Position.t list * string

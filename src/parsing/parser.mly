@@ -18,6 +18,13 @@
     let pos_right = Ast.position_of_expr right in
     (Ast.new_annot (Position.join pos_left pos_right), Pair (left,right))
 
+  let rec product = function
+    | [] -> TBase TUnit
+    | [t] -> t
+    | t::ts ->
+    let left = t in let right = product ts in
+    TPair (left, right)
+
   let rec list_of_elts pos = function
     | [] -> (Ast.new_annot pos, Const Nil)
     | x::xs ->
@@ -96,7 +103,6 @@ unique_term: t=term EOF { t }
   parsing_error (Position.lex_join $startpos $endpos) "Syntax error."
 }
 
-
 element:
   a=definition { Definition (Utils.log_disabled, a) }
 | DEBUG a=definition { Definition (Utils.log_full, a) }
@@ -106,9 +112,9 @@ element:
 
 atoms: ATOMS a=ID* { a }
 
-types_def: TYPE ts=separated_nonempty_list(TYPE_AND, name_and_typ) { ts }
+types_def: TYPE ts=separated_nonempty_list(TYPE_AND, param_type_def) { ts }
 
-name_and_typ: name=TID EQUAL t=typ { (name, [], t) }
+param_type_def: name=TID params=list(TVAR) EQUAL t=typ { (name, params, t) }
 
 term:
   a=abstraction { a }
@@ -214,6 +220,7 @@ prefix:
 
 typ:
   t=atomic_typ { t }
+| s=TID ts=nonempty_list(atomic_typ) { TCustom(ts, s) }
 | lhs=typ ARROW rhs=typ { TArrow (lhs, rhs) }
 | NEG t=typ { TNeg t }
 | lhs=typ OR rhs=typ  { TCup (lhs, rhs) }
@@ -224,8 +231,7 @@ atomic_typ:
   x=type_constant { TBase x }
 | s=TID { TCustom ([], s) }
 | s=TVAR { TVar s }
-| LPAREN lhs=typ COMMA rhs=typ RPAREN { TPair (lhs, rhs) }
-| LPAREN t=typ RPAREN { t }
+| LPAREN ts=separated_list(COMMA, typ) RPAREN { product ts }
 | LBRACE fs=separated_list(COMMA, typ_field) RBRACE { TRecord (false, fs) }
 | LBRACE fs=separated_list(COMMA, typ_field) DOUBLEPOINT RBRACE { TRecord (true, fs) }
 | LBRACKET re=typ_re RBRACKET { TSList re }
@@ -258,9 +264,9 @@ type_interval:
 | LBRACKET lb=lint SEMICOLON RBRACKET { TInt (Some lb, None) }
 | LBRACKET SEMICOLON RBRACKET { TInt (None, None) }*)
   lb=lint DOUBLEDASH ub=lint { TInt (Some lb, Some ub) }
-| TIMES DOUBLEDASH ub=lint { TInt (None, Some ub) }
-| lb=lint DOUBLEDASH TIMES { TInt (Some lb, None) }
-| TIMES DOUBLEDASH TIMES { TInt (None, None) }
+| COLON DOUBLEDASH ub=lint { TInt (None, Some ub) }
+| lb=lint DOUBLEDASH COLON { TInt (Some lb, None) }
+| COLON DOUBLEDASH COLON { TInt (None, None) }
 
 (*%inline annoted(X): x=X {
   (Position.with_poss $startpos $endpos (unique_exprid ()), x)

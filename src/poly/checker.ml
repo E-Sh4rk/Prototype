@@ -9,6 +9,12 @@ open Parsing.Variable
 open Utils
 
 (*
+TODO: Remove the "wanted result" parameter from
+simplify_inference_solutions, and try to preserve result vars in the same way as
+monomorphic vars (with a lower priority though). Each time, if this introduces new variables,
+substitue them by the preserved var. Then, rename monomorphic and result variables
+equivalents to the original. Finally, try to maximise the args, and for new poly vars
+which have both polarities, make them determinstic.
 TODO: Make simplify_inference_solutions and simplify_solutions take
 an arbitrary type as solution.
 TODO: let rec (with optional type annotation for the whole definition)

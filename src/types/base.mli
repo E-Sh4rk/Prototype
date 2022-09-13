@@ -93,6 +93,7 @@ module type TVarSet = sig
     val add : var -> t -> t
     val inter : t -> t -> t
     val diff : t -> t -> t
+    val rm : var -> t -> t
     val destruct : t -> var list
     val pp : Format.formatter -> t -> unit
 end

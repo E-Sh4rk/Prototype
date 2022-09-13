@@ -227,6 +227,7 @@ module type TVarSet = sig
   val add : var -> t -> t
   val inter : t -> t -> t
   val diff : t -> t -> t
+  val rm : var -> t -> t
   val destruct : t -> var list
   val pp : Format.formatter -> t -> unit
 end
@@ -241,6 +242,7 @@ module TVarSet = struct
   let add = CD.Var.Set.add
   let inter = CD.Var.Set.cap
   let diff = CD.Var.Set.diff
+  let rm = CD.Var.Set.remove
   let destruct = CD.Var.Set.get
   let pp fmt t =
     destruct t |> Format.fprintf fmt "%a@." (Utils.pp_list pp_var)

@@ -552,6 +552,7 @@ module type Subst = sig
     val remove : t -> TVarSet.t -> t
     val split : t -> TVarSet.t -> t * t
     val apply_simplify : t -> typ -> typ
+    val new_vars : t -> TVarSet.t
 end
 module Subst : Subst = struct
     include Subst
@@ -581,6 +582,13 @@ module Subst : Subst = struct
     let apply_simplify s t =
         if TVarSet.inter (Subst.dom s) (vars t) |> TVarSet.is_empty
         then t else Subst.apply s t |> simplify_typ
+    let new_vars s =
+        let old_vars = dom s in
+        let new_vars =
+            destruct s |> List.map (fun (_, t) -> vars t)
+            |> List.fold_left TVarSet.union TVarSet.empty
+        in
+        TVarSet.diff old_vars new_vars
 end
 
 let next_var_name = ref 0

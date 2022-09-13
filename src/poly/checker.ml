@@ -9,14 +9,6 @@ open Parsing.Variable
 open Utils
 
 (*
-TODO: Remove the "wanted result" parameter from
-simplify_inference_solutions, and try to preserve result vars in the same way as
-monomorphic vars (with a lower priority though). Each time, if this introduces new variables,
-substitue them by the preserved var. Then, rename monomorphic and result variables
-equivalents to the original. Finally, try to maximise the args, and for new poly vars
-which have both polarities, make them determinstic.
-TODO: Make simplify_inference_solutions and simplify_solutions take
-an arbitrary type as solution.
 TODO: let rec (with optional type annotation for the whole definition)
 *)
 
@@ -205,13 +197,15 @@ let typeof_nofail tenv env mono annot e =
   try typeof tenv env mono annot e
   with Untypeable _ -> Format.printf "%a@." PMsc.pp_e e ; assert false
 
+let static_vars_of_type t =
+  vars t |> TVarSet.filter (fun v ->
+    var_name v |> String.starts_with ~prefix:static_tvar_prefix
+  )
+
 let tallying_infer poly mono constr =
-  let mono = constr |> List.map (fun (a,b) ->
-      vars a |> TVarSet.union (vars b) |> TVarSet.filter (fun v ->
+  let mono = mono |> TVarSet.filter (fun v ->
         var_name v |> String.starts_with ~prefix:static_tvar_prefix
-      )
-    ) |> List.fold_left TVarSet.union TVarSet.empty
-  |> TVarSet.inter mono in
+      ) in
   tallying_infer poly mono constr
 
 type 'a result =
@@ -255,6 +249,17 @@ let restore_name_of_mono_vars mono sol =
         renaming@acc
       ) [] (Subst.destruct sol) |> Subst.construct in
   Subst.compose subst sol
+
+(*
+TODO: Remove the "wanted result" parameter from
+simplify_inference_solutions, and try to preserve result vars in the same way as
+monomorphic vars (with a lower priority though). Each time, if this introduces new variables,
+substitue them by the preserved var. Then, rename monomorphic and result variables
+equivalents to the original. Finally, try to maximise the args, and for new poly vars
+which have both polarities, make them determinstic.
+TODO: Make simplify_inference_solutions and simplify_solutions take
+an arbitrary type as solution.
+*)
 
 let simplify_inference_solutions mono (r,r') to_maximize vars_to_use sols =
   log ~level:2 "Simplifying solutions...@." ;
@@ -362,6 +367,7 @@ let rec infer_a' vardef tenv env mono annot_a a =
     log ~level:1 "Inference: solving %a <= %a with delta=[]@."
       pp_typ t pp_typ s ;
     let poly = r::(vs |> TVarSet.destruct) in
+    let mono = static_vars_of_type s |> TVarSet.union mono in
     let res =
       tallying_infer poly mono [(t, s)]
       |> simplify_inference_solutions mono result_var to_maximize vars_to_use
@@ -376,6 +382,7 @@ let rec infer_a' vardef tenv env mono annot_a a =
     need_var v str ;
     let t = Env.find v env in
     let (vs,tsubst,t) = fresh mono t in
+    let mono = static_vars_of_type s |> TVarSet.union mono in
     let res =
       tallying mono [(t, s)]
       |> simplify_solutions mono r
@@ -496,6 +503,7 @@ let rec infer_a' vardef tenv env mono annot_a a =
   | App (v1, v2), AppA ([], []) ->
     let (constraints,(vs1,subst1),(vs2,subst2),alpha) = app_constraints v1 v2 in
     let poly = TVarSet.union vs1 vs2 |> TVarSet.destruct in
+    let mono = var_typ alpha |> static_vars_of_type |> TVarSet.union mono in
     let res =
       tallying_infer (alpha::poly) mono constraints
       |> simplify_inference_solutions mono (alpha, Variable.to_typevar vardef)
@@ -513,6 +521,7 @@ let rec infer_a' vardef tenv env mono annot_a a =
     Subst res |> map_res (fun sigmas -> AppA (List.split sigmas))
   | App (v1, v2), _ ->
     let (constraints,(vs1,subst1),(vs2,subst2),alpha) = app_constraints v1 v2 in
+    let mono = var_typ alpha |> static_vars_of_type |> TVarSet.union mono in
     let res =
       tallying mono constraints
       |> simplify_solutions mono alpha

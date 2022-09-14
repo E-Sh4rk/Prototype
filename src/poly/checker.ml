@@ -318,7 +318,7 @@ let simplify_solutions mono res sols =
     let t = Subst.apply s res in
     let clean = clean_type_ext ~pos:empty ~neg:any mono t in
     let s = Subst.compose clean s in
-    (* log "Res: %a@." pp_typ (Subst.find' s r) ; *)
+    (* log "Res: %a@." pp_typ (Subst.apply_simplify s res) ; *)
     (* log "Res: %a@." Subst.pp s ; *)
     (* TODO: more simplifications ?? *)
     Some s
@@ -346,7 +346,7 @@ let need_var env v str =
 
 let rec infer_a' vardef tenv env mono annot_a a =
   let need_var = need_var env in
-  let simple_constraint_infer v str s =
+  let simple_constraint_infer v str s r =
     need_var v str ;
     let t = Env.find v env in
     let to_maximize = [t] in
@@ -354,12 +354,12 @@ let rec infer_a' vardef tenv env mono annot_a a =
     let (vs,tsubst,t) = fresh mono t in
     log ~level:1 "Inference: solving %a <= %a with delta=[]@."
       pp_typ t pp_typ s ;
-    let res_vars = TVarSet.diff (vars s) mono in
+    let res_vars = TVarSet.diff (vars r) mono in
     let poly = (res_vars |> TVarSet.destruct)@(vs |> TVarSet.destruct) in
     let mono = static_vars_of_type s |> TVarSet.union mono in
     let res =
       tallying_infer poly mono [(t, s)]
-      |> simplify_inference_solutions mono s to_maximize vars_to_use
+      |> simplify_inference_solutions mono r to_maximize vars_to_use
       |> List.map (fun sol ->
       let mono_part = Subst.restrict sol mono in
       let poly_part = Subst.compose (Subst.restrict sol vs) tsubst in
@@ -367,14 +367,14 @@ let rec infer_a' vardef tenv env mono annot_a a =
     ) |> regroup Subst.equiv
     in Subst res
   in
-  let simple_constraint v str s =
+  let simple_constraint v str s r =
     need_var v str ;
     let t = Env.find v env in
     let (vs,tsubst,t) = fresh mono t in
     let mono = static_vars_of_type s |> TVarSet.union mono in
     let res =
       tallying mono [(t, s)]
-      |> simplify_solutions mono s
+      |> simplify_solutions mono r
       |> List.map (fun sol -> Subst.compose (Subst.restrict sol vs) tsubst)
     in
     assert (res <> []) ; res
@@ -456,38 +456,38 @@ let rec infer_a' vardef tenv env mono annot_a a =
   | Pair (v1, v2), NoneA | Let (v1, v2), NoneA ->
     need_var v1 "pair" ; need_var v2 "pair" ; Ok NoneA
   | Projection (Parsing.Ast.Field label, v), ProjA [] ->
-    let alpha = Variable.to_typevar vardef in
-    let s = mk_record true [label, alpha |> var_typ |> cons] in
-    let res = simple_constraint_infer v "projection" s in
+    let alpha = Variable.to_typevar vardef |> var_typ in
+    let s = mk_record true [label, alpha |> cons] in
+    let res = simple_constraint_infer v "projection" s alpha in
     map_res (fun sigma -> ProjA sigma) res
   | Projection (Parsing.Ast.Field label, v), ProjA _ ->
-    let alpha = Variable.to_typevar vardef in
-    let s = mk_record true [label, alpha |> var_typ |> cons] in
-    Ok (ProjA (simple_constraint v "projection" s))
+    let alpha = Variable.to_typevar vardef |> var_typ in
+    let s = mk_record true [label, alpha |> cons] in
+    Ok (ProjA (simple_constraint v "projection" s alpha))
   | Projection (p, v), ProjA [] ->
-    let alpha = Variable.to_typevar vardef in
+    let alpha = Variable.to_typevar vardef |> var_typ in
     let s =
       if p = Parsing.Ast.Fst
-      then mk_times (alpha |> var_typ |> cons) any_node
-      else mk_times any_node (alpha |> var_typ |> cons)
+      then mk_times (alpha |> cons) any_node
+      else mk_times any_node (alpha |> cons)
     in
-    let res = simple_constraint_infer v "projection" s in
+    let res = simple_constraint_infer v "projection" s alpha in
     map_res (fun sigma -> ProjA sigma) res
   | Projection (p, v), ProjA _ ->
-    let alpha = Variable.to_typevar vardef in
+    let alpha = Variable.to_typevar vardef |> var_typ in
     let s =
       if p = Parsing.Ast.Fst
-      then mk_times (alpha |> var_typ |> cons) any_node
-      else mk_times any_node (alpha |> var_typ |> cons)
+      then mk_times (alpha |> cons) any_node
+      else mk_times any_node (alpha |> cons)
     in
-    Ok (ProjA (simple_constraint v "projection" s))
+    Ok (ProjA (simple_constraint v "projection" s alpha))
   | RecordUpdate (v, _, o), RecordUpdateA [] ->
     (match o with None -> () | Some v' -> need_var v' "record update") ;
-    let res = simple_constraint_infer v "record update" record_any in
+    let res = simple_constraint_infer v "record update" record_any record_any in
     map_res (fun sigma -> RecordUpdateA sigma) res
   | RecordUpdate (v, _, o), RecordUpdateA _ ->
     (match o with None -> () | Some v' -> need_var v' "record update") ;
-    Ok (ProjA (simple_constraint v "record update" record_any))
+    Ok (ProjA (simple_constraint v "record update" record_any record_any))
   | App (v1, v2), AppA ([], []) ->
     let alpha = Variable.to_typevar vardef in
     let (constraints,(vs1,subst1),(vs2,subst2)) = app_constraints v1 v2 alpha in

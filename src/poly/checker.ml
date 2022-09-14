@@ -314,14 +314,22 @@ let simplify_inference_solutions mono res to_maximize vars_to_use sols =
   log ~level:2 "Solutions simplified!@." ; sols
 
 let simplify_solutions mono res sols =
-  let sols = sols |> List.filter_map (fun s ->
-    let t = Subst.apply s res in
+  let sols = sols |> List.filter_map (fun sol ->
+    let t = Subst.apply sol res in
     let clean = clean_type_ext ~pos:empty ~neg:any mono t in
-    let s = Subst.compose clean s in
+    let sol = Subst.compose clean sol in
+
+    let to_simplify = Subst.dom sol |> TVarSet.destruct in
+    let sol =
+      List.fold_left (fun sol v ->
+        let t = Subst.find' sol v in
+        let (s, _) = remove_redundant_vars mono t in
+        Subst.compose s sol
+      ) sol to_simplify in
+
     (* log "Res: %a@." pp_typ (Subst.apply_simplify s res) ; *)
     (* log "Res: %a@." Subst.pp s ; *)
-    (* TODO: more simplifications ?? *)
-    Some s
+    Some sol
     ) in
   sols
 
@@ -628,7 +636,9 @@ and infer' tenv env mono annot e =
     log ~level:1 "Typing definition for %s...@." (Variable.show v) ;
     begin match infer_a_iterated v tenv env mono annot_a a with
     | Ok annot_a ->
-      let annot_a = decorrelate_branches mono annot_a in
+      (* NOTE: branches decorrelation of vars is disabled for performance issues *)
+      (* let annot_a = decorrelate_branches mono annot_a in *)
+      ignore decorrelate_branches ;
       let t = typeof_a_nofail v tenv env mono annot_a a in
       let t = simplify_poly_typ mono t in
       log ~level:1 "Definition of %s typed: %a@." (Variable.show v) pp_typ t ;

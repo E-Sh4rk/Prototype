@@ -320,29 +320,33 @@ let and_ = fun x -> fun y ->
     (0,Int) | (Int\0,Any) -> Int
 *)
 
-
 let concat concat x y =
    if x is Nil then y else (fst x, (concat (snd x) y) ) 
 
-let concat = fixpoint concat 
+let concat = fixpoint concat
 
-
-let flatten flatten x = 
+(* let concat = < [ ('a)* ] -> [ ('a)* ] -> [ ('a)* ] > *)
+(* let flatten flatten x =
    if x is Nil then nil else
    if x is (Any, Any) then concat(flatten (fst x)) (flatten (snd x)) else
    (x,nil)
-   
-let flatten = fixpoint flatten   
+*)
+(* let flatten = fixpoint flatten *)
 
 type TRUE  =  'a -> 'b -> 'a
 type FALSE =  'a -> 'b -> 'b
 
-let ifthenelse (b : (TRUE | FALSE) )  x y = b x y 
+let ifthenelse (b : TRUE ; FALSE )  x y = b x y
 
 (* expected type for the follwoing function
  *   (TRUE -> 'c -> 'd -> 'c)
  * & (FALSE -> 'c -> 'd -> 'd) 
 *)
 
+(* Parametric types examples *)
 
+type Tree 'a = ('a, [(Tree 'a)*])
+let a = <Tree Int>
 
+type Rec 'a = Rec 'a -> 'a
+let b = <Rec 'b>

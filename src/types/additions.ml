@@ -769,7 +769,7 @@ let [@warning "-27"] simplify_poly_product_dnf mono ~open_nodes ~contravar dnf =
 
 let simplify_poly_typ mono t =
     let t = clean_poly_vars mono t in
-    (* let (_, t) = remove_redundant_vars mono t in *)
+    let (_, t) = remove_redundant_vars mono t in
     (* ignore (simplify_poly_dnf, simplify_poly_product_dnf) ; *)
     let t = simplify_typ_aux simplify_poly_dnf simplify_poly_product_dnf mono t in
     let t = clean_poly_vars mono t in

@@ -599,7 +599,7 @@ and infer' tenv env mono noninferred annot e =
     else (log ~level:0 "Untypeable expression (--> need %s)@." (Variable.show v) ; fail)
   | Bind ((), v, a, e), UnkA (annot_a, s) ->
     let (req, opt) = analyze_dependencies env e in
-    (* Note: optimisation *)
+    (* NOTE: optimisation *)
     let skippable = VarSet.mem v req |> not in
     let skipped = skippable && (VarSet.mem v opt |> not) in
     (* let (skippable, skipped) = (skippable || true, skipped && false) in *)

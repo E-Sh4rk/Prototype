@@ -142,3 +142,6 @@ val refresh : TVarSet.t -> typ -> typ
 in term of the variables that are greater. Thus, greater variables (in particular variables not in var_order)
 are less likely to be constrained. *)
 val tallying : var_order:var list -> TVarSet.t -> (typ * typ) list -> Subst.t list
+
+(* Some additions *)
+val factorize : TVarSet.t * TVarSet.t -> typ -> typ * typ

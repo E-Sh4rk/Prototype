@@ -319,16 +319,30 @@ let simplify_solutions mono res sols =
     let clean = clean_type_ext ~pos:empty ~neg:any mono t in
     let sol = Subst.compose clean sol in
 
+    let sol = restore_name_of_vars sol in
+
     let to_simplify = Subst.dom sol |> TVarSet.destruct in
     let sol =
       List.fold_left (fun sol v ->
         let t = Subst.find' sol v in
-        let (s, _) = remove_redundant_vars mono t in
-        Subst.compose s sol
+        let (a,b) = factorize (TVarSet.construct [v], TVarSet.empty) t in
+        if is_empty b
+        then
+          (* Clean main var *)
+          let clean = Subst.construct [(v, a)] in
+          let sol = Subst.compose clean sol in
+          let lst = Subst.rm v sol |> Subst.destruct in
+          let sol = (v,a)::lst |> Subst.construct in
+          sol
+        else
+          (* Remove duplicates *)
+          let t = Subst.find' sol v in
+          let (s, _) = remove_redundant_vars mono t in
+          Subst.compose s sol
       ) sol to_simplify in
 
-    (* log "Res: %a@." pp_typ (Subst.apply_simplify s res) ; *)
-    (* log "Res: %a@." Subst.pp s ; *)
+    (* log "Res: %a@." pp_typ (Subst.apply_simplify sol res) ; *)
+    (* log "Res: %a@." Subst.pp sol ; *)
     Some sol
     ) in
   sols

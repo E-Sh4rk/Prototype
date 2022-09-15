@@ -288,7 +288,6 @@ else 0
  *                             *
  *******************************)
 
-
 type Falsy = False | "" | 0
 type Truthy = ~Falsy
 
@@ -302,8 +301,6 @@ let and_ = fun x -> fun y ->
      &(Truthy -> 'b -> 'b)
 *)
 
-
-
 let and_ = fun x -> fun y ->
   if x is Falsy then x else (y, succ x)
 
@@ -312,7 +309,6 @@ let and_ = fun x -> fun y ->
      &(Truthy&(Int\0) -> 'b -> ('b,Int))
 *)
 
-
  let test = fun x ->
    if fst x is Falsy then (fst x) + (snd x) else succ (fst x)
 
@@ -320,10 +316,12 @@ let and_ = fun x -> fun y ->
     (0,Int) | (Int\0,Any) -> Int
 *)
 
+let fixpoint = <(('v -> '118) -> ('v -> '118)) -> ('v -> '118)>
+
 let concat concat x y =
    if x is Nil then y else (fst x, (concat (snd x) y) ) 
 
-let concat = fixpoint concat
+(* let concat = fixpoint concat *)
 
 (* let concat = < [ ('a)* ] -> [ ('a)* ] -> [ ('a)* ] > *)
 (* let flatten flatten x =

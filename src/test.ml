@@ -316,20 +316,21 @@ let and_ = fun x -> fun y ->
     (0,Int) | (Int\0,Any) -> Int
 *)
 
-let fixpoint = <(('v -> '118) -> ('v -> '118)) -> ('v -> '118)>
+let fixpoint = <(('a -> 'b) -> ('a -> 'b)) -> ('a -> 'b)>
 
 let concat concat x y =
    if x is Nil then y else (fst x, (concat (snd x) y) ) 
 
 let concat : ['a*] -> ['a*] -> ['a*] = fixpoint concat
 
-(* let concat = < [ ('a)* ] -> [ ('a)* ] -> [ ('a)* ] > *)
-(* let flatten flatten x =
+(* TODO: Simplify flatten type and see why the fixpoint is not precise enough *)
+
+let flatten flatten (x:[['a*]*];[]) =
    if x is Nil then nil else
    if x is (Any, Any) then concat(flatten (fst x)) (flatten (snd x)) else
    (x,nil)
-*)
-(* let flatten = fixpoint flatten *)
+
+let flatten : [['a*]*] -> ['a*] = fixpoint flatten
 
 type TRUE  =  'a -> 'b -> 'a
 type FALSE =  'a -> 'b -> 'b

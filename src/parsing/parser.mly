@@ -75,7 +75,6 @@
 
 %type<Ast.parser_expr> term
 %start<Ast.parser_expr> unique_term
-%start<(Ast.varname * Ast.parser_expr) list> definitions
 %start<Ast.parser_program> program
 
 %right ARROW
@@ -89,11 +88,6 @@
 %%
 
 program: e=element* EOF { e }
-| error {
-  parsing_error (Position.lex_join $startpos $endpos) "Syntax error."
-}
-
-definitions: a=definition* EOF { a }
 | error {
   parsing_error (Position.lex_join $startpos $endpos) "Syntax error."
 }
@@ -118,7 +112,7 @@ param_type_def: name=TID params=list(TVAR) EQUAL t=typ { (name, params, t) }
 
 term:
   a=abstraction { a }
-| d=definition IN t=term { annot $startpos $endpos (Let (fst d, snd d, t)) }
+| d=definition IN t=term { annot $startpos $endpos (Let (Utils.fst3 d, Utils.snd3 d, t)) }
 (*| lhs=term b=binop rhs=term { App (App (Primitive b, lhs), rhs) }*)
 | t=simple_term { t }
 | IF t=term IS ty=typ THEN t1=term ELSE t2=term { annot $startpos $endpos (Ite (t,ty,t1,t2)) }
@@ -191,11 +185,15 @@ lint:
 { (ADomain tys, arg) }
 
 %inline definition:
-  LET i=identifier ais=annoted_identifier* EQUAL t=term
+  LET i=identifier ais=annoted_identifier* ty=optional_type_annot EQUAL t=term
   {
     let t = multi_param_abstraction $startpos $endpos ais t in
-    (i, t)
+    (i, t, ty)
   }
+
+%inline optional_type_annot:
+    { None }
+  | COLON t=typ { Some t }
 
 (*%inline binop :
 | PLUS  { Add }

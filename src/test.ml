@@ -321,7 +321,7 @@ let fixpoint = <(('v -> '118) -> ('v -> '118)) -> ('v -> '118)>
 let concat concat x y =
    if x is Nil then y else (fst x, (concat (snd x) y) ) 
 
-let concat = fixpoint concat
+let concat : ['a*] -> ['a*] -> ['a*] = fixpoint concat
 
 (* let concat = < [ ('a)* ] -> [ ('a)* ] -> [ ('a)* ] > *)
 (* let flatten flatten x =

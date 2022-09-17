@@ -98,7 +98,7 @@ let and2_ = fun x ->
 let and2_ = fun x ->
      if fst x is True then if snd x is True then fst x else false else false
 
-let not_ = fun x -> if x is True then true else false
+let not_ = fun x -> if x is True then false else true
 
 let or_ =  fun x -> fun y -> not_ (and_ (not_ x) (not_ y))
 

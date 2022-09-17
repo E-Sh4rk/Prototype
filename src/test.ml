@@ -323,11 +323,9 @@ let concat concat x y =
 
 let concat : ['a*] -> ['a*] -> ['a*] = fixpoint concat
 
-(* TODO: Simplify flatten type and see why the fixpoint is not precise enough *)
-
-let flatten flatten (x:[['a*]*];[]) =
+let flatten flatten (x:['a*]) =
    if x is Nil then nil else
-   if x is (Any, Any) then concat(flatten (fst x)) (flatten (snd x)) else
+   if x is (Any, Any) then concat (fst x) (flatten (snd x)) else
    (x,nil)
 
 let flatten : [['a*]*] -> ['a*] = fixpoint flatten

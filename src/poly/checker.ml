@@ -276,7 +276,6 @@ let simplify_inference_solutions mono res to_maximize vars_to_use sols =
           let t = Subst.find' sol v in
           let constr = [(var_typ v, t);(t, var_typ v)] in
           let mono = TVarSet.add v mono in
-          (* print_tallying_instance [] mono constr ; *)
           let res = tallying mono constr
           |> List.map (fun res ->
             (* If this introduces new variables, substitute them by the preserved var *)
@@ -298,7 +297,6 @@ let simplify_inference_solutions mono res to_maximize vars_to_use sols =
             Subst.compose rename sol
           | Some sol -> Subst.rm v sol
         ) sol to_simplify in
-      (* log "AFTER STEP 1:%a@." Subst.pp sol; *)      
       (* Remove a solution if it contains a substitution to empty for a mono var,
          or if it makes a to_maximize type empty *)
       if List.exists (fun (v,t') -> TVarSet.mem mono v && is_empty t')
@@ -336,7 +334,6 @@ let simplify_solutions mono res sols =
           sol
         else
           (* Remove duplicates *)
-          let t = Subst.find' sol v in
           let (s, _) = remove_redundant_vars mono t in
           Subst.compose s sol
       ) sol to_simplify in

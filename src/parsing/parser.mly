@@ -18,6 +18,13 @@
     let pos_right = Ast.position_of_expr right in
     (Ast.new_annot (Position.join pos_left pos_right), Pair (left,right))
 
+  let rec product = function
+    | [] -> TBase TUnit
+    | [t] -> t
+    | t::ts ->
+    let left = t in let right = product ts in
+    TPair (left, right)
+
   let rec list_of_elts pos = function
     | [] -> (Ast.new_annot pos, Const Nil)
     | x::xs ->
@@ -68,7 +75,6 @@
 
 %type<Ast.parser_expr> term
 %start<Ast.parser_expr> unique_term
-%start<(Ast.varname * Ast.parser_expr) list> definitions
 %start<Ast.parser_program> program
 
 %right ARROW
@@ -86,16 +92,10 @@ program: e=element* EOF { e }
   parsing_error (Position.lex_join $startpos $endpos) "Syntax error."
 }
 
-definitions: a=definition* EOF { a }
-| error {
-  parsing_error (Position.lex_join $startpos $endpos) "Syntax error."
-}
-
 unique_term: t=term EOF { t }
 | error {
   parsing_error (Position.lex_join $startpos $endpos) "Syntax error."
 }
-
 
 element:
   a=definition { Definition (Utils.log_disabled, a) }
@@ -106,13 +106,13 @@ element:
 
 atoms: ATOMS a=ID* { a }
 
-types_def: TYPE ts=separated_nonempty_list(TYPE_AND, name_and_typ) { ts }
+types_def: TYPE ts=separated_nonempty_list(TYPE_AND, param_type_def) { ts }
 
-name_and_typ: name=TID EQUAL t=typ { (name, t) }
+param_type_def: name=TID params=list(TVAR) EQUAL t=typ { (name, params, t) }
 
 term:
   a=abstraction { a }
-| d=definition IN t=term { annot $startpos $endpos (Let (fst d, snd d, t)) }
+| d=definition IN t=term { annot $startpos $endpos (Let (Utils.fst3 d, Utils.snd3 d, t)) }
 (*| lhs=term b=binop rhs=term { App (App (Primitive b, lhs), rhs) }*)
 | t=simple_term { t }
 | IF t=term IS ty=typ THEN t1=term ELSE t2=term { annot $startpos $endpos (Ite (t,ty,t1,t2)) }
@@ -181,14 +181,19 @@ lint:
 
 %inline annoted_identifier:
   arg = identifier { (Unnanoted, arg) }
-| LPAREN arg = identifier COLON ty = typ RPAREN { (ADomain ty, arg) }
+| LPAREN arg = identifier COLON tys = separated_nonempty_list(SEMICOLON, typ) RPAREN
+{ (ADomain tys, arg) }
 
 %inline definition:
-  LET i=identifier ais=annoted_identifier* EQUAL t=term
+  LET i=identifier ais=annoted_identifier* ty=optional_type_annot EQUAL t=term
   {
     let t = multi_param_abstraction $startpos $endpos ais t in
-    (i, t)
+    (i, t, ty)
   }
+
+%inline optional_type_annot:
+    { None }
+  | COLON t=typ { Some t }
 
 (*%inline binop :
 | PLUS  { Add }
@@ -213,6 +218,7 @@ prefix:
 
 typ:
   t=atomic_typ { t }
+| s=TID ts=nonempty_list(atomic_typ) { TCustom(ts, s) }
 | lhs=typ ARROW rhs=typ { TArrow (lhs, rhs) }
 | NEG t=typ { TNeg t }
 | lhs=typ OR rhs=typ  { TCup (lhs, rhs) }
@@ -221,10 +227,9 @@ typ:
 
 atomic_typ:
   x=type_constant { TBase x }
-| s=TID { TCustom s }
+| s=TID { TCustom ([], s) }
 | s=TVAR { TVar s }
-| LPAREN lhs=typ COMMA rhs=typ RPAREN { TPair (lhs, rhs) }
-| LPAREN t=typ RPAREN { t }
+| LPAREN ts=separated_list(COMMA, typ) RPAREN { product ts }
 | LBRACE fs=separated_list(COMMA, typ_field) RBRACE { TRecord (false, fs) }
 | LBRACE fs=separated_list(COMMA, typ_field) DOUBLEPOINT RBRACE { TRecord (true, fs) }
 | LBRACKET re=typ_re RBRACKET { TSList re }
@@ -257,9 +262,9 @@ type_interval:
 | LBRACKET lb=lint SEMICOLON RBRACKET { TInt (Some lb, None) }
 | LBRACKET SEMICOLON RBRACKET { TInt (None, None) }*)
   lb=lint DOUBLEDASH ub=lint { TInt (Some lb, Some ub) }
-| TIMES DOUBLEDASH ub=lint { TInt (None, Some ub) }
-| lb=lint DOUBLEDASH TIMES { TInt (Some lb, None) }
-| TIMES DOUBLEDASH TIMES { TInt (None, None) }
+| COLON DOUBLEDASH ub=lint { TInt (None, Some ub) }
+| lb=lint DOUBLEDASH COLON { TInt (Some lb, None) }
+| COLON DOUBLEDASH COLON { TInt (None, None) }
 
 (*%inline annoted(X): x=X {
   (Position.with_poss $startpos $endpos (unique_exprid ()), x)

@@ -79,7 +79,7 @@ module Annot = struct
     [@@deriving show]
 
   and t =
-    | VarA | DoA of (a * split) | SkipA of t | DoSkipA of (a * split * t)
+    | VarA | DoA of (a * typ option * split) | SkipA of t | DoSkipA of (a * split * t)
     [@@deriving show]
 
   let rec apply_subst_split s lst =
@@ -98,8 +98,9 @@ module Annot = struct
   if Subst.is_identity s then t
   else match t with
   | VarA -> VarA
-  | DoA (a, split) ->
-    DoA (apply_subst_a s a, apply_subst_split s split)
+  | DoA (a, ty, split) ->
+    DoA (apply_subst_a s a, Option.map (Subst.apply_simplify s) ty,
+      apply_subst_split s split)
   | SkipA t -> SkipA (apply_subst s t)
   | DoSkipA (a, split, t) ->
     DoSkipA (apply_subst_a s a, apply_subst_split s split, apply_subst s t)
@@ -115,16 +116,11 @@ module Annot = struct
       let initial_s = [(any, (false, initial_e e))] in
       let v = Variable.to_typevar v |> var_typ in
       LambdaA ([], [(v, initial_s)])
-    | Lambda (_, Parsing.Ast.ADomain dt, _, e) ->
+    | Lambda (_, Parsing.Ast.ADomain dts, _, e) ->
       let initial_s = [(any, (false, initial_e e))] in
-      LambdaA ([], [(dt, initial_s)])
-    | Lambda (_, Parsing.Ast.AArrow t, _, e) ->
-      let initial_s = [(any, (false, initial_e e))] in
-      let branches =
-        dnf t |> List.map (List.map fst) |> List.flatten
-        |> List.map (fun s -> (s, initial_s))
-      in
-      LambdaA ([],branches)
+      LambdaA ([], List.map (fun dt -> (dt, initial_s)) dts)
+    | Lambda (_, Parsing.Ast.AArrow _, _, _) ->
+      LambdaA ([],[]) (* Not supported *)
 
   and initial_e e =
       let open Msc in match e with

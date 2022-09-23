@@ -14,7 +14,7 @@ exception Untypeable of Position.t list * string
 
 let typeof_const_atom tenv c =
   match c with
-  | Parsing.Ast.Atom str -> get_type tenv str
+  | Parsing.Ast.Atom str -> get_atom_type tenv str
   | c -> Parsing.Ast.const_to_typ c
 
 let unbound_variable v =
@@ -98,21 +98,12 @@ let rec typeof_a vardef tenv env mono annot_a a =
     if Env.mem v1 env
     then var_type v2 env
     else raise (Untypeable (pos, "Invalid let binding: definition has been skipped."))
-  | Lambda (_, Parsing.Ast.Unnanoted, v, e), LambdaA annot ->
-    type_lambda env annot v e
-  | Lambda (_, Parsing.Ast.ADomain dt, v, e), LambdaA annot ->
-    let t = type_lambda env annot v e in
-    if equiv (domain t) dt
-    then t
-    else raise (Untypeable (pos, "Invalid lambda: domain does not match with user annotation."))
-  | Lambda (_, Parsing.Ast.AArrow t, v, e), LambdaA annot ->
-    let t' = type_lambda env annot v e in
-    if subtype t' t
-    then t
-    else raise (Untypeable (pos, "Invalid lambda: type does not match with user annotation."))
+  | Lambda (_, Parsing.Ast.AArrow _, _, _), LambdaA _ ->
+    raise (Untypeable (pos, "Invalid lambda: explicitely typed lambdas not supported."))
+  | Lambda (_, _, v, e), LambdaA annot -> type_lambda env annot v e
   | _, _ -> raise (Untypeable (pos, "Invalid annotations."))
   end
-  |> hard_clean mono |> simplify_typ
+  |> clean_poly_vars mono |> simplify_typ
 
 and typeof_splits tenv env mono v splits e =
   let pos = Variable.get_locations v in
@@ -141,7 +132,7 @@ and typeof tenv env mono annot e =
   | Bind (_, _, _, e), SkipA (annot) -> typeof tenv env mono annot e
   | _, _ -> raise (Untypeable ([], "Invalid annotations."))
   end
-  |> hard_clean mono |> simplify_typ
+  |> clean_poly_vars mono |> simplify_typ
 
 (* ===== REFINE ===== *)
 
@@ -608,7 +599,7 @@ and infer' tenv env mono noninferred annot e =
     else (log ~level:0 "Untypeable expression (--> need %s)@." (Variable.show v) ; fail)
   | Bind ((), v, a, e), UnkA (annot_a, s) ->
     let (req, opt) = analyze_dependencies env e in
-    (* Note: optimisation *)
+    (* NOTE: optimisation *)
     let skippable = VarSet.mem v req |> not in
     let skipped = skippable && (VarSet.mem v opt |> not) in
     (* let (skippable, skipped) = (skippable || true, skipped && false) in *)

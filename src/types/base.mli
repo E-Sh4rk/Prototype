@@ -93,6 +93,7 @@ module type TVarSet = sig
     val add : var -> t -> t
     val inter : t -> t -> t
     val diff : t -> t -> t
+    val rm : var -> t -> t
     val destruct : t -> var list
     val pp : Format.formatter -> t -> unit
 end
@@ -141,3 +142,6 @@ val refresh : TVarSet.t -> typ -> typ
 in term of the variables that are greater. Thus, greater variables (in particular variables not in var_order)
 are less likely to be constrained. *)
 val tallying : var_order:var list -> TVarSet.t -> (typ * typ) list -> Subst.t list
+
+(* Some additions *)
+val factorize : TVarSet.t * TVarSet.t -> typ -> typ * typ

@@ -59,7 +59,7 @@ let treat_untypable_annot_a pos anns =
 
 let typeof_const_atom tenv c =
   match c with
-  | Ast.Atom str -> get_type tenv str
+  | Ast.Atom str -> get_atom_type tenv str
   | c -> Ast.const_to_typ c
 
 let rec typeof_a pos tenv env anns a =
@@ -131,9 +131,10 @@ let rec typeof_a pos tenv env anns a =
     else if subtype tv (neg t)
     then var_type pos x2 env
     else raise (Ill_typed (pos, "Cannot select a branch for the typecase."))
-  | Lambda (_, Ast.ADomain s, v, e) ->
+  | Lambda (_, Ast.ADomain ss, v, e) ->
     let inferred_t = type_lambda env v e in
     let dom = domain inferred_t in
+    let s = disj ss in
     if equiv s dom
     then inferred_t
     else raise (Ill_typed (pos,
@@ -466,7 +467,8 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
     | Lambda (_, ua, v, e), LambdaA (former_typ, va) when ua = Ast.Unnanoted || no_lambda_ua ->
       let ts = ts |> List.map (cap_o arrow_any) in
       type_lambda v e ts va ~opt_branches_maxdom:any ~former_typ
-    | Lambda (_, Ast.ADomain s, v, e), LambdaA (former_typ, va) ->
+    | Lambda (_, Ast.ADomain ss, v, e), LambdaA (former_typ, va) ->
+      let s = disj ss in
       let ts = ts |> List.map (cap_o (mk_arrow (cons s) any_node)) in
       type_lambda v e ts va ~opt_branches_maxdom:s ~former_typ
     | Lambda (_, Ast.AArrow s, v, e), LambdaA (former_typ, va) when subtype s worst_t ->

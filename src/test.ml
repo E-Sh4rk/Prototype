@@ -98,7 +98,7 @@ let and2_ = fun x ->
 let and2_ = fun x ->
      if fst x is True then if snd x is True then fst x else false else false
 
-let not_ = fun x -> if x is True then true else false
+let not_ = fun x -> if x is True then false else true
 
 let or_ =  fun x -> fun y -> not_ (and_ (not_ x) (not_ y))
 
@@ -288,7 +288,6 @@ else 0
  *                             *
  *******************************)
 
-
 type Falsy = False | "" | 0
 type Truthy = ~Falsy
 
@@ -302,8 +301,6 @@ let and_ = fun x -> fun y ->
      &(Truthy -> 'b -> 'b)
 *)
 
-
-
 let and_ = fun x -> fun y ->
   if x is Falsy then x else (y, succ x)
 
@@ -312,7 +309,6 @@ let and_ = fun x -> fun y ->
      &(Truthy&(Int\0) -> 'b -> ('b,Int))
 *)
 
-
  let test = fun x ->
    if fst x is Falsy then (fst x) + (snd x) else succ (fst x)
 
@@ -320,19 +316,19 @@ let and_ = fun x -> fun y ->
     (0,Int) | (Int\0,Any) -> Int
 *)
 
+let fixpoint = <(('a -> 'b) -> ('a -> 'b)) -> ('a -> 'b)>
 
 let concat concat x y =
    if x is Nil then y else (fst x, (concat (snd x) y) ) 
 
-let concat = fixpoint concat 
+let concat : ['a*] -> ['a*] -> ['a*] = fixpoint concat
 
-
-let flatten flatten x = 
+let flatten flatten (x:['a*]) =
    if x is Nil then nil else
-   if x is (Any, Any) then concat(flatten (fst x)) (flatten (snd x)) else
+   if x is (Any, Any) then concat (fst x) (flatten (snd x)) else
    (x,nil)
-   
-let flatten = fixpoint flatten   
+
+let flatten : [['a*]*] -> ['a*] = fixpoint flatten
 
 
 let test = flatten ((1,true),((42,0),"ok"))
@@ -340,12 +336,17 @@ let test = flatten ((1,true),((42,0),"ok"))
 type TRUE  =  'a -> 'b -> 'a
 type FALSE =  'a -> 'b -> 'b
 
-let ifthenelse (b : (TRUE | FALSE) )  x y = b x y 
+let ifthenelse (b : TRUE ; FALSE )  x y = b x y
 
 (* expected type for the follwoing function
  *   (TRUE -> 'c -> 'd -> 'c)
  * & (FALSE -> 'c -> 'd -> 'd) 
 *)
 
+(* Parametric types examples *)
 
+type Tree 'a = ('a, [(Tree 'a)*])
+let a = <Tree Int>
 
+type Rec 'a = Rec 'a -> 'a
+let b = <Rec 'b>

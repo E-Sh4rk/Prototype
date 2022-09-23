@@ -89,11 +89,15 @@ let pairs s1 s2 =
   in
   aux s1 s2
 
-let find_remove pred lst =
+let add_others lst =
   let rec aux treated lst =
     match lst with
-    | [] -> None
+    | [] -> []
     | a::lst ->
       let others = treated@lst in
-      if pred a others then Some (a, others) else aux (treated@[a]) lst
-  in aux [] lst
+      (a,others)::(aux (treated@[a]) lst)
+  in
+  aux [] lst
+
+let find_among_others pred lst =
+  lst |> add_others |> List.find_opt (fun (a,o) -> pred a o)

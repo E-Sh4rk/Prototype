@@ -23,7 +23,7 @@ type const =
 
 type projection = Fst | Snd | Field of string
 
-type 'typ type_annot = Unnanoted | ADomain of 'typ | AArrow of 'typ
+type 'typ type_annot = Unnanoted | ADomain of 'typ list | AArrow of 'typ
 
 type ('a, 'typ, 'v) ast =
 | Abstract of 'typ
@@ -66,9 +66,9 @@ val substitute : annot_expr -> Variable.t -> annot_expr -> annot_expr
 val const_to_typ : const -> typ
 
 type parser_element =
-| Definition of (int (* log level *) * (string * parser_expr))
+| Definition of (int (* log level *) * (string * parser_expr * type_expr option))
 | Atoms of string list
-| Types of (string * type_expr) list
+| Types of (string * string list * type_expr) list
 
 type parser_program = parser_element list
 

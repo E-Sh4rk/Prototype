@@ -18,11 +18,16 @@ let print_result str =
 let use_poly () = true
 let compare_to_popl () = false
 
+exception IncompatibleType of typ
 let type_check_program
   (program:Ast.parser_program) (pr:string -> unit) pr_ill_typed =
-  let test_def (tenv,varm,env) (name,parsed_expr) =
+  let test_def (tenv,varm,env) (name,parsed_expr,typ_annot) =
     Format.ksprintf pr "%s: " name;
     begin
+      let typ_annot = match typ_annot with
+      | None -> None
+      | Some expr -> let (t, _) = type_expr_to_typ tenv empty_vtenv expr in Some t
+      in
       let var = Variable.create (Some name) in
       let annot_expr = Ast.parser_expr_to_annot_expr tenv empty_vtenv varm parsed_expr in
       let time0 = Unix.gettimeofday () in
@@ -44,7 +49,14 @@ let type_check_program
         Utils.log "%a@." Poly.Msc.pp_e nf_expr ;
         let typ =
           if use_poly ()
-          then Poly.Checker.typeof_simple tenv env TVarSet.empty nf_expr
+          then
+            let typ = Poly.Checker.typeof_simple tenv env TVarSet.empty nf_expr in
+            begin match typ_annot with
+            | None -> typ
+            | Some typ' ->
+              if subtype_poly TVarSet.empty typ typ'
+              then typ' else raise (IncompatibleType typ)
+            end
           else Legacy.Checker.typeof_simple tenv env nf_expr_ann
         in
         let time2 = Unix.gettimeofday () in
@@ -76,6 +88,9 @@ let type_check_program
             Format.ksprintf pr "===== Warning: Was typable with POPL22 system =====\nType was: %s\n" (string_of_type t)
           end ;
         (varm,env)
+        | IncompatibleType t ->
+          Format.ksprintf pr "The type inferred is not a subtype of the provided annotation: %s\n" (string_of_type t) ;
+          (varm,env)
       end
     in
     let treat_elem (tenv,varm,env) elem =

@@ -23,7 +23,7 @@ type type_regexp =
 and type_expr =
     | TVar of string
     | TBase of type_base
-    | TCustom of string
+    | TCustom of type_expr list * string
     | TPair of type_expr * type_expr
     | TRecord of bool * (string * type_expr * bool) list
     | TSList of type_regexp
@@ -33,7 +33,8 @@ and type_expr =
     | TDiff of type_expr * type_expr
     | TNeg of type_expr
 
-type type_env = node StrMap.t (* User-defined types *) * StrSet.t (* Atoms *)
+type type_alias = var list * node
+type type_env = type_alias StrMap.t (* User-defined types *) * StrSet.t (* Atoms *)
 type var_type_env = typ StrMap.t (* Var types *)
 
 let empty_tenv = (StrMap.empty, StrSet.empty)
@@ -50,6 +51,15 @@ let type_base_to_typ t =
     | TAny -> any | TEmpty -> empty
     | TString -> string_typ | TList -> list_typ
 
+let instantiate_alias env args name =
+    try
+        let (params, node) = StrMap.find name env in
+        let subst = List.combine params args |> Subst.construct in
+        Subst.apply subst (descr node)
+    with
+    | Not_found -> raise (TypeDefinitionError (Printf.sprintf "Type %s undefined!" name))
+    | Invalid_argument _ -> raise (TypeDefinitionError (Printf.sprintf "Wrong arity for type %s!" name))
+
 let derecurse_types env venv defs =
     let open Cduce_core in
     let venv =
@@ -59,39 +69,49 @@ let derecurse_types env venv defs =
     in
     let henv = Hashtbl.create 16 in
     let () =
-        List.iter (fun (name, def) ->
+        List.iter (fun (name, params, def) ->
                 if StrMap.mem name env then 
                     raise (TypeDefinitionError (Printf.sprintf "Type %s already defined!" name))
                 else
-                    Hashtbl.add henv name (def, None)) defs
+                    Hashtbl.add henv name (def, params, [])) defs
     in
-    let rec get_name name =
+    let rec get_name ~nd args name =
         match Hashtbl.find henv name with
-        | _, Some v -> v
-        | def, None -> 
-            let v = Typepat.mk_delayed () in
-            Hashtbl.replace henv name (def, Some v);
-            let t = aux def in
-            Typepat.link v t;
-            v
+        | def, params, lst ->
+            if nd then raise (TypeDefinitionError (Printf.sprintf "Cannot use a reference to %s here!" name)) ;
+            let cached = lst |> List.find_opt (fun (args',_) -> List.for_all2 equiv args args') in
+            begin match cached with
+            | None ->
+                let v = Typepat.mk_delayed () in
+                Hashtbl.replace henv name (def, params, (args, v)::lst);
+                let local = List.combine params args |> List.to_seq |> StrMap.of_seq in
+                let t = aux ~nd local def in
+                Typepat.link v t;
+                v
+            | Some (_, v) -> v
+            end
         | exception Not_found -> 
-            try Typepat.mk_type (descr (StrMap.find name env))
-            with Not_found -> 
-                raise (TypeDefinitionError (Printf.sprintf "Type %s undefined!" name))
-    and aux t =
+            Typepat.mk_type (instantiate_alias env args name)
+        | exception Invalid_argument _ ->
+            raise (TypeDefinitionError (Printf.sprintf "Wrong arity for type %s!" name))
+    and aux ~nd (* no delayed: disallow relying on delayed vars *) lcl t =
         match t with
         | TVar v ->
-            begin try Typepat.mk_type (Hashtbl.find venv v)
-            with Not_found ->
+            begin match StrMap.find_opt v lcl, Hashtbl.find_opt venv v with
+            | Some t, _ | None, Some t -> Typepat.mk_type t
+            | None, None ->
                 let t = mk_var v |> var_typ in
                 Hashtbl.add venv v t ;
-                Typepat.mk_type t end
+                Typepat.mk_type t
+            end
         | TBase tb -> Typepat.mk_type (type_base_to_typ tb)
-        | TCustom n -> get_name n
-        | TPair (t1,t2) -> Typepat.mk_prod (aux t1) (aux t2)
+        | TCustom (args, n) ->
+            let args = args |> List.map (aux ~nd:true lcl) |> List.map Typepat.typ in
+            get_name ~nd args n
+        | TPair (t1,t2) -> Typepat.mk_prod (aux ~nd lcl t1) (aux ~nd lcl t2)
         | TRecord (is_open, fields) ->
             let aux' (label,t,opt) =
-                let n = aux t in
+                let n = aux ~nd lcl t in
                 let n = if opt then Typepat.mk_optional n else n in
                 (to_label label, (n, None))
             in
@@ -99,53 +119,54 @@ let derecurse_types env venv defs =
                 Cduce_types.Ident.LabelMap.from_list_disj (List.map aux' fields)
             in
             Typepat.mk_record is_open lmap
-        | TSList lst -> Typepat.rexp (aux_re lst)
-        | TArrow (t1,t2) -> Typepat.mk_arrow (aux t1) (aux t2)
+        | TSList lst -> Typepat.rexp (aux_re ~nd lcl lst)
+        | TArrow (t1,t2) -> Typepat.mk_arrow (aux ~nd lcl t1) (aux ~nd lcl t2)
         | TCup (t1,t2) ->
-            let t1 = aux t1 in
-            let t2 = aux t2 in
+            let t1 = aux ~nd lcl t1 in
+            let t2 = aux ~nd lcl t2 in
             Typepat.mk_or t1 t2
         | TCap (t1,t2) ->
-            let t1 = aux t1 in
-            let t2 = aux t2 in
+            let t1 = aux ~nd lcl t1 in
+            let t2 = aux ~nd lcl t2 in
             Typepat.mk_and t1 t2
         | TDiff (t1,t2) ->
-            let t1 = aux t1 in
-            let t2 = aux t2 in
+            let t1 = aux ~nd lcl t1 in
+            let t2 = aux ~nd lcl t2 in
             Typepat.mk_diff t1 t2
-        | TNeg t -> Typepat.mk_diff (Typepat.mk_type any) (aux t)
-    and aux_re r =
+        | TNeg t -> Typepat.mk_diff (Typepat.mk_type any) (aux ~nd lcl t)
+    and aux_re ~nd lcl r =
         match r with
         | ReEmpty -> Typepat.mk_empty
         | ReEpsilon -> Typepat.mk_epsilon
-        | ReType t -> Typepat.mk_elem (aux t)
-        | ReSeq (r1, r2) -> Typepat.mk_seq (aux_re r1) (aux_re r2)
-        | ReAlt (r1, r2) -> Typepat.mk_alt (aux_re r1) (aux_re r2)
-        | ReStar r -> Typepat.mk_star (aux_re r)
+        | ReType t -> Typepat.mk_elem (aux ~nd lcl t)
+        | ReSeq (r1, r2) -> Typepat.mk_seq (aux_re ~nd lcl r1) (aux_re ~nd lcl r2)
+        | ReAlt (r1, r2) -> Typepat.mk_alt (aux_re ~nd lcl r1) (aux_re ~nd lcl r2)
+        | ReStar r -> Typepat.mk_star (aux_re ~nd lcl r)
     in
-    let nodes = List.map (fun (name, def) -> name, aux def) defs in
-    let res =
-        List.map (fun (name, node) -> (name, 
-                            (Typepat.internalize node; Typepat.typ node))) nodes
-    in
+    let res = defs |> List.map (fun (name, params, _) ->
+        let params = List.map (fun str -> mk_var str) params in
+        let args = List.map var_typ params in
+        let node = get_name ~nd:false args name in
+        (* Typepat.internalize node ; *)
+        name, params, Typepat.typ node) in
     let venv = Hashtbl.fold StrMap.add venv StrMap.empty in
     (res, venv)
 
 let type_expr_to_typ (tenv, _) venv t = 
-    match derecurse_types tenv venv [ ("", t) ] with
-    | ([ _, n ], venv) -> (n, venv)
+    match derecurse_types tenv venv [ ("", [], t) ] with
+    | ([ _, _, n ], venv) -> (n, venv)
     | _ -> assert false
 
 let define_types (tenv, aenv) venv defs =
     let defs = List.map
-        (fun (name, decl) -> (String.capitalize_ascii name, decl))
+        (fun (name, params, decl) -> (String.capitalize_ascii name, params, decl))
         defs
     in
     let (res, venv) = derecurse_types tenv venv defs in
     let tenv = List.fold_left
-        (fun acc (name, typ) ->
-            register name typ; 
-            StrMap.add name (cons typ) acc)
+        (fun acc (name, params, typ) ->
+            if params = [] then register name typ ;
+            StrMap.add name (params, cons typ) acc)
         tenv
         res
     in ((tenv, aenv), venv)
@@ -155,16 +176,11 @@ let define_atom (env, atoms) name =
     let typ = String.capitalize_ascii name in
     if StrMap.mem typ env
     then raise (TypeDefinitionError (Printf.sprintf "Type %s already defined!" typ))
-    else (StrMap.add typ (cons (mk_atom atom)) env, StrSet.add atom atoms)
+    else (StrMap.add typ ([], cons (mk_atom atom)) env, StrSet.add atom atoms)
 
-let get_type (env, _) name =
+let get_atom_type (env, _) name =
     let name = String.capitalize_ascii name in
-    try descr (StrMap.find name env)
-    with Not_found -> raise (TypeDefinitionError (Printf.sprintf "Type %s undefined!" name))
-
-let has_type (env, _) name =
-    let name = String.capitalize_ascii name in
-    StrMap.mem name env
+    instantiate_alias env [] name
 
 let has_atom (_, atoms) name =
     let name = String.uncapitalize_ascii name in
@@ -313,7 +329,7 @@ let remove_useless_from_dnf branch_type dnf =
     in
     aux [] dnf
 
-let simplify_raw_dnf ~open_nodes dnf =
+let [@warning "-27"] simplify_raw_dnf _ ~open_nodes ~contravar dnf =
     let regroup_conjuncts (vars, (ps, ns)) =
         (vars, (regroup_conjuncts ~open_nodes ps, ns))
     in
@@ -321,10 +337,10 @@ let simplify_raw_dnf ~open_nodes dnf =
     (* Regroup positive conjuncts with similar domain/codomain  *)
     List.map regroup_conjuncts dnf
 
-let simplify_raw_product_dnf ~open_nodes dnf =
+let [@warning "-27"] simplify_raw_product_dnf _ ~open_nodes ~contravar dnf =
     let dnf = remove_useless_from_dnf full_product_branch_type dnf in
-    (* TODO: More advanced simplifications for records *)
-    ignore (open_nodes) ; dnf
+    (* TODO: More advanced simplifications for products *)
+    dnf
 
 let is_test_type t =
     if vars t |> TVarSet.is_empty
@@ -348,11 +364,46 @@ let is_test_type t =
         in aux t
     else false
 
-let simplify_typ t =
+let pair_vars (a,b) = TVarSet.union (vars (descr a)) (vars (descr b))
+let pairs_vars lst =
+    lst |> List.map pair_vars |>
+    List.fold_left TVarSet.union TVarSet.empty
+let branch_vars ((pvs, nvs), (ps,ns)) =
+    TVarSet.construct (pvs@nvs) |>
+    TVarSet.union (pairs_vars ps) |>
+    TVarSet.union (pairs_vars ns)
+let branches_vars lst =
+    lst |> List.map branch_vars |>
+    List.fold_left TVarSet.union TVarSet.empty
+
+let simplify_typ_aux simplify_arrow simplify_product mono t =
     (*Utils.log ~level:2 "Simplifying type...@?" ;*)
     let cache = NHT.create 5 in
-    let rec aux node =
-        let aux' (a,b) = (aux a, aux b) in
+    let rec aux mono contravar node =
+        let aux_pair arrow mono (a,b) =
+            let monoa = TVarSet.union mono (vars (descr a)) in
+            let monob = TVarSet.union mono (vars (descr b)) in
+            (aux monob (arrow <> contravar) a, aux monoa contravar b) in
+        let aux_pairs arrow mono ps =
+            ps |> Utils.add_others |> List.map (fun (ps, others) ->
+                let vs = pairs_vars others in
+                aux_pair arrow (TVarSet.union mono vs) ps
+            )
+        in
+        let aux_branch arrow mono ((pvs, nvs), (ps,ns)) =
+            let mono = TVarSet.construct (pvs@nvs) |> TVarSet.union mono in
+            let ps_vars = ps |> pairs_vars in
+            let ns_vars = ns |> pairs_vars in
+            let ps = aux_pairs arrow (TVarSet.union mono ns_vars) ps in
+            let ns = aux_pairs arrow (TVarSet.union mono ps_vars) ns in
+            ((pvs,nvs),(ps,ns))
+        in
+        let aux_branches arrow mono lst =
+            lst |> Utils.add_others |> List.map (fun (branch, others) ->
+                let vs = branches_vars others in
+                aux_branch arrow (TVarSet.union mono vs) branch
+            )
+        in
         match NHT.find_opt cache node with
         | Some n -> n
         | None ->
@@ -368,22 +419,18 @@ let simplify_typ t =
                 | Times m ->
                     let module K = (val m) in
                     K.get_vars t |> K.Dnf.get_full
-                    |> simplify_raw_product_dnf ~open_nodes:cache
-                    |> List.map (fun (vars, (ps,ns)) ->
-                        (vars, (List.map aux' ps, List.map aux' ns))
-                        |> full_product_branch_type
-                    ) |> disj
+                    |> simplify_product mono ~open_nodes:cache ~contravar
+                    |> aux_branches false mono
+                    |> List.map full_product_branch_type |> disj
                 | Xml m ->
                     let module K = (val m) in
                     K.get_vars t |> K.mk
                 | Function m ->
                     let module K = (val m) in
                     K.get_vars t |> K.Dnf.get_full
-                    |> simplify_raw_dnf ~open_nodes:cache
-                    |> List.map (fun (vars, (ps,ns)) ->
-                        (vars, (List.map aux' ps, List.map aux' ns))
-                        |> full_branch_type
-                    ) |> disj
+                    |> simplify_arrow mono ~open_nodes:cache ~contravar
+                    |> aux_branches true mono
+                    |> List.map full_branch_type |> disj
                 | Record m ->
                     let module K = (val m) in
                     let dnf = K.get_vars t in
@@ -394,12 +441,15 @@ let simplify_typ t =
             ) empty (descr node) in
             define_typ n t ; n
     in
-    let res = aux (cons t) |> descr in
+    let res = aux mono false (cons t) |> descr in
     (* TODO: Uncomment the assert and fix it. *)
     (* if equiv res t |> not then Format.printf "Before:%a@.After:%a@." pp_typ t pp_typ res ; *)
     (* assert (equiv res t) ; *)
     (* Utils.log ~level:2 " Done.@." ;*)
     res
+
+let simplify_typ = simplify_typ_aux
+    simplify_raw_dnf simplify_raw_product_dnf TVarSet.empty
 
 let square_approx f out =
     let res = dnf f |> List.map begin
@@ -439,7 +489,6 @@ let square_split f out =
             (t, res)
     end
 
-(* TODO: Optimize triangle exact... *)
 let triangle_exact f out =
     let res = dnf f |> List.map begin
         fun lst ->
@@ -503,6 +552,7 @@ module type Subst = sig
     val remove : t -> TVarSet.t -> t
     val split : t -> TVarSet.t -> t * t
     val apply_simplify : t -> typ -> typ
+    val new_vars : t -> TVarSet.t
 end
 module Subst : Subst = struct
     include Subst
@@ -532,6 +582,13 @@ module Subst : Subst = struct
     let apply_simplify s t =
         if TVarSet.inter (Subst.dom s) (vars t) |> TVarSet.is_empty
         then t else Subst.apply s t |> simplify_typ
+    let new_vars s =
+        let old_vars = dom s in
+        let new_vars =
+            destruct s |> List.map (fun (_, t) -> vars t)
+            |> List.fold_left TVarSet.union TVarSet.empty
+        in
+        TVarSet.diff old_vars new_vars
 end
 
 let next_var_name = ref 0
@@ -539,31 +596,8 @@ let fresh_var () =
     next_var_name := !next_var_name + 1 ;
     mk_var (Format.sprintf "$%i" !next_var_name)
 
-let remove_redundant_vars mono t =
-    (* Utils.log ~level:2 "Started removing redundant vars in %a...@?" pp_typ t ; *)
-    let vs = TVarSet.diff (vars t) mono |> TVarSet.destruct
-    |> List.sort (fun v1 v2 -> var_compare v2 v1) in
-    let res = Utils.pairs vs vs
-    |> List.filter (fun (v1, v2) -> var_compare v1 v2 < 0)
-    |> List.fold_left (fun (res, t) (v1, v2) ->
-        let v1' = fresh_var () in
-        let v2' = fresh_var () in
-        let subst1 = Subst.construct [(v1, var_typ v1');(v2, var_typ v2')] in
-        let subst2 = Subst.construct [(v1, var_typ v2');(v2, var_typ v1')] in
-        let t1 = Subst.apply subst1 t in
-        let t2 = Subst.apply subst2 t in
-        if equiv t1 t2
-        then
-        let subst = Subst.construct [(v1, var_typ v2)] in
-        (Subst.compose subst res, Subst.apply subst t)
-        else (res, t)
-    ) (Subst.identity, t)
-    in (* Utils.log ~level:2 " Done.@." ; *) res
-
-let hard_clean mono t =
-    let t = clean_type ~pos:empty ~neg:any mono t in
-    let (_,t) = remove_redundant_vars mono t in
-    t
+let clean_poly_vars mono t =
+    clean_type ~pos:empty ~neg:any mono t
 
 let clean_type_ext ~pos ~neg mono t =
     let subst =
@@ -664,6 +698,85 @@ let triangle_split_poly mono f out =
             let (_,_,t) = fresh mono t in
             (sup_typ mono t, triangle_poly mono t out)
     end
+
+(* Simplification of polymorphic types *)
+
+let remove_redundant_vars mono t =
+    let compose_res (s,t) res = match res with
+    | None -> (Subst.identity, t)
+    | Some (s', t') -> (Subst.compose s' s, t')
+    in
+    let rec aux t =
+        let vs = TVarSet.diff (vars t) mono |> TVarSet.destruct in
+        Utils.pairs vs vs
+        |> List.filter (fun (v1, v2) -> var_compare v1 v2 < 0)
+        |> List.find_opt (fun (v1, v2) ->
+            let v1' = fresh_var () in
+            let v2' = fresh_var () in
+            let subst1 = Subst.construct [(v1, var_typ v1');(v2, var_typ v2')] in
+            let subst2 = Subst.construct [(v1, var_typ v2');(v2, var_typ v1')] in
+            let t1 = Subst.apply subst1 t in
+            let t2 = Subst.apply subst2 t in
+            equiv t1 t2
+        )
+        |> Option.map (fun (v1, v2) ->
+            let subst = Subst.construct [(v1, var_typ v2)] in
+            let t = Subst.apply subst t in
+            let res = aux t in
+            compose_res (subst, t) res
+        )
+    in
+    aux t |> compose_res (Subst.identity, t)
+
+let remove_useless_poly_conjuncts mono branch_type lst =
+    let atom_type (a,b) = branch_type (([],[]),([(a,b)],[])) in
+    let rec aux kept rem =
+        match rem with
+        | [] -> kept
+        | c::rem ->
+            let ct = atom_type c in
+            (* let rt = rem |> List.map atom_type |> conj in
+            let kt = kept |> List.map atom_type |> conj in
+            let others = conj [kt ; rt] in
+            if subtype_poly mono others ct *)
+            let rt = rem |> List.map atom_type in
+            let kt = kept |> List.map atom_type in
+            let others = kt@rt in
+            if List.exists (fun other -> subtype_poly mono other ct) others
+            then aux kept rem else aux (c::kept) rem
+    in
+    aux [] lst
+
+let [@warning "-27"] simplify_poly_dnf mono ~open_nodes ~contravar dnf =
+    let aux mono ((pvs,nvs),(ps,ns)) =
+        let tvars = TVarSet.construct (pvs@nvs) in
+        let tvars = TVarSet.diff tvars mono in
+        if TVarSet.is_empty tvars |> not && not contravar
+        then ((pvs,nvs),([],[]))
+        else if not contravar then
+            (* (ignore remove_useless_poly_conjuncts ; ((pvs,nvs),(ps,ns))) *)
+            ((pvs,nvs), (remove_useless_poly_conjuncts mono full_branch_type ps, ns))
+        else ((pvs,nvs),(ps,ns))
+    in
+    Utils.add_others dnf |> List.map (fun (branch, others) ->
+        let mono = TVarSet.union mono (branches_vars others) in
+        aux mono branch
+    )
+
+let [@warning "-27"] simplify_poly_product_dnf mono ~open_nodes ~contravar dnf =
+    (* TODO: poly simplifications for products *)
+    dnf
+
+let simplify_poly_typ mono t =
+    let t = clean_poly_vars mono t in
+    let (_, t) = remove_redundant_vars mono t in
+    ignore (simplify_poly_dnf, simplify_poly_product_dnf) ;
+    (* NOTE: Advanced simplification disabled because it sometimes raise a Cduce issue,
+       and it is not very efficient anyway (in particular when branches use the same vars). *)
+    (* let t = simplify_typ_aux simplify_poly_dnf simplify_poly_product_dnf mono t in
+    let t = clean_poly_vars mono t in
+    let (_, t) = remove_redundant_vars mono t in *)
+    t
 
 (* Operations on jokers (legacy) *)
 

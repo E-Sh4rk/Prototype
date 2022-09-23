@@ -16,8 +16,9 @@ let contains_records e =
     | Const EmptyRecord -> true
     | Const _ -> false
     | Lambda (_, Parsing.Ast.Unnanoted, _, e) -> aux e
-    | Lambda (_, Parsing.Ast.AArrow t, _, e)
-    | Lambda (_, Parsing.Ast.ADomain t, _, e) -> aux_t t || aux e
+    | Lambda (_, Parsing.Ast.AArrow t, _, e) -> aux_t t || aux e
+    | Lambda (_, Parsing.Ast.ADomain ts, _, e) ->
+      (List.exists aux_t ts) || aux e
     | Ite (_, s, _, _) -> aux_t s
     | Projection (Parsing.Ast.Field _, _)
     | RecordUpdate _ -> true

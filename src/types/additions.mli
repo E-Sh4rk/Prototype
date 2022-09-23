@@ -22,7 +22,7 @@ type type_regexp =
 and type_expr =
     | TVar of string
     | TBase of type_base
-    | TCustom of string
+    | TCustom of type_expr list * string
     | TPair of type_expr * type_expr
     | TRecord of bool * (string * type_expr * bool) list
     | TSList of type_regexp
@@ -44,11 +44,9 @@ val type_expr_to_typ : type_env -> var_type_env -> type_expr -> typ * var_type_e
 
 val define_atom : type_env -> string -> type_env
 
-val define_types : type_env -> var_type_env -> (string * type_expr) list -> type_env * var_type_env
+val define_types : type_env -> var_type_env -> (string * string list * type_expr) list -> type_env * var_type_env
 
-val get_type : type_env -> string -> typ
-
-val has_type : type_env -> string -> bool
+val get_atom_type : type_env -> string -> typ
 
 val has_atom : type_env -> string -> bool
 
@@ -61,6 +59,8 @@ val disj_o : typ list -> typ
 
 val simplify_dnf : (typ * typ) list list -> (typ * typ) list list
 val simplify_typ : typ -> typ
+val simplify_poly_typ : TVarSet.t -> typ -> typ
+val remove_redundant_vars : TVarSet.t -> typ -> subst * typ
 
 val branch_type : (typ*typ) list -> typ
 
@@ -101,10 +101,11 @@ module type Subst = sig
     val remove : t -> TVarSet.t -> t
     val split : t -> TVarSet.t -> t * t
     val apply_simplify : t -> typ -> typ
+    val new_vars : t -> TVarSet.t
 end
 module Subst : Subst
 (* val remove_redundant_vars : TVarSet.t -> typ -> Subst.t * typ *)
-val hard_clean : TVarSet.t -> typ -> typ
+val clean_poly_vars : TVarSet.t -> typ -> typ
 val clean_type_ext : pos:typ -> neg:typ -> TVarSet.t -> typ -> subst
 val fresh_var : unit -> var
 val instantiate : Subst.t list -> typ -> typ

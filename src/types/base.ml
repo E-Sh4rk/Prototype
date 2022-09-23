@@ -227,6 +227,7 @@ module type TVarSet = sig
   val add : var -> t -> t
   val inter : t -> t -> t
   val diff : t -> t -> t
+  val rm : var -> t -> t
   val destruct : t -> var list
   val pp : Format.formatter -> t -> unit
 end
@@ -241,6 +242,7 @@ module TVarSet = struct
   let add = CD.Var.Set.add
   let inter = CD.Var.Set.cap
   let diff = CD.Var.Set.diff
+  let rm = CD.Var.Set.remove
   let destruct = CD.Var.Set.get
   let pp fmt t =
     destruct t |> Format.fprintf fmt "%a@." (Utils.pp_list pp_var)
@@ -307,3 +309,62 @@ let clean_type ~pos ~neg vars t =
 let rectype = CD.Types.Subst.solve_rectype
 let refresh = CD.Types.Subst.refresh
 let tallying ~var_order = CD.Types.Tallying.tallying ~var_order
+
+(* Some additions *)
+let factorize (pvs, nvs) t =
+  let open Iter in
+  let treat_kind m t =
+    let module K = (val m : Kind) in
+    let conj lst = match lst with
+    | [] -> K.Dnf.any
+    | a::lst -> List.fold_left K.Dnf.cap a lst
+    in
+    let disj lst = match lst with
+    | [] -> K.Dnf.empty
+    | a::lst -> List.fold_left K.Dnf.cup a lst
+    in
+    let rebuild_partial lst =
+      lst |> List.map (fun ((pvs, nvs), mono) ->
+        let t = K.Dnf.mono mono in
+        let pvs = pvs |> List.map K.Dnf.var |> conj in
+        let nvs = nvs |> List.map K.Dnf.var |> List.map K.Dnf.neg |> conj in
+        conj [pvs ; nvs ; t]
+      ) |> disj
+    in
+    let (a,b) =
+      K.get_vars t
+      |> K.Dnf.get_partial |> List.map (fun ((pvs',nvs'), mono) ->
+        let pvs' = TVarSet.construct pvs' in
+        let nvs' = TVarSet.construct nvs' in
+        if TVarSet.diff pvs pvs' |> TVarSet.is_empty &&
+           TVarSet.diff nvs nvs' |> TVarSet.is_empty
+        then
+          let pvs' = TVarSet.diff pvs' pvs in
+          let nvs' = TVarSet.diff nvs' nvs in
+          ([((pvs',nvs'),mono)], [])
+        else ([], [((pvs',nvs'),mono)])
+      ) |> List.split in
+    let (a,b) = (List.concat a, List.concat b) in
+    let (a,b) = (rebuild_partial a, rebuild_partial b) in
+    (K.mk a, K.mk b)
+  in
+  let t = fold (fun (a,b) pack t ->
+      let (a',b') = match pack with
+      | Absent -> (empty, absent)
+      | Abstract m | Char m | Int m | Atom m -> treat_kind m t
+      | Times m ->
+          let module K = (val m :> Kind) in
+          treat_kind (module K) t
+      | Xml m ->
+          let module K = (val m :> Kind) in
+          treat_kind (module K) t
+      | Function m ->
+          let module K = (val m :> Kind) in
+          treat_kind (module K) t
+      | Record m ->
+          let module K = (val m :> Kind) in
+          treat_kind (module K) t
+      in
+      (cup a a', cup b b')
+    ) (empty, empty) t
+  in t

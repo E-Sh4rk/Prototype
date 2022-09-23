@@ -319,17 +319,32 @@ let and_ = fun x -> fun y ->
 let fixpoint = <(('a -> 'b) -> ('a -> 'b)) -> ('a -> 'b)>
 
 let concat concat x y =
-   if x is Nil then y else (fst x, (concat (snd x) y) ) 
+   if x is Nil then y else (fst x, (concat (snd x) y))
 
-let concat : ['a*] -> ['a*] -> ['a*] = fixpoint concat
+(* let concat : ['a*] -> ['b*] -> ['a* ; 'b*] = fixpoint concat *)
 
-let flatten flatten (x:['a*]) =
+let concat = < [ 'a* ] -> [ 'b* ] -> [ 'a* ; 'b* ] >
+
+(* let flatten_ocaml flatten (x:['a*]) =
    if x is Nil then nil else
    if x is (Any, Any) then concat (fst x) (flatten (snd x)) else
    (x,nil)
 
-let flatten : [['a*]*] -> ['a*] = fixpoint flatten
+let flatten_ocaml : [['a*]*] -> ['a*] = fixpoint flatten_ocaml *)
 
+type Tree 'a = ('a \ [Any*]) | [(Tree 'a)*]
+
+let flatten (flatten : Tree '_a -> ['_a*]) (x : Tree '_a) =
+  if x is Nil then nil else
+  if x is [Any*] then concat (flatten (fst x)) (flatten (snd x))
+  else (x,nil)
+
+(* let flatten = < (Tree 'a -> ['a*]) -> (Tree 'a -> ['a*]) > *)
+
+(* TODO: Investigate Cduce issue *)
+(* let flatten : (Tree 'a -> ['a*]) = fixpoint flatten *)
+
+let flatten = fixpoint flatten
 
 let test = flatten ((1,true),((42,0),"ok"))
 
@@ -345,8 +360,8 @@ let ifthenelse (b : TRUE ; FALSE )  x y = b x y
 
 (* Parametric types examples *)
 
-type Tree 'a = ('a, [(Tree 'a)*])
-let a = <Tree Int>
+type Tree' 'a = ('a, [(Tree' 'a)*])
+let a = <Tree' Int>
 
 type Rec 'a = Rec 'a -> 'a
 let b = <Rec 'b>

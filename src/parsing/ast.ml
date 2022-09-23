@@ -130,7 +130,7 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
             let (t, vtenv) = type_expr_to_typ tenv vtenv t in
             if is_test_type t
             then Ite (aux vtenv env e, t, aux vtenv env e1, aux vtenv env e2)
-            else failwith "Cannot make a typecase with a non-trvial arrow type."
+            else failwith "This is not a valid test type."
         | App (e1, e2) ->
             App (aux vtenv env e1, aux vtenv env e2)
         | Let (str, e1, e2) ->

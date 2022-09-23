@@ -334,6 +334,9 @@ let flatten flatten x =
    
 let flatten = fixpoint flatten   
 
+
+let test = flatten ((1,true),((42,0),"ok"))
+
 type TRUE  =  'a -> 'b -> 'a
 type FALSE =  'a -> 'b -> 'b
 

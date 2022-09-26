@@ -347,6 +347,18 @@ let rev_tl_aux rev_tl l  acc  =
 
 let rev_tl l = (fixpoint rev_tl_aux) l nil
 
+let foldr_aux foldr f l acc =
+   if l is Nil then acc else f (fst l) (foldr f (snd l) acc)
+
+let foldr = fixpoint foldr_aux
+
+let foldr_ann : ('a -> 'b -> 'b ) -> [ 'a* ] -> 'b -> 'b = fixpoint foldr_aux
+
+let foldr_ann2 : (('a -> 'b -> 'b ) -> [ 'a* ] -> 'b -> 'b) & (Any -> [] -> 'c -> 'c)  =
+    fixpoint foldr_aux
+
+
+
 type Tree 'a = ('a \ [Any*]) | [(Tree 'a)*]
 
 let flatten (flatten : Tree '_a -> ['_a*]) (x : Tree '_a) =

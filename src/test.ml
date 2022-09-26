@@ -321,7 +321,9 @@ let fixpoint = <(('a -> 'b) -> ('a -> 'b)) -> ('a -> 'b)>
 let concat concat x y =
    if x is Nil then y else (fst x, (concat (snd x) y))
 
-(* let concat : ['a*] -> ['b*] -> ['a* ; 'b*] = fixpoint concat *)
+let concat_annotated : ['a*] -> ['b*] -> ['a* ; 'b*] = fixpoint concat
+
+let concat = fixpoint concat
 
 let concat = < [ 'a* ] -> [ 'b* ] -> [ 'a* ; 'b* ] >
 
@@ -331,6 +333,19 @@ let concat = < [ 'a* ] -> [ 'b* ] -> [ 'a* ; 'b* ] >
    (x,nil)
 
 let flatten_ocaml : [['a*]*] -> ['a*] = fixpoint flatten_ocaml *)
+
+
+let reverse_aux reverse l  =
+    if l is Nil then nil else concat (reverse (snd l)) [(fst l)]
+    
+let reverse  = fixpoint reverse_aux
+
+let reverse_ann : [ ('a)*] -> [('a)*] = fixpoint reverse_aux
+
+let rev_tl_aux rev_tl l  acc  =
+     if l is Nil then acc else rev_tl (snd l) (fst l, acc)
+
+let rev_tl l = (fixpoint rev_tl_aux) l nil
 
 type Tree 'a = ('a \ [Any*]) | [(Tree 'a)*]
 
@@ -346,7 +361,7 @@ let flatten (flatten : Tree '_a -> ['_a*]) (x : Tree '_a) =
 
 let flatten = fixpoint flatten
 
-let test = flatten ((1,true),((42,0),"ok"))
+let test = flatten ((1,(true,nil)),(((42,(false,nil)),0),"ok"))
 
 type TRUE  =  'a -> 'b -> 'a
 type FALSE =  'a -> 'b -> 'b

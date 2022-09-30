@@ -3,29 +3,27 @@
 ## Compiling from scratch
 
 The easiest way to install from scratch is through [opam](https://opam.ocaml.org/), the OCaml Package Manager.
-The prototype supports OCaml version 4.07.1 to 4.13.1.
+It has been tested on OCaml 4.14.0.
 
-Once `opam` is installed, CDuce needs to be installed before the prototype.
+Once `opam` is installed, CDuce needs to be installed before running this prototype.
 
 ### Installing CDuce
 
 ```
-opam pin add cduce-types 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#tallying-with-custom-order'
+opam pin add cduce-types 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#dev'
 
-opam pin add cduce 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#tallying-with-custom-order'
+opam pin add cduce 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#dev'
 
 opam install cduce-types cduce
 ```
 
 ### Building the prototype
 
-Once CDuce is installed, the prototype can be built using
+Once CDuce is installed, our prototype can be built using
 
 ```
 git clone git@github.com:E-Sh4rk/Prototype.git
 cd Prototype/src
-opam install dune
-eval $(opam env)
 opam install ppx_deriving ppx_inline_test ppx_expect menhir pomap
 make
 ```

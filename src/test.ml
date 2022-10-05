@@ -357,6 +357,13 @@ let foldr_ann : ('a -> 'b -> 'b ) -> [ 'a* ] -> 'b -> 'b = fixpoint foldr_aux
 let foldr_ann2 : (('a -> 'b -> 'b ) -> [ 'a* ] -> 'b -> 'b) & (Any -> [] -> 'c -> 'c)  =
     fixpoint foldr_aux
 
+let filter_aux (filter :[ Any* ] -> (('a -> True) & ((~('a)) -> ~True)) -> [ ('a)* ] ) ( f : (('a -> True) & ((~('a)) -> ~True))) (l : [ ('a|'b)* ] )  =
+   if l is Nil then nil else
+   if l is [Any+] then
+       if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
+   else 42(3)    
+
+let filter : [ Any* ] -> (('a -> True) & ((~'a) -> ~True)) -> [ ('a)* ] = fixpoint filter_aux
 
 
 type Tree 'a = ('a \ [Any*]) | [(Tree 'a)*]

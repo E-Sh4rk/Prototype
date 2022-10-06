@@ -357,7 +357,12 @@ let foldr_ann : ('a -> 'b -> 'b ) -> [ 'a* ] -> 'b -> 'b = fixpoint foldr_aux
 let foldr_ann2 : (('a -> 'b -> 'b ) -> [ 'a* ] -> 'b -> 'b) & (Any -> [] -> 'c -> 'c)  =
     fixpoint foldr_aux
 
+let flatten_pure flatten x =
+  if x is Nil then nil else
+  if x is [Any*] then concat (flatten (fst x)) (flatten (snd x))
+  else (x,nil)
 
+(* let flatten_pure = fixpoint flatten_pure *)
 
 type Tree 'a = ('a \ [Any*]) | [(Tree 'a)*]
 

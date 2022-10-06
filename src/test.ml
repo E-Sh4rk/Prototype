@@ -358,6 +358,7 @@ let foldr_ann2 : (('a -> 'b -> 'b ) -> [ 'a* ] -> 'b -> 'b) & (Any -> [] -> 'c -
     fixpoint foldr_aux
 
 
+
 (* FILTER FUNCTION *)
 
 (* the following type checks ... with an unreadable type *)
@@ -367,6 +368,17 @@ let filter_aux_pure filter f l =
    if l is [Any+] then
        if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
    else 42(3)    
+
+(* TODO: Investigate:
+   - why f is splitted weirdly??
+   - why f(fst(l)) split 'True' is not propagated to lst(l)?? *)
+let filter_aux
+(filter : (('_a -> True) & ((~('_a)) -> ~True)) -> [ Any* ] -> [ ('_a)* ] ) ( f : (('_a -> True) & ((~('_a)) -> ~True))) (l : [ Any* ] )  =
+  (* filter f l = *)
+  if l is Nil then nil
+  else
+    if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
+
 
 (* the following loops:
 let filter : [ Any* ] -> (('a -> True) & ((~'a) -> ~True)) -> [ ('a)* ] = fixpoint filter_aux_pure

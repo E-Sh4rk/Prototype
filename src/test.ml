@@ -379,10 +379,35 @@ let filter_aux
   else
     if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
 
-
 (* the following loops:
 let filter : [ Any* ] -> (('a -> True) & ((~'a) -> ~True)) -> [ ('a)* ] = fixpoint filter_aux_pure
 *)
+
+(*
+   A new variation that does not require the
+   characteristic function to be defined on Any
+ *)
+
+let new_filter_aux
+  (filter : ((('_a & 'b) -> True) & (('_a\'_b) -> ~True)) -> [ '_a* ] -> [ ('_a&'_b)* ] )
+  (f : (('_a & 'b) -> True) & (('_a\'_b) -> ~True)) (l : [ ('_a&'_b)*  ] )  =
+  (* filter f l = *)
+  if l is Nil then nil
+  else
+    if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
+
+let new_filter = fixpoint new_filter_aux
+
+let filter_aux_classic
+(filter : (('_a) -> Bool) -> [ ('_a)* ] -> [ ('_a)* ] ) ( f : '_a -> Bool) (l : [ ('_a)* ] )  =
+  (* filter f l = *)
+  if l is Nil then nil
+  else
+    if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
+
+
+let filter_classic = fixpoint filter_aux_classic
+
 
 (* the following deos not type check and I do not understand why not *)
 

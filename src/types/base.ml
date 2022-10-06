@@ -300,8 +300,29 @@ module Subst = struct
   let pp = CD.Types.Subst.print
 end
 
-let inf_typ = CD.Types.Subst.min_type (* TODO: This implem is not optimal *)
-let sup_typ = CD.Types.Subst.max_type (* TODO: This implem is not optimal *)
+let subst_vars_with delta s t =
+  let vars = TVarSet.diff (vars t) delta in
+  let subst = vars |> TVarSet.destruct |>
+    List.map (fun v -> (v,s)) |> Subst.construct in
+  Subst.apply subst t
+
+let inf_typ delta t = (* TODO : use min_type once it will be fixed? *)
+  (* let res = CD.Types.Subst.min_type delta t (* TODO: This implem is not optimal *) in
+  if equiv t res |> not
+  then Format.printf "MIN_TYPE: type %a with delta=%a gives %a@."
+    pp_typ t TVarSet.pp delta pp_typ res ;
+  res *)
+  CD.Types.Subst.clean_type ~pos:empty ~neg:any delta t |>
+  subst_vars_with delta any
+
+let sup_typ delta t = (* TODO : use max_type once it will be fixed? *)
+  (* let res = CD.Types.Subst.max_type delta t (* TODO: This implem is not optimal *) in
+  if equiv t res |> not
+  then Format.printf "MAX_TYPE: type %a with delta=%a gives %a@."
+    pp_typ t TVarSet.pp delta pp_typ res ;
+  res *)
+  CD.Types.Subst.clean_type ~pos:any ~neg:empty delta t |>
+  subst_vars_with delta any
 
 (* Tallying *)
 let clean_type ~pos ~neg vars t =

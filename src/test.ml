@@ -369,16 +369,6 @@ let filter_aux_pure filter f l =
        if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
    else 42(3)    
 
-(* TODO: Investigate:
-   - why f is splitted weirdly??
-   - why f(fst(l)) split 'True' is not propagated to lst(l)?? *)
-let filter_aux
-(filter : (('_a -> True) & ((~('_a)) -> ~True)) -> [ Any* ] -> [ ('_a)* ] ) ( f : (('_a -> True) & ((~('_a)) -> ~True))) (l : [ Any* ] )  =
-  (* filter f l = *)
-  if l is Nil then nil
-  else
-    if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
-
 (* the following loops:
 let filter : [ Any* ] -> (('a -> True) & ((~'a) -> ~True)) -> [ ('a)* ] = fixpoint filter_aux_pure
 *)
@@ -411,14 +401,12 @@ let filter_classic = fixpoint filter_aux_classic
 
 (* the following deos not type check and I do not understand why not *)
 
-let filter_aux (filter :[ Any* ] -> (('a -> True) & ((~('a)) -> ~True)) -> [ ('a)* ] ) ( f : (('a -> True) & ((~('a)) -> ~True))) (l : [ Any* ] )  =
+let filter_aux (filter : (('_a -> True) & ((~('_a)) -> ~True)) -> [ Any* ] -> [ ('_a)* ] ) ( f : (('_a -> True) & ((~('_a)) -> ~True))) (l : [ Any* ] )  =
    if l is Nil then nil else
    if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
 
 
-let filter : [ Any* ] -> (('a -> True) & ((~'a) -> ~True)) -> [ ('a)* ] = fixpoint filter_aux
-
-
+let filter : (('a -> True) & ((~'a) -> ~True)) -> [Any*] -> [ ('a)* ] = fixpoint filter_aux
 
 (* DEEP FLATTEN FUNCTION *)
 

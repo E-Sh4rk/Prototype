@@ -357,10 +357,40 @@ let foldr_ann : ('a -> 'b -> 'b ) -> [ 'a* ] -> 'b -> 'b = fixpoint foldr_aux
 let foldr_ann2 : (('a -> 'b -> 'b ) -> [ 'a* ] -> 'b -> 'b) & (Any -> [] -> 'c -> 'c)  =
     fixpoint foldr_aux
 
+
+(* FILTER FUNCTION *)
+
+(* the following type checks ... with an unreadable type *)
+
+let filter_aux_pure filter f l =
+   if l is Nil then nil else
+   if l is [Any+] then
+       if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
+   else 42(3)    
+
+(* the following loops:
+let filter : [ Any* ] -> (('a -> True) & ((~'a) -> ~True)) -> [ ('a)* ] = fixpoint filter_aux_pure
+*)
+
+(* the following deos not type check and I do not understand why not *)
+
+let filter_aux (filter :[ Any* ] -> (('a -> True) & ((~('a)) -> ~True)) -> [ ('a)* ] ) ( f : (('a -> True) & ((~('a)) -> ~True))) (l : [ Any* ] )  =
+   if l is Nil then nil else
+   if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
+
+
+let filter : [ Any* ] -> (('a -> True) & ((~'a) -> ~True)) -> [ ('a)* ] = fixpoint filter_aux
+
+
+
+(* DEEP FLATTEN FUNCTION *)
+
 let flatten_pure flatten x =
   if x is Nil then nil else
   if x is [Any*] then concat (flatten (fst x)) (flatten (snd x))
   else (x,nil)
+
+
 
 (* let flatten_pure = fixpoint flatten_pure *)
 

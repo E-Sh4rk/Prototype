@@ -379,14 +379,22 @@ let filter : [ Any* ] -> (('a -> True) & ((~'a) -> ~True)) -> [ ('a)* ] = fixpoi
  *)
 
 let new_filter_aux
-  (filter : ((('_a & 'b) -> True) & (('_a\'_b) -> ~True)) -> [ '_a* ] -> [ ('_a&'_b)* ] )
-  (f : (('_a & 'b) -> True) & (('_a\'_b) -> ~True)) (l : [ ('_a&'_b)*  ] )  =
+  (filter : ((('_a & '_b) -> True) & (('_a\'_b) -> ~True)) -> [ '_a* ] -> [ ('_a&'_b)* ] )
+  (f : (('_a & '_b) -> True) & (('_a\'_b) -> ~True))
+  (l : [ ('_a)*  ] )  =
   (* filter f l = *)
   if l is Nil then nil
   else
     if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
 
-let new_filter = fixpoint new_filter_aux
+
+let new_filter :  ((('_a & '_b) -> True) & (('_a\'_b) -> ~True)) -> [ '_a* ] -> [ ('_a&'_b)* ] =
+      fixpoint new_filter_aux
+
+
+let xi = <(Int -> True) & (Bool -> False)>
+
+let filter_test = new_filter xi (1, (3, (true,(42,nil))))
 
 let filter_aux_classic
 (filter : (('_a) -> Bool) -> [ ('_a)* ] -> [ ('_a)* ] ) ( f : '_a -> Bool) (l : [ ('_a)* ] )  =
@@ -399,7 +407,7 @@ let filter_aux_classic
 let filter_classic = fixpoint filter_aux_classic
 
 
-(* the following deos not type check and I do not understand why not *)
+(* This type checks but it requires the domain of the function to be Any *)
 
 let filter_aux (filter : (('_a -> True) & ((~('_a)) -> ~True)) -> [ Any* ] -> [ ('_a)* ] ) ( f : (('_a -> True) & ((~('_a)) -> ~True))) (l : [ Any* ] )  =
    if l is Nil then nil else
@@ -407,6 +415,7 @@ let filter_aux (filter : (('_a -> True) & ((~('_a)) -> ~True)) -> [ Any* ] -> [ 
 
 
 let filter : (('a -> True) & ((~'a) -> ~True)) -> [Any*] -> [ ('a)* ] = fixpoint filter_aux
+
 
 (* DEEP FLATTEN FUNCTION *)
 

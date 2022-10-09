@@ -387,6 +387,18 @@ let new_filter_aux
   else
     if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
 
+(* here a better version with head and tail: it yields exactly the
+   same type as the version above but 40% slower
+ *)
+
+let new_filter_aux
+  (filter : ((('_a & '_b) -> True) & (('_a\'_b) -> ~True)) -> [ '_a* ] -> [ ('_a&'_b)* ] )
+  (f : (('_a & '_b) -> True) & (('_a\'_b) -> ~True))
+  (l : [ ('_a)*  ] )  =
+   if l is Nil then nil else
+       let h = fst(l) in
+       let t = snd(l) in
+       if f h is True then (h ,filter f t) else filter f t
 
 let new_filter :  ((('_a & '_b) -> True) & (('_a\'_b) -> ~True)) -> [ '_a* ] -> [ ('_a&'_b)* ] =
       fixpoint new_filter_aux

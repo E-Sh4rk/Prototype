@@ -418,22 +418,21 @@ let filter_aux_classic
 
 let filter_classic = fixpoint filter_aux_classic
 
-(* Tail recursive version 
+(* Tail recursive version *)
 
-
-let filter  : ((('_a & '_b) -> True) & (('_a\'_b) -> ~True)) -> [ '_a* ] -> [ ('_a&'_b)* ]  =
+(* let filter : ((('_a & '_b) -> True) & (('_a\'_b) -> ~True)) -> [ '_a* ] -> [ ('_a&'_b)* ]  =
    fun f -> fun l ->
    let filter_tr_aux  
      (filter : (((('_a & '_b) -> True) & (('_a\'_b) -> ~True)), [ '_a* ] , ['_a*] ) -> [ ('_a&'_b)* ] )
-     (f : ((('_a & '_b) -> True) & (('_a\'_b) -> ~True)), l : [ ('_a)* ], acc : [ ('_a)* ] )  =
+     (args : (((('_a & '_b) -> True) & (('_a\'_b) -> ~True)), [ ('_a)* ], [ ('_a)* ]) )  =
+      let f = fst args in
+      let l = fst (snd args) in
+      let acc = snd (snd args) in
       if l is Nil then acc else
          let h = fst(l) in
          let t = snd(l) in
          if f h is True then filter (f, t , (h,acc)) else filter (f , t , acc)
-   in (fixpoint filter_tr_aux) (f , l , [])
-
-*)
-
+   in (fixpoint filter_tr_aux) (f , l , []) *)
 
 (* This type checks but it requires the domain of the function to be Any *)
 

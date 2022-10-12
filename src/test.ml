@@ -403,10 +403,35 @@ let new_filter_aux
 let new_filter :  ((('_a & '_b) -> True) & (('_a\'_b) -> ~True)) -> [ '_a* ] -> [ ('_a&'_b)* ] =
       fixpoint new_filter_aux
 
+(* Notice that with the following version the result of the application is much less precise
+   despite the cross typing of both works
+ *)
+
+let new_filter_2_aux
+  (filter : ((('_a) -> True) & (('_b) -> ~True)) -> [ ('_a|'_b)* ] -> [ ('_a)* ] )
+  (f : (('_a) -> True) & (('_b) -> ~True))
+  (l : [ ('_a|'_b)* ] )  =
+   if l is Nil then nil else
+       let h = fst(l) in
+       let t = snd(l) in
+       if f h is True then (h ,filter f t) else filter f t
+
+let new_filter_2 : ((('_a) -> True) & (('_b) -> ~True)) -> [ ('_a|'_b)* ] -> [ ('_a)* ]  = fixpoint new_filter_2_aux
+
 
 let xi = <(Int -> True) & (Bool -> False)>
 
 let filter_test = new_filter xi (1, (3, (true,(42,nil))))
+
+let filter_2_test = new_filter_2 xi (1, (3, (true,(42,nil))))
+
+(* cross typing on the two versions *)
+
+let new_filter_2_as_1 :  ((('_a & '_b) -> True) & (('_a\'_b) -> ~True)) -> [ '_a* ] -> [ ('_a&'_b)* ] =
+      fixpoint new_filter_2_aux
+
+let new_filter_1_as_2 : ((('_a) -> True) & (('_b) -> ~True)) -> [ ('_a|'_b)* ] -> [ ('_a)* ]  =
+      fixpoint new_filter_aux
 
 let filter_aux_classic
 (filter : (('_a) -> Bool) -> [ ('_a)* ] -> [ ('_a)* ] ) ( f : '_a -> Bool) (l : [ ('_a)* ] )  =

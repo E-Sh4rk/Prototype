@@ -42,10 +42,14 @@ let test_1 = fun x -> fun y ->
 
 (* ============== RECURSIVE ============= *)
 
+(* The type deduced for fixpoint can be read as follows
+   forall('c <: 'a -> 'b)('d <:'c). ('c -> 'd) -> 'd 
+*)
 let fixpoint = fun f ->
   let delta = fun x ->
      f ( fun  v -> ( x x v ))
    in delta delta
+
 
 let fact fact n =
   if n is 0 then 1 else (fact (n-1))*n
@@ -327,12 +331,12 @@ let concat = fixpoint concat
 
 let concat = < [ 'a* ] -> [ 'b* ] -> [ 'a* ; 'b* ] >
 
-(* let flatten_ocaml flatten (x:['a*]) =
+ let flatten_ocaml flatten (x:['a*]) =
    if x is Nil then nil else
    if x is (Any, Any) then concat (fst x) (flatten (snd x)) else
    (x,nil)
 
-let flatten_ocaml : [['a*]*] -> ['a*] = fixpoint flatten_ocaml *)
+let flatten_ocaml : [['a*]*] -> ['a*] = fixpoint flatten_ocaml 
 
 
 let reverse_aux reverse l  =

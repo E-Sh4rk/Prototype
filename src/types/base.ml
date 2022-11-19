@@ -338,6 +338,8 @@ let factorize (pvs, nvs) t =
     in
     let rebuild_partial lst =
       lst |> List.map (fun ((pvs, nvs), mono) ->
+        let pvs = TVarSet.destruct pvs in
+        let nvs = TVarSet.destruct nvs in
         let t = K.Dnf.mono mono in
         let pvs = pvs |> List.map K.Dnf.var |> conj in
         let nvs = nvs |> List.map K.Dnf.var |> List.map K.Dnf.neg |> conj in

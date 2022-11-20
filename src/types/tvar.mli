@@ -60,6 +60,6 @@ val top_vars : Base.typ -> TVarSet.t
 val vars_with_polarity : Base.typ -> (TVar.t * [ `Both | `Neg | `Pos ]) list
 val check_var : Base.typ -> [ `Not_var | `Pos of TVar.t | `Neg of TVar.t ]
 
-val generalize : TVarSet.t -> Base.typ -> Base.typ
-val monomorphize_fresh : Base.typ -> Base.typ
-val monomorphize : Base.typ -> Base.typ
+val generalize : TVarSet.t -> Subst.t
+val monomorphize_fresh : TVarSet.t -> Subst.t
+val monomorphize_lookup : TVarSet.t -> Subst.t

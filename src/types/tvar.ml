@@ -40,7 +40,7 @@ module TVar = struct
 
   let mk_mono ?(infer=true) name =
     let id = unique_mono_id () in
-    let norm_name = "M"^(string_of_int id) in
+    let norm_name = (string_of_int id)^"M" in
     let name = match name with None -> norm_name | Some str -> str in
     let var = CD.Var.mk norm_name in
     VH.add data var {poly=false; infer; dname=name} ;
@@ -48,7 +48,7 @@ module TVar = struct
     var
   let mk_poly name =
     let id = unique_poly_id () in
-    let norm_name = "P"^(string_of_int id) in
+    let norm_name = (string_of_int id)^"P" in
     let name = match name with None -> norm_name | Some str -> str in
     let var = CD.Var.mk norm_name in
     VH.add data var {poly=true; infer=true; dname=name} ;
@@ -143,20 +143,45 @@ let top_vars = CD.Types.Subst.top_vars
 let vars_with_polarity t = CD.Types.Subst.var_polarities t |> CD.Var.Map.get
 let check_var = CD.Types.Subst.check_var
 
-let generalize mono t =
+let generalize vars =
   let is_mono v = TVar.is_unregistered v || TVar.is_mono v in
-  let s = TVarSet.diff (vars t) mono |>
+  vars |>
     TVarSet.filter is_mono |>
     TVarSet.destruct |> List.map (fun v ->
       (v, TVar.mk_poly None |> TVar.typ)
-    ) |> Subst.construct in
-  Subst.apply s t
-let monomorphize_fresh t =
+    ) |> Subst.construct
+
+let monomorphize_fresh vars =
   let is_poly v = TVar.is_unregistered v || TVar.is_poly v in
-  let s = vars t |>
+  vars |>
     TVarSet.filter is_poly |>
     TVarSet.destruct |> List.map (fun v ->
       (v, TVar.mk_mono None |> TVar.typ)
-    ) |> Subst.construct in
-  Subst.apply s t
-let monomorphize = failwith "TODO"
+    ) |> Subst.construct
+
+let lookup_or_fresh v =
+  let str = TVar.name v in
+  match TVar.lookup str with
+  | Some v' -> v'
+  | None ->
+    let str = (List.hd (String.split_on_char 'M' str))^"M" in
+    begin match TVar.lookup str with
+    | Some v' -> v'
+    | None -> TVar.mk_mono None
+    end
+
+let monomorphize_lookup vars =
+  let is_poly_reg v = not (TVar.is_unregistered v) && TVar.is_poly v in
+  let s1 = vars |>
+    TVarSet.filter TVar.is_unregistered |>
+    TVarSet.destruct |> List.map (fun v ->
+      (v, lookup_or_fresh v |> TVar.typ)
+    )
+  in
+  let s2 = vars |>
+    TVarSet.filter is_poly_reg |>
+    TVarSet.destruct |> List.map (fun v ->
+      (v, TVar.mk_mono None |> TVar.typ)
+    )
+  in
+  s1@s2 |> Subst.construct

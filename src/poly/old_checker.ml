@@ -1,5 +1,6 @@
 module PMsc = Msc
 open Types.Base
+open Types.Tvar
 open Types.Additions
 open Common.Msc
 open Old_annotations
@@ -323,9 +324,9 @@ let simplify_tallying_results mono result_var sols =
           List.fold_left (fun sol (v,t) ->
             if TVarSet.mem mono v |> not then sol
             else
-              let expected_name = (var_name v)^(var_name v) in
+              let expected_name = (TVar.name v)^(TVar.name v) in
               let simpl = top_vars t |>
-                TVarSet.filter (fun v -> String.equal (var_name v) expected_name)
+                TVarSet.filter (fun v -> String.equal (TVar.name v) expected_name)
                 |> TVarSet.destruct |> List.map (fun v' ->
                   (v', TVar.typ v)
                 ) |> Subst.construct
@@ -364,7 +365,7 @@ let rec infer_a' vardef tenv env mono noninferred annot_a a =
     let log_delta =
       TVarSet.inter noninferred (vars t) |> TVarSet.destruct in
     log ~level:1 "Simple constraint: solving %a <= %a with delta=%a@."
-      pp_typ t pp_typ s (pp_list pp_var) log_delta ;
+      pp_typ t pp_typ s (pp_list TVar.pp) log_delta ;
     let poly = match result_var with
       | None -> vs |> TVarSet.destruct
       | Some (r,_) -> r::(vs |> TVarSet.destruct)
@@ -428,7 +429,7 @@ let rec infer_a' vardef tenv env mono noninferred annot_a a =
   | Pair (v1, v2), NoneA | Let (v1, v2), NoneA ->
     need_var v1 "pair" ; need_var v2 "pair" ; Ok NoneA
   | Projection (Parsing.Ast.Field label, v), ProjA [] ->
-    let alpha = fresh_var () in
+    let alpha = TVar.mk_mono None in
     let s = mk_record true [label, TVar.typ alpha |> cons] in
     let res = simple_constraint_infer v "projection" s in
     map_res (fun sigma -> ProjA sigma) res
@@ -436,7 +437,7 @@ let rec infer_a' vardef tenv env mono noninferred annot_a a =
     if simple_constraint_check v "projection" (record_any_with label) sigma
     then Ok (ProjA sigma) else assert false
   | Projection (p, v), ProjA [] ->
-    let alpha = fresh_var () in
+    let alpha = TVar.mk_mono None in
     let s =
       if p = Parsing.Ast.Fst
       then mk_times (TVar.typ alpha |> cons) any_node
@@ -471,14 +472,14 @@ let rec infer_a' vardef tenv env mono noninferred annot_a a =
     let vs2 = TVarSet.inter (TVarSet.union vs2 vs1) (vars t2) in
     let subst2 = Subst.combine subst2 subst2' in
     (*let (vs2,subst2,t2) = fresh mono t2 in*)
-    let alpha = fresh_var () in
+    let alpha = TVar.mk_mono None in
     let poly = TVarSet.union vs1 vs2 |> TVarSet.destruct in
     let arrow_typ = mk_arrow (cons t2) (cons (TVar.typ alpha)) in
     let log_delta =
       TVarSet.inter noninferred (TVarSet.union (vars t1) (vars arrow_typ))
       |> TVarSet.destruct in
     log ~level:1 "Application: solving %a <= %a with delta=%a@."
-      pp_typ t1 pp_typ arrow_typ (pp_list pp_var) log_delta ;
+      pp_typ t1 pp_typ arrow_typ (pp_list TVar.pp) log_delta ;
     let res =
       tallying_infer (alpha::poly) noninferred [(t1, arrow_typ)]
       |> simplify_tallying_results mono (Some (alpha, Variable.to_typevar vardef))

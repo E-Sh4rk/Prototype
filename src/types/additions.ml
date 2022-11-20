@@ -664,7 +664,7 @@ let subtype_poly mono t1 t2 =
 let triangle_poly mono t s =
     (* Utils.log "Triangle_poly with t=%a and s=%a@." pp_typ t pp_typ s ; *)
     let (vt',_,t') = fresh mono t in
-    let alpha = TVar.mk_poly None in
+    let alpha = TVar.mk_mono None in
     let delta = TVarSet.union mono (vars s) in
     let res = tallying_infer (TVarSet.destruct vt') delta
         [(t', mk_arrow (TVar.typ alpha |> cons) (cons s))] in

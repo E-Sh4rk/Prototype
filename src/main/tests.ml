@@ -1,4 +1,5 @@
 open Types.Base
+open Types.Tvar
 open Parsing.Variable
 open Common.Msc
 open Common
@@ -39,11 +40,11 @@ let%test "neg_refs" [@tags "no-js"] =
   | _ -> false
 
 let%test "tallying" [@tags "no-js"] =
-  let u = mk_var "u" in
-  let input = mk_var "Input" in
-  let output = mk_var "Output" in
-  let poly1 = mk_var "p1" in
-  let poly2 = mk_var "p2" in
+  let u = TVar.mk_unregistered () in
+  let input = TVar.mk_unregistered () in
+  let output = TVar.mk_unregistered () in
+  let poly1 = TVar.mk_unregistered () in
+  let poly2 = TVar.mk_unregistered () in
   let right_udef = mk_arrow (TVar.typ input |> cons) (TVar.typ output |> cons) in
   let udef = mk_arrow (TVar.typ u |> cons) (cap right_udef (TVar.typ poly1) |> cons) in
   let udef = cap udef (TVar.typ poly2) in
@@ -51,10 +52,10 @@ let%test "tallying" [@tags "no-js"] =
   let poly3 = (*mk_var "p3"*)poly1 in
   let poly4 = (*mk_var "p4"*)poly2 in
   let ut' = Subst.apply ([poly1, TVar.typ poly3; poly2, TVar.typ poly4] |> Subst.construct) ut in
-  let res = mk_var "r" |> TVar.typ in
+  let res = TVar.mk_unregistered () |> TVar.typ in
   let left_part = mk_arrow (cons ut) (cons res) in
   let right_part = mk_arrow (cons ut') (cons res) in
-  let res2 = Types.Additions.fresh_var () in
+  let res2 = TVar.mk_unregistered () in
   let right_part = mk_arrow (cons right_part) (res2 |> TVar.typ |> cons) in
   Format.printf "%a@.%a@." pp_typ left_part pp_typ right_part ;
   let constr = [left_part, right_part] in
@@ -66,9 +67,9 @@ let%test "tallying" [@tags "no-js"] =
   )
 
 let%test "tallying2" [@tags "no-js"] =
-  let av = mk_var "a" in
-  let xv = mk_var "x" in
-  let resv = Types.Additions.fresh_var () in
+  let av = TVar.mk_unregistered () in
+  let xv = TVar.mk_unregistered () in
+  let resv = TVar.mk_unregistered () in
   let left_part = mk_times (TVar.typ av |> cons) any_node in
   let left_part = mk_arrow (cons left_part) (TVar.typ av |> cons) in
   let right_part = mk_arrow (TVar.typ xv |> cons) (TVar.typ resv |> cons) in
@@ -82,10 +83,10 @@ let%test "tallying2" [@tags "no-js"] =
   )
 
 let%test "tallying3" [@tags "no-js"] =
-  let av = mk_var "a" in
-  let xv = mk_var "x" in
-  let sxv = mk_var "sx" in
-  let resv = Types.Additions.fresh_var () in
+  let av = TVar.mk_unregistered () in
+  let xv = TVar.mk_unregistered () in
+  let sxv = TVar.mk_unregistered () in
+  let resv = TVar.mk_unregistered () in
   let left_part = mk_times (TVar.typ av |> cons) any_node in
   let left_part = mk_arrow (cons left_part) (TVar.typ av |> cons) in
   let right_part = cap (mk_times any_node (TVar.typ sxv |> cons)) (TVar.typ xv) in

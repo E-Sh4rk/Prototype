@@ -1,4 +1,5 @@
 open Types.Base
+open Types.Tvar
 open Common.Msc
 open Types.Additions
 open Annotations
@@ -204,7 +205,7 @@ and typeof tenv env mono anns e =
 
 (* ===== REFINE ===== *)
 
-let tmpvar = mk_var "%TMP%"
+let tmpvar = TVar.mk_mono (Some "%TMP%")
 let tmpvar_t = TVar.typ tmpvar
 
 let sufficient_a env mono a prev_t t =
@@ -294,16 +295,16 @@ let filter_res_a =
 let filter_res =
   List.filter_map (function (None, _) -> None | (Some gamma, anns) -> Some (gamma, anns))
 
-  let pi1_type =
-  let nv1 = mk_var "pi1" |> TVar.typ in
+let pi1_type =
+  let nv1 = TVar.mk_mono (Some "pi1") |> TVar.typ in
   let lhs = mk_times (cons nv1) any_node in
   mk_arrow (cons lhs) (cons nv1)
 let pi2_type =
-  let nv2 = mk_var "pi2" |> TVar.typ in
+  let nv2 = TVar.mk_mono (Some "pi2") |> TVar.typ in
   let lhs = mk_times any_node (cons nv2) in
   mk_arrow (cons lhs) (cons nv2)
 let pi_record_type label =
-  let nv = mk_var ("pi_"^label) |> TVar.typ in
+  let nv = TVar.mk_mono (Some ("pi_"^label)) |> TVar.typ in
   let lhs = mk_record true [label, cons nv] in
   mk_arrow (cons lhs) (cons nv)
 
@@ -386,7 +387,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
     let mono = TVarSet.union mono vars_t in
     (* TODO: rename poly vars *)
     let poly_vars = TVarSet.diff (vars t1 |> TVarSet.union (vars t2)) mono in
-    let fresh = mk_var "app" in
+    let fresh = TVar.mk_mono (Some "app") in
     let lhs = t1 in
     let rhs = mk_arrow (cons t2) (cap (TVar.typ fresh) t |> cons) in
     let substs = tallying_infer (poly_vars |> TVarSet.destruct) vars_t [(lhs, rhs)] in

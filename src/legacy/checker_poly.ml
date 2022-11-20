@@ -205,7 +205,7 @@ and typeof tenv env mono anns e =
 (* ===== REFINE ===== *)
 
 let tmpvar = mk_var "%TMP%"
-let tmpvar_t = var_typ tmpvar
+let tmpvar_t = TVar.typ tmpvar
 
 let sufficient_a env mono a prev_t t =
   assert (has_absent prev_t |> not && has_absent t |> not) ;
@@ -295,15 +295,15 @@ let filter_res =
   List.filter_map (function (None, _) -> None | (Some gamma, anns) -> Some (gamma, anns))
 
   let pi1_type =
-  let nv1 = mk_var "pi1" |> var_typ in
+  let nv1 = mk_var "pi1" |> TVar.typ in
   let lhs = mk_times (cons nv1) any_node in
   mk_arrow (cons lhs) (cons nv1)
 let pi2_type =
-  let nv2 = mk_var "pi2" |> var_typ in
+  let nv2 = mk_var "pi2" |> TVar.typ in
   let lhs = mk_times any_node (cons nv2) in
   mk_arrow (cons lhs) (cons nv2)
 let pi_record_type label =
-  let nv = mk_var ("pi_"^label) |> var_typ in
+  let nv = mk_var ("pi_"^label) |> TVar.typ in
   let lhs = mk_record true [label, cons nv] in
   mk_arrow (cons lhs) (cons nv)
 
@@ -388,7 +388,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
     let poly_vars = TVarSet.diff (vars t1 |> TVarSet.union (vars t2)) mono in
     let fresh = mk_var "app" in
     let lhs = t1 in
-    let rhs = mk_arrow (cons t2) (cap (var_typ fresh) t |> cons) in
+    let rhs = mk_arrow (cons t2) (cap (TVar.typ fresh) t |> cons) in
     let substs = tallying_infer (poly_vars |> TVarSet.destruct) vars_t [(lhs, rhs)] in
     let res =
       substs |> List.filter_map (fun s ->

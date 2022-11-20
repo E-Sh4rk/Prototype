@@ -1,5 +1,6 @@
 open Msc
 open Types.Base
+open Types.Tvar
 open Types.Additions
 open Old_annotations
 open Common

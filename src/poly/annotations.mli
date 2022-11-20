@@ -1,4 +1,5 @@
 open Types.Base
+open Types.Tvar
 open Parsing.Variable
 
 module Refinements : sig

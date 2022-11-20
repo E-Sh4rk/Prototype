@@ -1,4 +1,5 @@
 open Types.Base
+open Types.Additions
 
 module Refinements = Annotations.Refinements
 

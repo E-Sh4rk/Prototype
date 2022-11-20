@@ -80,7 +80,7 @@ val rectype : Base.typ -> TVar.t -> Base.typ (* [rectype t u] returns the type c
 (* Variables not in var_order are considered greater. In the result, a variable will be expressed
 in term of the variables that are greater. Thus, greater variables (in particular variables not in var_order)
 are less likely to be constrained. *)
-val tallying : var_order:TVar.t list -> TVarSet.t -> (Base.typ * Base.typ) list -> Subst.t list
+val tallying : var_order:TVar.t list -> TVarSet.t -> (Base.typ * Base.typ) list -> Subst.t list (* TODO *)
 
 (* Some additions *)
 val factorize : TVarSet.t * TVarSet.t -> Base.typ -> Base.typ * Base.typ

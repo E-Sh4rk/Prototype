@@ -272,7 +272,7 @@ let simplify_tallying_results mono result_var sols =
         match result_var with
         | None -> None
         | Some (r,r') ->
-          if subtype_poly TVarSet.empty (Subst.find' sol r) (var_typ r')
+          if subtype_poly TVarSet.empty (Subst.find' sol r) (TVar.typ r')
           then Some (r,r') else None
       in
       let sol =
@@ -280,7 +280,7 @@ let simplify_tallying_results mono result_var sols =
           if TVarSet.mem mono v |> not then sol
           else
             let t = Subst.find' sol v in
-            let constr = [(var_typ v, t);(t, var_typ v)] in
+            let constr = [(TVar.typ v, t);(t, TVar.typ v)] in
             (* print_tallying_instance [] mono constr ; *)
             let res = tallying mono constr
             |> List.map (fun res -> Subst.compose res sol)
@@ -288,7 +288,7 @@ let simplify_tallying_results mono result_var sols =
               match var_to_preserve with
               | None -> true
               | Some (r,r') ->
-                subtype_poly TVarSet.empty (Subst.find' sol r) (var_typ r')
+                subtype_poly TVarSet.empty (Subst.find' sol r) (TVar.typ r')
             )
             in
             match res with
@@ -302,7 +302,7 @@ let simplify_tallying_results mono result_var sols =
         | None -> sol
         | Some (r, target) ->
           let tr = Subst.find' sol r in
-          let constr = [(tr, var_typ target)] in
+          let constr = [(tr, TVar.typ target)] in
           let mono = TVarSet.add target mono in
           (* print_tallying_instance [] mono constr ; *)
           begin match tallying mono constr with
@@ -327,7 +327,7 @@ let simplify_tallying_results mono result_var sols =
               let simpl = top_vars t |>
                 TVarSet.filter (fun v -> String.equal (var_name v) expected_name)
                 |> TVarSet.destruct |> List.map (fun v' ->
-                  (v', var_typ v)
+                  (v', TVar.typ v)
                 ) |> Subst.construct
               in
               Subst.compose simpl sol
@@ -429,7 +429,7 @@ let rec infer_a' vardef tenv env mono noninferred annot_a a =
     need_var v1 "pair" ; need_var v2 "pair" ; Ok NoneA
   | Projection (Parsing.Ast.Field label, v), ProjA [] ->
     let alpha = fresh_var () in
-    let s = mk_record true [label, var_typ alpha |> cons] in
+    let s = mk_record true [label, TVar.typ alpha |> cons] in
     let res = simple_constraint_infer v "projection" s in
     map_res (fun sigma -> ProjA sigma) res
   | Projection (Parsing.Ast.Field label, v), ProjA sigma ->
@@ -439,8 +439,8 @@ let rec infer_a' vardef tenv env mono noninferred annot_a a =
     let alpha = fresh_var () in
     let s =
       if p = Parsing.Ast.Fst
-      then mk_times (var_typ alpha |> cons) any_node
-      else mk_times any_node (var_typ alpha |> cons)
+      then mk_times (TVar.typ alpha |> cons) any_node
+      else mk_times any_node (TVar.typ alpha |> cons)
     in
     let res = simple_constraint_infer v "projection" s in
     map_res (fun sigma -> ProjA sigma) res
@@ -473,7 +473,7 @@ let rec infer_a' vardef tenv env mono noninferred annot_a a =
     (*let (vs2,subst2,t2) = fresh mono t2 in*)
     let alpha = fresh_var () in
     let poly = TVarSet.union vs1 vs2 |> TVarSet.destruct in
-    let arrow_typ = mk_arrow (cons t2) (cons (var_typ alpha)) in
+    let arrow_typ = mk_arrow (cons t2) (cons (TVar.typ alpha)) in
     let log_delta =
       TVarSet.inter noninferred (TVarSet.union (vars t1) (vars arrow_typ))
       |> TVarSet.destruct in

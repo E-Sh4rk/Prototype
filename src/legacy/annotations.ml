@@ -1,5 +1,6 @@
 open Common.Msc
 open Types.Base
+open Types.Tvar
 open Types.Additions
 open Parsing
 
@@ -490,7 +491,7 @@ struct
       let initial_e = initial_e e in
       PLambdaA (any_or_absent,
       LambdaSAP.construct_with_custom_eq "initial"
-        [(Variable.Variable.to_typevar v |> var_typ, (initial_e, any))])
+        [(Variable.Variable.to_typevar v |> TVar.typ, (initial_e, any))])
     | Lambda (_, _, _, _) ->
       PLambdaA (any_or_absent,
       LambdaSAP.construct_with_custom_eq "initial" [])

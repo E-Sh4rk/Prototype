@@ -2,6 +2,7 @@ open Parsing.IO
 open Common.Msc
 open Common
 open Types.Base
+open Types.Tvar
 open Types.Additions
 open Parsing
 open Parsing.Variable

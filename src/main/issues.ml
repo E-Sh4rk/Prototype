@@ -129,7 +129,7 @@ let single_string str =
       CD.Types.times (single_char c |> cons) (cons acc)
   ) nil_typ rev_str
 
-let var_typ = CD.Types.var
+let TVar.typ = CD.Types.var
 
 (*
 let list_of alpha =
@@ -310,9 +310,9 @@ let test1 () =
   let av = mk_var "a" in
   let xv = mk_var "x" in
   let resv = mk_var "r" in
-  let left_part = mk_times (var_typ av |> cons) any_node in
-  let left_part = mk_arrow (cons left_part) (var_typ av |> cons) in
-  let right_part = mk_arrow (var_typ xv |> cons) (var_typ resv |> cons) in
+  let left_part = mk_times (TVar.typ av |> cons) any_node in
+  let left_part = mk_arrow (cons left_part) (TVar.typ av |> cons) in
+  let right_part = mk_arrow (TVar.typ xv |> cons) (TVar.typ resv |> cons) in
   Format.printf "%a@.%a@." pp_typ left_part pp_typ right_part ;
   let constr = [left_part, right_part] in
   let sol = tallying ~var_order:[resv;av] TVarSet.empty constr in
@@ -327,10 +327,10 @@ let test2 () =
   let xv = mk_var "x" in
   let sxv = mk_var "sx" in
   let resv = mk_var "r" in
-  let left_part = mk_times (var_typ av |> cons) any_node in
-  let left_part = mk_arrow (cons left_part) (var_typ av |> cons) in
-  let right_part = cap (mk_times any_node (var_typ sxv |> cons)) (var_typ xv) in
-  let right_part = mk_arrow (cons right_part) (var_typ resv |> cons) in
+  let left_part = mk_times (TVar.typ av |> cons) any_node in
+  let left_part = mk_arrow (cons left_part) (TVar.typ av |> cons) in
+  let right_part = cap (mk_times any_node (TVar.typ sxv |> cons)) (TVar.typ xv) in
+  let right_part = mk_arrow (cons right_part) (TVar.typ resv |> cons) in
   Format.printf "%a@.%a@." pp_typ left_part pp_typ right_part ;
   let constr = [left_part, right_part] in
   let sol = tallying ~var_order:[resv;av] (TVarSet.construct [sxv]) constr in
@@ -347,15 +347,15 @@ let fresh_var () =
 
 let inter_new_pair x =
   let a = fresh_var () in
-  let t = mk_times (var_typ a |> cons) any_node in
-  let t = cap t (var_typ x) in
+  let t = mk_times (TVar.typ a |> cons) any_node in
+  let t = cap t (TVar.typ x) in
   (t, a)
 
 let identity t x a =
   let (t', a') = inter_new_pair x in
   let subst1 = Subst.construct [(x, t')] in
   let t = Subst.apply subst1 t in
-  let subst2 = Subst.construct [(a', var_typ a)] in
+  let subst2 = Subst.construct [(a', TVar.typ a)] in
   Subst.apply subst2 t
 
 let test_subst () =

@@ -1,5 +1,6 @@
 
 open Types.Base
+open Types.Tvar
 
 val regroup : ('a -> 'a -> bool) -> ('a * 'b) list -> ('a * ('b list)) list
 (*val remove_redundance : typ list -> typ list*)

@@ -114,7 +114,7 @@ module Annot = struct
     | App _ -> AppA ([], [])
     | Lambda (_, Parsing.Ast.Unnanoted, v, e) ->
       let initial_s = [(any, (false, initial_e e))] in
-      let v = Variable.to_typevar v |> var_typ in
+      let v = Variable.to_typevar v |> TVar.typ in
       LambdaA ([], [(v, initial_s)])
     | Lambda (_, Parsing.Ast.ADomain dts, _, e) ->
       let initial_s = [(any, (false, initial_e e))] in

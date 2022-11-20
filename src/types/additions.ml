@@ -1,4 +1,5 @@
 open Base
+open Tvar
 
 module StrMap = Map.Make(String)
 module StrSet = Set.Make(String)
@@ -33,7 +34,7 @@ and type_expr =
     | TDiff of type_expr * type_expr
     | TNeg of type_expr
 
-type type_alias = var list * node
+type type_alias = TVar.t list * node
 type type_env = type_alias StrMap.t (* User-defined types *) * StrSet.t (* Atoms *)
 type var_type_env = typ StrMap.t (* Var types *)
 
@@ -100,7 +101,7 @@ let derecurse_types env venv defs =
             begin match StrMap.find_opt v lcl, Hashtbl.find_opt venv v with
             | Some t, _ | None, Some t -> Typepat.mk_type t
             | None, None ->
-                let t = mk_var v |> var_typ in
+                let t = TVar.mk_mono (Some v) |> TVar.typ in
                 Hashtbl.add venv v t ;
                 Typepat.mk_type t
             end
@@ -144,8 +145,8 @@ let derecurse_types env venv defs =
         | ReStar r -> Typepat.mk_star (aux_re ~nd lcl r)
     in
     let res = defs |> List.map (fun (name, params, _) ->
-        let params = List.map (fun str -> mk_var str) params in
-        let args = List.map var_typ params in
+        let params = List.map (fun _ -> TVar.mk_unregistered ()) params in
+        let args = List.map TVar.typ params in
         let node = get_name ~nd:false args name in
         (* Typepat.internalize node ; *)
         name, params, Typepat.typ node) in
@@ -202,8 +203,8 @@ let branch_type lst =
     end
 
 let full_branch_type ((pvs, nvs), (ps, ns)) =
-    let pvs = pvs |> List.map var_typ |> conj in
-    let nvs = nvs |> List.map var_typ |> List.map neg |> conj in
+    let pvs = pvs |> List.map TVar.typ |> conj in
+    let nvs = nvs |> List.map TVar.typ |> List.map neg |> conj in
     let ps = ps |>
         List.map (fun (a, b) -> mk_arrow a b) |> conj in
     let ns = ns |>
@@ -212,8 +213,8 @@ let full_branch_type ((pvs, nvs), (ps, ns)) =
     cap arrow_any t
 
 let full_product_branch_type ((pvs, nvs), (ps, ns)) =
-    let pvs = pvs |> List.map var_typ |> conj in
-    let nvs = nvs |> List.map var_typ |> List.map neg |> conj in
+    let pvs = pvs |> List.map TVar.typ |> conj in
+    let nvs = nvs |> List.map TVar.typ |> List.map neg |> conj in
     let ps = ps |>
         List.map (fun (a, b) -> mk_times a b) |> conj in
     let ns = ns |>
@@ -544,7 +545,7 @@ let remove_field_info t label =
 
 module type Subst = sig
     include Subst
-    val find' : t -> var -> typ
+    val find' : t -> TVar.t -> typ
     val compose : t -> t -> t
     val compose_restr : t -> t -> t
     val combine : t -> t -> t
@@ -552,12 +553,12 @@ module type Subst = sig
     val remove : t -> TVarSet.t -> t
     val split : t -> TVarSet.t -> t * t
     val apply_simplify : t -> typ -> typ
-    val new_vars : t -> TVarSet.t
+    val codom : t -> TVarSet.t
 end
 module Subst : Subst = struct
     include Subst
     let find' t v =
-        if mem t v then find t v else var_typ v
+        if mem t v then find t v else TVar.typ v
     let compose_restr_ s2 s1 =
         destruct s1 |>
             List.map (fun (v,t) -> (v, apply s2 t))
@@ -582,19 +583,10 @@ module Subst : Subst = struct
     let apply_simplify s t =
         if TVarSet.inter (Subst.dom s) (vars t) |> TVarSet.is_empty
         then t else Subst.apply s t |> simplify_typ
-    let new_vars s =
-        let old_vars = dom s in
-        let new_vars =
-            destruct s |> List.map (fun (_, t) -> vars t)
-            |> List.fold_left TVarSet.union TVarSet.empty
-        in
-        TVarSet.diff old_vars new_vars
+    let codom s =
+        destruct s |> List.map (fun (_, t) -> vars t)
+        |> List.fold_left TVarSet.union TVarSet.empty
 end
-
-let next_var_name = ref 0
-let fresh_var () =
-    next_var_name := !next_var_name + 1 ;
-    mk_var (Format.sprintf "$%i" !next_var_name)
 
 let clean_poly_vars mono t =
     clean_type ~pos:empty ~neg:any mono t
@@ -616,18 +608,10 @@ let instantiate ss t =
     List.map (fun s -> Subst.apply_simplify s t) ss
     |> conj
 
-let fresh_subst vars =
-    let x = ref TVarSet.empty in
-    let subst =
-        vars |> TVarSet.destruct |> List.map
-            (fun v -> (v, let v = fresh_var () in x := TVarSet.add v !x; var_typ v))
-        |> Subst.construct
-    in
-    (!x, subst)
-
 let fresh mono t =
     let poly = TVarSet.diff (vars t) mono in
-    let (x, subst) = fresh_subst poly in
+    let subst = refresh_all poly in
+    let x = Subst.codom subst in
     (x, subst, Subst.apply subst t)
 
 let print_tallying_instance var_order delta constr =
@@ -636,8 +620,8 @@ let print_tallying_instance var_order delta constr =
         Format.printf "(%a, %a)@." pp_typ l pp_typ r ;
     );
     Format.printf "With delta=%a and var order=%a@."
-        (Utils.pp_list pp_var) (TVarSet.destruct delta)
-        (Utils.pp_list pp_var) var_order
+        (Utils.pp_list TVar.pp) (TVarSet.destruct delta)
+        (Utils.pp_list TVar.pp) var_order
 
 let check_tallying_solution var_order delta constr res =
     let error = ref false in
@@ -680,10 +664,10 @@ let subtype_poly mono t1 t2 =
 let triangle_poly mono t s =
     (* Utils.log "Triangle_poly with t=%a and s=%a@." pp_typ t pp_typ s ; *)
     let (vt',_,t') = fresh mono t in
-    let alpha = fresh_var () in
+    let alpha = TVar.mk_poly None in
     let delta = TVarSet.union mono (vars s) in
     let res = tallying_infer (TVarSet.destruct vt') delta
-        [(t', mk_arrow (var_typ alpha |> cons) (cons s))] in
+        [(t', mk_arrow (TVar.typ alpha |> cons) (cons s))] in
     res |> List.map (fun subst ->
         let res = Subst.find' subst alpha |> sup_typ delta in
         (* Utils.log "Solution:%a@." pp_typ res ; *)
@@ -709,18 +693,18 @@ let remove_redundant_vars mono t =
     let rec aux t =
         let vs = TVarSet.diff (vars t) mono |> TVarSet.destruct in
         Utils.pairs vs vs
-        |> List.filter (fun (v1, v2) -> var_compare v1 v2 < 0)
+        |> List.filter (fun (v1, v2) -> TVar.compare v1 v2 < 0)
         |> List.find_opt (fun (v1, v2) ->
-            let v1' = fresh_var () in
-            let v2' = fresh_var () in
-            let subst1 = Subst.construct [(v1, var_typ v1');(v2, var_typ v2')] in
-            let subst2 = Subst.construct [(v1, var_typ v2');(v2, var_typ v1')] in
+            let v1' = TVar.mk_fresh v1 in
+            let v2' = TVar.mk_fresh v2 in
+            let subst1 = Subst.construct [(v1, TVar.typ v1');(v2, TVar.typ v2')] in
+            let subst2 = Subst.construct [(v1, TVar.typ v2');(v2, TVar.typ v1')] in
             let t1 = Subst.apply subst1 t in
             let t2 = Subst.apply subst2 t in
             equiv t1 t2
         )
         |> Option.map (fun (v1, v2) ->
-            let subst = Subst.construct [(v1, var_typ v2)] in
+            let subst = Subst.construct [(v1, TVar.typ v2)] in
             let t = Subst.apply subst t in
             let res = aux t in
             compose_res (subst, t) res
@@ -787,11 +771,11 @@ module Joker = struct
         | Min -> "-"
         | Max -> "+"
 
-    let joker k = mk_var (reserved_name_for_joker k) |> var_typ
+    let joker k = TVar.mk_mono (Some (reserved_name_for_joker k)) |> TVar.typ
     let jokers k t =
-        vars t |> TVarSet.filter (fun v -> String.equal (var_name v) (reserved_name_for_joker k))
+        vars t |> TVarSet.filter (fun v -> String.equal (TVar.display_name v) (reserved_name_for_joker k))
     let top_jokers k t =
-        top_vars t |> TVarSet.filter (fun v -> String.equal (var_name v) (reserved_name_for_joker k))
+        top_vars t |> TVarSet.filter (fun v -> String.equal (TVar.display_name v) (reserved_name_for_joker k))
 
     let substitute_jokers k t t_subs =
         let subst = jokers k t |> TVarSet.destruct |> List.map (fun j -> (j,t_subs)) |> Subst.construct in

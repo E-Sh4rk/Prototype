@@ -3,12 +3,10 @@ module CD = Cduce_types
 
 type typ = CD.Types.t
 type node = CD.Types.Node.t
-type var = CD.Var.t
 
 val dump_typ : Format.formatter -> typ -> unit
 val pp_typ : Format.formatter -> typ -> unit
 val show_typ : typ -> string
-val pp_var : Format.formatter -> var -> unit
 
 val register : string -> typ -> unit
 val pp : Format.formatter -> typ -> unit
@@ -34,7 +32,6 @@ val list_typ : typ
 val interval : int option -> int option -> typ
 val single_char : char -> typ
 val single_string : string -> typ
-val var_typ : var -> typ
 
 val neg : typ -> typ
 val cup : typ -> typ -> typ
@@ -51,7 +48,6 @@ val define_typ: node -> typ -> unit
 
 module Iter = CD.Types.Iter
 module type Kind = CD.Types.Kind
-
 
 val mk_times : node -> node -> typ
 val pair_any : typ
@@ -82,66 +78,8 @@ val domain : typ -> typ
 val apply : typ -> typ -> typ
 val dnf : typ -> (typ * typ) list list
 
-module type TVarSet = sig
-    type t
-    val empty : t
-    val construct : var list -> t
-    val is_empty : t -> bool
-    val mem : t -> var -> bool
-    val filter : (var -> bool) -> t -> t
-    val union : t -> t -> t
-    val add : var -> t -> t
-    val inter : t -> t -> t
-    val diff : t -> t -> t
-    val rm : var -> t -> t
-    val destruct : t -> var list
-    val pp : Format.formatter -> t -> unit
-end
-module TVarSet : TVarSet
-
-val mk_var : string -> var
-val var_equal : var -> var -> bool
-val var_compare : var -> var -> int
-val vars : typ -> TVarSet.t
-val top_vars : typ -> TVarSet.t
-val vars_with_polarity : typ -> (var * [ `Both | `Neg | `Pos ]) list
-val var_name : var -> string
-val check_var : typ -> [ `Not_var | `Pos of var | `Neg of var ]
-
-type subst
-module type Subst = sig
-    type t = subst
-    val construct : (var * typ) list -> t
-    val identity : t
-    val is_identity : t -> bool
-    val dom : t -> TVarSet.t
-    val mem : t -> var -> bool
-    val rm: var -> t -> t
-    val find : t -> var -> typ
-    val equiv : t -> t -> bool
-    val apply : t -> typ -> typ
-    val destruct : t -> (var * typ) list
-    val pp : Format.formatter -> t -> unit
-end
-module Subst : Subst
-
 val is_empty : typ -> bool
 val non_empty: typ -> bool
 val subtype  : typ -> typ -> bool
 val disjoint : typ -> typ -> bool
 val equiv : typ -> typ -> bool
-
-val inf_typ : TVarSet.t -> typ -> typ
-val sup_typ : TVarSet.t -> typ -> typ
-
-(* Tallying *)
-val clean_type : pos:typ -> neg:typ -> TVarSet.t -> typ -> typ
-val rectype : typ -> var -> typ (* [rectype t u] returns the type corresponding to the equation u=t *)
-val refresh : TVarSet.t -> typ -> typ
-(* Variables not in var_order are considered greater. In the result, a variable will be expressed
-in term of the variables that are greater. Thus, greater variables (in particular variables not in var_order)
-are less likely to be constrained. *)
-val tallying : var_order:var list -> TVarSet.t -> (typ * typ) list -> Subst.t list
-
-(* Some additions *)
-val factorize : TVarSet.t * TVarSet.t -> typ -> typ * typ

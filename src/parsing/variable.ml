@@ -1,4 +1,4 @@
-open Types.Base
+open Types.Tvar
 
 module Variable = struct
 
@@ -47,7 +47,7 @@ module Variable = struct
     if Hashtbl.mem typevars v
     then Hashtbl.find typevars v
     else
-      let tv = mk_var (show v) in
+      let tv = TVar.mk_mono (Some (show v)) in
       Hashtbl.add typevars v tv ;
       tv
 
@@ -57,7 +57,7 @@ module Variable = struct
     if Hashtbl.mem typevars_ext (v,i)
     then Hashtbl.find typevars_ext (v,i)
     else
-      let tv = mk_var ((show v)^"_"^(string_of_int i)) in
+      let tv = TVar.mk_mono (Some ((show v)^"_"^(string_of_int i))) in
       Hashtbl.add typevars_ext (v,i) tv ;
       tv
 end

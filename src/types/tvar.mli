@@ -14,6 +14,8 @@ module TVar : sig
 
     val mk_mono : ?infer:bool -> string option -> t
     val mk_poly : string option -> t
+    val mk_fresh : t -> t
+    val mk_unregistered : unit -> t
     val lookup : string -> t option
 
     val typ : t -> Base.typ
@@ -60,7 +62,25 @@ val top_vars : Base.typ -> TVarSet.t
 val vars_with_polarity : Base.typ -> (TVar.t * [ `Both | `Neg | `Pos ]) list
 val check_var : Base.typ -> [ `Not_var | `Pos of TVar.t | `Neg of TVar.t ]
 
+val refresh : mono:bool -> TVarSet.t -> Subst.t
+val refresh_all : TVarSet.t -> Subst.t
 val generalize : TVarSet.t -> Subst.t
 val monomorphize : TVarSet.t -> Subst.t
 val lookup_unregistered : TVarSet.t -> Subst.t
 val register_unregistered : mono:bool -> TVarSet.t -> Subst.t
+
+(* Operations on types *)
+
+val inf_typ : TVarSet.t -> Base.typ -> Base.typ
+val sup_typ : TVarSet.t -> Base.typ -> Base.typ
+
+(* Tallying *)
+val clean_type : pos:Base.typ -> neg:Base.typ -> TVarSet.t -> Base.typ -> Base.typ
+val rectype : Base.typ -> TVar.t -> Base.typ (* [rectype t u] returns the type corresponding to the equation u=t *)
+(* Variables not in var_order are considered greater. In the result, a variable will be expressed
+in term of the variables that are greater. Thus, greater variables (in particular variables not in var_order)
+are less likely to be constrained. *)
+val tallying : var_order:TVar.t list -> TVarSet.t -> (Base.typ * Base.typ) list -> Subst.t list
+
+(* Some additions *)
+val factorize : TVarSet.t * TVarSet.t -> Base.typ -> Base.typ * Base.typ

@@ -1,5 +1,6 @@
 
 open Base
+open Tvar
 
 module StrMap : Map.S with type key = String.t
 
@@ -93,7 +94,7 @@ val remove_field_info : typ -> string -> typ
 
 module type Subst = sig
     include Subst
-    val find' : t -> var -> typ
+    val find' : t -> TVar.t -> typ
     val compose : t -> t -> t
     val compose_restr : t -> t -> t
     val combine : t -> t -> t
@@ -101,18 +102,16 @@ module type Subst = sig
     val remove : t -> TVarSet.t -> t
     val split : t -> TVarSet.t -> t * t
     val apply_simplify : t -> typ -> typ
-    val new_vars : t -> TVarSet.t
+    val codom : t -> TVarSet.t
 end
 module Subst : Subst
 (* val remove_redundant_vars : TVarSet.t -> typ -> Subst.t * typ *)
 val clean_poly_vars : TVarSet.t -> typ -> typ
 val clean_type_ext : pos:typ -> neg:typ -> TVarSet.t -> typ -> subst
-val fresh_var : unit -> var
 val instantiate : Subst.t list -> typ -> typ
-val fresh_subst : TVarSet.t -> TVarSet.t * Subst.t
 val fresh : TVarSet.t -> typ -> TVarSet.t * Subst.t * typ
-val print_tallying_instance : var list -> TVarSet.t -> (typ * typ) list -> unit
-val tallying_infer : var list (* Polymorphic *) -> TVarSet.t (* Non-inferred *) -> (typ * typ) list -> Subst.t list
+val print_tallying_instance : TVar.t list -> TVarSet.t -> (typ * typ) list -> unit
+val tallying_infer : TVar.t list (* Polymorphic *) -> TVarSet.t (* Non-inferred *) -> (typ * typ) list -> Subst.t list
 val tallying : TVarSet.t (* Monomorphic *) -> (typ * typ) list -> Subst.t list
 val subtype_poly : TVarSet.t -> typ -> typ -> bool
 val triangle_poly : TVarSet.t -> typ -> typ -> typ

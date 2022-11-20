@@ -5,7 +5,6 @@ module LabelMap = CD.Ident.LabelMap
 
 type typ = CD.Types.t
 type node = CD.Types.Node.t
-type var = CD.Var.t
 
 let register s = 
   let module U = Encodings.Utf8 in
@@ -13,7 +12,6 @@ let register s =
 let dump_typ = CD.Types.dump
 let pp_typ = CD.Types.Print.print_noname
 let show_typ t = Format.asprintf "%a" pp_typ t
-let pp_var = CD.Var.print
 
 let pp = pp_typ
 let string_of_type = CD.Types.Print.to_string
@@ -119,8 +117,6 @@ let single_string str =
       CD.Types.times (single_char c |> cons) (cons acc)
   ) nil_typ rev_str
 
-let var_typ = CD.Types.var
-
 (*
 let list_of alpha =
     let alpha_list = CD.Types.make () in
@@ -147,7 +143,6 @@ let define_typ = CD.Types.define
 
 module Iter = CD.Types.Iter
 module type Kind = CD.Types.Kind
-
 
 let mk_times = CD.Types.times
 
@@ -215,171 +210,3 @@ let apply t args =
 
 let dnf t =
   snd (CD.Types.Arrow.get t)
-
-module type TVarSet = sig
-  type t
-  val empty : t
-  val construct : var list -> t
-  val is_empty : t -> bool
-  val mem : t -> var -> bool
-  val filter : (var -> bool) -> t -> t
-  val union : t -> t -> t
-  val add : var -> t -> t
-  val inter : t -> t -> t
-  val diff : t -> t -> t
-  val rm : var -> t -> t
-  val destruct : t -> var list
-  val pp : Format.formatter -> t -> unit
-end
-module TVarSet = struct
-  type t = CD.Var.Set.t
-  let empty = CD.Var.Set.empty
-  let construct = CD.Var.Set.from_list
-  let is_empty = CD.Var.Set.is_empty
-  let mem = CD.Var.Set.mem
-  let filter = CD.Var.Set.filter
-  let union = CD.Var.Set.cup
-  let add = CD.Var.Set.add
-  let inter = CD.Var.Set.cap
-  let diff = CD.Var.Set.diff
-  let rm = CD.Var.Set.remove
-  let destruct = CD.Var.Set.get
-  let pp fmt t =
-    destruct t |> Format.fprintf fmt "%a@." (Utils.pp_list pp_var)
-end
-
-let mk_var name = CD.Var.mk name
-let var_equal = CD.Var.equal
-let var_compare = CD.Var.compare
-let vars = CD.Types.Subst.vars
-let top_vars = CD.Types.Subst.top_vars
-let vars_with_polarity t = CD.Types.Subst.var_polarities t |> CD.Var.Map.get
-let var_name = CD.Var.name
-let check_var = CD.Types.Subst.check_var
-
-type subst = CD.Types.Subst.t
-module type Subst = sig
-  type t = subst
-  val construct : (var * typ) list -> t
-  val identity : t
-  val is_identity : t -> bool
-  val dom : t -> TVarSet.t
-  val mem : t -> var -> bool
-  val rm: var -> t -> t
-  val find : t -> var -> typ
-  val equiv : t -> t -> bool
-  val apply : t -> typ -> typ
-  val destruct : t -> (var * typ) list
-  val pp : Format.formatter -> t -> unit
-end
-module Subst = struct
-  type t = subst
-  let is_id (v,t) =
-    match CD.Types.Subst.check_var t with
-    | `Pos v' when CD.Var.equal v v' -> true
-    | _ -> false
-  let normalize = CD.Var.Map.filter (fun v t -> is_id (v,t) |> not)
-  let construct lst =
-    lst |> CD.Types.Subst.from_list |> normalize
-  let identity = CD.Types.Subst.from_list []
-  let destruct = CD.Var.Map.get
-  let is_identity t = destruct t |> List.for_all is_id
-  let apply = CD.Types.Subst.apply
-  let dom s = CD.Var.Map.domain s
-  let mem s v = CD.Var.Set.mem (dom s) v
-  let rm = CD.Var.Map.remove
-  let find s v = CD.Var.Map.assoc v s
-  let equiv s1 s2 =
-    let s1 = normalize s1 in
-    let s2 = normalize s2 in
-    CD.Var.Map.equal equiv s1 s2
-  (* let pp_entry fmt (v,t) =
-    Format.fprintf fmt "%a ===> %a" pp_var v pp_typ t
-  let pp fmt t =
-    Format.fprintf fmt "%a@." (Utils.pp_long_list pp_entry) (destruct t) *)
-  let pp = CD.Types.Subst.print
-end
-
-(* let subst_vars_with delta s t =
-  let vars = TVarSet.diff (vars t) delta in
-  let subst = vars |> TVarSet.destruct |>
-    List.map (fun v -> (v,s)) |> Subst.construct in
-  Subst.apply subst t *)
-
-let inf_typ delta t =
-  CD.Types.Subst.min_type delta t (* TODO: This implem is not optimal *)
-  (* CD.Types.Subst.clean_type ~pos:empty ~neg:any delta t |>
-  subst_vars_with delta any *)
-
-let sup_typ delta t =
-  CD.Types.Subst.max_type delta t (* TODO: This implem is not optimal *)
-  (* CD.Types.Subst.clean_type ~pos:any ~neg:empty delta t |>
-  subst_vars_with delta any *)
-
-(* Tallying *)
-let clean_type ~pos ~neg vars t =
-  CD.Types.Subst.clean_type ~pos ~neg vars t
-let rectype = CD.Types.Subst.solve_rectype
-let refresh = CD.Types.Subst.refresh
-let tallying ~var_order = CD.Types.Tallying.tallying ~var_order
-
-(* Some additions *)
-let factorize (pvs, nvs) t =
-  let open Iter in
-  let treat_kind m t =
-    let module K = (val m : Kind) in
-    let conj lst = match lst with
-    | [] -> K.Dnf.any
-    | a::lst -> List.fold_left K.Dnf.cap a lst
-    in
-    let disj lst = match lst with
-    | [] -> K.Dnf.empty
-    | a::lst -> List.fold_left K.Dnf.cup a lst
-    in
-    let rebuild_partial lst =
-      lst |> List.map (fun ((pvs, nvs), mono) ->
-        let pvs = TVarSet.destruct pvs in
-        let nvs = TVarSet.destruct nvs in
-        let t = K.Dnf.mono mono in
-        let pvs = pvs |> List.map K.Dnf.var |> conj in
-        let nvs = nvs |> List.map K.Dnf.var |> List.map K.Dnf.neg |> conj in
-        conj [pvs ; nvs ; t]
-      ) |> disj
-    in
-    let (a,b) =
-      K.get_vars t
-      |> K.Dnf.get_partial |> List.map (fun ((pvs',nvs'), mono) ->
-        let pvs' = TVarSet.construct pvs' in
-        let nvs' = TVarSet.construct nvs' in
-        if TVarSet.diff pvs pvs' |> TVarSet.is_empty &&
-           TVarSet.diff nvs nvs' |> TVarSet.is_empty
-        then
-          let pvs' = TVarSet.diff pvs' pvs in
-          let nvs' = TVarSet.diff nvs' nvs in
-          ([((pvs',nvs'),mono)], [])
-        else ([], [((pvs',nvs'),mono)])
-      ) |> List.split in
-    let (a,b) = (List.concat a, List.concat b) in
-    let (a,b) = (rebuild_partial a, rebuild_partial b) in
-    (K.mk a, K.mk b)
-  in
-  let t = fold (fun (a,b) pack t ->
-      let (a',b') = match pack with
-      | Absent -> (empty, absent)
-      | Abstract m | Char m | Int m | Atom m -> treat_kind m t
-      | Times m ->
-          let module K = (val m :> Kind) in
-          treat_kind (module K) t
-      | Xml m ->
-          let module K = (val m :> Kind) in
-          treat_kind (module K) t
-      | Function m ->
-          let module K = (val m :> Kind) in
-          treat_kind (module K) t
-      | Record m ->
-          let module K = (val m :> Kind) in
-          treat_kind (module K) t
-      in
-      (cup a a', cup b b')
-    ) (empty, empty) t
-  in t

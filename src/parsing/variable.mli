@@ -1,4 +1,4 @@
-open Types.Base
+open Types.Tvar
 
 module Variable : sig
   type t
@@ -10,8 +10,8 @@ module Variable : sig
   val attach_location : t -> Position.t -> unit
   val get_locations : t -> Position.t list
   val get_name : t -> string option
-  val to_typevar : t -> var
-  val get_typevar : t -> int -> var
+  val to_typevar : t -> TVar.t
+  val get_typevar : t -> int -> TVar.t
 end
 
 val get_predefined_var : int -> Variable.t

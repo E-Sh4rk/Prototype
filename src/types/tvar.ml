@@ -38,6 +38,11 @@ module TVar = struct
     (fun () ->
       last := !last + 1 ; !last)
 
+  let unique_unregistered_id =
+    let last = ref 0 in
+    (fun () ->
+      last := !last + 1 ; !last)
+
   let mk_mono ?(infer=true) name =
     let id = unique_mono_id () in
     let norm_name = (string_of_int id)^"M" in
@@ -54,6 +59,13 @@ module TVar = struct
     VH.add data var {poly=true; infer=true; dname=name} ;
     lookup := SM.add norm_name var (!lookup) ;
     var
+  let mk_fresh t =
+    let dname = display_name t in
+    if is_mono t then mk_mono (Some dname) else mk_poly (Some dname)
+  let mk_unregistered () =
+    let id = unique_unregistered_id () in
+    let norm_name = (string_of_int id)^"U" in
+    CD.Var.mk norm_name
 
   let lookup str =
     SM.find_opt str (!lookup)
@@ -143,6 +155,14 @@ let top_vars = CD.Types.Subst.top_vars
 let vars_with_polarity t = CD.Types.Subst.var_polarities t |> CD.Var.Map.get
 let check_var = CD.Types.Subst.check_var
 
+let refresh ~mono vars =
+  let test = if mono then TVar.is_mono else TVar.is_poly in
+  let f = (fun v -> (v, TVar.mk_fresh v |> TVar.typ)) in
+  vars |> TVarSet.filter test |>
+    TVarSet.destruct |> List.map f |> Subst.construct
+let refresh_all vars =
+  let f = (fun v -> (v, TVar.mk_fresh v |> TVar.typ)) in
+  vars |> TVarSet.destruct |> List.map f |> Subst.construct
 let generalize vars =
   vars |>
     TVarSet.filter TVar.is_mono |>
@@ -188,3 +208,92 @@ let register_unregistered ~mono vars =
   vars |>
     TVarSet.filter TVar.is_unregistered |>
     TVarSet.destruct |> List.map f |> Subst.construct
+
+(* Operations on types *)
+
+module Iter = CD.Types.Iter
+module type Kind = CD.Types.Kind
+
+(* let subst_vars_with delta s t =
+  let vars = TVarSet.diff (vars t) delta in
+  let subst = vars |> TVarSet.destruct |>
+    List.map (fun v -> (v,s)) |> Subst.construct in
+  Subst.apply subst t *)
+
+  let inf_typ delta t =
+    CD.Types.Subst.min_type delta t (* TODO: This implem is not optimal *)
+    (* CD.Types.Subst.clean_type ~pos:empty ~neg:any delta t |>
+    subst_vars_with delta any *)
+  
+  let sup_typ delta t =
+    CD.Types.Subst.max_type delta t (* TODO: This implem is not optimal *)
+    (* CD.Types.Subst.clean_type ~pos:any ~neg:empty delta t |>
+    subst_vars_with delta any *)
+  
+  (* Tallying *)
+  let clean_type ~pos ~neg vars t =
+    CD.Types.Subst.clean_type ~pos ~neg vars t
+  let rectype = CD.Types.Subst.solve_rectype
+  let tallying ~var_order = CD.Types.Tallying.tallying ~var_order
+  
+  (* Some additions *)
+  let factorize (pvs, nvs) t =
+    let open Iter in
+    let treat_kind m t =
+      let module K = (val m : Kind) in
+      let conj lst = match lst with
+      | [] -> K.Dnf.any
+      | a::lst -> List.fold_left K.Dnf.cap a lst
+      in
+      let disj lst = match lst with
+      | [] -> K.Dnf.empty
+      | a::lst -> List.fold_left K.Dnf.cup a lst
+      in
+      let rebuild_partial lst =
+        lst |> List.map (fun ((pvs, nvs), mono) ->
+          let pvs = TVarSet.destruct pvs in
+          let nvs = TVarSet.destruct nvs in
+          let t = K.Dnf.mono mono in
+          let pvs = pvs |> List.map K.Dnf.var |> conj in
+          let nvs = nvs |> List.map K.Dnf.var |> List.map K.Dnf.neg |> conj in
+          conj [pvs ; nvs ; t]
+        ) |> disj
+      in
+      let (a,b) =
+        K.get_vars t
+        |> K.Dnf.get_partial |> List.map (fun ((pvs',nvs'), mono) ->
+          let pvs' = TVarSet.construct pvs' in
+          let nvs' = TVarSet.construct nvs' in
+          if TVarSet.diff pvs pvs' |> TVarSet.is_empty &&
+             TVarSet.diff nvs nvs' |> TVarSet.is_empty
+          then
+            let pvs' = TVarSet.diff pvs' pvs in
+            let nvs' = TVarSet.diff nvs' nvs in
+            ([((pvs',nvs'),mono)], [])
+          else ([], [((pvs',nvs'),mono)])
+        ) |> List.split in
+      let (a,b) = (List.concat a, List.concat b) in
+      let (a,b) = (rebuild_partial a, rebuild_partial b) in
+      (K.mk a, K.mk b)
+    in
+    let t = fold (fun (a,b) pack t ->
+        let (a',b') = match pack with
+        | Absent -> (Base.empty, Base.absent)
+        | Abstract m | Char m | Int m | Atom m -> treat_kind m t
+        | Times m ->
+            let module K = (val m :> Kind) in
+            treat_kind (module K) t
+        | Xml m ->
+            let module K = (val m :> Kind) in
+            treat_kind (module K) t
+        | Function m ->
+            let module K = (val m :> Kind) in
+            treat_kind (module K) t
+        | Record m ->
+            let module K = (val m :> Kind) in
+            treat_kind (module K) t
+        in
+        (Base.cup a a', Base.cup b b')
+      ) (Base.empty, Base.empty) t
+    in t
+  

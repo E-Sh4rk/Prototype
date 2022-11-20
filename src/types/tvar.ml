@@ -144,44 +144,47 @@ let vars_with_polarity t = CD.Types.Subst.var_polarities t |> CD.Var.Map.get
 let check_var = CD.Types.Subst.check_var
 
 let generalize vars =
-  let is_mono v = TVar.is_unregistered v || TVar.is_mono v in
   vars |>
-    TVarSet.filter is_mono |>
+    TVarSet.filter TVar.is_mono |>
     TVarSet.destruct |> List.map (fun v ->
       (v, TVar.mk_poly None |> TVar.typ)
     ) |> Subst.construct
 
-let monomorphize_fresh vars =
-  let is_poly v = TVar.is_unregistered v || TVar.is_poly v in
+let monomorphize vars =
   vars |>
-    TVarSet.filter is_poly |>
+    TVarSet.filter TVar.is_poly |>
     TVarSet.destruct |> List.map (fun v ->
       (v, TVar.mk_mono None |> TVar.typ)
     ) |> Subst.construct
 
-let lookup_or_fresh v =
+let lookup_or_fresh c v =
   let str = TVar.name v in
   match TVar.lookup str with
-  | Some v' -> v'
+  | Some v' -> Some v'
   | None ->
-    let str = (List.hd (String.split_on_char 'M' str))^"M" in
+    let str = (List.hd (String.split_on_char c str))^(String.make 1 c) in
     begin match TVar.lookup str with
-    | Some v' -> v'
-    | None -> TVar.mk_mono None
+    | Some v' -> Some v'
+    | None -> None
     end
-
-let monomorphize_lookup vars =
-  let is_poly_reg v = not (TVar.is_unregistered v) && TVar.is_poly v in
-  let s1 = vars |>
+let lookup_or_fresh v =
+  match lookup_or_fresh 'M' v with
+  | Some v' -> Some v'
+  | None -> lookup_or_fresh 'P' v
+let lookup_unregistered vars =
+  vars |>
     TVarSet.filter TVar.is_unregistered |>
-    TVarSet.destruct |> List.map (fun v ->
-      (v, lookup_or_fresh v |> TVar.typ)
-    )
+    TVarSet.destruct |> List.filter_map (fun v ->
+      match lookup_or_fresh v with None -> None
+      | Some v' -> Some (v, TVar.typ v')
+    ) |> Subst.construct
+
+let register_unregistered ~mono vars =
+  let f =
+    if mono
+    then (fun v -> (v, TVar.mk_mono None |> TVar.typ))
+    else (fun v -> (v, TVar.mk_poly None |> TVar.typ))
   in
-  let s2 = vars |>
-    TVarSet.filter is_poly_reg |>
-    TVarSet.destruct |> List.map (fun v ->
-      (v, TVar.mk_mono None |> TVar.typ)
-    )
-  in
-  s1@s2 |> Subst.construct
+  vars |>
+    TVarSet.filter TVar.is_unregistered |>
+    TVarSet.destruct |> List.map f |> Subst.construct

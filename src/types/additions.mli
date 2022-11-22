@@ -105,6 +105,8 @@ module type Subst = sig
     val codom : t -> TVarSet.t
 end
 module Subst : Subst
+
+(* TODO: Move into a LegacyExt module *)
 (* val remove_redundant_vars : TVarSet.t -> typ -> Subst.t * typ *)
 val clean_poly_vars : TVarSet.t -> typ -> typ
 val clean_type_ext : pos:typ -> neg:typ -> TVarSet.t -> typ -> subst

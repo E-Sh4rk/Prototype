@@ -71,18 +71,22 @@ val register_unregistered : mono:bool -> TVarSet.t -> Subst.t
 
 (* Operations on types *)
 
-(* TODO : Move all functions that use a delta in a Legacy module *)
+module Legacy : sig
+    val inf_typ : TVarSet.t -> Base.typ -> Base.typ
+    val sup_typ : TVarSet.t -> Base.typ -> Base.typ
 
-val inf_typ : TVarSet.t -> Base.typ -> Base.typ
-val sup_typ : TVarSet.t -> Base.typ -> Base.typ
-
-(* Tallying *)
-val clean_type : pos:Base.typ -> neg:Base.typ -> TVarSet.t -> Base.typ -> Base.typ
-val rectype : Base.typ -> TVar.t -> Base.typ (* [rectype t u] returns the type corresponding to the equation u=t *)
-(* Variables not in var_order are considered greater. In the result, a variable will be expressed
-in term of the variables that are greater. Thus, greater variables (in particular variables not in var_order)
-are less likely to be constrained. *)
-val tallying : var_order:TVar.t list -> TVarSet.t -> (Base.typ * Base.typ) list -> Subst.t list
+    (* Tallying *)
+    val clean_type : pos:Base.typ -> neg:Base.typ -> TVarSet.t -> Base.typ -> Base.typ
+    val rectype : Base.typ -> TVar.t -> Base.typ (* [rectype t u] returns the type corresponding to the equation u=t *)
+    (* Variables not in var_order are considered greater. In the result, a variable will be expressed
+    in term of the variables that are greater. Thus, greater variables (in particular variables not in var_order)
+    are less likely to be constrained. *)
+    val tallying_raw : var_order:(TVar.t list) -> TVarSet.t -> (Base.typ * Base.typ) list -> Subst.t list
+    val tallying_infer : TVar.t list (* Polymorphic *) -> TVarSet.t (* Non-inferred *) ->
+        (Base.typ * Base.typ) list -> Subst.t list
+    val tallying : TVarSet.t (* Monomorphic *) -> (Base.typ * Base.typ) list -> Subst.t list
+    val print_tallying_instance : TVar.t list -> TVarSet.t -> (Base.typ * Base.typ) list -> unit
+end
 
 (* Some additions *)
 val factorize : TVarSet.t * TVarSet.t -> Base.typ -> Base.typ * Base.typ

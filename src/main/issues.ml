@@ -388,7 +388,7 @@ let issue_tally () =
   (* let t = cap t (arrow (neg true_typ |> cons) (cons false_typ)) in *)
   let t' = arrow (cons bt) (cons true_typ) in
   Format.printf "%a <= %a@." Print.print t Print.print t' ;
-  let sol = Tallying.tallying ~var_order:[a] CD.Var.Set.empty [(t,t')] in
+  let sol = tallying ~var_order:[a] CD.Var.Set.empty [(t,t')] in
   check_tallying_sol t t' sol
 
 let issue_tally2 () =
@@ -407,7 +407,7 @@ let issue_tally2 () =
   let rhs = cap true_typ at in
   let rhs = arrow (cons rhs) (cons bt) in
   Format.printf "%a <= %a@." Print.print lhs Print.print rhs ;
-  let sol = Tallying.tallying ~var_order:[b;c] (CD.Var.Set.singleton a) [(lhs, rhs)] in
+  let sol = tallying ~var_order:[b;c] (CD.Var.Set.singleton a) [(lhs, rhs)] in
   check_tallying_sol lhs rhs sol
 
 let _ = assert (issue_tally2 ())

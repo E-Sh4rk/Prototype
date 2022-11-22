@@ -210,10 +210,10 @@ let register_unregistered ~mono vars =
     TVarSet.destruct |> List.map f |> Subst.construct
 
 (* Operations on types *)
+module Iter = Base.Iter
+module type Kind = Base.Kind
 
-module Iter = CD.Types.Iter
-module type Kind = CD.Types.Kind
-
+module Legacy = struct
 (* let subst_vars_with delta s t =
   let vars = TVarSet.diff (vars t) delta in
   let subst = vars |> TVarSet.destruct |>
@@ -234,66 +234,108 @@ module type Kind = CD.Types.Kind
   let clean_type ~pos ~neg vars t =
     CD.Types.Subst.clean_type ~pos ~neg vars t
   let rectype = CD.Types.Subst.solve_rectype
-  let tallying ~var_order = CD.Types.Tallying.tallying ~var_order
-  
-  (* Some additions *)
-  let factorize (pvs, nvs) t =
-    let open Iter in
-    let treat_kind m t =
-      let module K = (val m : Kind) in
-      let conj lst = match lst with
-      | [] -> K.Dnf.any
-      | a::lst -> List.fold_left K.Dnf.cap a lst
-      in
-      let disj lst = match lst with
-      | [] -> K.Dnf.empty
-      | a::lst -> List.fold_left K.Dnf.cup a lst
-      in
-      let rebuild_partial lst =
-        lst |> List.map (fun ((pvs, nvs), mono) ->
-          let pvs = TVarSet.destruct pvs in
-          let nvs = TVarSet.destruct nvs in
-          let t = K.Dnf.mono mono in
-          let pvs = pvs |> List.map K.Dnf.var |> conj in
-          let nvs = nvs |> List.map K.Dnf.var |> List.map K.Dnf.neg |> conj in
-          conj [pvs ; nvs ; t]
-        ) |> disj
-      in
-      let (a,b) =
-        K.get_vars t
-        |> K.Dnf.get_partial |> List.map (fun ((pvs',nvs'), mono) ->
-          let pvs' = TVarSet.construct pvs' in
-          let nvs' = TVarSet.construct nvs' in
-          if TVarSet.diff pvs pvs' |> TVarSet.is_empty &&
-             TVarSet.diff nvs nvs' |> TVarSet.is_empty
-          then
-            let pvs' = TVarSet.diff pvs' pvs in
-            let nvs' = TVarSet.diff nvs' nvs in
-            ([((pvs',nvs'),mono)], [])
-          else ([], [((pvs',nvs'),mono)])
-        ) |> List.split in
-      let (a,b) = (List.concat a, List.concat b) in
-      let (a,b) = (rebuild_partial a, rebuild_partial b) in
-      (K.mk a, K.mk b)
+  let tallying_raw ~var_order = CD.Types.Tallying.tallying ~var_order
+
+  let print_tallying_instance var_order delta constr =
+    Format.printf "Constraints:@." ;
+    constr |> List.iter (fun (l,r) ->
+        Format.printf "(%a, %a)@." Base.pp_typ l Base.pp_typ r ;
+    );
+    Format.printf "With delta=%a and var order=%a@."
+        (Utils.pp_list TVar.pp) (TVarSet.destruct delta)
+        (Utils.pp_list TVar.pp) var_order
+
+  let check_tallying_solution var_order delta constr res =
+    let error = ref false in
+    let res =
+        res |> List.filter_map (fun s ->
+        if (constr |> List.for_all (fun (l,r) ->
+                Base.subtype (Subst.apply s l) (Subst.apply s r)
+            ))
+        then Some s else begin
+            error := true ;
+            Format.printf "INVALID SOLUTION REMOVED: %a@." Subst.pp s ;
+            None
+        end
+    )
     in
-    let t = fold (fun (a,b) pack t ->
-        let (a',b') = match pack with
-        | Absent -> (Base.empty, Base.absent)
-        | Abstract m | Char m | Int m | Atom m -> treat_kind m t
-        | Times m ->
-            let module K = (val m :> Kind) in
-            treat_kind (module K) t
-        | Xml m ->
-            let module K = (val m :> Kind) in
-            treat_kind (module K) t
-        | Function m ->
-            let module K = (val m :> Kind) in
-            treat_kind (module K) t
-        | Record m ->
-            let module K = (val m :> Kind) in
-            treat_kind (module K) t
-        in
-        (Base.cup a a', Base.cup b b')
-      ) (Base.empty, Base.empty) t
-    in t
-  
+    if !error then begin
+        Format.printf "WARNING: Cduce tallying issue.@." ;
+        print_tallying_instance var_order delta constr
+    end ; res
+
+  let tallying_infer poly noninfered constr =
+    assert (TVarSet.inter (TVarSet.construct poly) noninfered |> TVarSet.is_empty) ;
+    Utils.log ~level:2 "Tallying (inference) instance initiated...@?" ;
+    let res = tallying_raw ~var_order:poly noninfered constr in
+    Utils.log ~level:2 " Done (%i sol).@." (List.length res) ;
+    res |> check_tallying_solution poly noninfered constr
+
+  let tallying mono constr =
+    Utils.log ~level:2 "Tallying (no inference) instance initiated...@?" ;
+    let var_order = [] in
+    let res = tallying_raw ~var_order mono constr in
+    Utils.log ~level:2 " Done (%i sol).@." (List.length res) ;
+    res |> check_tallying_solution [] mono constr
+end
+
+(* Some additions *)
+let factorize (pvs, nvs) t =
+  let open Iter in
+  let treat_kind m t =
+    let module K = (val m : Kind) in
+    let conj lst = match lst with
+    | [] -> K.Dnf.any
+    | a::lst -> List.fold_left K.Dnf.cap a lst
+    in
+    let disj lst = match lst with
+    | [] -> K.Dnf.empty
+    | a::lst -> List.fold_left K.Dnf.cup a lst
+    in
+    let rebuild_partial lst =
+      lst |> List.map (fun ((pvs, nvs), mono) ->
+        let pvs = TVarSet.destruct pvs in
+        let nvs = TVarSet.destruct nvs in
+        let t = K.Dnf.mono mono in
+        let pvs = pvs |> List.map K.Dnf.var |> conj in
+        let nvs = nvs |> List.map K.Dnf.var |> List.map K.Dnf.neg |> conj in
+        conj [pvs ; nvs ; t]
+      ) |> disj
+    in
+    let (a,b) =
+      K.get_vars t
+      |> K.Dnf.get_partial |> List.map (fun ((pvs',nvs'), mono) ->
+        let pvs' = TVarSet.construct pvs' in
+        let nvs' = TVarSet.construct nvs' in
+        if TVarSet.diff pvs pvs' |> TVarSet.is_empty &&
+            TVarSet.diff nvs nvs' |> TVarSet.is_empty
+        then
+          let pvs' = TVarSet.diff pvs' pvs in
+          let nvs' = TVarSet.diff nvs' nvs in
+          ([((pvs',nvs'),mono)], [])
+        else ([], [((pvs',nvs'),mono)])
+      ) |> List.split in
+    let (a,b) = (List.concat a, List.concat b) in
+    let (a,b) = (rebuild_partial a, rebuild_partial b) in
+    (K.mk a, K.mk b)
+  in
+  let t = fold (fun (a,b) pack t ->
+      let (a',b') = match pack with
+      | Absent -> (Base.empty, Base.absent)
+      | Abstract m | Char m | Int m | Atom m -> treat_kind m t
+      | Times m ->
+          let module K = (val m :> Kind) in
+          treat_kind (module K) t
+      | Xml m ->
+          let module K = (val m :> Kind) in
+          treat_kind (module K) t
+      | Function m ->
+          let module K = (val m :> Kind) in
+          treat_kind (module K) t
+      | Record m ->
+          let module K = (val m :> Kind) in
+          treat_kind (module K) t
+      in
+      (Base.cup a a', Base.cup b b')
+    ) (Base.empty, Base.empty) t
+  in t

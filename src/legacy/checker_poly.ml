@@ -247,10 +247,10 @@ let sufficient_a env mono a prev_t t =
     (* TODO: rename poly vars *)
     let poly_vars = TVarSet.diff (vars lhs) mono in
     let rhs = mk_arrow (cons tmpvar_t) (cons t) in
-    tallying_infer (poly_vars |> TVarSet.destruct) mono [(lhs,rhs)] |>
+    Types.Tvar.Legacy.tallying_infer (poly_vars |> TVarSet.destruct) mono [(lhs,rhs)] |>
     List.filter_map (fun s ->
       let s = Subst.find s tmpvar in
-      let s = clean_type ~pos:any ~neg:empty mono s in
+      let s = Types.Tvar.Legacy.clean_type ~pos:any ~neg:empty mono s in
       Ref_env.refine v2 s env
     )
   | Ite (v, s, x1, x2) ->
@@ -390,7 +390,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
     let fresh = TVar.mk_mono (Some "app") in
     let lhs = t1 in
     let rhs = mk_arrow (cons t2) (cap (TVar.typ fresh) t |> cons) in
-    let substs = tallying_infer (poly_vars |> TVarSet.destruct) vars_t [(lhs, rhs)] in
+    let substs = Types.Tvar.Legacy.tallying_infer (poly_vars |> TVarSet.destruct) vars_t [(lhs, rhs)] in
     let res =
       substs |> List.filter_map (fun s ->
         (* TODO: simplify types *)

@@ -589,7 +589,7 @@ module Subst : Subst = struct
 end
 
 let clean_poly_vars mono t =
-    clean_type ~pos:empty ~neg:any mono t
+    Legacy.clean_type ~pos:empty ~neg:any mono t
 
 let clean_type_ext ~pos ~neg mono t =
     let subst =
@@ -614,51 +614,9 @@ let fresh mono t =
     let x = Subst.codom subst in
     (x, subst, Subst.apply subst t)
 
-let print_tallying_instance var_order delta constr =
-    Format.printf "Constraints:@." ;
-    constr |> List.iter (fun (l,r) ->
-        Format.printf "(%a, %a)@." pp_typ l pp_typ r ;
-    );
-    Format.printf "With delta=%a and var order=%a@."
-        (Utils.pp_list TVar.pp) (TVarSet.destruct delta)
-        (Utils.pp_list TVar.pp) var_order
-
-let check_tallying_solution var_order delta constr res =
-    let error = ref false in
-    let res =
-        res |> List.filter_map (fun s ->
-        if (constr |> List.for_all (fun (l,r) ->
-                subtype (Subst.apply s l) (Subst.apply s r)
-            ))
-        then Some s else begin
-            error := true ;
-            Format.printf "INVALID SOLUTION REMOVED: %a@." Subst.pp s ;
-            None
-        end
-    )
-    in
-    if !error then begin
-        Format.printf "WARNING: Cduce tallying issue.@." ;
-        print_tallying_instance var_order delta constr
-    end ; res
-
-let tallying_infer poly noninfered constr =
-    assert (TVarSet.inter (TVarSet.construct poly) noninfered |> TVarSet.is_empty) ;
-    Utils.log ~level:2 "Tallying (inference) instance initiated...@?" ;
-    let res = tallying ~var_order:poly noninfered constr in
-    Utils.log ~level:2 " Done (%i sol).@." (List.length res) ;
-    res |> check_tallying_solution poly noninfered constr
-
-let tallying mono constr =
-    Utils.log ~level:2 "Tallying (no inference) instance initiated...@?" ;
-    let var_order = [] in
-    let res = tallying ~var_order mono constr in
-    Utils.log ~level:2 " Done (%i sol).@." (List.length res) ;
-    res |> check_tallying_solution [] mono constr
-
 let subtype_poly mono t1 t2 =
     let (xs, _, t) = fresh mono t2 in
-    let res = tallying (TVarSet.union mono xs) [(t1,t)] in
+    let res = Legacy.tallying (TVarSet.union mono xs) [(t1,t)] in
     res <> []
 
 let triangle_poly mono t s =
@@ -666,10 +624,10 @@ let triangle_poly mono t s =
     let (vt',_,t') = fresh mono t in
     let alpha = TVar.mk_mono None in
     let delta = TVarSet.union mono (vars s) in
-    let res = tallying_infer (TVarSet.destruct vt') delta
+    let res = Legacy.tallying_infer (TVarSet.destruct vt') delta
         [(t', mk_arrow (TVar.typ alpha |> cons) (cons s))] in
     res |> List.map (fun subst ->
-        let res = Subst.find' subst alpha |> sup_typ delta in
+        let res = Subst.find' subst alpha |> Legacy.sup_typ delta in
         (* Utils.log "Solution:%a@." pp_typ res ; *)
         res
     ) |> disj
@@ -680,7 +638,7 @@ let triangle_split_poly mono f out =
         fun lst ->
             let t = branch_type lst in
             let (_,_,t) = fresh mono t in
-            (sup_typ mono t, triangle_poly mono t out)
+            (Legacy.sup_typ mono t, triangle_poly mono t out)
     end
 
 (* Simplification of polymorphic types *)

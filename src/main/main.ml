@@ -1,3 +1,4 @@
+module Leg = Legacy
 open Parsing.IO
 open Common.Msc
 open Common
@@ -33,7 +34,7 @@ let type_check_program
       let annot_expr = Ast.parser_expr_to_annot_expr tenv empty_vtenv varm parsed_expr in
       let time0 = Unix.gettimeofday () in
       let nf_expr = Msc.convert_to_msc annot_expr in
-      let nf_expr_ann = nf_expr |> Legacy.Msc.from_common_msc ~legacy:true in
+      let nf_expr_ann = nf_expr |> Leg.Msc.from_common_msc ~legacy:true in
       let time1 = Unix.gettimeofday () in
       assert (VarSet.subset (fv_e nf_expr) (Env.domain env |> VarSet.of_list)) ;
       let tmp_log = !Utils.log_level in
@@ -41,8 +42,8 @@ let type_check_program
       let typ_legacy =
         if compare_to_popl ()
         then
-          try Some (Legacy.Old_checker.typeof_simple_legacy tenv env nf_expr_ann)
-          with Legacy.Old_checker.Ill_typed _ -> None
+          try Some (Leg.Old_checker.typeof_simple_legacy tenv env nf_expr_ann)
+          with Leg.Old_checker.Ill_typed _ -> None
         else None
       in
       Utils.log_level := tmp_log ;
@@ -58,7 +59,7 @@ let type_check_program
               if subtype_poly TVarSet.empty typ typ'
               then typ' else raise (IncompatibleType typ)
             end
-          else Legacy.Checker.typeof_simple tenv env nf_expr_ann
+          else Leg.Checker.typeof_simple tenv env nf_expr_ann
         in
         let time2 = Unix.gettimeofday () in
         let msc_time = (time1 -. time0 ) *. 1000. in
@@ -79,7 +80,7 @@ let type_check_program
             )
           end ;
         (varm, env)
-      end with Legacy.Checker.Ill_typed (pos, str)
+      end with Leg.Checker.Ill_typed (pos, str)
       | Poly.Checker.Untypeable (pos, str) ->
         pr_ill_typed (pos, str);
         if compare_to_popl () then

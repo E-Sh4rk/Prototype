@@ -110,9 +110,6 @@ val clean_poly_vars : TVarSet.t -> typ -> typ
 val clean_type_ext : pos:typ -> neg:typ -> TVarSet.t -> typ -> subst
 val instantiate : Subst.t list -> typ -> typ
 val fresh : TVarSet.t -> typ -> TVarSet.t * Subst.t * typ
-val print_tallying_instance : TVar.t list -> TVarSet.t -> (typ * typ) list -> unit
-val tallying_infer : TVar.t list (* Polymorphic *) -> TVarSet.t (* Non-inferred *) -> (typ * typ) list -> Subst.t list
-val tallying : TVarSet.t (* Monomorphic *) -> (typ * typ) list -> Subst.t list
 val subtype_poly : TVarSet.t -> typ -> typ -> bool
 val triangle_poly : TVarSet.t -> typ -> typ -> typ
 val triangle_split_poly : TVarSet.t -> typ -> typ -> (typ * typ) list

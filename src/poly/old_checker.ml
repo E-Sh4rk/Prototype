@@ -283,7 +283,7 @@ let simplify_tallying_results mono result_var sols =
             let t = Subst.find' sol v in
             let constr = [(TVar.typ v, t);(t, TVar.typ v)] in
             (* print_tallying_instance [] mono constr ; *)
-            let res = tallying mono constr
+            let res = Legacy.tallying mono constr
             |> List.map (fun res -> Subst.compose res sol)
             |> List.find_opt (fun sol -> (* Is it precise enough? *)
               match var_to_preserve with
@@ -306,7 +306,7 @@ let simplify_tallying_results mono result_var sols =
           let constr = [(tr, TVar.typ target)] in
           let mono = TVarSet.add target mono in
           (* print_tallying_instance [] mono constr ; *)
-          begin match tallying mono constr with
+          begin match Legacy.tallying mono constr with
           | [] -> sol
           | res::_ ->
             (* log "SOLUTION:%a@." Subst.pp res ; *)
@@ -371,7 +371,7 @@ let rec infer_a' vardef tenv env mono noninferred annot_a a =
       | Some (r,_) -> r::(vs |> TVarSet.destruct)
     in
     let res =
-      tallying_infer poly noninferred [(t, s)]
+      Legacy.tallying_infer poly noninferred [(t, s)]
       |> simplify_tallying_results mono result_var
       |> List.map (fun sol ->
       let mono_part = Subst.restrict sol mono in
@@ -481,7 +481,7 @@ let rec infer_a' vardef tenv env mono noninferred annot_a a =
     log ~level:1 "Application: solving %a <= %a with delta=%a@."
       pp_typ t1 pp_typ arrow_typ (pp_list TVar.pp) log_delta ;
     let res =
-      tallying_infer (alpha::poly) noninferred [(t1, arrow_typ)]
+      Legacy.tallying_infer (alpha::poly) noninferred [(t1, arrow_typ)]
       |> simplify_tallying_results mono (Some (alpha, Variable.to_typevar vardef))
       |> List.map (fun sol ->
       let poly1_part = Subst.compose (Subst.restrict sol vs1) subst1 in

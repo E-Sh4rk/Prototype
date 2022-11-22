@@ -207,7 +207,7 @@ let tallying_infer poly mono constr =
   let mono = mono |> TVarSet.filter (fun v ->
       TVar.display_name v |> String.starts_with ~prefix:static_tvar_prefix
       ) in
-  tallying_infer poly mono constr
+  Legacy.tallying_infer poly mono constr
 
 type 'a result =
 | Ok of 'a
@@ -277,7 +277,7 @@ let simplify_inference_solutions mono res to_maximize vars_to_use sols =
           let t = Subst.find' sol v in
           let constr = [(TVar.typ v, t);(t, TVar.typ v)] in
           let mono = TVarSet.add v mono in
-          let res = tallying mono constr
+          let res = Legacy.tallying mono constr
           |> List.map (fun res ->
             (* If this introduces new variables, substitute them by the preserved var *)
             let nv = TVarSet.diff (Subst.codom res) (Subst.dom res) in
@@ -394,7 +394,7 @@ let rec infer_a' vardef tenv env mono annot_a a =
     let (vs,tsubst,t) = fresh mono t in
     let mono = static_vars_of_type s |> TVarSet.union mono in
     let res =
-      tallying mono [(t, s)]
+      Legacy.tallying mono [(t, s)]
       |> simplify_solutions mono r
       |> List.map (fun sol -> Subst.compose (Subst.restrict sol vs) tsubst)
     in
@@ -534,7 +534,7 @@ let rec infer_a' vardef tenv env mono annot_a a =
     let (constraints,(vs1,subst1),(vs2,subst2)) = app_constraints v1 v2 alpha in
     let mono = TVar.typ alpha |> static_vars_of_type |> TVarSet.union mono in
     let res =
-      tallying mono constraints
+      Legacy.tallying mono constraints
       |> simplify_solutions mono (TVar.typ alpha)
       |> List.map (fun sol ->
         let poly1_part = Subst.compose (Subst.restrict sol vs1) subst1 in

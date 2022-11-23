@@ -60,8 +60,6 @@ val disj_o : typ list -> typ
 
 val simplify_dnf : (typ * typ) list list -> (typ * typ) list list
 val simplify_typ : typ -> typ
-val simplify_poly_typ : TVarSet.t -> typ -> typ
-val remove_redundant_vars : TVarSet.t -> typ -> subst * typ
 
 val branch_type : (typ*typ) list -> typ
 
@@ -106,15 +104,18 @@ module type Subst = sig
 end
 module Subst : Subst
 
-(* TODO: Move into a LegacyExt module *)
-(* val remove_redundant_vars : TVarSet.t -> typ -> Subst.t * typ *)
-val clean_poly_vars : TVarSet.t -> typ -> typ
-val clean_type_ext : pos:typ -> neg:typ -> TVarSet.t -> typ -> subst
 val instantiate : Subst.t list -> typ -> typ
-val fresh : TVarSet.t -> typ -> TVarSet.t * Subst.t * typ
-val subtype_poly : TVarSet.t -> typ -> typ -> bool
-val triangle_poly : TVarSet.t -> typ -> typ -> typ
-val triangle_split_poly : TVarSet.t -> typ -> typ -> (typ * typ) list
+
+module LegacyExt : sig
+    val simplify_poly_typ : TVarSet.t -> typ -> typ
+    val remove_redundant_vars : TVarSet.t -> typ -> Subst.t * typ
+    val clean_poly_vars : TVarSet.t -> typ -> typ
+    val clean_type_ext : pos:typ -> neg:typ -> TVarSet.t -> typ -> Subst.t
+    val fresh : TVarSet.t -> typ -> TVarSet.t * Subst.t * typ
+    val subtype_poly : TVarSet.t -> typ -> typ -> bool
+    val triangle_poly : TVarSet.t -> typ -> typ -> typ
+    val triangle_split_poly : TVarSet.t -> typ -> typ -> (typ * typ) list
+end
 
 (* Operations on jokers (legacy) *)
 

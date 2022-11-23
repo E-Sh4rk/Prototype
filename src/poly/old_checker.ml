@@ -104,7 +104,7 @@ let rec typeof_a vardef tenv env mono annot_a a =
   | Lambda (_, _, v, e), LambdaA annot -> type_lambda env annot v e
   | _, _ -> raise (Untypeable (pos, "Invalid annotations."))
   end
-  |> clean_poly_vars mono |> simplify_typ
+  |> LegacyExt.clean_poly_vars mono |> simplify_typ
 
 and typeof_splits tenv env mono v splits e =
   let pos = Variable.get_locations v in
@@ -133,7 +133,7 @@ and typeof tenv env mono annot e =
   | Bind (_, _, _, e), SkipA (annot) -> typeof tenv env mono annot e
   | _, _ -> raise (Untypeable ([], "Invalid annotations."))
   end
-  |> clean_poly_vars mono |> simplify_typ
+  |> LegacyExt.clean_poly_vars mono |> simplify_typ
 
 (* ===== REFINE ===== *)
 
@@ -166,7 +166,7 @@ let refine_a env mono a t = (* empty possibilites are often omitted *)
       )
   | App (v1, v2) ->
     let t1 = Env.find v1 env in
-    triangle_split_poly mono t1 t
+    LegacyExt.triangle_split_poly mono t1 t
     |> List.map (fun (t1, t2) -> Env.construct [(v1,t1);(v2,t2)])
   | Ite (v, s, v1, v2) ->
     [Env.construct [(v,s);(v1,t)] ; Env.construct [(v,neg s);(v2,t)]]
@@ -273,7 +273,7 @@ let simplify_tallying_results mono result_var sols =
         match result_var with
         | None -> None
         | Some (r,r') ->
-          if subtype_poly TVarSet.empty (Subst.find' sol r) (TVar.typ r')
+          if LegacyExt.subtype_poly TVarSet.empty (Subst.find' sol r) (TVar.typ r')
           then Some (r,r') else None
       in
       let sol =
@@ -289,7 +289,7 @@ let simplify_tallying_results mono result_var sols =
               match var_to_preserve with
               | None -> true
               | Some (r,r') ->
-                subtype_poly TVarSet.empty (Subst.find' sol r) (TVar.typ r')
+                LegacyExt.subtype_poly TVarSet.empty (Subst.find' sol r) (TVar.typ r')
             )
             in
             match res with
@@ -311,7 +311,7 @@ let simplify_tallying_results mono result_var sols =
           | res::_ ->
             (* log "SOLUTION:%a@." Subst.pp res ; *)
             let to_maximize = Subst.apply res tr in
-            let clean = clean_type_ext ~pos:any ~neg:empty mono to_maximize in
+            let clean = LegacyExt.clean_type_ext ~pos:any ~neg:empty mono to_maximize in
             let res = Subst.compose clean res in
             Subst.compose res sol
           end
@@ -361,7 +361,7 @@ let rec infer_a' vardef tenv env mono noninferred annot_a a =
       | [r] -> Some (r, Variable.to_typevar vardef)
       | _ -> assert false
     in
-    let (vs,tsubst,t) = fresh mono t in
+    let (vs,tsubst,t) = LegacyExt.fresh mono t in
     let log_delta =
       TVarSet.inter noninferred (vars t) |> TVarSet.destruct in
     log ~level:1 "Simple constraint: solving %a <= %a with delta=%a@."
@@ -461,17 +461,17 @@ let rec infer_a' vardef tenv env mono noninferred annot_a a =
     need_var v2 "application" ;
     (* let t1 = Env.find v1 env |> prune_poly_typ noninferred in *)
     let t1 = Env.find v1 env in
-    let (vs1,subst1,t1) = fresh mono t1 in
+    let (vs1,subst1,t1) = LegacyExt.fresh mono t1 in
     (* let t2 = Env.find v2 env |> prune_poly_typ noninferred in *)
     let t2 = Env.find v2 env in
     (* TODO: temporary... it seems to work better for typing things like fixpoint
        combinator and avoids trigerring a bug in Cduce implementation of tallying.
        But theoretically t1 and t2 should have independent polymorphic variables. *)
     let subst2 = Subst.restrict subst1 (vars t2) in
-    let (vs2,subst2',t2) = fresh (TVarSet.union mono vs1) (Subst.apply subst2 t2) in
+    let (vs2,subst2',t2) = LegacyExt.fresh (TVarSet.union mono vs1) (Subst.apply subst2 t2) in
     let vs2 = TVarSet.inter (TVarSet.union vs2 vs1) (vars t2) in
     let subst2 = Subst.combine subst2 subst2' in
-    (*let (vs2,subst2,t2) = fresh mono t2 in*)
+    (*let (vs2,subst2,t2) = LegacyExt.fresh mono t2 in*)
     let alpha = TVar.mk_mono None in
     let poly = TVarSet.union vs1 vs2 |> TVarSet.destruct in
     let arrow_typ = mk_arrow (cons t2) (cons (TVar.typ alpha)) in
@@ -542,7 +542,7 @@ let rec infer_a' vardef tenv env mono noninferred annot_a a =
         (* remove_empty_branches |> *)
         remove_redundant_branches
         (* |> List.map (fun (t,(b,splits)) ->
-          let (subst, t) = remove_redundant_vars mono t in
+          let (subst, t) = LegacyExt.remove_redundant_vars mono t in
           (t, (b,Annot.apply_subst_split subst splits))
           ) *)
       else branches in

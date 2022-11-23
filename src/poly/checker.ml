@@ -107,7 +107,7 @@ let rec typeof_a vardef tenv env mono annot_a a =
   | Lambda (_, _, v, e), LambdaA (annot, _) -> type_lambda env annot v e
   | _, _ -> raise (Untypeable (pos, "Invalid annotations."))
   end
-  |> clean_poly_vars mono |> simplify_typ
+  |> LegacyExt.clean_poly_vars mono |> simplify_typ
 
 and typeof_splits tenv env mono v splits e =
   let pos = Variable.get_locations v in
@@ -133,7 +133,7 @@ and typeof tenv env mono annot e =
       begin match ty with
       | None -> t
       | Some ty ->
-        if subtype_poly mono t ty then ty
+        if LegacyExt.subtype_poly mono t ty then ty
         else raise (Untypeable (pos, "Invalid type simplification."))
       end
     in *)
@@ -147,7 +147,7 @@ and typeof tenv env mono annot e =
   | Bind (_, _, _, e), SkipA (annot) -> typeof tenv env mono annot e
   | _, _ -> raise (Untypeable ([], "Invalid annotations."))
   end
-  |> clean_poly_vars mono |> simplify_typ
+  |> LegacyExt.clean_poly_vars mono |> simplify_typ
 
 (* ===== REFINE ===== *)
 
@@ -180,7 +180,7 @@ let refine_a env mono a t = (* empty possibilites are often omitted *)
       )
   | App (v1, v2) ->
     let t1 = Env.find v1 env in
-    triangle_split_poly mono t1 t
+    LegacyExt.triangle_split_poly mono t1 t
     |> List.map (fun (t1, t2) -> Env.construct [(v1,t1);(v2,t2)])
   | Ite (v, s, v1, v2) ->
     [Env.construct [(v,s);(v1,t)] ; Env.construct [(v,neg s);(v2,t)]]
@@ -264,8 +264,8 @@ let simplify_inference_solutions mono res to_maximize vars_to_use sols =
           (as long as it does not make the result too unprecise). Otherwise, make
           the new vars deterministic. *)
       let is_precise =
-        if subtype_poly TVarSet.empty (Subst.apply_simplify sol res) res
-        then (fun sol -> subtype_poly TVarSet.empty (Subst.apply_simplify sol res) res)
+        if LegacyExt.subtype_poly TVarSet.empty (Subst.apply_simplify sol res) res
+        then (fun sol -> LegacyExt.subtype_poly TVarSet.empty (Subst.apply_simplify sol res) res)
         else (fun _ -> true)
       in
       let modified_mono = Subst.dom sol |> TVarSet.inter mono |> TVarSet.destruct in
@@ -316,7 +316,7 @@ let simplify_inference_solutions mono res to_maximize vars_to_use sols =
 let simplify_solutions mono res sols =
   let sols = sols |> List.filter_map (fun sol ->
     let t = Subst.apply sol res in
-    let clean = clean_type_ext ~pos:empty ~neg:any mono t in
+    let clean = LegacyExt.clean_type_ext ~pos:empty ~neg:any mono t in
     let sol = Subst.compose clean sol in
 
     let sol = restore_name_of_vars sol in
@@ -336,7 +336,7 @@ let simplify_solutions mono res sols =
           sol
         else
           (* Remove duplicates *)
-          let (s, _) = remove_redundant_vars mono t in
+          let (s, _) = LegacyExt.remove_redundant_vars mono t in
           Subst.compose s sol
       ) sol to_simplify in
 
@@ -372,7 +372,7 @@ let rec infer_a' vardef tenv env mono annot_a a =
     let t = Env.find v env in
     let to_maximize = [t] in
     let vars_to_use = Variable.get_typevar vardef in
-    let (vs,tsubst,t) = fresh mono t in
+    let (vs,tsubst,t) = LegacyExt.fresh mono t in
     log ~level:1 "Inference: solving %a <= %a with delta=[]@."
       pp_typ t pp_typ s ;
     let res_vars = TVarSet.diff (vars r) mono in
@@ -391,7 +391,7 @@ let rec infer_a' vardef tenv env mono annot_a a =
   let simple_constraint v str s r =
     need_var v str ;
     let t = Env.find v env in
-    let (vs,tsubst,t) = fresh mono t in
+    let (vs,tsubst,t) = LegacyExt.fresh mono t in
     let mono = static_vars_of_type s |> TVarSet.union mono in
     let res =
       Legacy.tallying mono [(t, s)]
@@ -404,16 +404,16 @@ let rec infer_a' vardef tenv env mono annot_a a =
     need_var v1 "application" ;
     need_var v2 "application" ;
     let t1 = Env.find v1 env in
-    let (vs1,subst1,t1) = fresh mono t1 in
+    let (vs1,subst1,t1) = LegacyExt.fresh mono t1 in
     let t2 = Env.find v2 env in
     (* TODO: temporary... it seems to work better for typing things like fixpoint
         combinator and avoids trigerring a bug in Cduce implementation of tallying.
         But theoretically t1 and t2 should have independent polymorphic variables. *)
     let subst2 = Subst.restrict subst1 (vars t2) in
-    let (vs2,subst2',t2) = fresh (TVarSet.union mono vs1) (Subst.apply subst2 t2) in
+    let (vs2,subst2',t2) = LegacyExt.fresh (TVarSet.union mono vs1) (Subst.apply subst2 t2) in
     let vs2 = TVarSet.inter (TVarSet.union vs2 vs1) (vars t2) in
     let subst2 = Subst.combine subst2 subst2' in
-    (*let (vs2,subst2,t2) = fresh mono t2 in*)
+    (*let (vs2,subst2,t2) = LegacyExt.fresh mono t2 in*)
     let arrow_typ = mk_arrow (cons t2) (cons (TVar.typ alpha)) in
     log ~level:1 "Application: solving %a <= %a@." pp_typ t1 pp_typ arrow_typ ;
     let constraints = [(t1, arrow_typ)] in
@@ -653,7 +653,7 @@ and infer' tenv env mono annot e =
       (* let annot_a = decorrelate_branches mono annot_a in *)
       ignore decorrelate_branches ;
       let t = typeof_a_nofail v tenv env mono annot_a a in
-      let t = simplify_poly_typ mono t in
+      let t = LegacyExt.simplify_poly_typ mono t in
       log ~level:1 "Definition of %s typed: %a@." (Variable.show v) pp_typ t ;
       let rec after_def splits =
         let splits = List.map (fun (s,(b,a)) -> (s, (ref b, a))) splits in

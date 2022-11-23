@@ -588,137 +588,139 @@ module Subst : Subst = struct
         |> List.fold_left TVarSet.union TVarSet.empty
 end
 
-let clean_poly_vars mono t =
-    Legacy.clean_type ~pos:empty ~neg:any mono t
-
-let clean_type_ext ~pos ~neg mono t =
-    let subst =
-        vars_with_polarity t |>
-        List.filter_map (fun (v,p) ->
-            if TVarSet.mem mono v then None
-            else match p with
-            | `Pos -> Some (v, pos)
-            | `Neg -> Some (v, neg)
-            | `Both -> None
-        )
-    in
-    Subst.construct subst
-
 let instantiate ss t =
     List.map (fun s -> Subst.apply_simplify s t) ss
     |> conj
 
-let fresh mono t =
-    let poly = TVarSet.diff (vars t) mono in
-    let subst = refresh_all poly in
-    let x = Subst.codom subst in
-    (x, subst, Subst.apply subst t)
+module LegacyExt = struct
+    let clean_poly_vars mono t =
+        Legacy.clean_type ~pos:empty ~neg:any mono t
 
-let subtype_poly mono t1 t2 =
-    let (xs, _, t) = fresh mono t2 in
-    let res = Legacy.tallying (TVarSet.union mono xs) [(t1,t)] in
-    res <> []
+    let clean_type_ext ~pos ~neg mono t =
+        let subst =
+            vars_with_polarity t |>
+            List.filter_map (fun (v,p) ->
+                if TVarSet.mem mono v then None
+                else match p with
+                | `Pos -> Some (v, pos)
+                | `Neg -> Some (v, neg)
+                | `Both -> None
+            )
+        in
+        Subst.construct subst
 
-let triangle_poly mono t s =
-    (* Utils.log "Triangle_poly with t=%a and s=%a@." pp_typ t pp_typ s ; *)
-    let (vt',_,t') = fresh mono t in
-    let alpha = TVar.mk_mono None in
-    let delta = TVarSet.union mono (vars s) in
-    let res = Legacy.tallying_infer (TVarSet.destruct vt') delta
-        [(t', mk_arrow (TVar.typ alpha |> cons) (cons s))] in
-    res |> List.map (fun subst ->
-        let res = Subst.find' subst alpha |> Legacy.sup_typ delta in
-        (* Utils.log "Solution:%a@." pp_typ res ; *)
-        res
-    ) |> disj
+    let fresh mono t =
+        let poly = TVarSet.diff (vars t) mono in
+        let subst = refresh_all poly in
+        let x = Subst.codom subst in
+        (x, subst, Subst.apply subst t)
 
-let triangle_split_poly mono f out =
-    dnf f |>
-    List.map begin
-        fun lst ->
-            let t = branch_type lst in
-            let (_,_,t) = fresh mono t in
-            (Legacy.sup_typ mono t, triangle_poly mono t out)
-    end
+    let subtype_poly mono t1 t2 =
+        let (xs, _, t) = fresh mono t2 in
+        let res = Legacy.tallying (TVarSet.union mono xs) [(t1,t)] in
+        res <> []
 
-(* Simplification of polymorphic types *)
+    let triangle_poly mono t s =
+        (* Utils.log "Triangle_poly with t=%a and s=%a@." pp_typ t pp_typ s ; *)
+        let (vt',_,t') = fresh mono t in
+        let alpha = TVar.mk_mono None in
+        let delta = TVarSet.union mono (vars s) in
+        let res = Legacy.tallying_infer (TVarSet.destruct vt') delta
+            [(t', mk_arrow (TVar.typ alpha |> cons) (cons s))] in
+        res |> List.map (fun subst ->
+            let res = Subst.find' subst alpha |> Legacy.sup_typ delta in
+            (* Utils.log "Solution:%a@." pp_typ res ; *)
+            res
+        ) |> disj
 
-let remove_redundant_vars mono t =
-    let compose_res (s,t) res = match res with
-    | None -> (Subst.identity, t)
-    | Some (s', t') -> (Subst.compose s' s, t')
-    in
-    let rec aux t =
-        let vs = TVarSet.diff (vars t) mono |> TVarSet.destruct in
-        Utils.pairs vs vs
-        |> List.filter (fun (v1, v2) -> TVar.compare v1 v2 < 0)
-        |> List.find_opt (fun (v1, v2) ->
-            let v1' = TVar.mk_fresh v1 in
-            let v2' = TVar.mk_fresh v2 in
-            let subst1 = Subst.construct [(v1, TVar.typ v1');(v2, TVar.typ v2')] in
-            let subst2 = Subst.construct [(v1, TVar.typ v2');(v2, TVar.typ v1')] in
-            let t1 = Subst.apply subst1 t in
-            let t2 = Subst.apply subst2 t in
-            equiv t1 t2
+    let triangle_split_poly mono f out =
+        dnf f |>
+        List.map begin
+            fun lst ->
+                let t = branch_type lst in
+                let (_,_,t) = fresh mono t in
+                (Legacy.sup_typ mono t, triangle_poly mono t out)
+        end
+
+    (* Simplification of polymorphic types *)
+
+    let remove_redundant_vars mono t =
+        let compose_res (s,t) res = match res with
+        | None -> (Subst.identity, t)
+        | Some (s', t') -> (Subst.compose s' s, t')
+        in
+        let rec aux t =
+            let vs = TVarSet.diff (vars t) mono |> TVarSet.destruct in
+            Utils.pairs vs vs
+            |> List.filter (fun (v1, v2) -> TVar.compare v1 v2 < 0)
+            |> List.find_opt (fun (v1, v2) ->
+                let v1' = TVar.mk_fresh v1 in
+                let v2' = TVar.mk_fresh v2 in
+                let subst1 = Subst.construct [(v1, TVar.typ v1');(v2, TVar.typ v2')] in
+                let subst2 = Subst.construct [(v1, TVar.typ v2');(v2, TVar.typ v1')] in
+                let t1 = Subst.apply subst1 t in
+                let t2 = Subst.apply subst2 t in
+                equiv t1 t2
+            )
+            |> Option.map (fun (v1, v2) ->
+                let subst = Subst.construct [(v1, TVar.typ v2)] in
+                let t = Subst.apply subst t in
+                let res = aux t in
+                compose_res (subst, t) res
+            )
+        in
+        aux t |> compose_res (Subst.identity, t)
+
+    let remove_useless_poly_conjuncts mono branch_type lst =
+        let atom_type (a,b) = branch_type (([],[]),([(a,b)],[])) in
+        let rec aux kept rem =
+            match rem with
+            | [] -> kept
+            | c::rem ->
+                let ct = atom_type c in
+                (* let rt = rem |> List.map atom_type |> conj in
+                let kt = kept |> List.map atom_type |> conj in
+                let others = conj [kt ; rt] in
+                if subtype_poly mono others ct *)
+                let rt = rem |> List.map atom_type in
+                let kt = kept |> List.map atom_type in
+                let others = kt@rt in
+                if List.exists (fun other -> subtype_poly mono other ct) others
+                then aux kept rem else aux (c::kept) rem
+        in
+        aux [] lst
+
+    let [@warning "-27"] simplify_poly_dnf mono ~open_nodes ~contravar dnf =
+        let aux mono ((pvs,nvs),(ps,ns)) =
+            let tvars = TVarSet.construct (pvs@nvs) in
+            let tvars = TVarSet.diff tvars mono in
+            if TVarSet.is_empty tvars |> not && not contravar
+            then ((pvs,nvs),([],[]))
+            else if not contravar then
+                (* (ignore remove_useless_poly_conjuncts ; ((pvs,nvs),(ps,ns))) *)
+                ((pvs,nvs), (remove_useless_poly_conjuncts mono full_branch_type ps, ns))
+            else ((pvs,nvs),(ps,ns))
+        in
+        Utils.add_others dnf |> List.map (fun (branch, others) ->
+            let mono = TVarSet.union mono (branches_vars others) in
+            aux mono branch
         )
-        |> Option.map (fun (v1, v2) ->
-            let subst = Subst.construct [(v1, TVar.typ v2)] in
-            let t = Subst.apply subst t in
-            let res = aux t in
-            compose_res (subst, t) res
-        )
-    in
-    aux t |> compose_res (Subst.identity, t)
 
-let remove_useless_poly_conjuncts mono branch_type lst =
-    let atom_type (a,b) = branch_type (([],[]),([(a,b)],[])) in
-    let rec aux kept rem =
-        match rem with
-        | [] -> kept
-        | c::rem ->
-            let ct = atom_type c in
-            (* let rt = rem |> List.map atom_type |> conj in
-            let kt = kept |> List.map atom_type |> conj in
-            let others = conj [kt ; rt] in
-            if subtype_poly mono others ct *)
-            let rt = rem |> List.map atom_type in
-            let kt = kept |> List.map atom_type in
-            let others = kt@rt in
-            if List.exists (fun other -> subtype_poly mono other ct) others
-            then aux kept rem else aux (c::kept) rem
-    in
-    aux [] lst
+    let [@warning "-27"] simplify_poly_product_dnf mono ~open_nodes ~contravar dnf =
+        (* TODO: poly simplifications for products *)
+        dnf
 
-let [@warning "-27"] simplify_poly_dnf mono ~open_nodes ~contravar dnf =
-    let aux mono ((pvs,nvs),(ps,ns)) =
-        let tvars = TVarSet.construct (pvs@nvs) in
-        let tvars = TVarSet.diff tvars mono in
-        if TVarSet.is_empty tvars |> not && not contravar
-        then ((pvs,nvs),([],[]))
-        else if not contravar then
-            (* (ignore remove_useless_poly_conjuncts ; ((pvs,nvs),(ps,ns))) *)
-            ((pvs,nvs), (remove_useless_poly_conjuncts mono full_branch_type ps, ns))
-        else ((pvs,nvs),(ps,ns))
-    in
-    Utils.add_others dnf |> List.map (fun (branch, others) ->
-        let mono = TVarSet.union mono (branches_vars others) in
-        aux mono branch
-    )
-
-let [@warning "-27"] simplify_poly_product_dnf mono ~open_nodes ~contravar dnf =
-    (* TODO: poly simplifications for products *)
-    dnf
-
-let simplify_poly_typ mono t =
-    let t = clean_poly_vars mono t in
-    let (_, t) = remove_redundant_vars mono t in
-    ignore (simplify_poly_dnf, simplify_poly_product_dnf) ;
-    (* NOTE: Advanced simplification disabled because it sometimes raise a Cduce issue,
-       and it is not very efficient anyway (in particular when branches use the same vars). *)
-    (* let t = simplify_typ_aux simplify_poly_dnf simplify_poly_product_dnf mono t in
-    let t = clean_poly_vars mono t in
-    let (_, t) = remove_redundant_vars mono t in *)
-    t
+    let simplify_poly_typ mono t =
+        let t = clean_poly_vars mono t in
+        let (_, t) = remove_redundant_vars mono t in
+        ignore (simplify_poly_dnf, simplify_poly_product_dnf) ;
+        (* NOTE: Advanced simplification disabled because it sometimes raise a Cduce issue,
+        and it is not very efficient anyway (in particular when branches use the same vars). *)
+        (* let t = simplify_typ_aux simplify_poly_dnf simplify_poly_product_dnf mono t in
+        let t = clean_poly_vars mono t in
+        let (_, t) = remove_redundant_vars mono t in *)
+        t
+end
 
 (* Operations on jokers (legacy) *)
 

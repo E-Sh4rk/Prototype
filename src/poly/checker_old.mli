@@ -2,7 +2,7 @@ open Msc
 open Types.Base
 open Types.Tvar
 open Types.Additions
-open Annotations
+open Annotations_old
 open Common
 
 exception Untypeable of Position.t list * string

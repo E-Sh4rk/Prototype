@@ -52,7 +52,7 @@ let type_check_program
         let typ =
           if use_poly ()
           then
-            let typ = Poly.Checker.typeof_simple tenv env TVarSet.empty nf_expr in
+            let typ = Poly.Checker_old.typeof_simple tenv env TVarSet.empty nf_expr in
             begin match typ_annot with
             | None -> typ
             | Some typ' ->
@@ -81,7 +81,7 @@ let type_check_program
           end ;
         (varm, env)
       end with Leg.Checker.Ill_typed (pos, str)
-      | Poly.Checker.Untypeable (pos, str) ->
+      | Poly.Checker_old.Untypeable (pos, str) ->
         pr_ill_typed (pos, str);
         if compare_to_popl () then
           begin match typ_legacy with

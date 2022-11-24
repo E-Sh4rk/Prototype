@@ -3,7 +3,7 @@ open Types.Base
 open Types.Tvar
 open Types.Additions
 open Common.Msc
-open Annotations
+open Annotations_old
 open Annot
 open Common
 open Parsing.Variable

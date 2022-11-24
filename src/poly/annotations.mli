@@ -41,5 +41,10 @@ module FullAnnot : sig
         | Keep of (a * generalization * typ (* (optimisation) *) * branches)
         | Skip of t
 
-    (* TODO *)
+    val pp_inst : Format.formatter -> inst -> unit
+    val pp_renaming : Format.formatter -> renaming -> unit
+    val pp_generalization : Format.formatter -> generalization -> unit
+    val pp_branches : Format.formatter -> branches -> unit
+    val pp_a : Format.formatter -> a -> unit
+    val pp : Format.formatter -> t -> unit
 end

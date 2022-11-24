@@ -39,9 +39,13 @@ end
 
 module FullAnnot = struct
   type inst = Subst.t list
+  [@@deriving show]
   type renaming = Subst.t
+  [@@deriving show]
   type generalization = Subst.t
+  [@@deriving show]
   type branches = (typ*t) list
+  [@@deriving show]
   and a =
       | ConstA | AliasA
       | LambdaA of branches
@@ -52,10 +56,10 @@ module FullAnnot = struct
       | ThenA of renaming
       | ElseA of renaming
       | RecordUpdateA of inst * (renaming option)
+  [@@deriving show]
   and t =
       | BVar of renaming
       | Keep of (a * generalization * typ (* (optimisation) *) * branches)
       | Skip of t
-
-  (* TODO *)
+  [@@deriving show]
 end

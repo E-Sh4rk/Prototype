@@ -2,6 +2,8 @@ open Parsing
 open Types.Base
 open Parsing.Variable
 
+(* TODO: Implement new MSC *)
+
 type 'va a =
   | Abstract of typ
   | Const of Ast.const

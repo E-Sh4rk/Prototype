@@ -38,5 +38,24 @@ module PartialAnnot = struct
 end
 
 module FullAnnot = struct
+  type inst = Subst.t list
+  type renaming = Subst.t
+  type generalization = Subst.t
+  type branches = (typ*t) list
+  and a =
+      | ConstA | AliasA
+      | LambdaA of branches
+      | PairA of renaming * renaming
+      | AppA of inst (* NOTE: different from the paper *)
+      | ProjA of inst
+      | EmptyA of inst
+      | ThenA of renaming
+      | ElseA of renaming
+      | RecordUpdateA of inst * (renaming option)
+  and t =
+      | BVar of renaming
+      | Keep of (a * generalization * typ (* (optimisation) *) * branches)
+      | Skip of t
+
   (* TODO *)
 end

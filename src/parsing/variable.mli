@@ -6,9 +6,11 @@ module Variable : sig
   val show : t -> string
   val compare : t -> t -> int
   val equals : t -> t -> bool
-  val create : string option -> t
+  val create : binding:bool -> string option -> t
   val attach_location : t -> Position.t -> unit
   val get_locations : t -> Position.t list
+  val is_binding_var : t -> bool
+  val is_lambda_var : t -> bool
   val get_name : t -> string option
   val to_typevar : t -> TVar.t
   val get_typevar : t -> int -> TVar.t

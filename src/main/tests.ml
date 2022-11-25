@@ -5,8 +5,8 @@ open Parsing.Variable
 open Common.Msc
 open Common
 
-let v1 = Variable.create (Some "v1")
-let v2 = Variable.create (Some "v2")
+let v1 = Variable.create ~binding:true (Some "v1")
+let v2 = Variable.create ~binding:true (Some "v2")
 
 let%test "propagate-app" [@tags "no-js"] =
   let ii = mk_arrow (cons int_typ) (cons int_typ) in

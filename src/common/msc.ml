@@ -191,7 +191,7 @@ let convert_to_msc ast =
       let ((_, pos), _) = ast in
       try
         let (defs, expr_var_map, a) = to_defs_and_a expr_var_map ast in
-        let var = Variable.create name in
+        let var = Variable.create ~binding:true name in
         Variable.attach_location var pos ;
         let expr_var_map =
           ExprMap.add (Ast.unannot_and_normalize ast) var expr_var_map in

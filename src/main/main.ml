@@ -30,7 +30,7 @@ let type_check_program
       | None -> None
       | Some expr -> let (t, _) = type_expr_to_typ tenv empty_vtenv expr in Some t
       in
-      let var = Variable.create (Some name) in
+      let var = Variable.create ~binding:false (Some name) in
       let annot_expr = Ast.parser_expr_to_annot_expr tenv empty_vtenv varm parsed_expr in
       let time0 = Unix.gettimeofday () in
       let nf_expr = Msc.convert_to_msc annot_expr in

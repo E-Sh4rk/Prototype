@@ -122,7 +122,7 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
                 let (t, vtenv) = type_expr_to_typ tenv vtenv t in
                 (AArrow (t), vtenv)
             in
-            let var = Variable.create (Some str) in
+            let var = Variable.create ~binding:false (Some str) in
             Variable.attach_location var pos ;
             let env = StrMap.add str var env in
             Lambda (t, var, aux vtenv env e)
@@ -134,7 +134,7 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
         | App (e1, e2) ->
             App (aux vtenv env e1, aux vtenv env e2)
         | Let (str, e1, e2) ->
-            let var = Variable.create (Some str) in
+            let var = Variable.create ~binding:false (Some str) in
             Variable.attach_location var pos ;
             let env' = StrMap.add str var env in
             Let (var, aux vtenv env e1, aux vtenv env' e2)

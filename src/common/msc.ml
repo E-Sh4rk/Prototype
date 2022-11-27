@@ -4,6 +4,7 @@ module ExprMap = Parsing.Ast.ExprMap
 open Types.Base
 
 type 'va a =
+  | Alias of Variable.t
   | Abstract of typ
   | Const of Ast.const
   | Lambda of 'va * (typ Ast.type_annot) * Variable.t * 'va e
@@ -23,6 +24,7 @@ and 'va e =
 let map ef af =
   let rec aux_a a =
     begin match a with
+    | Alias v -> Alias v
     | Abstract t -> Abstract t
     | Const c -> Const c
     | Lambda (va, ta, v, e) -> Lambda (va, ta, v, aux_e e)
@@ -47,6 +49,7 @@ let map_a ef af = map ef af |> snd
 
 let rec map_annot_a ef af a =
   match a with
+    | Alias v -> Alias v
     | Abstract t -> Abstract t
     | Const c -> Const c
     | Lambda (va, ta, v, e) -> Lambda (af va, ta, v, map_annot_e ef af e)
@@ -64,7 +67,7 @@ and map_annot_e ef af e =
 let fold ef af =
   let rec aux_a a =
     begin match a with
-    | Abstract _ | Const _ | App _ | Pair _
+    | Alias _ | Abstract _ | Const _ | App _ | Pair _
     | Projection _ | RecordUpdate _ | Ite _ | Let _ -> []
     | Lambda (_, _, _, e) -> [aux_e e]
     end
@@ -89,7 +92,7 @@ let fv_a' a acc =
   let acc = List.fold_left VarSet.union VarSet.empty acc in
   match a with
   | Lambda (_, _, v, _) -> VarSet.remove v acc
-  | Projection (_, v) | RecordUpdate (v, _, None) ->
+  | Alias v | Projection (_, v) | RecordUpdate (v, _, None) ->
     VarSet.add v acc
   | Ite (v, _, x1, x2) -> VarSet.add v acc |> VarSet.add x1 |> VarSet.add x2
   | App (v1, v2) | Pair (v1, v2) | Let (v1, v2) | RecordUpdate (v1, _, Some v2) ->
@@ -131,6 +134,7 @@ let filter_expr_map vals em =
 
 exception IsVar of Variable.t
 
+(* TODO: New MSC form *)
 let convert_to_msc ast =
   let aux expr_var_map ast =
     let rec to_defs_and_a expr_var_map ast =

@@ -22,7 +22,7 @@ let contains_records e =
     | Ite (_, s, _, _) -> aux_t s
     | Projection (Parsing.Ast.Field _, _)
     | RecordUpdate _ -> true
-    | App _ | Pair _ | Projection _ | Let _ -> false
+    | App _ | Pair _ | Projection _ | Let _ | Alias _ -> false
   and aux_t _ = false (* TODO: Implement contains_records for types *)
   in
   aux e

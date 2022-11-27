@@ -96,6 +96,7 @@ let rec typeof_a pos tenv env mono anns a =
     end
   in
   match a with
+  | Alias v -> var_type pos v env
   | Abstract t -> t
   | Const c -> typeof_const_atom tenv c
   | Pair (v1, v2) ->
@@ -212,6 +213,7 @@ let sufficient_a env mono a prev_t t =
   assert (has_absent prev_t |> not && has_absent t |> not) ;
   if subtype prev_t t then [env]
   else match a with
+  | Alias v -> [Ref_env.refine v t env] |> filter_options
   | Abstract _ | Const _ | Lambda _ -> []
   | Pair (v1, v2) ->
     split_pair t
@@ -415,6 +417,11 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
     let t = disj ts in
     match a, anns with
     | _, PUntypAtomA -> ([], false)
+    | Alias v, _ ->
+      let res =
+        [ (Ref_env.refine v t envr, PEmptyAtomA) ]
+        |> filter_res_a in
+      (res, false)
     | Abstract s, _ when subtype s t -> ([(envr, PEmptyAtomA)], false)
     | Abstract _, _ -> ([], false)
     | Const c, _ when subtype (typeof_const_atom tenv c) t ->

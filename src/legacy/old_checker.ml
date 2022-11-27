@@ -47,6 +47,7 @@ let rec typeof_a ~legacy pos tenv env a =
     end
   in
   match a with
+  | Alias v -> var_type pos v env
   | Abstract t -> t
   | Const c -> typeof_const_atom tenv c
   | Pair (v1, v2) ->
@@ -320,6 +321,10 @@ and infer_legacy_a' (*pos*)_ tenv env a t =
       log "@]@,END LAMBDA for variable %a" Variable.pp v ; res
   in
   begin match a with
+  | Alias v ->
+    let gammas =
+      [ Ref_env.refine_old v t envr ] |> filter_options in
+    (a, gammas, false)
   | Abstract s when subtype s t -> (a, [envr], false)
   | Abstract _ -> (a, [], false)
   | Const c when subtype (typeof_const_atom tenv c) t -> (a, [envr], false)
@@ -553,6 +558,10 @@ let rec infer_a' pos tenv env a t =
     (a, gammas, changes)
   end else begin
     begin match a with
+    | Alias v ->
+      let gammas =
+        [ Ref_env.refine v t envr ] |> filter_options in
+      (a, gammas, false)  
     | Abstract s when subtype s t -> (a, [envr], false)
     | Abstract _ -> (a, [], false)
     | Const c when subtype (typeof_const_atom tenv c) t -> (a, [envr], false)

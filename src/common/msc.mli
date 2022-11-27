@@ -2,9 +2,8 @@ open Parsing
 open Types.Base
 open Parsing.Variable
 
-(* TODO: Implement new MSC *)
-
 type 'va a =
+  | Alias of Variable.t
   | Abstract of typ
   | Const of Ast.const
   | Lambda of 'va * (typ Ast.type_annot) * Variable.t * 'va e

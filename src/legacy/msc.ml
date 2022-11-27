@@ -14,6 +14,7 @@ let from_common_msc ~legacy unannotated =
 let merge_annots' =
 let rec aux_a a1 a2 =
   match a1, a2 with
+  | Alias v, _ -> Alias v
   | Abstract t, _ -> Abstract t
   | Const c, _ -> Const c
   | Lambda (va1, t, v, e1), Lambda (va2, _, _, e2) ->

@@ -49,6 +49,7 @@ let rec typeof_a vardef tenv env mono annot_a a =
       ) |> conj_o
   in
   begin match a, annot_a with
+  | Alias v, NoneA -> var_type v env
   | Abstract t, NoneA -> t
   | Const c, NoneA -> typeof_const_atom tenv c
   | Pair (v1, v2), NoneA ->
@@ -153,6 +154,7 @@ and typeof tenv env mono annot e =
 
 let refine_a env mono a t = (* empty possibilites are often omitted *)
   match a with
+  | Alias v -> [Env.singleton v t]
   | Abstract _ | Const _ | Lambda _ -> []
   | Pair (v1, v2) ->
     split_pair t
@@ -473,7 +475,8 @@ let rec infer_a' vardef tenv env mono annot_a a =
     log ~level:0 "Lambda for %s exited.@." (Variable.show v) ; res
   in
   try match a, annot_a with
-  | Abstract _, NoneA | Const _, NoneA -> Ok NoneA
+  | Alias _, NoneA | Abstract _, NoneA | Const _, NoneA
+  -> Ok NoneA
   | Pair (v1, v2), NoneA | Let (v1, v2), NoneA ->
     need_var v1 "pair" ; need_var v2 "pair" ; Ok NoneA
   | Projection (Parsing.Ast.Field label, v), ProjA [] ->

@@ -79,6 +79,7 @@ let rec typeof_a pos tenv env anns a =
     end
   in
   match a with
+  | Alias v -> var_type pos v env
   | Abstract t -> t
   | Const c -> typeof_const_atom tenv c
   | Pair (v1, v2) ->
@@ -186,6 +187,7 @@ let refine_a ~sufficient tenv env a prev_t t =
   if not sufficient && is_empty t then []
   else if sufficient && subtype prev_t t then [env]
   else match a, sufficient with
+  | Alias v, _ -> [Ref_env.refine v t env] |> filter_options
   | Abstract s, false -> if disjoint s t then [] else [env]
   | Abstract s, true -> if subtype s t then [env] else []
   | Const c, false -> if disjoint (typeof_const_atom tenv c) t then [] else [env]
@@ -342,6 +344,11 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
     let worst_t = Joker.worst t in
     match a, anns with
     | _, UntypAtomA -> ([], false)
+    | Alias v, _ ->
+      let res =
+        [ (Ref_env.refine v t envr, EmptyAtomA) ]
+        |> filter_res_a in
+      (res, false)
     | Abstract s, _ when subtype s worst_t ->
       ([(envr, EmptyAtomA)], false)
     | Abstract _, _ -> ([], false)

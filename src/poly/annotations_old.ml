@@ -108,7 +108,7 @@ module Annot = struct
 
   let rec initial_a a =
     let open Msc in match a with
-    | Abstract _ | Const _ | Pair _ | Let _ -> NoneA
+    | Alias _ | Abstract _ | Const _ | Pair _ | Let _ -> NoneA
     | Ite _ -> IteA []
     | Projection _ -> ProjA []
     | RecordUpdate _ -> RecordUpdateA []

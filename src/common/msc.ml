@@ -134,7 +134,6 @@ let filter_expr_map vals em =
 
 exception IsVar of Variable.t
 
-(* TODO: New MSC form *)
 let convert_to_msc ast =
   let aux expr_var_map ast =
     let rec to_defs_and_a expr_var_map ast =
@@ -147,7 +146,8 @@ let convert_to_msc ast =
       else match e with
       | Ast.Abstract t -> ([], expr_var_map, Abstract t)
       | Ast.Const c -> ([], expr_var_map, Const c)
-      | Ast.Var v -> raise (IsVar v)
+      | Ast.Var v when Variable.is_binding_var v -> raise (IsVar v)
+      | Ast.Var v -> ([], expr_var_map, Alias v)
       | Ast.Lambda (t, v, e) ->
         (*let e = aux expr_var_map e in
         ([], expr_var_map, Lambda (t, v, e))*)

@@ -709,18 +709,13 @@ and infer_iterated tenv env mono annot e =
     infer_iterated tenv env mono annot e
   | res -> res
 
-(* TODO: do not add bindings with free var (just put them in the env) *)
 let infer tenv env mono e =
-  let fv = fv_e e in
-  let e = VarSet.fold (fun v acc ->
-    Bind ((), v, Abstract (var_type v env), acc)
-  ) fv e in
   if PMsc.contains_records e
   then raise (Untypeable ([], "Records unsupported by the polymorphic system."))
   else
     (* Format.printf "%a@." PMsc.pp_e e ; *)
     let annot =
-      match infer_iterated tenv Env.empty mono (Annot.initial_e e) e with
+      match infer_iterated tenv env mono (Annot.initial_e e) e with
       | Subst [] -> raise (Untypeable ([], "Annotations inference failed."))
       | Ok annot -> (e, annot)
       | _ -> assert false

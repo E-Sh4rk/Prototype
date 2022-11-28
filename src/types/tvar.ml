@@ -83,8 +83,10 @@ module type TVarSet = sig
   val mem : t -> TVar.t -> bool
   val filter : (TVar.t -> bool) -> t -> t
   val union : t -> t -> t
+  val union_many : t list -> t
   val add : TVar.t -> t -> t
   val inter : t -> t -> t
+  val inter_many : t list -> t
   val diff : t -> t -> t
   val rm : TVar.t -> t -> t
   val destruct : t -> TVar.t list
@@ -98,8 +100,10 @@ module TVarSet = struct
   let mem = CD.Var.Set.mem
   let filter = CD.Var.Set.filter
   let union = CD.Var.Set.cup
+  let union_many = List.fold_left union empty
   let add = CD.Var.Set.add
   let inter = CD.Var.Set.cap
+  let inter_many = List.fold_left inter empty
   let diff = CD.Var.Set.diff
   let rm = CD.Var.Set.remove
   let destruct = CD.Var.Set.get
@@ -153,7 +157,7 @@ module Subst = struct
   let pp = CD.Types.Subst.print
   let codom s =
     destruct s |> List.map (fun (_, t) -> vars t)
-    |> List.fold_left TVarSet.union TVarSet.empty
+    |> TVarSet.union_many
   let apply_to_subst s2 s1 =
     destruct s1 |>
       List.map (fun (v,t) -> (v, apply s2 t)) |> construct
@@ -297,15 +301,14 @@ let clean_type ~pos ~neg t =
   Raw.clean_type ~pos ~neg (vars_mono t) t
 
 (* TODO: Move Subst extension into Tvar *)
-(* TODO: Factorize "List.fold_left TVarSet.union TVarSet.empty" *)
 let tallying constr =
   let mono = constr |>
     List.map (fun (a,b) -> [vars_mono a ; vars_mono b]) |>
     List.flatten in
-  let mono = List.fold_left TVarSet.union TVarSet.empty mono in
+  let mono = TVarSet.union_many mono in
   let res = Raw.tallying_raw ~var_order:[] mono constr in
   let codom = List.map Subst.codom res in
-  let codom = List.fold_left TVarSet.union TVarSet.empty codom in
+  let codom = TVarSet.union_many codom in
   let lkp_subst = lookup_unregistered codom in
   let reg_subst = register_unregistered ~mono:false codom in
   res

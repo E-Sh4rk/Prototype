@@ -368,14 +368,14 @@ let is_test_type t =
 let pair_vars (a,b) = TVarSet.union (vars (descr a)) (vars (descr b))
 let pairs_vars lst =
     lst |> List.map pair_vars |>
-    List.fold_left TVarSet.union TVarSet.empty
+    TVarSet.union_many
 let branch_vars ((pvs, nvs), (ps,ns)) =
     TVarSet.construct (pvs@nvs) |>
     TVarSet.union (pairs_vars ps) |>
     TVarSet.union (pairs_vars ns)
 let branches_vars lst =
     lst |> List.map branch_vars |>
-    List.fold_left TVarSet.union TVarSet.empty
+    TVarSet.union_many
 
 let simplify_typ_aux simplify_arrow simplify_product mono t =
     (*Utils.log ~level:2 "Simplifying type...@?" ;*)
@@ -584,7 +584,7 @@ module Subst : Subst = struct
         then t else Subst.apply s t |> simplify_typ
     let codom s =
         destruct s |> List.map (fun (_, t) -> vars t)
-        |> List.fold_left TVarSet.union TVarSet.empty
+        |> TVarSet.union_many
 end
 
 let instantiate ss t =

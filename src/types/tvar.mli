@@ -31,8 +31,10 @@ module type TVarSet = sig
     val mem : t -> TVar.t -> bool
     val filter : (TVar.t -> bool) -> t -> t
     val union : t -> t -> t
+    val union_many : t list -> t
     val add : TVar.t -> t -> t
     val inter : t -> t -> t
+    val inter_many : t list -> t
     val diff : t -> t -> t
     val rm : TVar.t -> t -> t
     val destruct : t -> TVar.t list

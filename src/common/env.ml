@@ -8,7 +8,7 @@ let empty = (VarMap.empty, TVarSet.empty)
 let is_empty (m,_) =  VarMap.is_empty m
 let singleton v t = (VarMap.singleton v t, vars t)
 let construct lst = (VarMap.of_seq (List.to_seq lst),
-  List.map snd lst |> List.map vars |> List.fold_left TVarSet.union TVarSet.empty)
+  List.map snd lst |> List.map vars |> TVarSet.union_many)
 
 let add v t (m,s) = (VarMap.add v t m, TVarSet.union s (vars t))
 

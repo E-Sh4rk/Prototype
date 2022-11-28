@@ -114,14 +114,17 @@ module type Subst = sig
   val identity : t
   val is_identity : t -> bool
   val dom : t -> TVarSet.t
+  val codom : t -> TVarSet.t
   val mem : t -> TVar.t -> bool
   val rm: TVar.t -> t -> t
   val find : t -> TVar.t -> Base.typ
   val equiv : t -> t -> bool
   val apply : t -> Base.typ -> Base.typ
+  val apply_to_subst : t -> t -> t
   val destruct : t -> (TVar.t * Base.typ) list
   val pp : Format.formatter -> t -> unit
 end
+let vars = CD.Types.Subst.vars
 module Subst = struct
   type t = subst
   let is_id (v,t) =
@@ -148,9 +151,14 @@ module Subst = struct
   let pp fmt t =
     Format.fprintf fmt "%a@." (Utils.pp_long_list pp_entry) (destruct t) *)
   let pp = CD.Types.Subst.print
+  let codom s =
+    destruct s |> List.map (fun (_, t) -> vars t)
+    |> List.fold_left TVarSet.union TVarSet.empty
+  let apply_to_subst s2 s1 =
+    destruct s1 |>
+      List.map (fun (v,t) -> (v, apply s2 t)) |> construct
 end
 
-let vars = CD.Types.Subst.vars
 let vars_mono t =
   TVarSet.filter TVar.is_mono (vars t)
 let vars_poly t =
@@ -287,6 +295,24 @@ end
 
 let clean_type ~pos ~neg t =
   Raw.clean_type ~pos ~neg (vars_mono t) t
+
+(* TODO: Move Subst extension into Tvar *)
+(* TODO: Factorize "List.fold_left TVarSet.union TVarSet.empty" *)
+let tallying constr =
+  let mono = constr |>
+    List.map (fun (a,b) -> [vars_mono a ; vars_mono b]) |>
+    List.flatten in
+  let mono = List.fold_left TVarSet.union TVarSet.empty mono in
+  let res = Raw.tallying_raw ~var_order:[] mono constr in
+  let codom = List.map Subst.codom res in
+  let codom = List.fold_left TVarSet.union TVarSet.empty codom in
+  let lkp_subst = lookup_unregistered codom in
+  let reg_subst = register_unregistered ~mono:false codom in
+  res
+    |> List.map (Subst.apply_to_subst lkp_subst)
+    |> List.map (Subst.apply_to_subst reg_subst)
+
+let tallying_infer _ = failwith "TODO"
 
 (* Some additions *)
 let factorize (pvs, nvs) t =

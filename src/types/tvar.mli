@@ -47,11 +47,13 @@ module type Subst = sig
     val identity : t
     val is_identity : t -> bool
     val dom : t -> TVarSet.t
+    val codom : t -> TVarSet.t
     val mem : t -> TVar.t -> bool
     val rm: TVar.t -> t -> t
     val find : t -> TVar.t -> Base.typ
     val equiv : t -> t -> bool
     val apply : t -> Base.typ -> Base.typ
+    val apply_to_subst : t -> t -> t
     val destruct : t -> (TVar.t * Base.typ) list
     val pp : Format.formatter -> t -> unit
 end
@@ -92,6 +94,8 @@ module Raw : sig
 end
 
 val clean_type : pos:Base.typ -> neg:Base.typ -> Base.typ -> Base.typ
+val tallying : (Base.typ * Base.typ) list -> Subst.t list
+val tallying_infer : (Base.typ * Base.typ) list -> Subst.t list
 
 (* Some additions *)
 val factorize : TVarSet.t * TVarSet.t -> Base.typ -> Base.typ * Base.typ

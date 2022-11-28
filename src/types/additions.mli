@@ -100,7 +100,6 @@ module type Subst = sig
     val remove : t -> TVarSet.t -> t
     val split : t -> TVarSet.t -> t * t
     val apply_simplify : t -> typ -> typ
-    val codom : t -> TVarSet.t
 end
 module Subst : Subst
 

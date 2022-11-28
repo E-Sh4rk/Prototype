@@ -58,6 +58,9 @@ end
 module Subst : Subst
 
 val vars : Base.typ -> TVarSet.t
+val vars_mono : Base.typ -> TVarSet.t
+val vars_poly : Base.typ -> TVarSet.t
+val vars_noninfer : Base.typ -> TVarSet.t
 val top_vars : Base.typ -> TVarSet.t
 val vars_with_polarity : Base.typ -> (TVar.t * [ `Both | `Neg | `Pos ]) list
 val check_var : Base.typ -> [ `Not_var | `Pos of TVar.t | `Neg of TVar.t ]
@@ -71,7 +74,7 @@ val register_unregistered : mono:bool -> TVarSet.t -> Subst.t
 
 (* Operations on types *)
 
-module Legacy : sig
+module Raw : sig
     val inf_typ : TVarSet.t -> Base.typ -> Base.typ
     val sup_typ : TVarSet.t -> Base.typ -> Base.typ
 
@@ -87,6 +90,8 @@ module Legacy : sig
     val tallying : TVarSet.t (* Monomorphic *) -> (Base.typ * Base.typ) list -> Subst.t list
     val print_tallying_instance : TVar.t list -> TVarSet.t -> (Base.typ * Base.typ) list -> unit
 end
+
+val clean_type : pos:Base.typ -> neg:Base.typ -> Base.typ -> Base.typ
 
 (* Some additions *)
 val factorize : TVarSet.t * TVarSet.t -> Base.typ -> Base.typ * Base.typ

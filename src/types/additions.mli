@@ -106,7 +106,7 @@ module Subst : Subst
 
 val instantiate : Subst.t list -> typ -> typ
 
-module LegacyExt : sig
+module RawExt : sig
     val simplify_poly_typ : TVarSet.t -> typ -> typ
     val remove_redundant_vars : TVarSet.t -> typ -> Subst.t * typ
     val clean_poly_vars : TVarSet.t -> typ -> typ

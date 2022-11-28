@@ -592,9 +592,9 @@ let instantiate ss t =
     List.map (fun s -> Subst.apply_simplify s t) ss
     |> conj
 
-module LegacyExt = struct
+module RawExt = struct
     let clean_poly_vars mono t =
-        Legacy.clean_type ~pos:empty ~neg:any mono t
+        Raw.clean_type ~pos:empty ~neg:any mono t
 
     let clean_type_ext ~pos ~neg mono t =
         let subst =
@@ -617,7 +617,7 @@ module LegacyExt = struct
 
     let subtype_poly mono t1 t2 =
         let (xs, _, t) = fresh mono t2 in
-        let res = Legacy.tallying (TVarSet.union mono xs) [(t1,t)] in
+        let res = Raw.tallying (TVarSet.union mono xs) [(t1,t)] in
         res <> []
 
     let triangle_poly mono t s =
@@ -625,10 +625,10 @@ module LegacyExt = struct
         let (vt',_,t') = fresh mono t in
         let alpha = TVar.mk_mono None in
         let delta = TVarSet.union mono (vars s) in
-        let res = Legacy.tallying_infer (TVarSet.destruct vt') delta
+        let res = Raw.tallying_infer (TVarSet.destruct vt') delta
             [(t', mk_arrow (TVar.typ alpha |> cons) (cons s))] in
         res |> List.map (fun subst ->
-            let res = Subst.find' subst alpha |> Legacy.sup_typ delta in
+            let res = Subst.find' subst alpha |> Raw.sup_typ delta in
             (* Utils.log "Solution:%a@." pp_typ res ; *)
             res
         ) |> disj
@@ -639,7 +639,7 @@ module LegacyExt = struct
             fun lst ->
                 let t = branch_type lst in
                 let (_,_,t) = fresh mono t in
-                (Legacy.sup_typ mono t, triangle_poly mono t out)
+                (Raw.sup_typ mono t, triangle_poly mono t out)
         end
 
     (* Simplification of polymorphic types *)

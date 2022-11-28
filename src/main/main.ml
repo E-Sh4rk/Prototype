@@ -56,7 +56,7 @@ let type_check_program
             begin match typ_annot with
             | None -> typ
             | Some typ' ->
-              if LegacyExt.subtype_poly TVarSet.empty typ typ'
+              if RawExt.subtype_poly TVarSet.empty typ typ'
               then typ' else raise (IncompatibleType typ)
             end
           else Leg.Checker.typeof_simple tenv env nf_expr_ann

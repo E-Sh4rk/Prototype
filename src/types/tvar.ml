@@ -151,6 +151,12 @@ module Subst = struct
 end
 
 let vars = CD.Types.Subst.vars
+let vars_mono t =
+  TVarSet.filter TVar.is_mono (vars t)
+let vars_poly t =
+  TVarSet.filter TVar.is_poly (vars t)
+let vars_noninfer t =
+  TVarSet.filter (fun v -> TVar.can_infer v |> not) (vars t)
 let top_vars = CD.Types.Subst.top_vars
 let vars_with_polarity t = CD.Types.Subst.var_polarities t |> CD.Var.Map.get
 let check_var = CD.Types.Subst.check_var
@@ -213,7 +219,7 @@ let register_unregistered ~mono vars =
 module Iter = Base.Iter
 module type Kind = Base.Kind
 
-module Legacy = struct
+module Raw = struct
 (* let subst_vars_with delta s t =
   let vars = TVarSet.diff (vars t) delta in
   let subst = vars |> TVarSet.destruct |>
@@ -278,6 +284,9 @@ module Legacy = struct
     Utils.log ~level:2 " Done (%i sol).@." (List.length res) ;
     res |> check_tallying_solution [] mono constr
 end
+
+let clean_type ~pos ~neg t =
+  Raw.clean_type ~pos ~neg (vars_mono t) t
 
 (* Some additions *)
 let factorize (pvs, nvs) t =

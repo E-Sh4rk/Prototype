@@ -266,8 +266,8 @@ let simplify_inference_solutions mono res to_maximize vars_to_use sols =
           (as long as it does not make the result too unprecise). Otherwise, make
           the new vars deterministic. *)
       let is_precise =
-        if RawExt.subtype_poly TVarSet.empty (Subst.apply_simplify sol res) res
-        then (fun sol -> RawExt.subtype_poly TVarSet.empty (Subst.apply_simplify sol res) res)
+        if RawExt.subtype_poly TVarSet.empty (apply_subst_simplify sol res) res
+        then (fun sol -> RawExt.subtype_poly TVarSet.empty (apply_subst_simplify sol res) res)
         else (fun _ -> true)
       in
       let modified_mono = Subst.dom sol |> TVarSet.inter mono |> TVarSet.destruct in
@@ -342,7 +342,7 @@ let simplify_solutions mono res sols =
           Subst.compose s sol
       ) sol to_simplify in
 
-    (* log "Res: %a@." pp_typ (Subst.apply_simplify sol res) ; *)
+    (* log "Res: %a@." pp_typ (apply_subst_simplify sol res) ; *)
     (* log "Res: %a@." Subst.pp sol ; *)
     Some sol
     ) in
@@ -354,7 +354,7 @@ let decorrelate_branches mono annot_a =
     let subst = new_vars |> TVarSet.destruct |> List.map (fun v ->
       (v, TVar.mk_fresh v |> TVar.typ)
     ) |> Subst.construct in
-    (Subst.apply_simplify subst t, apply_subst_split subst splits)
+    (apply_subst_simplify subst t, apply_subst_split subst splits)
   in
   match annot_a with
   | LambdaA (branches, []) ->
@@ -456,7 +456,7 @@ let rec infer_a' vardef tenv env mono annot_a a =
         | Subst lst ->
           let res =
             lst |> List.map (fun (sigma, splits) ->
-              (Subst.remove sigma xs, (Subst.apply_simplify sigma s, splits)))
+              (Subst.remove sigma xs, (apply_subst_simplify sigma s, splits)))
             |> regroup Subst.equiv
           in
           Subst res |> map_res' (fun sigma splits ->
@@ -599,7 +599,7 @@ and infer_splits' tenv env mono v splits e =
       log ~level:1 "Exploring split %a for variable %s.@." pp_typ s (Variable.show v) ;
       begin match infer_iterated tenv env mono annot e with
       | Ok annot -> aux splits |> map_res' (fun sigma splits ->
-        (Subst.apply_simplify sigma s,(b,Annot.apply_subst sigma annot))::splits)
+        (apply_subst_simplify sigma s,(b,Annot.apply_subst sigma annot))::splits)
       | Split lst ->
         let res =
           lst |> List.map (fun (env', annot) ->
@@ -610,7 +610,7 @@ and infer_splits' tenv env mono v splits e =
         in
         map_res (fun splits' -> splits'@splits) (Split res)
       | res -> res |> map_res' (fun sigma annot ->
-        (Subst.apply_simplify sigma s,(b,annot))::(Annot.apply_subst_split sigma splits))
+        (apply_subst_simplify sigma s,(b,annot))::(Annot.apply_subst_split sigma splits))
       end
   in
   let res = aux splits in

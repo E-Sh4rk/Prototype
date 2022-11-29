@@ -75,23 +75,6 @@ module TVar = struct
   let pp = CD.Var.print
 end
 
-module type TVarSet = sig
-  type t
-  val empty : t
-  val construct : TVar.t list -> t
-  val is_empty : t -> bool
-  val mem : t -> TVar.t -> bool
-  val filter : (TVar.t -> bool) -> t -> t
-  val union : t -> t -> t
-  val union_many : t list -> t
-  val add : TVar.t -> t -> t
-  val inter : t -> t -> t
-  val inter_many : t list -> t
-  val diff : t -> t -> t
-  val rm : TVar.t -> t -> t
-  val destruct : t -> TVar.t list
-  val pp : Format.formatter -> t -> unit
-end
 module TVarSet = struct
   type t = CD.Var.Set.t
   let empty = CD.Var.Set.empty
@@ -111,26 +94,10 @@ module TVarSet = struct
     destruct t |> Format.fprintf fmt "%a@." (Utils.pp_list TVar.pp)
 end
 
-type subst = CD.Types.Subst.t
-module type Subst = sig
-  type t = subst
-  val construct : (TVar.t * Base.typ) list -> t
-  val identity : t
-  val is_identity : t -> bool
-  val dom : t -> TVarSet.t
-  val codom : t -> TVarSet.t
-  val mem : t -> TVar.t -> bool
-  val rm: TVar.t -> t -> t
-  val find : t -> TVar.t -> Base.typ
-  val equiv : t -> t -> bool
-  val apply : t -> Base.typ -> Base.typ
-  val apply_to_subst : t -> t -> t
-  val destruct : t -> (TVar.t * Base.typ) list
-  val pp : Format.formatter -> t -> unit
-end
 let vars = CD.Types.Subst.vars
+
 module Subst = struct
-  type t = subst
+  type t = CD.Types.Subst.t
   let is_id (v,t) =
     match CD.Types.Subst.check_var t with
     | `Pos v' when CD.Var.equal v v' -> true
@@ -146,21 +113,42 @@ module Subst = struct
   let mem s v = CD.Var.Set.mem (dom s) v
   let rm = CD.Var.Map.remove
   let find s v = CD.Var.Map.assoc v s
+  let find' t v = if mem t v then find t v else TVar.typ v
   let equiv s1 s2 =
     let s1 = normalize s1 in
     let s2 = normalize s2 in
     CD.Var.Map.equal Base.equiv s1 s2
-  (* let pp_entry fmt (v,t) =
+
+  let apply_to_subst s2 s1 =
+    destruct s1 |>
+      List.map (fun (v,t) -> (v, apply s2 t))
+  let compose s2 s1 =
+      let only_s2 = destruct s2 |>
+          List.filter (fun (v, _) -> mem s1 v |> not) in
+      construct ((apply_to_subst s2 s1)@only_s2)
+  let apply_to_subst s2 s1 = apply_to_subst s2 s1 |> construct
+  let combine s1 s2 =
+      assert (TVarSet.inter (dom s1) (dom s2) |> TVarSet.is_empty) ;
+      let s1 = destruct s1 in
+      let s2 = destruct s2 in
+      s1@s2 |> construct
+  let restrict s vars =
+      let vars = TVarSet.inter (dom s) vars in
+      vars |> TVarSet.destruct |> List.map (fun v -> (v, find s v)) |> construct
+  let remove s vars =
+      let nvars = TVarSet.diff (dom s) vars in
+      restrict s nvars
+  let split s vars =
+      (restrict s vars, remove s vars)
+  let codom s =
+      destruct s |> List.map (fun (_, t) -> vars t)
+      |> TVarSet.union_many
+
+(* let pp_entry fmt (v,t) =
     Format.fprintf fmt "%a ===> %a" pp_var v pp_typ t
   let pp fmt t =
     Format.fprintf fmt "%a@." (Utils.pp_long_list pp_entry) (destruct t) *)
   let pp = CD.Types.Subst.print
-  let codom s =
-    destruct s |> List.map (fun (_, t) -> vars t)
-    |> TVarSet.union_many
-  let apply_to_subst s2 s1 =
-    destruct s1 |>
-      List.map (fun (v,t) -> (v, apply s2 t)) |> construct
 end
 
 let vars_mono t =
@@ -300,7 +288,6 @@ end
 let clean_type ~pos ~neg t =
   Raw.clean_type ~pos ~neg (vars_mono t) t
 
-(* TODO: Move Subst extension into Tvar *)
 let tallying constr =
   let mono = constr |>
     List.map (fun (a,b) -> [vars_mono a ; vars_mono b]) |>

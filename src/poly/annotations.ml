@@ -1,4 +1,5 @@
 open Types.Base
+open Types.Tvar
 open Types.Additions
 
 module PartialAnnot = struct
@@ -18,7 +19,7 @@ module PartialAnnot = struct
   [@@deriving show]
 
   let rec apply_subst_branches s lst =
-    let aux (ty, t) = (Subst.apply_simplify s ty, apply_subst s t) in
+    let aux (ty, t) = (apply_subst_simplify s ty, apply_subst s t) in
     List.map aux lst
   and apply_subst_a s a = match a with
   | InferA -> InferA

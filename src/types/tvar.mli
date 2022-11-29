@@ -23,7 +23,7 @@ module TVar : sig
     val pp : Format.formatter -> t -> unit
 end
 
-module type TVarSet = sig
+module TVarSet : sig
     type t
     val empty : t
     val construct : TVar.t list -> t
@@ -40,11 +40,9 @@ module type TVarSet = sig
     val destruct : t -> TVar.t list
     val pp : Format.formatter -> t -> unit
 end
-module TVarSet : TVarSet
 
-type subst
-module type Subst = sig
-    type t = subst
+module Subst : sig
+    type t
     val construct : (TVar.t * Base.typ) list -> t
     val identity : t
     val is_identity : t -> bool
@@ -53,13 +51,18 @@ module type Subst = sig
     val mem : t -> TVar.t -> bool
     val rm: TVar.t -> t -> t
     val find : t -> TVar.t -> Base.typ
+    val find' : t -> TVar.t -> Base.typ
     val equiv : t -> t -> bool
     val apply : t -> Base.typ -> Base.typ
     val apply_to_subst : t -> t -> t
     val destruct : t -> (TVar.t * Base.typ) list
+    val compose : t -> t -> t
+    val combine : t -> t -> t
+    val restrict : t -> TVarSet.t -> t
+    val remove : t -> TVarSet.t -> t
+    val split : t -> TVarSet.t -> t * t
     val pp : Format.formatter -> t -> unit
 end
-module Subst : Subst
 
 val vars : Base.typ -> TVarSet.t
 val vars_mono : Base.typ -> TVarSet.t

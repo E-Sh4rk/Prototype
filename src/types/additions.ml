@@ -541,54 +541,13 @@ let remove_field_info t label =
     let singleton = mk_record false [label, any_or_absent_node] in
     merge_records t singleton
 
-(* Operations on substs and vars *)
-
-module type Subst = sig
-    include Subst
-    val find' : t -> TVar.t -> typ
-    val compose : t -> t -> t
-    val compose_restr : t -> t -> t
-    val combine : t -> t -> t
-    val restrict : t -> TVarSet.t -> t
-    val remove : t -> TVarSet.t -> t
-    val split : t -> TVarSet.t -> t * t
-    val apply_simplify : t -> typ -> typ
-end
-module Subst : Subst = struct
-    include Subst
-    let find' t v =
-        if mem t v then find t v else TVar.typ v
-    let compose_restr_ s2 s1 =
-        destruct s1 |>
-            List.map (fun (v,t) -> (v, apply s2 t))
-    let compose_restr s2 s1 = compose_restr_ s2 s1 |> construct
-    let compose s2 s1 =
-        let only_s2 = destruct s2 |>
-            List.filter (fun (v, _) -> mem s1 v |> not) in
-        construct ((compose_restr_ s2 s1)@only_s2)
-    let combine s1 s2 =
-        assert (TVarSet.inter (dom s1) (dom s2) |> TVarSet.is_empty) ;
-        let s1 = destruct s1 in
-        let s2 = destruct s2 in
-        s1@s2 |> construct
-    let restrict s vars =
-        let vars = TVarSet.inter (dom s) vars in
-        vars |> TVarSet.destruct |> List.map (fun v -> (v, find s v)) |> construct
-    let remove s vars =
-        let nvars = TVarSet.diff (dom s) vars in
-        restrict s nvars
-    let split s vars =
-        (restrict s vars, remove s vars)
-    let apply_simplify s t =
-        if TVarSet.inter (Subst.dom s) (vars t) |> TVarSet.is_empty
-        then t else Subst.apply s t |> simplify_typ
-    let codom s =
-        destruct s |> List.map (fun (_, t) -> vars t)
-        |> TVarSet.union_many
-end
+(* Operations on type vars *)
+let apply_subst_simplify s t =
+    if TVarSet.inter (Subst.dom s) (vars t) |> TVarSet.is_empty
+    then t else Subst.apply s t |> simplify_typ
 
 let instantiate ss t =
-    List.map (fun s -> Subst.apply_simplify s t) ss
+    List.map (fun s -> apply_subst_simplify s t) ss
     |> conj
 
 module RawExt = struct

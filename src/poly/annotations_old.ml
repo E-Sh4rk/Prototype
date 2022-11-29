@@ -65,7 +65,7 @@ module Annot = struct
       Format.fprintf fmt "----- Subst %i -----@.%a@." i Subst.pp s
     )
   let apply_subst_substs s ss =
-    List.map (fun s' -> Subst.compose_restr s s') ss
+    List.map (fun s' -> Subst.apply_to_subst s s') ss
 
   type split = (typ*(bool*t)) list
   [@@deriving show]
@@ -84,9 +84,9 @@ module Annot = struct
     [@@deriving show]
 
   let rec apply_subst_split s lst =
-    lst |> List.map (fun (ty,(b,t)) -> (Subst.apply_simplify s ty, (b, apply_subst s t)))
+    lst |> List.map (fun (ty,(b,t)) -> (apply_subst_simplify s ty, (b, apply_subst s t)))
   and apply_subst_branches s lst =
-    let aux (ty, split) = (Subst.apply_simplify s ty, apply_subst_split s split) in
+    let aux (ty, split) = (apply_subst_simplify s ty, apply_subst_split s split) in
     List.map aux lst
   and apply_subst_a s a = match a with
   | NoneA -> NoneA
@@ -100,7 +100,7 @@ module Annot = struct
   else match t with
   | VarA -> VarA
   | DoA (a, ty, split) ->
-    DoA (apply_subst_a s a, Option.map (Subst.apply_simplify s) ty,
+    DoA (apply_subst_a s a, Option.map (apply_subst_simplify s) ty,
       apply_subst_split s split)
   | SkipA t -> SkipA (apply_subst s t)
   | DoSkipA (a, split, t) ->

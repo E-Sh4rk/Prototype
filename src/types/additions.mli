@@ -88,21 +88,9 @@ val remove_field_info : typ -> string -> typ
 (** [remove_field_info t label] removes all the information
     about the field label in the record t. *)
 
-(* Operations on substitutions and type variables *)
+(* Operations on type variables *)
 
-module type Subst = sig
-    include Subst
-    val find' : t -> TVar.t -> typ
-    val compose : t -> t -> t
-    val compose_restr : t -> t -> t
-    val combine : t -> t -> t
-    val restrict : t -> TVarSet.t -> t
-    val remove : t -> TVarSet.t -> t
-    val split : t -> TVarSet.t -> t * t
-    val apply_simplify : t -> typ -> typ
-end
-module Subst : Subst
-
+val apply_subst_simplify : Subst.t -> typ -> typ
 val instantiate : Subst.t list -> typ -> typ
 
 module RawExt : sig

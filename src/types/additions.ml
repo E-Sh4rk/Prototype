@@ -680,6 +680,12 @@ module RawExt = struct
         t
 end
 
+let simplify_poly_typ t =
+    RawExt.simplify_poly_typ (vars_mono t) t
+
+let subtype_poly t1 t2 =
+    tallying [(t1,t2)] <> []
+
 (* Operations on jokers (legacy) *)
 
 module Joker = struct

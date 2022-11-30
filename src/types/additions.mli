@@ -104,6 +104,9 @@ module RawExt : sig
     val triangle_split_poly : TVarSet.t -> typ -> typ -> (typ * typ) list
 end
 
+val simplify_poly_typ : typ -> typ
+val subtype_poly : typ -> typ -> bool
+
 (* Operations on jokers (legacy) *)
 
 module Joker : sig

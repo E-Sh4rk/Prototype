@@ -95,6 +95,7 @@ module TVarSet = struct
 end
 
 let vars = CD.Types.Subst.vars
+let check_var = CD.Types.Subst.check_var
 
 module Subst = struct
   type t = CD.Types.Subst.t
@@ -143,6 +144,13 @@ module Subst = struct
   let codom s =
       destruct s |> List.map (fun (_, t) -> vars t)
       |> TVarSet.union_many
+  let inverse_renaming t =
+    destruct t |>
+    List.map (fun (v,t) ->
+      match check_var t with
+      | `Pos v' -> (v', TVar.typ v)
+      | _ -> assert false) |>
+    construct
 
 (* let pp_entry fmt (v,t) =
     Format.fprintf fmt "%a ===> %a" pp_var v pp_typ t
@@ -155,11 +163,10 @@ let vars_mono t =
   TVarSet.filter TVar.is_mono (vars t)
 let vars_poly t =
   TVarSet.filter TVar.is_poly (vars t)
-let vars_noninfer t =
-  TVarSet.filter (fun v -> TVar.can_infer v |> not) (vars t)
+let vars_infer t =
+  TVarSet.filter TVar.can_infer (vars t)
 let top_vars = CD.Types.Subst.top_vars
 let vars_with_polarity t = CD.Types.Subst.var_polarities t |> CD.Var.Map.get
-let check_var = CD.Types.Subst.check_var
 
 let refresh ~mono vars =
   let test = if mono then TVar.is_mono else TVar.is_poly in
@@ -302,7 +309,19 @@ let tallying constr =
     |> List.map (Subst.apply_to_subst lkp_subst)
     |> List.map (Subst.apply_to_subst reg_subst)
 
-let tallying_infer _ = failwith "TODO"
+let tallying_infer constr =
+  let infer = constr |>
+    List.map (fun (a,b) -> [vars_infer a ; vars_infer b]) |>
+    List.flatten in
+  let infer = TVarSet.union_many infer in
+  let gen = generalize infer in
+  let constr = constr |>
+    List.map (fun (a,b) -> (Subst.apply gen a, Subst.apply gen b))
+  in
+  tallying constr |> List.map (fun s ->
+    let s = Subst.apply_to_subst s gen in
+    Subst.apply_to_subst (Subst.inverse_renaming gen) s
+  )
 
 (* Some additions *)
 let factorize (pvs, nvs) t =

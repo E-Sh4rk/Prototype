@@ -61,13 +61,14 @@ module Subst : sig
     val restrict : t -> TVarSet.t -> t
     val remove : t -> TVarSet.t -> t
     val split : t -> TVarSet.t -> t * t
+    val inverse_renaming : t -> t
     val pp : Format.formatter -> t -> unit
 end
 
 val vars : Base.typ -> TVarSet.t
 val vars_mono : Base.typ -> TVarSet.t
 val vars_poly : Base.typ -> TVarSet.t
-val vars_noninfer : Base.typ -> TVarSet.t
+val vars_infer : Base.typ -> TVarSet.t
 val top_vars : Base.typ -> TVarSet.t
 val vars_with_polarity : Base.typ -> (TVar.t * [ `Both | `Neg | `Pos ]) list
 val check_var : Base.typ -> [ `Not_var | `Pos of TVar.t | `Neg of TVar.t ]

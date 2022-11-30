@@ -61,6 +61,10 @@ let instantiate_alias env args name =
     | Not_found -> raise (TypeDefinitionError (Printf.sprintf "Type %s undefined!" name))
     | Invalid_argument _ -> raise (TypeDefinitionError (Printf.sprintf "Wrong arity for type %s!" name))
 
+let no_infer_prefix = "_"
+let is_infer_var_name name =
+    String.starts_with ~prefix:no_infer_prefix name |> not
+
 let derecurse_types env venv defs =
     let open Cduce_core in
     let venv =
@@ -101,7 +105,7 @@ let derecurse_types env venv defs =
             begin match StrMap.find_opt v lcl, Hashtbl.find_opt venv v with
             | Some t, _ | None, Some t -> Typepat.mk_type t
             | None, None ->
-                let t = TVar.mk_mono (Some v) |> TVar.typ in
+                let t = TVar.mk_mono ~infer:(is_infer_var_name v) (Some v) |> TVar.typ in
                 Hashtbl.add venv v t ;
                 Typepat.mk_type t
             end

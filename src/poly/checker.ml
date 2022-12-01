@@ -1,12 +1,8 @@
 open Types.Base
 open Types.Tvar
 open Types.Additions
-open Common.Msc
-open Annotations_old
-open Annot
 open Common
 open Parsing.Variable
-open Utils
 
 exception Untypeable of Position.t list * string
 
@@ -43,11 +39,13 @@ let rec typeof_a vardef tenv env annot_a a =
       annot |> List.map (fun (s, annot) ->
         check_mono pos s ;
         let env = Env.add v s env in
-        let t = typeof tenv env v annot e in
+        let t = typeof tenv env annot e in
         mk_arrow (cons s) (cons t)
       ) |> conj_o
   in (* TODO *)
-  begin match a, annot_a with
+  ignore (type_lambda, env, annot_a, a, instantiate_check,
+  typeof_const_atom, var_type) ;
+  (*begin match a, annot_a with
   | Alias v, NoneA -> var_type v env
   | Abstract t, NoneA -> t
   | Const c, NoneA -> typeof_const_atom tenv c
@@ -107,9 +105,10 @@ let rec typeof_a vardef tenv env annot_a a =
   | Lambda (_, _, v, e), LambdaA (annot, _) -> type_lambda env annot v e
   | _, _ -> raise (Untypeable (pos, "Invalid annotations."))
   end
-  |> RawExt.clean_poly_vars mono |> simplify_typ
+  |> RawExt.clean_poly_vars mono |> simplify_typ*)
+  failwith "TODO"
   
-and typeof _ = failwith "TODO"
+and typeof _ = ignore typeof_a ; failwith "TODO"
 
 let infer _ = failwith "TODO"
 

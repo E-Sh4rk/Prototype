@@ -508,7 +508,12 @@ let ifthenelse (b : TRUE ; FALSE )  x y = b x y
 (* expected type for the follwoing function
  *   (TRUE -> 'c -> 'd -> 'c)
  * & (FALSE -> 'c -> 'd -> 'd) 
-*)
+ *
+ * BUT
+   let check :    (TRUE -> 'c -> 'd -> 'c) & (FALSE -> 'c -> 'd -> 'd) = ifthenelse
+ * does not type
+ *)
+
 
 (* Parametric types examples *)
 

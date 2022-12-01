@@ -27,7 +27,7 @@ module FullAnnot : sig
     type generalization = Subst.t
     type branches = (typ*t) list
     and a =
-        | ConstA | AliasA
+        | ConstA | AliasA | AbstractA | LetA
         | LambdaA of branches
         | PairA of renaming * renaming
         | AppA of inst (* NOTE: different from the paper *)

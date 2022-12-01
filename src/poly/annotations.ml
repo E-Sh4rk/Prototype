@@ -48,7 +48,7 @@ module FullAnnot = struct
   type branches = (typ*t) list
   [@@deriving show]
   and a =
-      | ConstA | AliasA
+      | ConstA | AliasA | AbstractA | LetA
       | LambdaA of branches
       | PairA of renaming * renaming
       | AppA of inst (* NOTE: different from the paper *)

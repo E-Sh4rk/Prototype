@@ -105,6 +105,7 @@ module RawExt : sig
 end
 
 val simplify_poly_typ : typ -> typ
+val clean_poly_vars : typ -> typ
 val subtype_poly : typ -> typ -> bool
 
 (* Operations on jokers (legacy) *)

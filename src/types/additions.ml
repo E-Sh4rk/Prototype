@@ -687,6 +687,9 @@ end
 let simplify_poly_typ t =
     RawExt.simplify_poly_typ (vars_mono t) t
 
+let clean_poly_vars =
+    clean_type ~pos:empty ~neg:any
+
 let subtype_poly t1 t2 =
     tallying [(t1,t2)] <> []
 

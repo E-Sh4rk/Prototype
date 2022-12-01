@@ -61,6 +61,7 @@ module Subst : sig
     val restrict : t -> TVarSet.t -> t
     val remove : t -> TVarSet.t -> t
     val split : t -> TVarSet.t -> t * t
+    val is_renaming : t -> bool
     val inverse_renaming : t -> t
     val pp : Format.formatter -> t -> unit
 end

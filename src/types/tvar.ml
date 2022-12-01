@@ -144,6 +144,12 @@ module Subst = struct
   let codom s =
       destruct s |> List.map (fun (_, t) -> vars t)
       |> TVarSet.union_many
+  let is_renaming t =
+    destruct t |>
+    List.for_all (fun (_,t) ->
+      match check_var t with
+      | `Pos _ -> true
+      | _ -> false)
   let inverse_renaming t =
     destruct t |>
     List.map (fun (v,t) ->

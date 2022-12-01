@@ -36,7 +36,7 @@ module FullAnnot : sig
         | RecordUpdateA of inst * (renaming option)
     and t =
         | BVar of renaming
-        | Keep of (a * generalization * typ (* (optimisation) *) * branches)
+        | Keep of (a * generalization * typ option (* (optimisation) *) * branches)
         | Skip of t
 
     val pp_inst : Format.formatter -> inst -> unit

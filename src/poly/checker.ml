@@ -34,9 +34,17 @@ let check_mono pos t =
 
 let rename_check pos r t =
   if Subst.is_renaming r &&
-    Subst.dom r |> TVarSet.filter TVar.is_mono |> TVarSet.is_empty
+    Subst.dom r |> TVarSet.filter TVar.is_mono |> TVarSet.is_empty &&
+    Subst.codom r |> TVarSet.filter TVar.is_mono |> TVarSet.is_empty
   then Subst.apply r t
   else raise (Untypeable (pos, "Invalid renaming."))
+
+let generalize_check pos r t =
+  if Subst.is_renaming r &&
+    Subst.dom r |> TVarSet.filter TVar.is_poly |> TVarSet.is_empty &&
+    Subst.codom r |> TVarSet.filter TVar.is_mono |> TVarSet.is_empty
+  then Subst.apply r t
+  else raise (Untypeable (pos, "Invalid generalization."))  
   
 let rec typeof_a vardef tenv env annot_a a =
   let open FullAnnot in
@@ -125,7 +133,35 @@ let rec typeof_a vardef tenv env annot_a a =
   end
   |> clean_poly_vars |> simplify_typ
   
-and typeof _ = ignore typeof_a ; failwith "TODO"
+and typeof tenv env annot e =
+  let open FullAnnot in
+  begin match e, annot with
+  | Var v, BVar r -> var_type v env |> rename_check [] r
+  | Bind (_, v, a, e), Keep (annot_a, gen, ty, branches) ->
+    let t = (* TODO: We are cheating... *)
+      begin match ty with
+      | None -> typeof_a v tenv env annot_a a
+      | Some t -> t
+      end in
+    let pos = Variable.get_locations v in
+    if branches = []
+    then raise (Untypeable (pos, "Invalid decomposition: cannot be empty."))
+    else
+      let dom = branches |> List.map fst |> disj in
+      if subtype t dom
+      then
+        let t = generalize_check pos gen t in
+        branches |> List.map (fun (s, annot) ->
+          let env = Env.add v (cap t s) env in
+          typeof tenv env annot e
+        ) |> disj_o
+      else raise (Untypeable (pos, "Invalid decomposition: does not cover the whole domain."))
+  | Bind (_, v, _, e), Skip annot ->
+    assert (Env.mem v env |> not) ;
+    typeof tenv env annot e
+  | _, _ -> raise (Untypeable ([], "Invalid annotations."))
+  end
+  |> clean_poly_vars |> simplify_typ
 
 let infer _ = failwith "TODO"
 

@@ -58,7 +58,7 @@ module FullAnnot = struct
   [@@deriving show]
   and t =
       | BVar of renaming
-      | Keep of (a * generalization * typ (* (optimisation) *) * branches)
+      | Keep of (a * generalization * typ option (* (optimisation) *) * branches)
       | Skip of t
   [@@deriving show]
 end

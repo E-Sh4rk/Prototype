@@ -318,14 +318,18 @@ let tallying constr =
     |> List.map (Subst.apply_to_subst reg_subst)
 
 let tallying_infer constr =
-  (* TODO: rename poly vars *)
   let infer = constr |>
     List.map (fun (a,b) -> [vars_infer a ; vars_infer b]) |>
     List.flatten in
   let infer = TVarSet.union_many infer in
   let gen = generalize infer in
   let constr = constr |>
-    List.map (fun (a,b) -> (Subst.apply gen a, Subst.apply gen b))
+    List.map (fun (a,b) ->
+      let r1 = refresh_all (vars_poly a) in
+      let r2 = refresh_all (vars_poly b) in
+      let a = Subst.apply r1 a in
+      let b = Subst.apply r2 b in
+      (Subst.apply gen a, Subst.apply gen b))
   in
   tallying constr |> List.map (fun s ->
     let s = Subst.apply_to_subst s gen in

@@ -318,6 +318,7 @@ let tallying constr =
     |> List.map (Subst.apply_to_subst reg_subst)
 
 let tallying_infer constr =
+  (* TODO: rename poly vars *)
   let infer = constr |>
     List.map (fun (a,b) -> [vars_infer a ; vars_infer b]) |>
     List.flatten in

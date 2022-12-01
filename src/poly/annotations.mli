@@ -32,9 +32,7 @@ module FullAnnot : sig
         | PairA of renaming * renaming
         | AppA of inst (* NOTE: different from the paper *)
         | ProjA of inst
-        | EmptyA of inst
-        | ThenA of renaming
-        | ElseA of renaming (* TODO: change annot? *)
+        | EmptyA of inst | ThenA | ElseA
         | RecordUpdateA of inst * (renaming option)
     and t =
         | BVar of renaming

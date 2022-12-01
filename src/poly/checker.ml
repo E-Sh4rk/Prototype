@@ -104,16 +104,15 @@ let rec typeof_a vardef tenv env annot_a a =
     let t = var_type v env |> instantiate_check pos ss in
     if is_empty t then empty
     else raise (Untypeable (pos, "Invalid typecase: tested expression is not empty."))  
-  | Ite (v, s, v1, _), ThenA r ->
-    (* TODO: renaming really useful??? *)
+  | Ite (v, s, v1, _), ThenA ->
     let t = var_type v env in
     if subtype t s
-    then var_type v1 env |> rename_check pos r
+    then var_type v1 env
     else raise (Untypeable (pos, "Invalid typecase: tested expression hasn't the required type."))
-  | Ite (v, s, _, v2), ElseA r ->
+  | Ite (v, s, _, v2), ElseA ->
     let t = var_type v env in
     if subtype t (neg s)
-    then var_type v2 env |> rename_check pos r
+    then var_type v2 env
     else raise (Untypeable (pos, "Invalid typecase: tested expression hasn't the required type."))  
   | Let (v1, v2), LetA ->
     if Env.mem v1 env

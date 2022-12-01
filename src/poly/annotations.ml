@@ -53,9 +53,7 @@ module FullAnnot = struct
       | PairA of renaming * renaming
       | AppA of inst (* NOTE: different from the paper *)
       | ProjA of inst
-      | EmptyA of inst
-      | ThenA of renaming
-      | ElseA of renaming
+      | EmptyA of inst | ThenA | ElseA
       | RecordUpdateA of inst * (renaming option)
   [@@deriving show]
   and t =

@@ -159,7 +159,7 @@ let refine_a env mono a t = (* empty possibilites are often omitted *)
   | Pair (v1, v2) ->
     split_pair t
     |> List.map (
-      fun (t1, t2) -> Env.construct [(v1,t1) ; (v2, t2)]
+      fun (t1, t2) -> Env.construct_dup [(v1,t1) ; (v2, t2)]
     )
   | Projection (Fst, v) -> [Env.singleton v (mk_times (cons t) any_node)]
   | Projection (Snd, v) -> [Env.singleton v (mk_times any_node (cons t))]
@@ -178,14 +178,14 @@ let refine_a env mono a t = (* empty possibilites are often omitted *)
       fun ti ->
         let field_type = get_field_assuming_not_absent ti label in
         let ti = remove_field_info ti label in
-        Env.construct [(v, ti) ; (x, field_type)]
+        Env.construct_dup [(v, ti) ; (x, field_type)]
       )
   | App (v1, v2) ->
     let t1 = Env.find v1 env in
     RawExt.triangle_split_poly mono t1 t
-    |> List.map (fun (t1, t2) -> Env.construct [(v1,t1);(v2,t2)])
+    |> List.map (fun (t1, t2) -> Env.construct_dup [(v1,t1);(v2,t2)])
   | Ite (v, s, v1, v2) ->
-    [Env.construct [(v,s);(v1,t)] ; Env.construct [(v,neg s);(v2,t)]]
+    [Env.construct_dup [(v,s);(v1,t)] ; Env.construct_dup [(v,neg s);(v2,t)]]
   | Let (_, v2) -> [Env.singleton v2 t]
 
 (* ===== INFER ===== *)

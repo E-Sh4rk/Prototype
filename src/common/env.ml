@@ -34,6 +34,9 @@ let strengthen_existing v t env =
 let strengthen v t env =
   try strengthen_existing v t env with Not_found -> add v t env
 
+let construct_dup = List.fold_left
+  (fun acc (v, t) -> strengthen v t acc) empty
+
 let cap (m1, s1) (m2, s2) =
   (VarMap.union (fun _ t1 t2 ->
     Some (cap_o t1 t2)

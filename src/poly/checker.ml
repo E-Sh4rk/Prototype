@@ -6,6 +6,10 @@ open Parsing.Variable
 open Msc
 open Annotations
 
+(* ====================================== *)
+(* =============== TYPEOF =============== *)
+(* ====================================== *)
+
 exception Untypeable of Position.t list * string
 
 let typeof_const_atom tenv c =
@@ -163,6 +167,46 @@ and typeof tenv env annot e =
   end
   |> clean_poly_vars |> simplify_typ
 
-let infer _ = failwith "TODO"
+(* ====================================== *)
+(* =============== REFINE =============== *)
+(* ====================================== *)
+
+let refine_a env a t =
+  match a with
+  | Alias _ | Abstract _ | Const _ | Lambda _ -> []
+  | Pair (v1, v2) ->
+    split_pair t
+    |> List.map (
+      fun (t1, t2) -> Env.construct_dup [(v1,t1) ; (v2, t2)]
+    )
+  | Projection (Fst, v) -> [Env.singleton v (mk_times (cons t) any_node)]
+  | Projection (Snd, v) -> [Env.singleton v (mk_times any_node (cons t))]
+  | Projection (Field label, v) ->
+    [Env.singleton v (mk_record true [(label, cons t)])]
+  | RecordUpdate (v, label, None) ->
+    let t = cap t (record_any_without label) in
+    split_record t
+    |> List.map (
+      fun ti -> Env.singleton v (remove_field_info ti label)
+    )
+  | RecordUpdate (v, label, Some x) ->
+    let t = cap t (record_any_with label) in
+    split_record t
+    |> List.map (
+      fun ti ->
+        let field_type = get_field_assuming_not_absent ti label in
+        let ti = remove_field_info ti label in
+        Env.construct_dup [(v, ti) ; (x, field_type)]
+      )
+  | App _ -> ignore env ; failwith "TODO"
+  | Ite (v, s, v1, v2) ->
+    [Env.construct_dup [(v,s);(v1,t)] ; Env.construct_dup [(v,neg s);(v2,t)]]
+  | Let (_, v2) -> [Env.singleton v2 t]
+
+(* ====================================== *)
+(* ================ INFER =============== *)
+(* ====================================== *)
+
+let infer _ = ignore refine_a ; failwith "TODO"
 
 let typeof_simple _ = failwith "TODO"

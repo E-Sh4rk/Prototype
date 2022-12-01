@@ -167,6 +167,8 @@ let vars_infer t =
   TVarSet.filter TVar.can_infer (vars t)
 let top_vars = CD.Types.Subst.top_vars
 let vars_with_polarity t = CD.Types.Subst.var_polarities t |> CD.Var.Map.get
+let is_mono_typ t =
+  vars_poly t |> TVarSet.is_empty
 
 let refresh ~mono vars =
   let test = if mono then TVar.is_mono else TVar.is_poly in

@@ -72,6 +72,7 @@ val vars_infer : Base.typ -> TVarSet.t
 val top_vars : Base.typ -> TVarSet.t
 val vars_with_polarity : Base.typ -> (TVar.t * [ `Both | `Neg | `Pos ]) list
 val check_var : Base.typ -> [ `Not_var | `Pos of TVar.t | `Neg of TVar.t ]
+val is_mono_typ : Base.typ -> bool
 
 val refresh : mono:bool -> TVarSet.t -> Subst.t
 val refresh_all : TVarSet.t -> Subst.t

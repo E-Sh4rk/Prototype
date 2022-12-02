@@ -340,6 +340,8 @@ let tallying constr =
     |> List.map (Subst.apply_to_subst reg_subst)
 
 let tallying_infer constr =
+  (* TODO: set var_order for the tallying instance *)
+  (* TODO: make newly introduced mono vars more deterministic? *)
   let infer = constr |>
     List.map (fun (a,b) -> [vars_infer a ; vars_infer b]) |>
     List.flatten in
@@ -355,7 +357,9 @@ let tallying_infer constr =
   in
   tallying constr |> List.map (fun s ->
     let s = Subst.apply_to_subst s gen in
-    Subst.apply_to_subst (Subst.inverse_renaming gen) s
+    let s = Subst.apply_to_subst (Subst.inverse_renaming gen) s in
+    let mono_subst = monomorphize (Subst.codom s) in
+    Subst.apply_to_subst mono_subst s
   )
 
 (* Some additions *)

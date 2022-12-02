@@ -199,7 +199,9 @@ let refine_a env a t =
         Env.construct_dup [(v, ti) ; (x, field_type)]
       )
   | App (v1, v2) ->
-    Env.find v1 env |> dnf |> List.map (fun lst ->
+    let dnf = Env.find v1 env |> dnf in
+    let singl = List.length dnf <= 1 in
+    dnf |> List.map (fun lst ->
       let ti = branch_type lst in
       let ti = bot_instance ti in
       let alpha = TVar.mk_poly None in
@@ -211,12 +213,44 @@ let refine_a env a t =
         let clean_subst =  clean_type_subst ~pos:any ~neg:empty argt in
         let ti = Subst.apply clean_subst ti in
         let argt = Subst.apply clean_subst argt in
-        Env.construct_dup [ (v1, ti) ; (v2, argt) ]
+        if singl then Env.singleton v2 argt (* Optimisation *)
+        else Env.construct_dup [ (v1, ti) ; (v2, argt) ]
       )
     ) |> List.flatten
+    |> List.filter
+      (fun env -> env |> Env.bindings |> List.for_all (fun (_,t) -> is_mono_typ t))
   | Ite (v, s, v1, v2) ->
     [Env.construct_dup [(v,s);(v1,t)] ; Env.construct_dup [(v,neg s);(v2,t)]]
   | Let (_, v2) -> [Env.singleton v2 t]
+
+
+(* ====================================== *)
+(* =============== INFER I ============== *)
+(* ====================================== *)
+
+let infer_inst_a vardef tenv env mono pannot_a a =
+  let open PartialAnnot in
+  let open FullAnnot in
+  let vartype v = Env.find v env in
+  match a, pannot_a with
+  | Alias _, PartialA -> AliasA
+  | Abstract _, PartialA -> AbstractA
+  | Const _, PartialA -> ConstA
+  | Let _, PartialA -> LetA
+  | Pair (v1, v2), PartialA ->
+    let r1 = refresh_all (vartype v1 |> vars_poly) in
+    let r2 = refresh_all (vartype v2 |> vars_poly) in
+    PairA (r1, r2)
+  | Projection (Parsing.Ast.Field label, v), PartialA ->
+    let alpha = TVar.mk_poly None in
+    let s = mk_record true [label, TVar.typ alpha |> cons] in
+    let res = tallying [(vartype v, s)] in
+    ProjA res
+  | _, _ -> failwith "TODO"
+
+(* ====================================== *)
+(* =============== INFER B ============== *)
+(* ====================================== *)
 
 (* ====================================== *)
 (* ================ INFER =============== *)

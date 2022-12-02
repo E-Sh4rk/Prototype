@@ -246,7 +246,7 @@ let infer_inst_a vardef tenv env mono pannot_a a =
     let s = mk_record true [label, TVar.typ alpha |> cons] in
     let res = tallying [(vartype v, s)] in
     ProjA res
-  | _, _ -> failwith "TODO"
+  | _, _ -> ignore (vardef, tenv, mono) ; failwith "TODO"
 
 (* ====================================== *)
 (* =============== INFER B ============== *)
@@ -256,6 +256,6 @@ let infer_inst_a vardef tenv env mono pannot_a a =
 (* ================ INFER =============== *)
 (* ====================================== *)
 
-let infer _ = ignore refine_a ; failwith "TODO"
+let infer _ = ignore (refine_a, infer_inst_a) ; failwith "TODO"
 
 let typeof_simple _ = failwith "TODO"

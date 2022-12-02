@@ -254,6 +254,18 @@ module Raw = struct
   (* Tallying *)
   let clean_type ~pos ~neg vars t =
     CD.Types.Subst.clean_type ~pos ~neg vars t
+  let clean_type_subst ~pos ~neg mono t =
+    let subst =
+        vars_with_polarity t |>
+        List.filter_map (fun (v,p) ->
+            if TVarSet.mem mono v then None
+            else match p with
+            | `Pos -> Some (v, pos)
+            | `Neg -> Some (v, neg)
+            | `Both -> None
+        )
+    in
+    Subst.construct subst
   let rectype = CD.Types.Subst.solve_rectype
   let tallying_raw ~var_order = CD.Types.Tallying.tallying ~var_order
 
@@ -302,6 +314,16 @@ end
 
 let clean_type ~pos ~neg t =
   Raw.clean_type ~pos ~neg (vars_mono t) t
+
+let clean_type_subst ~pos ~neg t =
+  vars_with_polarity t |>
+  List.filter_map (fun (v,p) ->
+      if TVar.is_mono v then None
+      else match p with
+      | `Pos -> Some (v, pos)
+      | `Neg -> Some (v, neg)
+      | `Both -> None
+  ) |> Subst.construct
 
 let tallying constr =
   let mono = constr |>

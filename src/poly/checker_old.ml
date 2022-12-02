@@ -108,7 +108,7 @@ let rec typeof_a vardef tenv env mono annot_a a =
   | Lambda (_, _, v, e), LambdaA (annot, _) -> type_lambda env annot v e
   | _, _ -> raise (Untypeable (pos, "Invalid annotations."))
   end
-  |> RawExt.clean_poly_vars mono |> simplify_typ
+  |> RawExt.bot_instance mono |> simplify_typ
 
 and typeof_splits tenv env mono v splits e =
   let pos = Variable.get_locations v in
@@ -148,7 +148,7 @@ and typeof tenv env mono annot e =
   | Bind (_, _, _, e), SkipA (annot) -> typeof tenv env mono annot e
   | _, _ -> raise (Untypeable ([], "Invalid annotations."))
   end
-  |> RawExt.clean_poly_vars mono |> simplify_typ
+  |> RawExt.bot_instance mono |> simplify_typ
 
 (* ===== REFINE ===== *)
 
@@ -318,7 +318,7 @@ let simplify_inference_solutions mono res to_maximize vars_to_use sols =
 let simplify_solutions mono res sols =
   let sols = sols |> List.filter_map (fun sol ->
     let t = Subst.apply sol res in
-    let clean = RawExt.clean_type_ext ~pos:empty ~neg:any mono t in
+    let clean = Raw.clean_type_subst ~pos:empty ~neg:any mono t in
     let sol = Subst.compose clean sol in
 
     let sol = restore_name_of_vars sol in

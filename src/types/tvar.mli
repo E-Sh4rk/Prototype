@@ -90,6 +90,7 @@ module Raw : sig
 
     (* Tallying *)
     val clean_type : pos:Base.typ -> neg:Base.typ -> TVarSet.t -> Base.typ -> Base.typ
+    val clean_type_subst : pos:Base.typ -> neg:Base.typ -> TVarSet.t -> Base.typ -> Subst.t
     val rectype : Base.typ -> TVar.t -> Base.typ (* [rectype t u] returns the type corresponding to the equation u=t *)
     (* Variables not in var_order are considered greater. In the result, a variable will be expressed
     in term of the variables that are greater. Thus, greater variables (in particular variables not in var_order)
@@ -102,6 +103,7 @@ module Raw : sig
 end
 
 val clean_type : pos:Base.typ -> neg:Base.typ -> Base.typ -> Base.typ
+val clean_type_subst : pos:Base.typ -> neg:Base.typ -> Base.typ -> Subst.t
 val tallying : (Base.typ * Base.typ) list -> Subst.t list
 val tallying_infer : (Base.typ * Base.typ) list -> Subst.t list
 

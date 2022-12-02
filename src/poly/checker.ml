@@ -135,7 +135,7 @@ let rec typeof_a vardef tenv env annot_a a =
   | Lambda (_, _, v, e), LambdaA branches -> type_lambda env branches v e
   | _, _ -> raise (Untypeable (pos, "Invalid annotations."))
   end
-  |> clean_poly_vars |> simplify_typ
+  |> bot_instance |> simplify_typ
   
 and typeof tenv env annot e =
   let open FullAnnot in
@@ -165,7 +165,7 @@ and typeof tenv env annot e =
     typeof tenv env annot e
   | _, _ -> raise (Untypeable ([], "Invalid annotations."))
   end
-  |> clean_poly_vars |> simplify_typ
+  |> bot_instance |> simplify_typ
 
 (* ====================================== *)
 (* =============== REFINE =============== *)
@@ -198,7 +198,22 @@ let refine_a env a t =
         let ti = remove_field_info ti label in
         Env.construct_dup [(v, ti) ; (x, field_type)]
       )
-  | App _ -> ignore env ; failwith "TODO"
+  | App (v1, v2) ->
+    Env.find v1 env |> dnf |> List.map (fun lst ->
+      let ti = branch_type lst in
+      let ti = bot_instance ti in
+      let alpha = TVar.mk_poly None in
+      let constr = [ (ti, mk_arrow (TVar.typ alpha |> cons) (cons t)) ] in
+      let res = tallying constr in
+      res |> List.map (fun sol ->
+        let ti = Subst.apply sol ti in
+        let argt = Subst.find' sol alpha in
+        let clean_subst =  clean_type_subst ~pos:any ~neg:empty argt in
+        let ti = Subst.apply clean_subst ti in
+        let argt = Subst.apply clean_subst argt in
+        Env.construct_dup [ (v1, ti) ; (v2, argt) ]
+      )
+    ) |> List.flatten
   | Ite (v, s, v1, v2) ->
     [Env.construct_dup [(v,s);(v1,t)] ; Env.construct_dup [(v,neg s);(v2,t)]]
   | Let (_, v2) -> [Env.singleton v2 t]

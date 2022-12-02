@@ -555,21 +555,8 @@ let instantiate ss t =
     |> conj
 
 module RawExt = struct
-    let clean_poly_vars mono t =
+    let bot_instance mono t =
         Raw.clean_type ~pos:empty ~neg:any mono t
-
-    let clean_type_ext ~pos ~neg mono t =
-        let subst =
-            vars_with_polarity t |>
-            List.filter_map (fun (v,p) ->
-                if TVarSet.mem mono v then None
-                else match p with
-                | `Pos -> Some (v, pos)
-                | `Neg -> Some (v, neg)
-                | `Both -> None
-            )
-        in
-        Subst.construct subst
 
     let fresh mono t =
         let poly = TVarSet.diff (vars t) mono in
@@ -673,13 +660,13 @@ module RawExt = struct
         dnf
 
     let simplify_poly_typ mono t =
-        let t = clean_poly_vars mono t in
+        let t = bot_instance mono t in
         let (_, t) = remove_redundant_vars mono t in
         ignore (simplify_poly_dnf, simplify_poly_product_dnf) ;
         (* NOTE: Advanced simplification disabled because it sometimes raise a Cduce issue,
         and it is not very efficient anyway (in particular when branches use the same vars). *)
         (* let t = simplify_typ_aux simplify_poly_dnf simplify_poly_product_dnf mono t in
-        let t = clean_poly_vars mono t in
+        let t = bot_instance mono t in
         let (_, t) = remove_redundant_vars mono t in *)
         t
 end
@@ -687,8 +674,11 @@ end
 let simplify_poly_typ t =
     RawExt.simplify_poly_typ (vars_mono t) t
 
-let clean_poly_vars =
+let bot_instance =
     clean_type ~pos:empty ~neg:any
+
+let top_instance =
+    clean_type ~pos:any ~neg:empty    
 
 let subtype_poly t1 t2 =
     tallying [(t1,t2)] <> []

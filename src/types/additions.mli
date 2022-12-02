@@ -96,8 +96,7 @@ val instantiate : Subst.t list -> typ -> typ
 module RawExt : sig
     val simplify_poly_typ : TVarSet.t -> typ -> typ
     val remove_redundant_vars : TVarSet.t -> typ -> Subst.t * typ
-    val clean_poly_vars : TVarSet.t -> typ -> typ
-    val clean_type_ext : pos:typ -> neg:typ -> TVarSet.t -> typ -> Subst.t
+    val bot_instance : TVarSet.t -> typ -> typ
     val fresh : TVarSet.t -> typ -> TVarSet.t * Subst.t * typ
     val subtype_poly : TVarSet.t -> typ -> typ -> bool
     val triangle_poly : TVarSet.t -> typ -> typ -> typ
@@ -105,7 +104,8 @@ module RawExt : sig
 end
 
 val simplify_poly_typ : typ -> typ
-val clean_poly_vars : typ -> typ
+val bot_instance : typ -> typ
+val top_instance : typ -> typ
 val subtype_poly : typ -> typ -> bool
 
 (* Operations on jokers (legacy) *)

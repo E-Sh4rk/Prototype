@@ -98,20 +98,15 @@ let rec typeof_a vardef tenv env annot_a a =
       let right_record = mk_record false [label, cons t'] in
       merge_records t right_record  
     else raise (Untypeable (pos, "Invalid field update: not a record."))
-  | App (v1, v2), AppA ss ->
-    (* NOTE: different from the paper *)
-    let t1 = var_type v1 env in
-    let t2 = var_type v2 env in
-    ss |> List.map (fun s ->
-      let t1 = instantiate_check pos [s] t1 in
-      let t2 = instantiate_check pos [s] t2 in
-      if subtype t1 arrow_any
-      then
-        if subtype t2 (domain t1)
-        then apply t1 t2
-        else raise (Untypeable (pos, "Invalid application: argument not in the domain."))
-      else raise (Untypeable (pos, "Invalid application: not a function."))    
-    ) |> conj_o
+  | App (v1, v2), AppA (ss1, ss2) ->
+    let t1 = var_type v1 env |> instantiate_check pos ss1 in
+    let t2 = var_type v2 env |> instantiate_check pos ss2 in
+    if subtype t1 arrow_any
+    then
+      if subtype t2 (domain t1)
+      then apply t1 t2
+      else raise (Untypeable (pos, "Invalid application: argument not in the domain."))
+    else raise (Untypeable (pos, "Invalid application: not a function."))    
   | Ite (v, _, _, _), EmptyA ss ->
     let t = var_type v env |> instantiate_check pos ss in
     if is_empty t then empty

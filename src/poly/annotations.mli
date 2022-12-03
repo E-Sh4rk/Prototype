@@ -30,7 +30,7 @@ module FullAnnot : sig
         | ConstA | AliasA | AbstractA | LetA
         | LambdaA of branches
         | PairA of renaming * renaming
-        | AppA of inst (* NOTE: different from the paper *)
+        | AppA of inst * inst
         | ProjA of inst
         | EmptyA of inst | ThenA | ElseA
         | RecordUpdateA of inst * (renaming option)

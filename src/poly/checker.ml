@@ -223,6 +223,10 @@ let refine_a env a t =
 (* =============== INFER I ============== *)
 (* ====================================== *)
 
+let simplify_tallying sols =
+  (* TODO *)
+  sols
+
 let infer_inst_a vardef tenv env mono pannot_a a =
   let open PartialAnnot in
   let open FullAnnot in
@@ -257,6 +261,21 @@ let infer_inst_a vardef tenv env mono pannot_a a =
     let res = tallying [(vartype v, record_any)] in
     let r = refresh_all (vartype v2 |> vars_poly) in
     RecordUpdateA (res, Some r)
+  | App (v1, v2), PartialA ->
+    let alpha = TVar.mk_poly None in
+    let t1 = vartype v1 in
+    let t2 = vartype v2 in
+    let r1 = refresh_all (vars_poly t1) in
+    let r2 = refresh_all (vars_poly t2) in
+    let t1 = Subst.apply r1 t1 in
+    let t2 = Subst.apply r2 t2 in
+    let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
+    let res = tallying [(t1, arrow_type)] in
+    let res = simplify_tallying res in
+    let (s1, s2) = res |> List.map (fun s ->
+      (Subst.apply_to_subst s r1, Subst.apply_to_subst s r2)
+    ) |> List.split in
+    AppA (s1, s2)
   | _, _ -> ignore (vardef, tenv, mono) ; failwith "TODO"
 
 (* ====================================== *)

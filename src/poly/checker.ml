@@ -241,6 +241,22 @@ let infer_inst_a vardef tenv env mono pannot_a a =
     let s = mk_record true [label, TVar.typ alpha |> cons] in
     let res = tallying [(vartype v, s)] in
     ProjA res
+  | Projection (p, v), PartialA ->
+    let alpha = TVar.mk_poly None in
+    let s =
+      if p = Parsing.Ast.Fst
+      then mk_times (TVar.typ alpha |> cons) any_node
+      else mk_times any_node (TVar.typ alpha |> cons)
+    in
+    let res = tallying [(vartype v, s)] in
+    ProjA res
+  | RecordUpdate (v, _, None), PartialA ->
+    let res = tallying [(vartype v, record_any)] in
+    RecordUpdateA (res, None)
+  | RecordUpdate (v, _, Some v2), PartialA ->
+    let res = tallying [(vartype v, record_any)] in
+    let r = refresh_all (vartype v2 |> vars_poly) in
+    RecordUpdateA (res, Some r)
   | _, _ -> ignore (vardef, tenv, mono) ; failwith "TODO"
 
 (* ====================================== *)

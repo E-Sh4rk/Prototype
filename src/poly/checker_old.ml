@@ -511,7 +511,7 @@ let rec infer_a' vardef tenv env mono annot_a a =
     map_res (fun sigma -> RecordUpdateA sigma) res
   | RecordUpdate (v, _, o), RecordUpdateA _ ->
     (match o with None -> () | Some v' -> need_var v' "record update") ;
-    Ok (ProjA (simple_constraint v "record update" record_any record_any))
+    Ok (RecordUpdateA (simple_constraint v "record update" record_any record_any))
   | App (v1, v2), AppA ([], []) ->
     let alpha = Variable.to_typevar vardef in
     let (constraints,(vs1,subst1),(vs2,subst2)) = app_constraints v1 v2 alpha in

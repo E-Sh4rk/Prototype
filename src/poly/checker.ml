@@ -276,6 +276,13 @@ let infer_inst_a vardef tenv env mono pannot_a a =
       (Subst.apply_to_subst s r1, Subst.apply_to_subst s r2)
     ) |> List.split in
     AppA (s1, s2)
+  | Ite (v, s, _, _), PartialA ->
+    let t = vartype v in
+    let res = tallying [(t, empty)] in
+    if res <> [] then EmptyA res
+    else if subtype t s then ThenA
+    else if subtype t (neg s) then ElseA
+    else assert false
   | _, _ -> ignore (vardef, tenv, mono) ; failwith "TODO"
 
 (* ====================================== *)

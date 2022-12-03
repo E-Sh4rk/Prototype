@@ -218,7 +218,6 @@ let refine_a env a t =
     [Env.construct_dup [(v,s);(v1,t)] ; Env.construct_dup [(v,neg s);(v2,t)]]
   | Let (_, v2) -> [Env.singleton v2 t]
 
-
 (* ====================================== *)
 (* =============== INFER I ============== *)
 (* ====================================== *)
@@ -227,7 +226,7 @@ let simplify_tallying sols =
   (* TODO *)
   sols
 
-let infer_inst_a vardef tenv env mono pannot_a a =
+let rec infer_inst_a tenv env pannot_a a =
   let open PartialAnnot in
   let open FullAnnot in
   let vartype v = Env.find v env in
@@ -283,7 +282,19 @@ let infer_inst_a vardef tenv env mono pannot_a a =
     else if subtype t s then ThenA
     else if subtype t (neg s) then ElseA
     else assert false
-  | _, _ -> ignore (vardef, tenv, mono) ; failwith "TODO"
+  | Lambda ((), _, v, e), PartialAnnot.LambdaA (b1, b2) ->
+    assert (b2 = []) ;
+    let branches = b1 |> List.map (fun (s, pannot) ->
+      let env = Env.add v s env in
+      let annot = infer_inst tenv env pannot e in
+      (s, annot)
+    ) in
+    FullAnnot.LambdaA branches
+  | _, _ ->  assert false
+
+and infer_inst tenv env annot e =
+  ignore (tenv, env, annot, e) ;
+  failwith "TODO"
 
 (* ====================================== *)
 (* =============== INFER B ============== *)

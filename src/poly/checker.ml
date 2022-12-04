@@ -320,10 +320,36 @@ and infer_inst tenv env pannot e =
 (* =============== INFER B ============== *)
 (* ====================================== *)
 
+type 'a res =
+  | Ok of 'a
+  | Split of Env.t * 'a
+  | Subst of (Subst.t * 'a) list
+  | NeedVar of (Variable.t * 'a * 'a option)
+
+let map_res f res =
+  match res with
+  | Ok a -> Ok (f a)
+  | Split (env, a) ->
+    Split (env, f a)
+  | Subst lst ->
+    Subst (lst |> List.map (fun (s, a) -> (s, f a)))
+  | NeedVar (v, a, ao) ->
+    NeedVar (v, f a, Option.map f ao)
+
+let rec infer_branches_a vardef tenv env pannot_a a =
+  ignore (map_res, vardef, tenv, env, pannot_a, a) ;
+  failwith "TODO"
+
+and infer_branches tenv env pannot_a a =
+  ignore (tenv, env, pannot_a, a, infer_branches_a) ;
+  failwith "TODO"
+
 (* ====================================== *)
 (* ================ INFER =============== *)
 (* ====================================== *)
 
-let infer _ = ignore (refine_a, infer_inst) ; failwith "TODO"
+let infer _ =
+  ignore (refine_a, infer_inst, infer_branches) ;
+  failwith "TODO"
 
 let typeof_simple _ = failwith "TODO"

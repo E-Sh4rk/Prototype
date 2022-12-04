@@ -137,7 +137,7 @@ and typeof tenv env annot e =
   begin match e, annot with
   | Var v, BVar r -> var_type v env |> rename_check [] r
   | Bind (_, v, a, e), Keep (annot_a, gen, ty, branches) ->
-    let t = (* TODO: We are cheating... *)
+    let t = (* NOTE: ty different than None bypass type checking. *)
       begin match ty with
       | None -> typeof_a v tenv env annot_a a
       | Some t -> t
@@ -292,9 +292,29 @@ let rec infer_inst_a tenv env pannot_a a =
     FullAnnot.LambdaA branches
   | _, _ ->  assert false
 
-and infer_inst tenv env annot e =
-  ignore (tenv, env, annot, e) ;
-  failwith "TODO"
+and infer_inst tenv env pannot e =
+  let open PartialAnnot in
+  let open FullAnnot in
+  let vartype v = Env.find v env in
+  match e, pannot with
+  | Var v, Partial ->
+    let r = refresh_all (vartype v |> vars_poly) in
+    BVar r
+  | Bind ((), _, _, e), PartialAnnot.Skip pannot ->
+    let annot = infer_inst tenv env pannot e in
+    FullAnnot.Skip annot
+  | Bind ((), v, a, e), PartialAnnot.Keep (pannot_a, branches) ->
+    let annot_a = infer_inst_a tenv env pannot_a a in
+    let t = typeof_a v tenv env annot_a a in
+    let gen = TVarSet.diff (vars t) (Env.tvars env) |> generalize in
+    let t = Subst.apply gen t in
+    let branches = branches |> List.map (fun (si, pannot) ->
+      let t = cap_o t si in
+      let env = Env.add v t env in
+      (si, infer_inst tenv env pannot e)
+    ) in
+    FullAnnot.Keep (annot_a, gen, None, branches)
+  | _, _ ->  assert false
 
 (* ====================================== *)
 (* =============== INFER B ============== *)
@@ -304,6 +324,6 @@ and infer_inst tenv env annot e =
 (* ================ INFER =============== *)
 (* ====================================== *)
 
-let infer _ = ignore (refine_a, infer_inst_a) ; failwith "TODO"
+let infer _ = ignore (refine_a, infer_inst) ; failwith "TODO"
 
 let typeof_simple _ = failwith "TODO"

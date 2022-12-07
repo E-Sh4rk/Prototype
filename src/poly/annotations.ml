@@ -7,7 +7,7 @@ module PartialAnnot = struct
   [@@deriving show]
 
   and a =
-  | InferA | PartialA
+  | InferA of infer_state | PartialA
   | LambdaA of branches (* Fully Explored *) * branches (* Remaining *)
   [@@deriving show]
 
@@ -18,11 +18,14 @@ module PartialAnnot = struct
   | KeepSkip of (a * branches * t)
   [@@deriving show]
 
+  and infer_state = IMain | IThen | IElse
+  [@@deriving show]
+
   let rec apply_subst_branches s lst =
     let aux (ty, t) = (apply_subst_simplify s ty, apply_subst s t) in
     List.map aux lst
   and apply_subst_a s a = match a with
-  | InferA -> InferA
+  | InferA s -> InferA s
   | PartialA -> PartialA
   | LambdaA (b1, b2) ->
     LambdaA (apply_subst_branches s b1, apply_subst_branches s b2)

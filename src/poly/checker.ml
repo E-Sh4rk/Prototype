@@ -5,7 +5,7 @@ open Common
 open Parsing.Variable
 open Msc
 open Annotations
-open Utils
+(* open Utils *)
 
 (* ====================================== *)
 (* =============== TYPEOF =============== *)
@@ -325,7 +325,7 @@ type 'a res =
   | Ok of 'a
   | Split of Env.t * 'a
   | Subst of (Subst.t * 'a) list
-  | NeedVar of (Variable.t * 'a * 'a option)
+  | NeedVar of (VarSet.t * 'a * 'a option)
 
 let map_res f res =
   match res with
@@ -334,67 +334,76 @@ let map_res f res =
     Split (env, f a)
   | Subst lst ->
     Subst (lst |> List.map (fun (s, a) -> (s, f a)))
-  | NeedVar (v, a, ao) ->
-    NeedVar (v, f a, Option.map f ao)
+  | NeedVar (vs, a, ao) ->
+    NeedVar (vs, f a, Option.map f ao)
 
-exception NeedVarExc of Variable.t
-let needvar env v =
-  if Env.mem v env |> not
-  then raise (NeedVarExc v)
-let vartype env v =
-  needvar env v ; Env.find v env
+let needvar env vs a =
+  let vs = VarSet.of_list vs in
+  let vs = VarSet.diff vs (Env.domain env |> VarSet.of_list) in
+  NeedVar (vs, a, None)
 
 let rec infer_branches_a vardef tenv env pannot_a a =
+  let memvar v = Env.mem v env in
+  let vartype v = Env.find v env in
   let needvar = needvar env in
-  let vartype = vartype env in
-  ignore (map_res, vardef, tenv, env, pannot_a, a, needvar, vartype) ;
+  let packannot a = List.map (fun s -> (s, a)) in
+  ignore (map_res, vardef, tenv, env, pannot_a, a, needvar) ;
   let open PartialAnnot in
-  try match a, pannot_a with
-  | Alias _, InferA | Abstract _, InferA | Const _, InferA
-    -> Ok (PartialA)
-  | Pair (v1, v2), InferA | Let (v1, v2), InferA ->
-    needvar v1 ; needvar v2 ; Ok (PartialA)
-  | Projection (p, v), InferA ->
-    let t = vartype v in
-    let alpha = Variable.to_typevar vardef in
-    let s =
-      begin match p with
-      | Parsing.Ast.Field label ->
-        mk_record true [label, TVar.typ alpha |> cons]
-      | Parsing.Ast.Fst ->
-        mk_times (TVar.typ alpha |> cons) any_node
-      | Parsing.Ast.Snd ->
-        mk_times any_node (TVar.typ alpha |> cons)
-      end
-    in
-    let res = tallying_infer [(t, s)] in
-    let res = res |> List.map (fun s -> (s, PartialA)) in
-    Subst res
-  | App (v1, v2), InferA ->
-    let t1 = vartype v1 in
-    let t2 = vartype v2 in
-    let alpha = Variable.to_typevar vardef in
-    let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
-    let res = tallying_infer [(t1, arrow_type)] in
-    let res = res |> List.map (fun s -> (s, PartialA)) in
-    Subst res
-  | Ite (_, _, _, _), InferA -> failwith "TODO"
-  | Ite (v, tau, v1, v2), PartialA ->
-    (* TODO: How to ensure the empty case will not require a branch? *)
-    let t = vartype v in
-    if non_empty (cap t tau) then needvar v1 ;
-    if non_empty (cap t (neg tau)) then needvar v2 ;
-    Ok (PartialA)
+  match a, pannot_a with
   | _, PartialA -> Ok (PartialA)
-  | Lambda _, InferA ->
+  | Alias _, InferA IMain | Abstract _, InferA IMain
+  | Const _, InferA IMain -> Ok (PartialA)
+  | Pair (v1, v2), InferA IMain | Let (v1, v2), InferA IMain ->
+    needvar [v1; v2] PartialA
+  | Projection (p, v), InferA IMain ->
+    if memvar v then
+      let t = vartype v in
+      let alpha = Variable.to_typevar vardef in
+      let s =
+        begin match p with
+        | Parsing.Ast.Field label ->
+          mk_record true [label, TVar.typ alpha |> cons]
+        | Parsing.Ast.Fst ->
+          mk_times (TVar.typ alpha |> cons) any_node
+        | Parsing.Ast.Snd ->
+          mk_times any_node (TVar.typ alpha |> cons)
+        end
+      in
+      let res = tallying_infer [(t, s)] in
+      Subst (packannot PartialA res)
+    else
+      needvar [v] (InferA IMain)
+  | RecordUpdate (v, _, None), InferA IMain ->
+    if memvar v then
+      let res = tallying_infer [(vartype v, record_any)] in
+      Subst (packannot PartialA res)
+    else
+      needvar [v] (InferA IMain)
+  | RecordUpdate (v, _, Some v'), InferA IMain ->
+    if memvar v && memvar v' then
+      let res = tallying_infer [(vartype v, record_any)] in
+      Subst (packannot PartialA res)
+    else
+      needvar [v ; v'] (InferA IMain)
+  | App (v1, v2), InferA IMain ->
+    if memvar v1 && memvar v2 then
+      let t1 = vartype v1 in
+      let t2 = vartype v2 in
+      let alpha = Variable.to_typevar vardef in
+      let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
+      let res = tallying_infer [(t1, arrow_type)] in
+      Subst (packannot PartialA res)
+    else
+      needvar [v1;v2] (InferA IMain)
+  | Ite (_, _, _, _), InferA IMain -> failwith "TODO"
+  | Ite (_, _, _, _), InferA IThen -> failwith "TODO"
+  | Ite (_, _, _, _), InferA IElse -> failwith "TODO"
+  | Lambda _, InferA IMain ->
     let alpha = Variable.to_typevar vardef in
     let pannot_a = LambdaA ([], [(TVar.typ alpha, Infer)]) in
     infer_branches_a vardef tenv env pannot_a a
   | Lambda ((), _, _, _), LambdaA _ -> failwith "TODO"
   | _, _ -> assert false
-  with NeedVarExc v ->
-    log ~level:1 "Variable %s needed. Going up.@." (Variable.show v) ;
-    NeedVar (v, InferA, None)
 
 and infer_branches tenv env pannot_a a =
   ignore (tenv, env, pannot_a, a, infer_branches_a) ;

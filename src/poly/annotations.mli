@@ -4,13 +4,14 @@ open Types.Tvar
 module PartialAnnot : sig
     type branches = (typ*t) list
     and a =
-        | InferA | PartialA
+        | InferA of infer_state | PartialA
         | LambdaA of branches (* Fully Explored *) * branches (* Remaining *)
     and t =
         | Infer | Partial
         | Keep of (a * branches)
         | Skip of t
         | KeepSkip of (a * branches * t)
+    and infer_state = IMain | IThen | IElse
 
     val pp_branches : Format.formatter -> branches -> unit
     val pp_a : Format.formatter -> a -> unit

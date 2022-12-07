@@ -5,7 +5,7 @@ open Common
 open Parsing.Variable
 open Msc
 open Annotations
-(* open Utils *)
+open Utils
 
 (* ====================================== *)
 (* =============== TYPEOF =============== *)
@@ -352,8 +352,33 @@ let rec infer_branches_a vardef tenv env pannot_a a =
   let vartype v = Env.find v env in
   let needvar = needvar env in
   let packannot a = List.map (fun s -> (s, a)) in
-  ignore (map_res, vardef, tenv, env, pannot_a, a, needvar) ;
   let open PartialAnnot in
+  let lambda v (b1, b2) e =
+    let domain_explored = b1 |> List.map fst |> disj in
+    let rec aux domain_explored b =
+      let b = b |> List.filter
+        (fun (s,_) -> subtype s domain_explored |> not) in
+      match b with
+      | [] -> Ok ([], [])
+      | b ->
+        let f (s, _) others = others |> List.for_all
+          (fun (s', _) -> (subtype s' s |> not) || subtype s s')
+        in
+        let ((s, pannot), b) = find_among_others f b |> Option.get in
+        let env = Env.add v s env in
+        begin match infer_branches_iterated tenv env pannot e with
+        | Ok pannot ->
+          aux (cup domain_explored s) b
+          |> map_res (fun (b1, b2) -> ((s, pannot)::b1, b2))
+        | Subst _ -> failwith "TODO"
+        | NeedVar (vs, pannot, None) ->
+          NeedVar (vs, ([], (s, pannot)::b), Some ([], b))
+        | res -> map_res (fun pannot -> ([], (s, pannot)::b)) res
+        end
+    in
+    aux domain_explored b2 |>
+      map_res (fun (b1', b2') -> LambdaA (b1@b1', b2'))
+  in
   match a, pannot_a with
   | _, PartialA -> Ok (PartialA)
   | Alias _, InferA IMain | Abstract _, InferA IMain
@@ -419,12 +444,35 @@ let rec infer_branches_a vardef tenv env pannot_a a =
     let alpha = Variable.to_typevar vardef in
     let pannot_a = LambdaA ([], [(TVar.typ alpha, Infer)]) in
     infer_branches_a vardef tenv env pannot_a a
-  | Lambda ((), _, _, _), LambdaA _ -> failwith "TODO"
+  | Lambda ((), _, v, e), LambdaA (b1, b2) ->
+    if b1@b2 |> List.for_all (fun (s,_) -> is_empty s)
+    then Subst [] else lambda v (b1,b2) e
   | _, _ -> assert false
 
 and infer_branches tenv env pannot_a a =
-  ignore (tenv, env, pannot_a, a, infer_branches_a) ;
+  ignore (tenv, env, pannot_a, a, infer_branches_a,
+    infer_branches_a_iterated) ;
   failwith "TODO"
+
+and infer_branches_a_iterated vardef tenv env pannot_a a =
+  match infer_branches_a vardef tenv env pannot_a a with
+  | Split (gamma, pannot_a) when Env.is_empty gamma ->
+    infer_branches_a_iterated vardef tenv env pannot_a a
+  | Subst [(subst, pannot_a)] when Subst.is_identity subst ->
+    infer_branches_a_iterated vardef tenv env pannot_a a
+  | NeedVar (vs, pannot_a, _) when VarSet.is_empty vs ->
+    infer_branches_a_iterated vardef tenv env pannot_a a
+  | res -> res
+
+and infer_branches_iterated tenv env pannot e =
+  match infer_branches tenv env pannot e with
+  | Split (gamma, pannot) when Env.is_empty gamma ->
+    infer_branches_iterated tenv env pannot e
+  | Subst [(subst, pannot)] when Subst.is_identity subst ->
+    infer_branches_iterated tenv env pannot e
+  | NeedVar (vs, pannot, _) when VarSet.is_empty vs ->
+    infer_branches_iterated tenv env pannot e
+  | res -> res
 
 (* ====================================== *)
 (* ================ INFER =============== *)

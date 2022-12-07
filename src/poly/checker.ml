@@ -342,11 +342,6 @@ let needvar env vs a =
   let vs = VarSet.diff vs (Env.domain env |> VarSet.of_list) in
   NeedVar (vs, a, None)
 
-let complete pannot sol =
-  if List.exists (fun (s, _) -> Subst.is_identity s) sol
-  then sol
-  else sol@[(Subst.identity, pannot)]
-
 let rec infer_branches_a vardef tenv env pannot_a a =
   let memvar v = Env.mem v env in
   let vartype v = Env.find v env in
@@ -446,13 +441,17 @@ let rec infer_branches_a vardef tenv env pannot_a a =
   | Ite (v, tau, _, _), InferA IMain ->
     if memvar v then
       let t = vartype v in
-      if subtype t tau then
+      let not_else = subtype t tau in
+      let not_then = subtype t (neg tau) in
+      if not_then || not_else then begin
         let res = tallying_infer [(t, empty)] in
-        Subst (packannot PartialA res |> complete (InferA IThen))
-      else if subtype t (neg tau) then
-        let res = tallying_infer [(t, empty)] in
-        Subst (packannot PartialA res |> complete (InferA IElse))
-      else
+        if List.exists Subst.is_identity res then
+          Ok (PartialA)
+        else if not_else then
+          Subst ((packannot PartialA res)@[(Subst.identity, InferA IThen)])
+        else
+          Subst ((packannot PartialA res)@[(Subst.identity, InferA IElse)])
+      end else
         Split (Env.singleton v tau, InferA IMain)
     else
       needvar [v] (InferA IMain)

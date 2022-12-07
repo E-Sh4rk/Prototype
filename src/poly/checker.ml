@@ -466,10 +466,43 @@ let rec infer_branches_a vardef tenv env pannot_a a =
     then Subst [] else lambda v (b1,b2) e
   | _, _ -> assert false
 
-and infer_branches tenv env pannot_a a =
-  ignore (tenv, env, pannot_a, a, infer_branches_a,
-    infer_branches_a_iterated) ;
-  failwith "TODO"
+and infer_branches tenv env pannot e =
+  let needvar = needvar env in
+  let open PartialAnnot in
+  match e, pannot with
+  | Var _, Partial -> Ok Partial
+  | Var v, Infer -> needvar [v] Partial
+  | Bind _, Infer ->
+    let pannot = Skip Infer in
+    infer_branches tenv env pannot e
+  | Bind ((), v, _, e), Skip pannot ->
+    begin match infer_branches_iterated tenv env pannot e with
+    | NeedVar (vs, pannot, Some pannot') when VarSet.mem v vs ->
+      let pannot = KeepSkip (InferA IMain, [(any, pannot)], pannot') in
+      let pannot' = Skip pannot' in
+      NeedVar (VarSet.remove v vs, pannot, Some pannot')
+    | NeedVar (vs, pannot, None) when VarSet.mem v vs ->
+      let pannot = Keep (InferA IMain, [(any, pannot)]) in
+      NeedVar (VarSet.remove v vs, pannot, None)
+    | res -> map_res (fun pannot -> Skip pannot) res
+    end
+  | Bind ((), v, a, _), KeepSkip (pannot_a, splits, pannot) ->
+    begin match infer_branches_a_iterated v tenv env pannot_a a with
+    | Subst lst when
+      List.for_all (fun (s,_) -> Subst.is_identity s |> not) lst ->
+      let lst = lst |> List.map (fun (s, pannot_a) ->
+        (s, KeepSkip (pannot_a, splits, pannot))
+      ) in
+      let lst = lst@[(Subst.identity, Skip pannot)] in
+      Subst lst
+    | NeedVar (vs, pannot_a, None) ->
+      NeedVar (vs, KeepSkip (pannot_a, splits, pannot), Some (Skip pannot))
+    | res ->
+      map_res (fun pannot_a -> KeepSkip (pannot_a, splits, pannot)) res
+    end
+  | Bind ((), _, _, _), Keep (_, _) ->
+    failwith "TODO"
+  | _, _ -> assert false
 
 and infer_branches_a_iterated vardef tenv env pannot_a a =
   match infer_branches_a vardef tenv env pannot_a a with

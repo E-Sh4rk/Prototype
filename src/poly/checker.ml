@@ -365,12 +365,30 @@ let rec infer_branches_a vardef tenv env pannot_a a =
           (fun (s', _) -> (subtype s' s |> not) || subtype s s')
         in
         let ((s, pannot), b) = find_among_others f b |> Option.get in
-        let env = Env.add v s env in
-        begin match infer_branches_iterated tenv env pannot e with
+        let env' = Env.add v s env in
+        begin match infer_branches_iterated tenv env' pannot e with
         | Ok pannot ->
           aux (cup domain_explored s) b
           |> map_res (fun (b1, b2) -> ((s, pannot)::b1, b2))
-        | Subst _ -> failwith "TODO"
+        | Subst lst ->
+          let x = Env.tvars env in
+          let sigma = lst |>
+            List.map (fun (subst,_) -> Subst.restrict subst x) in
+          let sigma = (Subst.identity)::sigma in
+          let sigma = remove_duplicates Subst.equiv sigma in
+          let res = sigma |> List.map (fun subst ->
+            let b' =
+              lst |> List.filter_map (fun (subst', pannot') ->
+                let subst_cur = Subst.remove subst' x in
+                let subst' = Subst.restrict subst' x in
+                if Subst.equiv subst' subst
+                then Some (s, apply_subst subst_cur pannot')
+                else None
+              )
+            in
+            (subst, ([], b'@b))
+          ) in
+          Subst res
         | NeedVar (vs, pannot, None) ->
           NeedVar (vs, ([], (s, pannot)::b), Some ([], b))
         | res -> map_res (fun pannot -> ([], (s, pannot)::b)) res

@@ -531,6 +531,7 @@ and infer_branches tenv env pannot e =
   | Bind ((), v, a, e), Keep (pannot_a, splits) ->
     begin match infer_branches_a_iterated v tenv env pannot_a a with
     | Ok pannot_a ->
+      (* TODO: Update BindPropagate according to new rule *)
       let annot_a = infer_inst_a tenv env pannot_a a in
       let t = typeof_a v tenv env annot_a a in
       let propagate = splits |> List.find_map (fun (s,_) ->

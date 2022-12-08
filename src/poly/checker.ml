@@ -469,6 +469,31 @@ let rec infer_branches_a vardef tenv env pannot_a a =
 and infer_branches tenv env pannot e =
   let needvar = needvar env in
   let open PartialAnnot in
+  let split_body v t splits e =
+    assert (splits <> []) ;
+    let splits =
+      match List.filter (fun (s, _) -> disjoint s t |> not) splits with
+      | [] -> [List.hd splits]
+      | splits -> splits
+    in
+    let rec aux splits =
+      match splits with
+      | [] -> Ok []
+      | (s, pannot)::splits ->
+        let env = Env.add v (cap_o t s) env in
+        begin match infer_branches_iterated tenv env pannot e with
+        | Ok pannot ->
+          aux splits |> map_res (fun splits -> (s, pannot)::splits)
+        | Split (env', pannot) ->
+          let s' = Env.find v (Env.strengthen v s env') in
+          let new_splits = [ s' ; diff_o s s' ] |> List.filter non_empty in
+          let new_splits = new_splits |> List.map (fun s -> (s, pannot)) in
+          Split (Env.rm v env', new_splits@splits)
+        | res -> res |> map_res (fun pannot -> (s, pannot)::splits)
+        end
+    in
+    aux splits
+  in
   match e, pannot with
   | Var _, Partial -> Ok Partial
   | Var v, Infer -> needvar [v] Partial
@@ -504,7 +529,7 @@ and infer_branches tenv env pannot e =
       map_res (fun pannot_a -> KeepSkip (pannot_a, splits, pannot)) res
     end
   | Bind ((), _, _, _), Keep (_, _) ->
-    failwith "TODO"
+    ignore split_body ; failwith "TODO"
   | _, _ -> assert false
 
 and infer_branches_a_iterated vardef tenv env pannot_a a =

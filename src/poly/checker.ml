@@ -548,9 +548,9 @@ and infer_branches tenv env pannot e =
       begin match propagate with
       | Some env' -> Split (env', Keep (pannot_a, splits))
       | None ->
-        (* let gen = TVarSet.diff (vars t) (Env.tvars env) |> generalize in
-        let t = Subst.apply gen t in *)
-        ignore (e, split_body) ; failwith "TODO"
+        let gen = TVarSet.diff (vars t) (Env.tvars env) |> generalize in
+        let t = Subst.apply gen t in
+        split_body v t splits e |> map_res (fun splits -> Keep (pannot_a, splits))
       end
     | res -> res |> map_res (fun pannot_a -> Keep (pannot_a, splits))
     end

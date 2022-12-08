@@ -528,8 +528,32 @@ and infer_branches tenv env pannot e =
     | res ->
       map_res (fun pannot_a -> KeepSkip (pannot_a, splits, pannot)) res
     end
-  | Bind ((), _, _, _), Keep (_, _) ->
-    ignore split_body ; failwith "TODO"
+  | Bind ((), v, a, e), Keep (pannot_a, splits) ->
+    begin match infer_branches_a_iterated v tenv env pannot_a a with
+    | Ok pannot_a ->
+      let annot_a = infer_inst_a tenv env pannot_a a in
+      let t = typeof_a v tenv env annot_a a in
+      let propagate = splits |> List.find_map (fun (s,_) ->
+        if is_empty (cap t s) then None
+        else
+          let gammas = refine_a env a (neg s) in
+          gammas |> List.find_opt (fun gamma ->
+            Env.bindings gamma |> List.for_all (fun (v,s) ->
+              let t = Env.find v env in
+              is_empty t || (cap t s |> non_empty)
+            )
+          )
+      )
+      in
+      begin match propagate with
+      | Some env' -> Split (env', Keep (pannot_a, splits))
+      | None ->
+        (* let gen = TVarSet.diff (vars t) (Env.tvars env) |> generalize in
+        let t = Subst.apply gen t in *)
+        ignore (e, split_body) ; failwith "TODO"
+      end
+    | res -> res |> map_res (fun pannot_a -> Keep (pannot_a, splits))
+    end
   | _, _ -> assert false
 
 and infer_branches_a_iterated vardef tenv env pannot_a a =

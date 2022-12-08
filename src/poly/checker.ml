@@ -488,6 +488,9 @@ and infer_branches tenv env pannot e =
     end
   | Bind ((), v, a, _), KeepSkip (pannot_a, splits, pannot) ->
     begin match infer_branches_a_iterated v tenv env pannot_a a with
+    | Ok pannot_a ->
+      let pannot = Keep (pannot_a, splits) in
+      infer_branches tenv env pannot e
     | Subst lst when
       List.for_all (fun (s,_) -> Subst.is_identity s |> not) lst ->
       let lst = lst |> List.map (fun (s, pannot_a) ->

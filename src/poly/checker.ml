@@ -253,12 +253,15 @@ let rec infer_inst_a tenv env pannot_a a =
       end
     in
     let res = tallying [(vartype v, s)] in
+    let res = simplify_tallying res in
     ProjA res
   | RecordUpdate (v, _, None), PartialA ->
     let res = tallying [(vartype v, record_any)] in
+    let res = simplify_tallying res in
     RecordUpdateA (res, None)
   | RecordUpdate (v, _, Some v2), PartialA ->
     let res = tallying [(vartype v, record_any)] in
+    let res = simplify_tallying res in
     let r = refresh_all (vartype v2 |> vars_poly) in
     RecordUpdateA (res, Some r)
   | App (v1, v2), PartialA ->
@@ -342,6 +345,10 @@ let needvar env vs a =
   let vs = VarSet.diff vs (Env.domain env |> VarSet.of_list) in
   NeedVar (vs, a, None)
 
+let simplify_tallying_infer sols =
+    (* TODO *)
+    sols
+
 let rec infer_branches_a vardef tenv env pannot_a a =
   let memvar v = Env.mem v env in
   let vartype v = Env.find v env in
@@ -413,18 +420,21 @@ let rec infer_branches_a vardef tenv env pannot_a a =
         end
       in
       let res = tallying_infer [(t, s)] in
+      let res = simplify_tallying_infer res in
       Subst (packannot PartialA res)
     else
       needvar [v] (InferA IMain)
   | RecordUpdate (v, _, None), InferA IMain ->
     if memvar v then
       let res = tallying_infer [(vartype v, record_any)] in
+      let res = simplify_tallying_infer res in
       Subst (packannot PartialA res)
     else
       needvar [v] (InferA IMain)
   | RecordUpdate (v, _, Some v'), InferA IMain ->
     if memvar v && memvar v' then
       let res = tallying_infer [(vartype v, record_any)] in
+      let res = simplify_tallying_infer res in
       Subst (packannot PartialA res)
     else
       needvar [v ; v'] (InferA IMain)
@@ -435,6 +445,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       let alpha = Variable.to_typevar vardef in
       let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
       let res = tallying_infer [(t1, arrow_type)] in
+      let res = simplify_tallying_infer res in
       Subst (packannot PartialA res)
     else
       needvar [v1;v2] (InferA IMain)
@@ -445,6 +456,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       let not_then = subtype t (neg tau) in
       if not_then || not_else then begin
         let res = tallying_infer [(t, empty)] in
+        let res = simplify_tallying_infer res in
         if List.exists Subst.is_identity res then
           Ok (PartialA)
         else if not_else then

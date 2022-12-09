@@ -345,6 +345,17 @@ let needvar env vs a =
   let vs = VarSet.diff vs (Env.domain env |> VarSet.of_list) in
   NeedVar (vs, a, None)
 
+let is_valid_refinement env gamma =
+  let bindings = Env.bindings gamma in
+  bindings |> List.for_all (fun (v,s) ->
+    let t = Env.find v env in
+    is_empty t || (cap t s |> non_empty)
+  ) &&
+  bindings |> List.exists (fun (v,s) ->
+    let t = Env.find v env in
+    cap t s |> non_empty && cap t (neg s) |> non_empty
+  )
+
 let simplify_tallying_infer sols =
     (* TODO *)
     sols
@@ -544,23 +555,16 @@ and infer_branches tenv env pannot e =
     begin match infer_branches_a_iterated v tenv env pannot_a a with
     | Ok pannot_a ->
       (* TODO: Update BindPropagate according to new rule *)
-      let annot_a = infer_inst_a tenv env pannot_a a in
-      let t = typeof_a v tenv env annot_a a in
       let propagate = splits |> List.find_map (fun (s,_) ->
-        if is_empty (cap t s) then None
-        else
-          let gammas = refine_a env a (neg s) in
-          gammas |> List.find_opt (fun gamma ->
-            Env.bindings gamma |> List.for_all (fun (v,s) ->
-              let t = Env.find v env in
-              is_empty t || (cap t s |> non_empty)
-            )
-          )
+        let gammas = refine_a env a (neg s) in
+        gammas |> List.find_opt (is_valid_refinement env)
       )
       in
       begin match propagate with
       | Some env' -> Split (env', Keep (pannot_a, splits))
       | None ->
+        let annot_a = infer_inst_a tenv env pannot_a a in
+        let t = typeof_a v tenv env annot_a a in  
         let gen = TVarSet.diff (vars t) (Env.tvars env) |> generalize in
         let t = Subst.apply gen t in
         split_body v t splits e |> map_res (fun splits -> Keep (pannot_a, splits))

@@ -1,3 +1,4 @@
+module PMsc = Msc
 open Types.Base
 open Types.Tvar
 open Types.Additions
@@ -163,6 +164,14 @@ and typeof tenv env annot e =
   end
   |> bot_instance |> simplify_typ
 
+let typeof_a_nofail vardef tenv env annot_a a =
+  try typeof_a vardef tenv env annot_a a
+  with Untypeable (_, str) -> Format.printf "%a: %s@." PMsc.pp_a a str ; assert false
+
+let typeof_nofail tenv env annot e =
+  try typeof tenv env annot e
+  with Untypeable (_, str) -> Format.printf "%a: %s@." PMsc.pp_e e str ; assert false  
+
 (* ====================================== *)
 (* =============== REFINE =============== *)
 (* ====================================== *)
@@ -309,7 +318,7 @@ and infer_inst tenv env pannot e =
     FullAnnot.Skip annot
   | Bind ((), v, a, e), PartialAnnot.Keep (pannot_a, branches) ->
     let annot_a = infer_inst_a tenv env pannot_a a in
-    let t = typeof_a v tenv env annot_a a in
+    let t = typeof_a_nofail v tenv env annot_a a in
     let gen = TVarSet.diff (vars t) (Env.tvars env) |> generalize in
     let t = Subst.apply gen t in
     let branches = branches |> List.map (fun (si, pannot) ->
@@ -554,7 +563,6 @@ and infer_branches tenv env pannot e =
   | Bind ((), v, a, e), Keep (pannot_a, splits) ->
     begin match infer_branches_a_iterated v tenv env pannot_a a with
     | Ok pannot_a ->
-      (* TODO: Update BindPropagate according to new rule *)
       let propagate = splits |> List.find_map (fun (s,_) ->
         let gammas = refine_a env a (neg s) in
         gammas |> List.find_opt (is_valid_refinement env)
@@ -564,7 +572,7 @@ and infer_branches tenv env pannot e =
       | Some env' -> Split (env', Keep (pannot_a, splits))
       | None ->
         let annot_a = infer_inst_a tenv env pannot_a a in
-        let t = typeof_a v tenv env annot_a a in  
+        let t = typeof_a_nofail v tenv env annot_a a in  
         let gen = TVarSet.diff (vars t) (Env.tvars env) |> generalize in
         let t = Subst.apply gen t in
         split_body v t splits e |> map_res (fun splits -> Keep (pannot_a, splits))
@@ -597,8 +605,13 @@ and infer_branches_iterated tenv env pannot e =
 (* ================ INFER =============== *)
 (* ====================================== *)
 
-let infer _ =
-  ignore (refine_a, infer_inst, infer_branches) ;
-  failwith "TODO"
+let infer tenv env e =
+  let open PartialAnnot in
+  match infer_branches_iterated tenv env Infer e with
+  | Subst [] -> raise (Untypeable ([], "Annotations inference failed."))
+  | Ok annot -> infer_inst tenv env annot e
+  | _ -> assert false
 
-let typeof_simple _ = failwith "TODO"
+let typeof_simple tenv env e =
+  let annot = infer tenv env e in
+  typeof_nofail tenv env annot e

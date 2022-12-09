@@ -724,4 +724,4 @@ let infer tenv env mono e =
 
 let typeof_simple tenv env mono e =
   let (e, anns) = infer tenv env mono e in
-  typeof_nofail tenv Env.empty mono anns e  
+  typeof_nofail tenv env mono anns e  

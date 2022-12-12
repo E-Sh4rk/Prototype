@@ -529,10 +529,15 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       needvar [v] (InferA IMain)
   | Ite (_, _, v1, _), InferA IThen -> needvar [v1] PartialA
   | Ite (_, _, _, v2), InferA IElse -> needvar [v2] PartialA
-  | Lambda _, InferA IMain ->
+  | Lambda ((), Unnanoted, _, _), InferA IMain ->
     let alpha = Variable.to_typevar vardef in
     let pannot_a = LambdaA ([], [(TVar.typ alpha, Infer)]) in
     infer_branches_a vardef tenv env pannot_a a
+  | Lambda ((), ADomain ts, _, _), InferA IMain ->
+    let pannot_a = LambdaA ([], packannot Infer ts) in
+    infer_branches_a vardef tenv env pannot_a a
+  | Lambda ((), AArrow _, _, _), InferA IMain ->
+    raise (Untypeable ([], "Arrows with full annotations are not supported."))
   | Lambda ((), _, v, e), LambdaA (b1, b2) ->
     if b1@b2 |> List.for_all (fun (s,_) -> is_empty s)
     then Subst [] else lambda v (b1,b2) e

@@ -372,8 +372,26 @@ let is_valid_refinement env gamma =
 
 let simplify_tallying_infer tvars sols =
   let tvars = TVarSet.filter TVar.is_mono tvars in
+  let replace_toplevel t v =
+    let involved = TVarSet.diff (top_vars t) tvars in
+    vars_with_polarity t |> List.filter_map (fun (v', k) ->
+      if TVarSet.mem involved v' then
+      match k with
+      | `Pos -> Some (v', TVar.typ v)
+      | `Neg -> Some (v', TVar.typ v |> neg)
+      | `Both -> None
+      else None
+      ) |> Subst.construct
+  in
   (* TODO *)
   sols |> List.map (fun sol -> Subst.restrict sol tvars)
+  |> List.map (fun sol -> (* Simplify *)
+    List.fold_left (fun sol v ->
+      let t = Subst.find' sol v in
+      let s = replace_toplevel t v in
+      Subst.apply_to_subst s sol
+    ) sol (Subst.dom sol |> TVarSet.destruct)
+  )
   |> remove_duplicates Subst.equiv
   |> (fun res -> (* Printing (debug) *)
     Format.printf "=== Solutions ===@." ;

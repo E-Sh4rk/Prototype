@@ -370,9 +370,13 @@ let is_valid_refinement env gamma =
     )
   else false
 
-let simplify_tallying_infer sols =
+let simplify_tallying_infer resvar sols =
     (* TODO *)
-    sols
+    sols |> List.map (fun sol ->
+      match resvar with
+      | None -> sol
+      | Some v -> Subst.rm v sol
+    ) |> remove_duplicates Subst.equiv
 
 let rec infer_branches_a vardef tenv env pannot_a a =
   let memvar v = Env.mem v env in
@@ -448,21 +452,21 @@ let rec infer_branches_a vardef tenv env pannot_a a =
         end
       in
       let res = tallying_infer [(t, s)] in
-      let res = simplify_tallying_infer res in
+      let res = simplify_tallying_infer (Some alpha) res in
       Subst (packannot PartialA res)
     else
       needvar [v] (InferA IMain)
   | RecordUpdate (v, _, None), InferA IMain ->
     if memvar v then
       let res = tallying_infer [(vartype v, record_any)] in
-      let res = simplify_tallying_infer res in
+      let res = simplify_tallying_infer None res in
       Subst (packannot PartialA res)
     else
       needvar [v] (InferA IMain)
   | RecordUpdate (v, _, Some v'), InferA IMain ->
     if memvar v && memvar v' then
       let res = tallying_infer [(vartype v, record_any)] in
-      let res = simplify_tallying_infer res in
+      let res = simplify_tallying_infer None res in
       Subst (packannot PartialA res)
     else
       needvar [v ; v'] (InferA IMain)
@@ -473,7 +477,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       let alpha = Variable.to_typevar vardef in
       let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
       let res = tallying_infer [(t1, arrow_type)] in
-      let res = simplify_tallying_infer res in
+      let res = simplify_tallying_infer (Some alpha) res in
       Subst (packannot PartialA res)
     else
       needvar [v1;v2] (InferA IMain)
@@ -484,7 +488,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       let not_then = subtype t (neg tau) in
       if not_then || not_else then begin
         let res = tallying_infer [(t, empty)] in
-        let res = simplify_tallying_infer res in
+        let res = simplify_tallying_infer None res in
         if List.exists Subst.is_identity res then
           Ok (PartialA)
         else if not_else then
@@ -625,7 +629,17 @@ let infer tenv env e =
   match infer_branches_iterated tenv env Infer e with
   | Subst [] -> raise (Untypeable ([], "Annotations inference failed."))
   | Ok annot -> infer_inst tenv env annot e
-  | _ -> assert false
+  | NeedVar (vs, _, _) ->
+    Format.printf "NeedVar %a@." (pp_list Variable.pp) (VarSet.to_seq vs |> List.of_seq) ;
+    assert false
+  | Split (gamma, _) ->
+    Format.printf "Split %a@." Env.pp gamma ;
+    assert false
+  | Subst lst ->
+    (* Format.printf "Subst %a@." (pp_long_list Subst.pp) (List.map fst lst) ; *)
+    Format.printf "Subst %a@."
+      (pp_long_list TVarSet.pp) (List.map fst lst |> List.map Subst.dom) ;
+    assert false
 
 let typeof_simple tenv env e =
   let annot = infer tenv env e in

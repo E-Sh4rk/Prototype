@@ -331,10 +331,10 @@ let concat = fixpoint concat
 
 let concat = < [ 'a* ] -> [ 'b* ] -> [ 'a* ; 'b* ] >
 
- let flatten_ocaml flatten (x:['a*]) =
-   if x is Nil then nil else
-   if x is (Any, Any) then concat (fst x) (flatten (snd x)) else
-   (x,nil)
+let flatten_ocaml flatten (x:['a*]) =
+  if x is Nil then nil else
+  if x is (Any, Any) then concat (fst x) (flatten (snd x)) else
+  (x,nil)
 
 let flatten_ocaml : [['a*]*] -> ['a*] = fixpoint flatten_ocaml 
 

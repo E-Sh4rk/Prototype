@@ -383,17 +383,23 @@ let simplify_tallying_infer tvars sols =
       else None
       ) |> Subst.construct
   in
-  (* TODO *)
-  sols |> List.map (fun sol -> Subst.restrict sol tvars)
-  |> List.map (fun sol -> (* Simplify *)
+  sols
+  (* Restrict *)
+  |> List.map (fun sol -> Subst.restrict sol tvars)
+  (* Simplify *)
+  |> List.map (fun sol ->
     List.fold_left (fun sol v ->
       let t = Subst.find' sol v in
       let s = replace_toplevel t v in
       Subst.apply_to_subst s sol
     ) sol (Subst.dom sol |> TVarSet.destruct)
   )
+  (* Normalize *)
+  |> List.filter
+    (fun sol -> sol |> Subst.destruct |> List.for_all (fun (_,t) -> non_empty t))
   |> remove_duplicates Subst.equiv
-  (* |> (fun res -> (* Printing (debug) *)
+  (* Printing (debug) *)
+  (* |> (fun res ->
     Format.printf "=== Solutions ===@." ;
     Format.printf "with tvars=%a@." TVarSet.pp tvars ;
     res |> List.iter (fun s -> Format.printf "%a@." Subst.pp s) ;

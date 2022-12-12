@@ -4,7 +4,7 @@ let (+) = <Int->Int->Int>
 let ( * ) = <Int->Int->Int>
 let succ = <Int->Int>
 
-debug 2 let impossible_branch = fun x ->
+let impossible_branch = fun x ->
     if x is Int then x + 1 else (42 3)
 
 let impossible_branch2 = fun x -> fun y ->

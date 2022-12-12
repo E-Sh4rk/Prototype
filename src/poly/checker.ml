@@ -412,7 +412,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
                 let subst_cur = Subst.remove subst' x in
                 let subst' = Subst.restrict subst' x in
                 if Subst.equiv subst' subst
-                then Some (s, apply_subst subst_cur pannot')
+                then Some (Subst.apply subst_cur s, apply_subst subst_cur pannot')
                 else None
               )
             in

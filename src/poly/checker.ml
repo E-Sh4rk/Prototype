@@ -393,12 +393,12 @@ let simplify_tallying_infer tvars sols =
     ) sol (Subst.dom sol |> TVarSet.destruct)
   )
   |> remove_duplicates Subst.equiv
-  |> (fun res -> (* Printing (debug) *)
+  (* |> (fun res -> (* Printing (debug) *)
     Format.printf "=== Solutions ===@." ;
     Format.printf "with tvars=%a@." TVarSet.pp tvars ;
     res |> List.iter (fun s -> Format.printf "%a@." Subst.pp s) ;
     res
-  )
+  ) *)
 
 let rec infer_branches_a vardef tenv env pannot_a a =
   let memvar v = Env.mem v env in

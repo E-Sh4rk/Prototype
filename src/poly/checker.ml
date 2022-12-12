@@ -355,15 +355,20 @@ let needvar env vs a =
   NeedVar (vs, a, None)
 
 let is_valid_refinement env gamma =
-  let bindings = Env.bindings gamma in
-  bindings |> List.for_all (fun (v,s) ->
-    let t = Env.find v env in
-    is_empty t || (cap t s |> non_empty)
-  ) &&
-  bindings |> List.exists (fun (v,s) ->
-    let t = Env.find v env in
-    cap t s |> non_empty && cap t (neg s) |> non_empty
-  )
+  if VarSet.subset
+    (Env.domain gamma |> VarSet.of_list)
+    (Env.domain env |> VarSet.of_list)
+  then
+    let bindings = Env.bindings gamma in
+    bindings |> List.for_all (fun (v,s) ->
+      let t = Env.find v env in
+      is_empty t || (cap t s |> non_empty)
+    ) &&
+    bindings |> List.exists (fun (v,s) ->
+      let t = Env.find v env in
+      cap t s |> non_empty && cap t (neg s) |> non_empty
+    )
+  else false
 
 let simplify_tallying_infer sols =
     (* TODO *)
@@ -377,6 +382,8 @@ let rec infer_branches_a vardef tenv env pannot_a a =
   let open PartialAnnot in
   let lambda v (b1, b2) e =
     let domain_explored = b1 |> List.map fst |> disj in
+    log ~level:2 "Typing lambda for %a with unexplored branches %a.@."
+      Variable.pp v (pp_list pp_typ) (List.map fst b2) ;
     let rec aux domain_explored b =
       let b = b |> List.filter
         (fun (s,_) -> subtype s domain_explored |> not) in
@@ -387,6 +394,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
           (fun (s', _) -> (subtype s' s |> not) || subtype s s')
         in
         let ((s, pannot), b) = find_among_others f b |> Option.get in
+        log ~level:1 "Exploring lambda branch %a for %a.@." pp_typ s Variable.pp v ;
         let env' = Env.add v s env in
         begin match infer_branches_iterated tenv env' pannot e with
         | Ok pannot ->
@@ -508,10 +516,13 @@ and infer_branches tenv env pannot e =
       | [] -> [List.hd splits]
       | splits -> splits
     in
+    log ~level:2 "Typing binding for %a with splits %a.@."
+      Variable.pp v (pp_list pp_typ) (List.map fst splits) ;
     let rec aux splits =
       match splits with
       | [] -> Ok []
       | (s, pannot)::splits ->
+        log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
         let env = Env.add v (cap_o t s) env in
         begin match infer_branches_iterated tenv env pannot e with
         | Ok pannot ->
@@ -535,15 +546,18 @@ and infer_branches tenv env pannot e =
   | Bind ((), v, _, e), Skip pannot ->
     begin match infer_branches_iterated tenv env pannot e with
     | NeedVar (vs, pannot, Some pannot') when VarSet.mem v vs ->
+      log ~level:0 "Var %a needed (optional).@." Variable.pp v ;
       let pannot = KeepSkip (InferA IMain, [(any, pannot)], pannot') in
       let pannot' = Skip pannot' in
       NeedVar (VarSet.remove v vs, pannot, Some pannot')
     | NeedVar (vs, pannot, None) when VarSet.mem v vs ->
+      log ~level:0 "Var %a needed.@." Variable.pp v ;
       let pannot = Keep (InferA IMain, [(any, pannot)]) in
       NeedVar (VarSet.remove v vs, pannot, None)
     | res -> map_res (fun pannot -> Skip pannot) res
     end
   | Bind ((), v, a, _), KeepSkip (pannot_a, splits, pannot) ->
+    log ~level:1 "Typing var %a (optional).@." Variable.pp v ;
     begin match infer_branches_a_iterated v tenv env pannot_a a with
     | Ok pannot_a ->
       let pannot = Keep (pannot_a, splits) in
@@ -561,6 +575,7 @@ and infer_branches tenv env pannot e =
       map_res (fun pannot_a -> KeepSkip (pannot_a, splits, pannot)) res
     end
   | Bind ((), v, a, e), Keep (pannot_a, splits) ->
+    log ~level:1 "Typing var %a.@." Variable.pp v ;
     begin match infer_branches_a_iterated v tenv env pannot_a a with
     | Ok pannot_a ->
       let propagate = splits |> List.find_map (fun (s,_) ->

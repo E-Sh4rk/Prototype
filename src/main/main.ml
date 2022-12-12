@@ -2,7 +2,6 @@ open Parsing.IO
 open Common.Msc
 open Common
 open Types.Base
-open Types.Tvar
 open Types.Additions
 open Parsing
 open Parsing.Variable
@@ -51,11 +50,11 @@ let type_check_program
         let typ =
           if use_poly ()
           then
-            let typ = Poly.Checker_old.typeof_simple tenv env TVarSet.empty nf_expr in
+            let typ = Poly.Checker.typeof_simple tenv env nf_expr in
             begin match typ_annot with
             | None -> typ
             | Some typ' ->
-              if RawExt.subtype_poly TVarSet.empty typ typ'
+              if subtype_poly typ typ'
               then typ' else raise (IncompatibleType typ)
             end
           else Legacy.Checker.typeof_simple tenv env nf_expr_ann
@@ -80,7 +79,7 @@ let type_check_program
           end ;
         (varm, env)
       end with Legacy.Checker.Ill_typed (pos, str)
-      | Poly.Checker_old.Untypeable (pos, str) ->
+      | Poly.Checker.Untypeable (pos, str) ->
         pr_ill_typed (pos, str);
         if compare_to_popl () then
           begin match typ_legacy with

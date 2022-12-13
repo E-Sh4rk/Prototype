@@ -112,3 +112,15 @@ let add_others lst =
 
 let find_among_others pred lst =
   lst |> add_others |> List.find_opt (fun (a,o) -> pred a o)
+
+let rec insert x lst =
+  match lst with
+  | [] -> [[x]]
+  | h::t ->
+    (x::lst) :: (List.map (fun el -> h::el) (insert x t))
+
+let rec perm lst =
+  match lst with
+  | [] -> [[]]
+  | h::t ->
+    List.flatten (List.map (insert h) (perm t))

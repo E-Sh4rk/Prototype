@@ -381,6 +381,7 @@ let subst_more_general s1 s2 =
   ) |> List.flatten |> tallying <> []
 
 let simplify_tallying_infer tvars resvars sols =
+  (* TODO: What when a resvar is also in tvars??? *)
   let tvars = TVarSet.filter TVar.is_mono tvars in
   let resvars = TVarSet.construct resvars in
   let detvars = TVarSet.union tvars resvars in
@@ -459,6 +460,21 @@ let simplify_tallying_infer tvars resvars sols =
     res
   ) *)
 
+let types_equiv_modulo_renaming mono t1 t2 =
+  let (v1s, v2s) = (TVarSet.diff (vars t1) mono, TVarSet.diff (vars t2) mono) in
+  let (v1s, v2s) = (TVarSet.diff v1s v2s, TVarSet.diff v2s v1s) in
+  let (v1s, v2s) = (TVarSet.destruct v1s, TVarSet.destruct v2s) in
+  if List.length v1s <> List.length v2s
+  then false
+  else
+    perm v2s |> List.exists (fun v2s ->
+      let subst = List.map2 (fun v1 v2 ->
+        (v1, TVar.typ v2)
+        ) v1s v2s |> Subst.construct in
+        let t1 = Subst.apply subst t1 in
+        equiv t1 t2
+    )
+
 let rec infer_branches_a vardef tenv env pannot_a a =
   let memvar v = Env.mem v env in
   let vartype v = Env.find v env in
@@ -466,12 +482,12 @@ let rec infer_branches_a vardef tenv env pannot_a a =
   let packannot a = List.map (fun s -> (s, a)) in
   let open PartialAnnot in
   let lambda v (b1, b2) e =
-    let domain_explored = b1 |> List.map fst |> disj in
+    let explored = b1 |> List.map fst in
     log ~level:2 "Typing lambda for %a with unexplored branches %a.@."
       Variable.pp v (pp_list pp_typ) (List.map fst b2) ;
-    let rec aux domain_explored b =
+    let rec aux explored b =
       let b = b |> List.filter
-        (fun (s,_) -> subtype s domain_explored |> not) in
+        (fun (s,_) -> subtype s (disj explored) |> not) in
       match b with
       | [] -> Ok ([], [])
       | b ->
@@ -483,7 +499,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
         let env' = Env.add v s env in
         begin match infer_branches_iterated tenv env' pannot e with
         | Ok pannot ->
-          aux (cup domain_explored s) b
+          aux (s::explored) b
           |> map_res (fun (b1, b2) -> ((s, pannot)::b1, b2))
         | Subst lst ->
           let x = Env.tvars env in
@@ -491,15 +507,19 @@ let rec infer_branches_a vardef tenv env pannot_a a =
             List.map (fun (subst,_) -> Subst.restrict subst x) in
           let sigma = (Subst.identity)::sigma in
           let sigma = remove_duplicates Subst.equiv sigma in
-          (* TODO: If one of the new branches is equivalent to another branch modulo renaming,
-             don't add it. *)
           let res = sigma |> List.map (fun subst ->
             let b' =
               lst |> List.filter_map (fun (subst', pannot') ->
                 let subst_cur = Subst.remove subst' x in
                 let subst' = Subst.restrict subst' x in
                 if Subst.equiv subst' subst
-                then Some (Subst.apply subst_cur s, apply_subst subst_cur pannot')
+                then
+                  let s = Subst.apply subst_cur s in
+                  let pannot' = apply_subst subst_cur pannot' in
+                  (* If it is equivalent to an existing branch modulo renaming, don't add it. *)
+                  let ts = (List.map fst b)@explored in
+                  if ts |> List.exists (types_equiv_modulo_renaming x s)
+                  then None else Some (s, pannot')
                 else None
               )
             in
@@ -511,7 +531,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
         | res -> map_res (fun pannot -> ([], (s, pannot)::b)) res
         end
     in
-    aux domain_explored b2 |>
+    aux explored b2 |>
       map_res (fun (b1', b2') -> LambdaA (b1@b1', b2'))
   in
   match a, pannot_a with

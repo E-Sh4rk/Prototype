@@ -381,10 +381,8 @@ let subst_more_general s1 s2 =
   ) |> List.flatten |> tallying <> []
 
 let simplify_tallying_infer tvars resvars sols =
-  (* TODO: What when a resvar is also in tvars??? *)
   let tvars = TVarSet.filter TVar.is_mono tvars in
   let resvars = TVarSet.construct resvars in
-  let detvars = TVarSet.union tvars resvars in
   let replace_toplevel t v =
     let involved = TVarSet.diff (top_vars t) tvars in
     vars_with_polarity t |> List.filter_map (fun (v', k) ->
@@ -397,7 +395,8 @@ let simplify_tallying_infer tvars resvars sols =
       ) |> Subst.construct
   in
   let nb_new_vars sol =
-    let nv = TVarSet.diff (Subst.codom sol) detvars in
+    let sol = Subst.restrict sol tvars in
+    let nv = TVarSet.diff (Subst.codom sol) tvars in
     nv |> TVarSet.destruct |> List.length
   in
   let better_sol sol1 sol2 =

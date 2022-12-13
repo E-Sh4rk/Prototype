@@ -5,6 +5,7 @@ open Types.Base
 open Types.Additions
 open Parsing
 open Parsing.Variable
+open Types.Tvar
 
 let std_fmt = ref Format.std_formatter
 let err_fmt = ref Format.err_formatter
@@ -55,7 +56,10 @@ let type_check_program
             | None -> typ
             | Some typ' ->
               if subtype_poly typ typ'
-              then typ' else raise (IncompatibleType typ)
+              then
+                let g = generalize (vars typ') in
+                Subst.apply g typ'
+              else raise (IncompatibleType typ)
             end
           else Legacy.Checker.typeof_simple tenv env nf_expr_ann
         in

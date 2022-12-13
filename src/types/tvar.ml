@@ -347,6 +347,7 @@ let tallying_infer constr =
     List.flatten in
   let infer = TVarSet.union_many infer in
   let gen = generalize infer in
+  let mon = Subst.inverse_renaming gen in
   let constr = constr |>
     List.map (fun (a,b) ->
       let r1 = refresh_all (vars_poly a) in
@@ -357,7 +358,7 @@ let tallying_infer constr =
   in
   tallying constr |> List.map (fun s ->
     let s = Subst.apply_to_subst s gen in
-    let s = Subst.apply_to_subst (Subst.inverse_renaming gen) s in
+    let s = Subst.apply_to_subst mon s in
     let mono_subst = monomorphize (Subst.codom s) in
     Subst.apply_to_subst mono_subst s
   )

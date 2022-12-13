@@ -407,11 +407,12 @@ let simplify_tallying_infer tvars resvars sols =
   in
   let try_simplify sol v t =
     let pvs = TVarSet.diff (vars t) tvars in
-    let g = generalize pvs in
+    let g = generalize pvs in let m = Subst.inverse_renaming g in
     let t = Subst.apply g t in
     let res = tallying [(TVar.typ v, t) ; (t, TVar.typ v)]
     |> List.map (fun s ->
       let s = Subst.apply_to_subst s g in
+      let s = Subst.apply_to_subst m s in
       let mono_subst = monomorphize (Subst.codom s) in
       Subst.apply_to_subst mono_subst s
     )
@@ -483,13 +484,17 @@ let rec infer_branches_a vardef tenv env pannot_a a =
   let packannot a = List.map (fun s -> (s, a)) in
   let open PartialAnnot in
   let lambda v (b1, b2) e =
-    let explored = b1 |> List.map fst in
     log ~level:2 "Typing lambda for %a with unexplored branches %a.@."
       Variable.pp v (pp_list pp_typ) (List.map fst b2) ;
     let rec aux explored b =
-      (* TODO: clean free variables of explored branches before comparing with current branch *)
+      let explored_domain = explored
+        (* |> List.map (fun t ->
+          let nvs = TVarSet.diff (vars t) (Env.tvars env) in
+          let g = generalize nvs in let m = Subst.inverse_renaming g in
+          Subst.apply g t |> clean_type ~pos:any ~neg:empty |> Subst.apply m) *)
+        |> disj in
       let b = b |> List.filter
-        (fun (s,_) -> subtype s (disj explored) |> not) in
+        (fun (s,_) -> subtype s explored_domain |> not) in
       match b with
       | [] -> Ok ([], [])
       | b ->
@@ -533,7 +538,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
         | res -> map_res (fun pannot -> ([], (s, pannot)::b)) res
         end
     in
-    aux explored b2 |>
+    aux (b1 |> List.map fst) b2 |>
       map_res (fun (b1', b2') -> LambdaA (b1@b1', b2'))
   in
   match a, pannot_a with

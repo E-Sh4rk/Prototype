@@ -56,6 +56,8 @@ let rec typeof_a vardef tenv env annot_a a =
   let open FullAnnot in
   let pos = Variable.get_locations vardef in
   let type_lambda env annot v e =
+    (* TODO: Remove branches that are worse than another branch
+       (smaller domain, greater codomain) *)
     if annot = []
     then raise (Untypeable (pos, "Invalid lambda: there must be at least 1 branch."))
     else
@@ -485,6 +487,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
     log ~level:2 "Typing lambda for %a with unexplored branches %a.@."
       Variable.pp v (pp_list pp_typ) (List.map fst b2) ;
     let rec aux explored b =
+      (* TODO: clean free variables of explored branches before comparing with current branch *)
       let b = b |> List.filter
         (fun (s,_) -> subtype s (disj explored) |> not) in
       match b with

@@ -221,7 +221,7 @@ let refine_a env a t =
       let constr = [ (ti, mk_arrow (TVar.typ alpha |> cons) (cons t)) ] in
       let res = tallying constr in
       res |> List.map (fun sol ->
-        let ti = Subst.apply sol ti in
+        let ti = apply_subst_simplify sol ti in
         let argt = Subst.find' sol alpha in
         let clean_subst =  clean_type_subst ~pos:any ~neg:empty argt in
         let ti = Subst.apply clean_subst ti in
@@ -244,7 +244,7 @@ let simplify_tallying sols =
   (* TODO *)
   sols
 
-let rec infer_inst_a tenv env pannot_a a =
+let rec infer_inst_a vardef tenv env pannot_a a =
   let open PartialAnnot in
   let open FullAnnot in
   let vartype v = Env.find v env in
@@ -290,7 +290,10 @@ let rec infer_inst_a tenv env pannot_a a =
     let t1 = Subst.apply r1 t1 in
     let t2 = Subst.apply r2 t2 in
     let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
+    log ~level:4 "@.Tallying for %a: %a <= %a@."
+      Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
     let res = tallying [(t1, arrow_type)] in
+    log ~level:4 "Done.@." ;
     let res = simplify_tallying res in
     let (s1, s2) = res |> List.map (fun s ->
       (Subst.apply_to_subst s r1, Subst.apply_to_subst s r2)
@@ -325,7 +328,7 @@ and infer_inst tenv env pannot e =
     let annot = infer_inst tenv env pannot e in
     FullAnnot.Skip annot
   | Bind ((), v, a, e), PartialAnnot.Keep (pannot_a, branches) ->
-    let annot_a = infer_inst_a tenv env pannot_a a in
+    let annot_a = infer_inst_a v tenv env pannot_a a in
     let t = typeof_a_nofail v tenv env annot_a a in
     let gen = TVarSet.diff (vars t) (Env.tvars env) |> generalize in
     let t = Subst.apply gen t in
@@ -527,7 +530,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
                 let subst' = Subst.restrict subst' x in
                 if Subst.equiv subst' subst
                 then
-                  let s = Subst.apply subst_cur s in
+                  let s = apply_subst_simplify subst_cur s in
                   let pannot' = apply_subst subst_cur pannot' in
                   (* If it is equivalent to an existing branch modulo renaming, don't add it. *)
                   let ts = (List.map fst b)@explored in
@@ -592,16 +595,16 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       let t2 = vartype v2 in
       let alpha = Variable.to_typevar vardef in
       let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
-      (* Format.printf "@.Tallying for %a: %a <= %a@."
-        Variable.pp vardef pp_typ t1 pp_typ arrow_type ; *)
+      log ~level:3 "@.Tallying (inference) for %a: %a <= %a@."
+        Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
       let res = tallying_infer [(t1, arrow_type)] in
-      (* res |> List.iter (fun s ->
-        Format.printf "Solution: %a@." Subst.pp s
-      ) ; *)
+      res |> List.iter (fun s ->
+        log ~level:3 "Solution: %a@." Subst.pp s
+      ) ;
       let res = simplify_tallying_infer (Env.tvars env) [alpha] res in
-      (* res |> List.iter (fun s ->
-        Format.printf "Solution (simplified): %a@." Subst.pp s
-      ) ; *)
+      res |> List.iter (fun s ->
+        log ~level:3 "Solution (simplified): %a@." Subst.pp s
+      ) ;
       Subst (packannot PartialA res)
     else
       needvar [v1;v2] (InferA IMain)
@@ -719,7 +722,7 @@ and infer_branches tenv env pannot e =
       begin match propagate with
       | Some env' -> Split (env', Keep (pannot_a, splits))
       | None ->
-        let annot_a = infer_inst_a tenv env pannot_a a in
+        let annot_a = infer_inst_a v tenv env pannot_a a in
         let t = typeof_a_nofail v tenv env annot_a a in  
         let gen = TVarSet.diff (vars t) (Env.tvars env) |> generalize in
         let t = Subst.apply gen t in

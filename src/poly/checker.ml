@@ -56,17 +56,23 @@ let rec typeof_a vardef tenv env annot_a a =
   let open FullAnnot in
   let pos = Variable.get_locations vardef in
   let type_lambda env annot v e =
-    (* TODO: Remove branches that are worse than another branch
-       (smaller domain, greater codomain) *)
     if annot = []
     then raise (Untypeable (pos, "Invalid lambda: there must be at least 1 branch."))
     else
-      annot |> List.map (fun (s, annot) ->
-        check_mono pos s ;
-        let env = Env.add v s env in
-        let t = typeof tenv env annot e in
-        mk_arrow (cons s) (cons t)
-      ) |> conj_o
+      let branches =
+        annot |> List.map (fun (s, annot) ->
+          check_mono pos s ;
+          let env = Env.add v s env in
+          let t = typeof tenv env annot e in
+          mk_arrow (cons s) (cons t)
+        ) in
+      (* NOTE: This is an optimisation (simplification of the type). *)
+      let leq t1 t2 =
+        let gen = TVarSet.diff (vars t1) (Env.tvars env) |> generalize in
+        let t1 = Subst.apply gen t1 in
+        subtype_poly t1 t2
+      in
+      branches |> keep_only_minimal leq |> conj_o
   in
   begin match a, annot_a with
   | Alias v, AliasA -> var_type v env

@@ -681,6 +681,7 @@ let top_instance =
     clean_type ~pos:any ~neg:empty    
 
 let subtype_poly t1 t2 =
+    let t2 = Subst.apply (monomorphize (vars t2)) t2 in
     tallying [(t1,t2)] <> []
 
 (* Operations on jokers (legacy) *)

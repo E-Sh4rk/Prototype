@@ -57,10 +57,21 @@ let do_not_memoize f =
   in aux
 
 let rec remove_duplicates equiv lst =
-  let remove elt lst = List.filter (fun e -> equiv elt e |> not) lst in
+  let remove elt = List.filter (fun e -> equiv elt e |> not) in
   match lst with
   | [] -> []
   | e::lst -> e::(remove e lst |> remove_duplicates equiv)
+
+let keep_only_minimal leq lst =
+  let remove_greater elt = List.filter (fun e -> leq elt e |> not) in
+  let rec aux explored lst =
+    match lst with
+    | [] -> List.rev explored
+    | e::lst ->
+      let explored = remove_greater e explored in
+      let lst = remove_greater e lst in
+      aux (e::explored) lst
+  in aux [] lst
 
 let pp_long_list pp_elt fmt lst =
   Format.fprintf fmt "[@,@[<v 1>" ;

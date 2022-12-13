@@ -370,8 +370,20 @@ let is_valid_refinement env gamma =
     )
   else false
 
-let simplify_tallying_infer tvars sols =
+let subst_more_general s1 s2 =
+  let s2m = Subst.codom s2 |> monomorphize in
+  let s2 = Subst.apply_to_subst s2m s2 in
+  let s1g = Subst.codom s1 |> generalize in
+  let s1 = Subst.apply_to_subst s1g s1 in
+  Subst.destruct s1 |> List.map (fun (v,t1) ->
+    let t2 = Subst.find' s2 v in
+    [(t1, t2) ; (t2, t1)]
+  ) |> List.flatten |> tallying <> []
+
+let simplify_tallying_infer tvars resvars sols =
   let tvars = TVarSet.filter TVar.is_mono tvars in
+  let resvars = TVarSet.construct resvars in
+  let detvars = TVarSet.union tvars resvars in
   let replace_toplevel t v =
     let involved = TVarSet.diff (top_vars t) tvars in
     vars_with_polarity t |> List.filter_map (fun (v', k) ->
@@ -383,20 +395,61 @@ let simplify_tallying_infer tvars sols =
       else None
       ) |> Subst.construct
   in
+  let nb_new_vars sol =
+    let nv = TVarSet.diff (Subst.codom sol) detvars in
+    nv |> TVarSet.destruct |> List.length
+  in
+  let better_sol sol1 sol2 =
+    nb_new_vars sol1 <= nb_new_vars sol2 &&
+    subst_more_general sol1 sol2
+  in
+  let try_simplify sol v t =
+    let pvs = TVarSet.diff (vars t) tvars in
+    let g = generalize pvs in
+    let t = Subst.apply g t in
+    let res = tallying [(TVar.typ v, t) ; (t, TVar.typ v)]
+    |> List.map (fun s ->
+      let s = Subst.apply_to_subst s g in
+      let mono_subst = monomorphize (Subst.codom s) in
+      Subst.apply_to_subst mono_subst s
+    )
+    |> List.filter (fun s ->
+      let sol' = Subst.compose s sol in
+      let sol' = Subst.restrict sol' resvars in
+      subst_more_general sol' sol
+      (* ignore s ; false *)
+    )
+    in
+    match res with
+    | [] -> None
+    | sol::_ -> Some sol
+  in
   sols
-  (* Restrict *)
-  |> List.map (fun sol -> Subst.restrict sol tvars)
-  (* Simplify *)
+  (* Simplify (light) *)
   |> List.map (fun sol ->
+    let new_dom = TVarSet.inter (Subst.dom sol) tvars in
     List.fold_left (fun sol v ->
       let t = Subst.find' sol v in
       let s = replace_toplevel t v in
       Subst.apply_to_subst s sol
-    ) sol (Subst.dom sol |> TVarSet.destruct)
+    ) sol (new_dom |> TVarSet.destruct)
   )
-  (* Normalize *)
-  |> List.filter
-    (fun sol -> sol |> Subst.destruct |> List.for_all (fun (_,t) -> non_empty t))
+  (* Simplify (heavy) *)
+  |> List.map (fun sol ->
+    let new_dom = TVarSet.inter (Subst.dom sol) tvars in
+    List.fold_left (fun sol v ->
+      let t = Subst.find' sol v in
+      match try_simplify sol v t with
+      | None -> sol
+      | Some s -> Subst.apply_to_subst s sol
+    ) sol (new_dom |> TVarSet.destruct)
+  )
+  (* Remove "less general" solutions *)
+  |> keep_only_minimal better_sol
+  (* Restrict and normalize *)
+  |> List.map (fun sol -> Subst.restrict sol tvars)
+  (* |> List.filter
+    (fun sol -> sol |> Subst.destruct |> List.for_all (fun (_,t) -> non_empty t)) *)
   |> remove_duplicates Subst.equiv
   (* Printing (debug) *)
   (* |> (fun res ->
@@ -438,6 +491,8 @@ let rec infer_branches_a vardef tenv env pannot_a a =
             List.map (fun (subst,_) -> Subst.restrict subst x) in
           let sigma = (Subst.identity)::sigma in
           let sigma = remove_duplicates Subst.equiv sigma in
+          (* TODO: If one of the new branches is equivalent to another branch modulo renaming,
+             don't add it. *)
           let res = sigma |> List.map (fun subst ->
             let b' =
               lst |> List.filter_map (fun (subst', pannot') ->
@@ -480,21 +535,21 @@ let rec infer_branches_a vardef tenv env pannot_a a =
         end
       in
       let res = tallying_infer [(t, s)] in
-      let res = simplify_tallying_infer (Env.tvars env) res in
+      let res = simplify_tallying_infer (Env.tvars env) [alpha] res in
       Subst (packannot PartialA res)
     else
       needvar [v] (InferA IMain)
   | RecordUpdate (v, _, None), InferA IMain ->
     if memvar v then
       let res = tallying_infer [(vartype v, record_any)] in
-      let res = simplify_tallying_infer (Env.tvars env) res in
+      let res = simplify_tallying_infer (Env.tvars env) [] res in
       Subst (packannot PartialA res)
     else
       needvar [v] (InferA IMain)
   | RecordUpdate (v, _, Some v'), InferA IMain ->
     if memvar v && memvar v' then
       let res = tallying_infer [(vartype v, record_any)] in
-      let res = simplify_tallying_infer (Env.tvars env) res in
+      let res = simplify_tallying_infer (Env.tvars env) [] res in
       Subst (packannot PartialA res)
     else
       needvar [v ; v'] (InferA IMain)
@@ -504,8 +559,16 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       let t2 = vartype v2 in
       let alpha = Variable.to_typevar vardef in
       let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
+      (* Format.printf "@.Tallying for %a: %a <= %a@."
+        Variable.pp vardef pp_typ t1 pp_typ arrow_type ; *)
       let res = tallying_infer [(t1, arrow_type)] in
-      let res = simplify_tallying_infer (Env.tvars env) res in
+      (* res |> List.iter (fun s ->
+        Format.printf "Solution: %a@." Subst.pp s
+      ) ; *)
+      let res = simplify_tallying_infer (Env.tvars env) [alpha] res in
+      (* res |> List.iter (fun s ->
+        Format.printf "Solution (simplified): %a@." Subst.pp s
+      ) ; *)
       Subst (packannot PartialA res)
     else
       needvar [v1;v2] (InferA IMain)
@@ -516,7 +579,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       let not_then = subtype t (neg tau) in
       if not_then || not_else then begin
         let res = tallying_infer [(t, empty)] in
-        let res = simplify_tallying_infer (Env.tvars env) res in
+        let res = simplify_tallying_infer (Env.tvars env) [] res in
         if List.exists Subst.is_identity res then
           Ok (PartialA)
         else if not_else then

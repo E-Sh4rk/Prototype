@@ -240,8 +240,29 @@ let refine_a env a t =
 (* =============== INFER I ============== *)
 (* ====================================== *)
 
-let simplify_tallying sols =
-  (* TODO *)
+let simplify_tallying sols res =
+  let sols = sols |> List.filter_map (fun sol ->
+    (* TODO (check, improve) *)
+    let t = Subst.apply sol res in
+    let clean = clean_type_subst ~pos:empty ~neg:any t in
+    let sol = Subst.compose clean sol in
+    let to_simplify = Subst.dom sol |> TVarSet.destruct in
+    let sol =
+      List.fold_left (fun sol v ->
+        let t = Subst.find' sol v in
+        let (a,b) = factorize (TVarSet.construct [v], TVarSet.empty) t in
+        if is_empty b
+        then
+          (* Clean main var *)
+          let clean = Subst.construct [(v, a)] in
+          let sol = Subst.compose clean sol in
+          let lst = Subst.rm v sol |> Subst.destruct in
+          let sol = (v,a)::lst |> Subst.construct in
+          sol
+        else sol
+      ) sol to_simplify in
+    Some sol
+    ) in
   sols
 
 let rec infer_inst_a vardef tenv env pannot_a a =
@@ -270,15 +291,15 @@ let rec infer_inst_a vardef tenv env pannot_a a =
       end
     in
     let res = tallying [(vartype v, s)] in
-    let res = simplify_tallying res in
+    let res = simplify_tallying res (TVar.typ alpha) in
     ProjA res
   | RecordUpdate (v, _, None), PartialA ->
     let res = tallying [(vartype v, record_any)] in
-    let res = simplify_tallying res in
+    let res = simplify_tallying res record_any in
     RecordUpdateA (res, None)
   | RecordUpdate (v, _, Some v2), PartialA ->
     let res = tallying [(vartype v, record_any)] in
-    let res = simplify_tallying res in
+    let res = simplify_tallying res record_any in
     let r = refresh_all (vartype v2 |> vars_poly) in
     RecordUpdateA (res, Some r)
   | App (v1, v2), PartialA ->
@@ -294,7 +315,7 @@ let rec infer_inst_a vardef tenv env pannot_a a =
       Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
     let res = tallying [(t1, arrow_type)] in
     log ~level:4 "Done.@." ;
-    let res = simplify_tallying res in
+    let res = simplify_tallying res (TVar.typ alpha) in
     let (s1, s2) = res |> List.map (fun s ->
       (Subst.apply_to_subst s r1, Subst.apply_to_subst s r2)
     ) |> List.split in
@@ -443,7 +464,7 @@ let simplify_tallying_infer tvars resvars sols =
     List.fold_left (fun sol v ->
       let t = Subst.find' sol v in
       let s = replace_toplevel t v in
-      Subst.apply_to_subst s sol
+      Subst.compose s sol
     ) sol (new_dom |> TVarSet.destruct)
   )
   (* Simplify (heavy) *)
@@ -453,7 +474,7 @@ let simplify_tallying_infer tvars resvars sols =
       let t = Subst.find' sol v in
       match try_simplify sol v t with
       | None -> sol
-      | Some s -> Subst.apply_to_subst s sol
+      | Some s -> Subst.compose s sol
     ) sol (new_dom |> TVarSet.destruct)
   )
   (* Remove "less general" solutions *)
@@ -723,7 +744,7 @@ and infer_branches tenv env pannot e =
       | Some env' -> Split (env', Keep (pannot_a, splits))
       | None ->
         let annot_a = infer_inst_a v tenv env pannot_a a in
-        let t = typeof_a_nofail v tenv env annot_a a in  
+        let t = typeof_a_nofail v tenv env annot_a a in
         let gen = TVarSet.diff (vars t) (Env.tvars env) |> generalize in
         let t = Subst.apply gen t in
         split_body v t splits e |> map_res (fun splits -> Keep (pannot_a, splits))

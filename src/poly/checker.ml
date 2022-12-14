@@ -285,6 +285,7 @@ let rec infer_inst_a vardef tenv env pannot_a a =
     let r2 = refresh_all (vartype v2 |> vars_poly) in
     PairA (r1, r2)
   | Projection (p, v), PartialA ->
+    let t = vartype v in
     let alpha = TVar.mk_poly None in
     let s =
       begin match p with
@@ -296,7 +297,9 @@ let rec infer_inst_a vardef tenv env pannot_a a =
         mk_times any_node (TVar.typ alpha |> cons)
       end
     in
-    let res = tallying [(vartype v, s)] in
+    log ~level:4 "@.Tallying for %a: %a <= %a@."
+      Variable.pp vardef pp_typ t pp_typ s ;
+    let res = tallying [(t, s)] in
     let res = simplify_tallying res (TVar.typ alpha) in
     ProjA res
   | RecordUpdate (v, _, None), PartialA ->
@@ -320,7 +323,6 @@ let rec infer_inst_a vardef tenv env pannot_a a =
     log ~level:4 "@.Tallying for %a: %a <= %a@."
       Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
     let res = tallying [(t1, arrow_type)] in
-    log ~level:4 "Done.@." ;
     let res = simplify_tallying res (TVar.typ alpha) in
     let (s1, s2) = res |> List.map (fun s ->
       (Subst.apply_to_subst s r1, Subst.apply_to_subst s r2)
@@ -597,8 +599,16 @@ let rec infer_branches_a vardef tenv env pannot_a a =
           mk_times any_node (TVar.typ alpha |> cons)
         end
       in
+      log ~level:3 "@.Tallying (inference) for %a: %a <= %a@."
+        Variable.pp vardef pp_typ t pp_typ s ;
       let res = tallying_infer [(t, s)] in
+      res |> List.iter (fun s ->
+        log ~level:3 "Solution: %a@." Subst.pp s
+      ) ;
       let res = simplify_tallying_infer (Env.tvars env) [alpha] res in
+      res |> List.iter (fun s ->
+        log ~level:3 "Solution (simplified): %a@." Subst.pp s
+      ) ;
       Subst (packannot PartialA res)
     else
       needvar [v] (InferA IMain)
@@ -641,8 +651,16 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       let not_else = subtype t tau in
       let not_then = subtype t (neg tau) in
       if not_then || not_else then begin
+        log ~level:3 "@.Tallying (inference) for %a: %a <= %a@."
+          Variable.pp vardef pp_typ t pp_typ empty ;
         let res = tallying_infer [(t, empty)] in
+        res |> List.iter (fun s ->
+          log ~level:3 "Solution: %a@." Subst.pp s
+        ) ;
         let res = simplify_tallying_infer (Env.tvars env) [] res in
+        res |> List.iter (fun s ->
+          log ~level:3 "Solution (simplified): %a@." Subst.pp s
+        ) ;
         if List.exists Subst.is_identity res then
           Ok (PartialA)
         else if not_else then

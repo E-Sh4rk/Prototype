@@ -346,7 +346,7 @@ let reverse  = fixpoint reverse_aux
 
 let reverse_ann : [ ('a)*] -> [('a)*] = fixpoint reverse_aux
 
-let rev_tl_aux (rev_tl:'a->'b) l acc  =
+let rev_tl_aux rev_tl l acc  =
      if l is Nil then acc else rev_tl (snd l) (fst l, acc)
 
 let rev_tl l = (fixpoint rev_tl_aux) l nil
@@ -358,10 +358,9 @@ let foldr = fixpoint foldr_aux
 
 let foldr_ann : ('a -> 'b -> 'b ) -> [ 'a* ] -> 'b -> 'b = fixpoint foldr_aux
 
-let foldr_ann2 : (('a -> 'b -> 'b ) -> [ 'a* ] -> 'b -> 'b) & (Any -> [] -> 'c -> 'c)  =
-    fixpoint foldr_aux
-
-
+(* TODO: Why is it so long? *)
+(* let foldr_ann2 : (('a -> 'b -> 'b ) -> [ 'a* ] -> 'b -> 'b) & (Any -> [] -> 'c -> 'c)  =
+    fixpoint foldr_aux *)
 
 (* FILTER FUNCTION *)
 

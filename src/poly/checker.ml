@@ -349,7 +349,7 @@ let rec infer_inst_a vardef tenv env pannot_a a =
     let r2 = refresh_all (vars_poly t2) in
     let t1 = Subst.apply r1 t1 in
     let t2 = Subst.apply r2 t2 in
-    let res =
+    let tallying t1 t2 =
       match approximate_app t1 t2 with
       | None ->
         let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
@@ -360,6 +360,20 @@ let rec infer_inst_a vardef tenv env pannot_a a =
         log ~level:4 "@.Approximate tallying for %a (%i sols).@."
           Variable.pp vardef (List.length res) ; res
     in
+    (* NOTE: Approximation for fixpoint combinator applications *)
+    let res =
+      if subtype t2 arrow_any
+      then begin
+        match dnf t2 with
+        | [arrows] ->
+          arrows |> List.map (fun (s,t) ->
+              let t2 = mk_arrow (cons s) (cons t) in
+              tallying t1 t2
+            ) |> List.flatten
+        | _ -> []
+      end else []
+    in
+    let res = if res = [] then tallying t1 t2 else res in
     let res = simplify_tallying res (TVar.typ alpha) in
     let (s1, s2) = res |> List.map (fun s ->
       (Subst.apply_to_subst s r1, Subst.apply_to_subst s r2)

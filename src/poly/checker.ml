@@ -261,7 +261,7 @@ let simplify_tallying sols res =
   let is_better_sol s1 s2 =
     let t1 = Subst.apply s1 res |> bot_instance in
     let t2 = Subst.apply s2 res |> bot_instance in
-    subtype t1 t2
+    subtype_poly t1 t2
   in
   let sols = sols |> List.filter_map (fun sol ->
     let t = Subst.apply sol res in

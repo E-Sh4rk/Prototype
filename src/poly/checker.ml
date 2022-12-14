@@ -55,13 +55,18 @@ let generalize_check pos r t =
 let rec typeof_a vardef tenv env annot_a a =
   let open FullAnnot in
   let pos = Variable.get_locations vardef in
+  let var_type v = var_type v env in
+  let rename_check = rename_check pos in
+  let instantiate_check = instantiate_check pos in
+  let check_mono = check_mono pos in
+  let untypeable str = raise (Untypeable (pos, str)) in
   let type_lambda env annot v e =
     if annot = []
-    then raise (Untypeable (pos, "Invalid lambda: there must be at least 1 branch."))
+    then untypeable ("Invalid lambda: there must be at least 1 branch.")
     else
       let branches =
         annot |> List.map (fun (s, annot) ->
-          check_mono pos s ;
+          check_mono s ;
           let env = Env.add v s env in
           let t = typeof tenv env annot e in
           mk_arrow (cons s) (cons t)
@@ -75,70 +80,70 @@ let rec typeof_a vardef tenv env annot_a a =
       branches |> keep_only_minimal leq |> conj_o
   in
   begin match a, annot_a with
-  | Alias v, AliasA -> var_type v env
+  | Alias v, AliasA -> var_type v
   | Abstract t, AbstractA -> t
   | Const c, ConstA -> typeof_const_atom tenv c
   | Pair (v1, v2), PairA (r1, r2) ->
-    let t1 = var_type v1 env |> rename_check pos r1 in
-    let t2 = var_type v2 env |> rename_check pos r2 in
+    let t1 = var_type v1 |> rename_check r1 in
+    let t2 = var_type v2 |> rename_check r2 in
     mk_times (cons t1) (cons t2)
   | Projection (Field label, v), ProjA ss ->
-    let t = var_type v env |> instantiate_check pos ss in
+    let t = var_type v |> instantiate_check ss in
     if subtype t record_any
     then
       try get_field t label
       with Not_found ->
-        raise (Untypeable (pos, "Invalid projection: missing label " ^ label ^ "."))
-    else raise (Untypeable (pos, "Invalid projection: not a record."))
+        untypeable ("Invalid projection: missing label " ^ label ^ ".")
+    else untypeable ("Invalid projection: not a record.")
   | Projection (p, v), ProjA ss ->
-    let t = var_type v env |> instantiate_check pos ss in
+    let t = var_type v |> instantiate_check ss in
     if subtype t pair_any
     then (if p = Fst then pi1 t else pi2 t)
-    else raise (Untypeable (pos, "Invalid projection: not a pair."))
+    else untypeable ("Invalid projection: not a pair.")
   | RecordUpdate (v, label, None), RecordUpdateA (ss, None) ->
-    let t = var_type v env |> instantiate_check pos ss in
+    let t = var_type v |> instantiate_check ss in
     if subtype t record_any
     then remove_field t label
-    else raise (Untypeable (pos, "Invalid field deletion: not a record."))
+    else untypeable ("Invalid field deletion: not a record.")
   | RecordUpdate (v, label, Some v'), RecordUpdateA (ss, Some r) ->
-    let t = var_type v env |> instantiate_check pos ss in
+    let t = var_type v |> instantiate_check ss in
     if subtype t record_any
     then
-      let t' = var_type v' env |> rename_check pos r in
+      let t' = var_type v' |> rename_check r in
       let right_record = mk_record false [label, cons t'] in
       merge_records t right_record  
-    else raise (Untypeable (pos, "Invalid field update: not a record."))
+    else untypeable ("Invalid field update: not a record.")
   | App (v1, v2), AppA (ss1, ss2) ->
-    let t1 = var_type v1 env |> instantiate_check pos ss1 in
-    let t2 = var_type v2 env |> instantiate_check pos ss2 in
+    let t1 = var_type v1 |> instantiate_check ss1 in
+    let t2 = var_type v2 |> instantiate_check ss2 in
     if subtype t1 arrow_any
     then
       if subtype t2 (domain t1)
       then apply t1 t2
-      else raise (Untypeable (pos, "Invalid application: argument not in the domain."))
-    else raise (Untypeable (pos, "Invalid application: not a function."))    
+      else untypeable ("Invalid application: argument not in the domain.")
+    else untypeable ("Invalid application: not a function.")
   | Ite (v, _, _, _), EmptyA ss ->
-    let t = var_type v env |> instantiate_check pos ss in
+    let t = var_type v |> instantiate_check ss in
     if is_empty t then empty
-    else raise (Untypeable (pos, "Invalid typecase: tested expression is not empty."))  
+    else untypeable ("Invalid typecase: tested expression is not empty.")
   | Ite (v, s, v1, _), ThenA ->
-    let t = var_type v env in
+    let t = var_type v in
     if subtype t s
-    then var_type v1 env
-    else raise (Untypeable (pos, "Invalid typecase: tested expression hasn't the required type."))
+    then var_type v1
+    else untypeable ("Invalid typecase: tested expression hasn't the required type.")
   | Ite (v, s, _, v2), ElseA ->
-    let t = var_type v env in
+    let t = var_type v in
     if subtype t (neg s)
-    then var_type v2 env
-    else raise (Untypeable (pos, "Invalid typecase: tested expression hasn't the required type."))  
+    then var_type v2
+    else untypeable ("Invalid typecase: tested expression hasn't the required type.")
   | Let (v1, v2), LetA ->
     if Env.mem v1 env
-    then var_type v2 env
-    else raise (Untypeable (pos, "Invalid let binding: definition has not been typed."))
+    then var_type v2
+    else untypeable ("Invalid let binding: definition has not been typed.")
   | Lambda (_, Parsing.Ast.AArrow _, _, _), LambdaA _ ->
-    raise (Untypeable (pos, "Invalid lambda: explicitely typed lambdas are not supported."))
+    untypeable ("Invalid lambda: explicitely typed lambdas are not supported.")
   | Lambda (_, _, v, e), LambdaA branches -> type_lambda env branches v e
-  | _, _ -> raise (Untypeable (pos, "Invalid annotations."))
+  | _, _ -> untypeable ("Invalid annotations.")
   end
   |> bot_instance |> simplify_typ
   
@@ -153,8 +158,9 @@ and typeof tenv env annot e =
       | Some t -> t
       end in
     let pos = Variable.get_locations v in
+    let untypeable str = raise (Untypeable (pos, str)) in
     if branches = []
-    then raise (Untypeable (pos, "Invalid decomposition: cannot be empty."))
+    then untypeable ("Invalid decomposition: cannot be empty.")
     else
       let dom = branches |> List.map fst |> disj in
       if subtype t dom
@@ -164,7 +170,7 @@ and typeof tenv env annot e =
           let env = Env.add v (cap t s) env in
           typeof tenv env annot e
         ) |> disj_o
-      else raise (Untypeable (pos, "Invalid decomposition: does not cover the whole domain."))
+      else untypeable ("Invalid decomposition: does not cover the whole domain.")
   | Bind (_, v, _, e), Skip annot ->
     assert (Env.mem v env |> not) ;
     typeof tenv env annot e

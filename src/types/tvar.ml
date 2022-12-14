@@ -271,12 +271,16 @@ module Raw = struct
 
   let print_tallying_instance var_order delta constr =
     Format.printf "Constraints:@." ;
+    let allvars = ref TVarSet.empty in
     constr |> List.iter (fun (l,r) ->
+        allvars := TVarSet.union (!allvars) (vars l) ;
+        allvars := TVarSet.union (!allvars) (vars r) ;
         Format.printf "(%a, %a)@." Base.pp_typ l Base.pp_typ r ;
     );
-    Format.printf "With delta=%a and var order=%a@."
+    Format.printf "With delta=%a, var order=%a, and natural var order=%a@."
         (Utils.pp_list TVar.pp) (TVarSet.destruct delta)
         (Utils.pp_list TVar.pp) var_order
+        (Utils.pp_list TVar.pp) (TVarSet.destruct !allvars)
 
   let check_tallying_solution var_order delta constr res =
     let error = ref false in

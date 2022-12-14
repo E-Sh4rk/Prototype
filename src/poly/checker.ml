@@ -114,14 +114,24 @@ let rec typeof_a vardef tenv env annot_a a =
       merge_records t right_record  
     else untypeable ("Invalid field update: not a record.")
   | App (v1, v2), AppA (ss1, ss2) ->
-    let t1 = var_type v1 |> instantiate_check ss1 in
+    let apply t1 t2 =
+      if subtype t1 arrow_any
+      then
+        if subtype t2 (domain t1)
+        then apply t1 t2
+        else untypeable ("Invalid application: argument not in the domain.")
+      else untypeable ("Invalid application: not a function.")
+    in
+    (* NOTE: Approximation... this is not what the paper suggests. *)
+    let treat_sigma (s1,s2) =
+      let t1 = var_type v1 |> instantiate_check [s1] in
+      let t2 = var_type v2 |> instantiate_check [s2] in
+      apply t1 t2
+    in
+    List.combine ss1 ss2 |> List.map treat_sigma |> conj_o
+    (* let t1 = var_type v1 |> instantiate_check ss1 in
     let t2 = var_type v2 |> instantiate_check ss2 in
-    if subtype t1 arrow_any
-    then
-      if subtype t2 (domain t1)
-      then apply t1 t2
-      else untypeable ("Invalid application: argument not in the domain.")
-    else untypeable ("Invalid application: not a function.")
+    apply t1 t2 *)
   | Ite (v, _, _, _), EmptyA ss ->
     let t = var_type v |> instantiate_check ss in
     if is_empty t then empty
@@ -191,6 +201,7 @@ let typeof_nofail tenv env annot e =
 (* ====================================== *)
 
 let refine_a env a t =
+  log ~level:5 "refine_a@." ;
   match a with
   | Alias _ | Abstract _ | Const _ | Lambda _ -> []
   | Pair (v1, v2) ->
@@ -247,8 +258,8 @@ let refine_a env a t =
 (* ====================================== *)
 
 let simplify_tallying sols res =
+  (* TODO: Filter solutions (remove weaker ones) *)
   let sols = sols |> List.filter_map (fun sol ->
-    (* TODO (check, improve) *)
     let t = Subst.apply sol res in
     let clean = clean_type_subst ~pos:empty ~neg:any t in
     let sol = Subst.compose clean sol in
@@ -270,6 +281,20 @@ let simplify_tallying sols res =
     Some sol
     ) in
   sols
+
+let approximate_app t1 t2 =
+  (* NOTE: Disabled for now *)
+  ignore (t1, t2) ; None
+  (* let inst_for_arrow (t,_) =
+    tallying [(t2, t)]
+  in
+  let inst_for_arrows arrows =
+    arrows |> List.map inst_for_arrow |> List.flatten
+  in
+  let insts = dnf t1 |> List.map inst_for_arrows in
+  if List.for_all (fun inst -> inst <> []) insts
+  then Some (List.flatten insts)
+  else None *)
 
 let rec infer_inst_a vardef tenv env pannot_a a =
   let open PartialAnnot in
@@ -319,10 +344,17 @@ let rec infer_inst_a vardef tenv env pannot_a a =
     let r2 = refresh_all (vars_poly t2) in
     let t1 = Subst.apply r1 t1 in
     let t2 = Subst.apply r2 t2 in
-    let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
-    log ~level:4 "@.Tallying for %a: %a <= %a@."
-      Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
-    let res = tallying [(t1, arrow_type)] in
+    let res =
+      match approximate_app t1 t2 with
+      | None ->
+        let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
+        log ~level:4 "@.Tallying for %a: %a <= %a@."
+          Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
+        tallying [(t1, arrow_type)]
+      | Some res ->
+        log ~level:4 "@.Approximate tallying for %a (%i sols).@."
+          Variable.pp vardef (List.length res) ; res
+    in
     let res = simplify_tallying res (TVar.typ alpha) in
     let (s1, s2) = res |> List.map (fun s ->
       (Subst.apply_to_subst s r1, Subst.apply_to_subst s r2)
@@ -771,6 +803,7 @@ and infer_branches tenv env pannot e =
         let t = typeof_a_nofail v tenv env annot_a a in
         let gen = TVarSet.diff (vars t) (Env.tvars env) |> generalize in
         let t = Subst.apply gen t in
+        log ~level:1 "Var %a typed with type %a.@." Variable.pp v pp_typ t ;
         split_body v t splits e |> map_res (fun splits -> Keep (pannot_a, splits))
       end
     | res -> res |> map_res (fun pannot_a -> Keep (pannot_a, splits))
@@ -778,6 +811,7 @@ and infer_branches tenv env pannot e =
   | _, _ -> assert false
 
 and infer_branches_a_iterated vardef tenv env pannot_a a =
+  log ~level:5 "infer_branches_a_iterated@." ;
   match infer_branches_a vardef tenv env pannot_a a with
   | Split (gamma, pannot_a) when Env.is_empty gamma ->
     infer_branches_a_iterated vardef tenv env pannot_a a
@@ -788,6 +822,7 @@ and infer_branches_a_iterated vardef tenv env pannot_a a =
   | res -> res
 
 and infer_branches_iterated tenv env pannot e =
+  log ~level:5 "infer_branches_e_iterated@." ;
   match infer_branches tenv env pannot e with
   | Split (gamma, pannot) when Env.is_empty gamma ->
     infer_branches_iterated tenv env pannot e

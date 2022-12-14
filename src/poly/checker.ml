@@ -288,7 +288,8 @@ let simplify_tallying sols res =
   sols |> keep_only_minimal is_better_sol
 
 let approximate_app t1 t2 =
-  (* NOTE: Disabled for now *)
+  (* NOTE: Approximation for tallying instances...
+     disabled because it seems to be too unprecise sometimes. *)
   ignore (t1, t2) ; None
   (* let inst_for_arrow (t,_) =
     tallying [(t2, t)]

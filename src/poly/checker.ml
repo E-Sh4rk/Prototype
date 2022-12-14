@@ -258,7 +258,11 @@ let refine_a env a t =
 (* ====================================== *)
 
 let simplify_tallying sols res =
-  (* TODO: Filter solutions (remove weaker ones) *)
+  let is_better_sol s1 s2 =
+    let t1 = Subst.apply s1 res |> bot_instance in
+    let t2 = Subst.apply s2 res |> bot_instance in
+    subtype t1 t2
+  in
   let sols = sols |> List.filter_map (fun sol ->
     let t = Subst.apply sol res in
     let clean = clean_type_subst ~pos:empty ~neg:any t in
@@ -280,7 +284,8 @@ let simplify_tallying sols res =
       ) sol to_simplify in
     Some sol
     ) in
-  sols
+  (* Remove weaker solutions *)
+  sols |> keep_only_minimal is_better_sol
 
 let approximate_app t1 t2 =
   (* NOTE: Disabled for now *)

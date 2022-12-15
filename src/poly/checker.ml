@@ -567,6 +567,19 @@ let types_equiv_modulo_renaming mono t1 t2 =
         equiv t1 t2
     )
 
+let decorrelate_branches mono pannot_a =
+  let open PartialAnnot in
+  let rename_vars (t, pannot) =
+    let new_vars = TVarSet.diff (vars t) mono in
+    let r = refresh_all new_vars in
+    (apply_subst_simplify r t, apply_subst r pannot)
+  in
+  match pannot_a with
+  | LambdaA (branches, []) ->
+    LambdaA (List.map rename_vars branches, [])
+  | LambdaA _ -> assert false
+  | pannot_a -> pannot_a
+
 let rec infer_branches_a vardef tenv env pannot_a a =
   let memvar v = Env.mem v env in
   let vartype v = Env.find v env in
@@ -811,6 +824,7 @@ and infer_branches tenv env pannot e =
     log ~level:1 "Typing var %a.@." Variable.pp v ;
     begin match infer_branches_a_iterated v tenv env pannot_a a with
     | Ok pannot_a ->
+      let pannot_a = decorrelate_branches (Env.tvars env) pannot_a in
       let propagate = splits |> List.find_map (fun (s,_) ->
         let gammas = refine_a env a (neg s) in
         gammas |> List.find_opt (is_valid_refinement env)

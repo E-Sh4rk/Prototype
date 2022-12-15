@@ -325,11 +325,9 @@ let fixpoint = <(('a -> 'b) -> ('a -> 'b)) -> ('a -> 'b)>
 let concat concat x y =
    if x is Nil then y else (fst x, (concat (snd x) y))
 
-let concat_annotated : ['a*] -> ['b*] -> ['a* ; 'b*] = fixpoint concat
-
 let concat = fixpoint concat
 
-let concat = < [ 'a* ] -> [ 'b* ] -> [ 'a* ; 'b* ] >
+let concat : ['a*] -> ['b*] -> ['a* ; 'b*] = fixpoint concat
 
 let flatten_ocaml flatten (x:['a*]) =
   if x is Nil then nil else
@@ -337,7 +335,6 @@ let flatten_ocaml flatten (x:['a*]) =
   (x,nil)
 
 let flatten_ocaml : [['a*]*] -> ['a*] = fixpoint flatten_ocaml 
-
 
 let reverse_aux reverse l  =
     if l is Nil then nil else concat (reverse (snd l)) [(fst l)]

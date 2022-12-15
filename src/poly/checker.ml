@@ -267,7 +267,6 @@ let simplify_tallying sols res =
     let t = Subst.apply sol res in
     let clean = clean_type_subst ~pos:empty ~neg:any t in
     let sol = Subst.compose clean sol in
-    let to_simplify = Subst.dom sol |> TVarSet.destruct in
     let sol =
       List.fold_left (fun sol v ->
         let t = Subst.find' sol v in
@@ -281,26 +280,33 @@ let simplify_tallying sols res =
           let sol = (v,a)::lst |> Subst.construct in
           sol
         else sol
-      ) sol to_simplify in
+      ) sol (Subst.dom sol |> TVarSet.destruct) in
     Some sol
     ) in
   (* Remove weaker solutions *)
   sols |> keep_only_minimal is_better_sol
 
-let approximate_app t1 t2 =
-  (* NOTE: Approximation for tallying instances...
-     disabled because it seems to be too unprecise sometimes. *)
-  ignore (t1, t2) ; None
-  (* let inst_for_arrow (t,_) =
-    tallying [(t2, t)]
+let approximate_app t1 t2 resvar =
+  (* NOTE: Approximation for tallying instances for the application *)
+  (* ignore (t1, t2, resvar) ; None *)
+  let arrow_type = mk_arrow (cons t2) (TVar.typ resvar |> cons) in
+  let inst_for_arrow (t,s) =
+    tallying [(mk_arrow (cons t) (cons s), arrow_type)]
   in
   let inst_for_arrows arrows =
     arrows |> List.map inst_for_arrow |> List.flatten
   in
-  let insts = dnf t1 |> List.map inst_for_arrows in
+  (* Case of many unions disabled because of the approximation
+     made in typeof for the app case. *)
+  (* let insts = dnf t1 |> List.map inst_for_arrows in
   if List.for_all (fun inst -> inst <> []) insts
   then Some (List.flatten insts)
   else None *)
+  match dnf t1 with
+  | [arrows] ->
+    let inst = inst_for_arrows arrows in
+    if inst <> [] then Some inst else None
+  | _ -> None
 
 let rec infer_inst_a vardef tenv env pannot_a a =
   let open PartialAnnot in
@@ -343,15 +349,15 @@ let rec infer_inst_a vardef tenv env pannot_a a =
     let r = refresh_all (vartype v2 |> vars_poly) in
     RecordUpdateA (res, Some r)
   | App (v1, v2), PartialA ->
-    let alpha = TVar.mk_poly None in
     let t1 = vartype v1 in
     let t2 = vartype v2 in
     let r1 = refresh_all (vars_poly t1) in
     let r2 = refresh_all (vars_poly t2) in
     let t1 = Subst.apply r1 t1 in
     let t2 = Subst.apply r2 t2 in
+    let alpha = TVar.mk_poly None in
     let tallying t1 t2 =
-      match approximate_app t1 t2 with
+      match approximate_app t1 t2 alpha with
       | None ->
         let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
         log ~level:4 "@.Tallying for %a: %a <= %a@."
@@ -365,12 +371,20 @@ let rec infer_inst_a vardef tenv env pannot_a a =
     let res =
       if subtype t2 arrow_any
       then begin
-        match dnf t2 with
-        | [arrows] ->
+        let inst_for_arrows arrows =
           arrows |> List.map (fun (s,t) ->
-              let t2 = mk_arrow (cons s) (cons t) in
-              tallying t1 t2
-            ) |> List.flatten
+            let t2 = mk_arrow (cons s) (cons t) in
+            tallying t1 t2
+          ) |> List.flatten
+        in
+        (* Case of many unions disabled because of the approximation
+          made in typeof for the app case. *)
+        (* let insts = dnf t2 |> List.map inst_for_arrows in
+        if List.for_all (fun inst -> inst <> []) insts
+        then List.flatten insts
+        else [] *)
+        match dnf t2 with
+        | [arrows] -> inst_for_arrows arrows
         | _ -> []
       end else []
     in

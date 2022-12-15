@@ -671,9 +671,6 @@ module RawExt = struct
         t
 end
 
-let simplify_poly_typ t =
-    RawExt.simplify_poly_typ (vars_mono t) t
-
 let bot_instance =
     clean_type ~pos:empty ~neg:any
 
@@ -682,7 +679,7 @@ let top_instance =
 
 let subtype_poly t1 t2 =
     let t2 = Subst.apply (monomorphize (vars t2)) t2 in
-    tallying [(t1,t2)] <> []
+    tallying [(bot_instance t1,t2)] <> []
 
 (* Operations on jokers (legacy) *)
 

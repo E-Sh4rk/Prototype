@@ -259,8 +259,8 @@ let refine_a env a t =
 
 let simplify_tallying sols res =
   let is_better_sol s1 s2 =
-    let t1 = Subst.apply s1 res |> bot_instance in
-    let t2 = Subst.apply s2 res |> bot_instance in
+    let t1 = Subst.apply s1 res in
+    let t2 = Subst.apply s2 res in
     subtype_poly t1 t2
   in
   let sols = sols |> List.filter_map (fun sol ->

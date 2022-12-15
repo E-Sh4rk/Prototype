@@ -122,16 +122,17 @@ let rec typeof_a vardef tenv env annot_a a =
         else untypeable ("Invalid application: argument not in the domain.")
       else untypeable ("Invalid application: not a function.")
     in
-    (* NOTE: Approximation... this is not what the paper suggests. *)
-    let treat_sigma (s1,s2) =
+    (* NOTE: Approximation... this is not what the paper suggests.
+       Disabled because incompatible with app tallying approximations. *)
+    (* let treat_sigma (s1,s2) =
       let t1 = var_type v1 |> instantiate_check [s1] in
       let t2 = var_type v2 |> instantiate_check [s2] in
       apply t1 t2
     in
-    List.combine ss1 ss2 |> List.map treat_sigma |> conj_o
-    (* let t1 = var_type v1 |> instantiate_check ss1 in
+    List.combine ss1 ss2 |> List.map treat_sigma |> conj_o *)
+    let t1 = var_type v1 |> instantiate_check ss1 in
     let t2 = var_type v2 |> instantiate_check ss2 in
-    apply t1 t2 *)
+    apply t1 t2
   | Ite (v, _, _, _), EmptyA ss ->
     let t = var_type v |> instantiate_check ss in
     if is_empty t then empty
@@ -296,17 +297,17 @@ let approximate_app t1 t2 resvar =
   let inst_for_arrows arrows =
     arrows |> List.map inst_for_arrow |> List.flatten
   in
-  (* Case of many unions disabled because of the approximation
-     made in typeof for the app case. *)
-  (* let insts = dnf t1 |> List.map inst_for_arrows in
-  if List.for_all (fun inst -> inst <> []) insts
+  (* Use the code below to apply the approx even with many conjunctions *)
+  let insts = dnf t1 |> List.map inst_for_arrows in
+  if insts <> [] && List.for_all (fun inst -> inst <> []) insts
   then Some (List.flatten insts)
-  else None *)
-  match dnf t1 with
+  else None
+  (* Use the code below to only use approx if only 1 conjunction *)
+  (* match dnf t1 with
   | [arrows] ->
     let inst = inst_for_arrows arrows in
     if inst <> [] then Some inst else None
-  | _ -> None
+  | _ -> None *)
 
 let rec infer_inst_a vardef tenv env pannot_a a =
   let open PartialAnnot in
@@ -377,15 +378,15 @@ let rec infer_inst_a vardef tenv env pannot_a a =
             tallying t1 t2
           ) |> List.flatten
         in
-        (* Case of many unions disabled because of the approximation
-          made in typeof for the app case. *)
-        (* let insts = dnf t2 |> List.map inst_for_arrows in
+        (* Use the code below to apply the approx even with many conjunctions *)
+        let insts = dnf t2 |> List.map inst_for_arrows in
         if List.for_all (fun inst -> inst <> []) insts
         then List.flatten insts
-        else [] *)
-        match dnf t2 with
+        else []
+        (* Use the code below to only use approx if only 1 conjunction *)
+        (* match dnf t2 with
         | [arrows] -> inst_for_arrows arrows
-        | _ -> []
+        | _ -> [] *)
       end else []
     in
     let res = if res = [] then tallying t1 t2 else res in

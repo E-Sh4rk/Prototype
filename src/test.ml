@@ -320,14 +320,26 @@ let and_ = fun x -> fun y ->
     (0,Int) | (Int\0,Any) -> Int
 *)
 
-let fixpoint = <(('a -> 'b) -> ('a -> 'b)) -> ('a -> 'b)>
+(* Problem here. If I comment out the fixpoint below then the type-checking
+   of concat fails.
+   If I do not comment it out, then it fails?! *)
 
-let concat concat x y =
+(*
+  version of fixpoint with simpler typing:
+
+  let fixpoint = <(('a -> 'b) -> ('a -> 'b)) -> ('a -> 'b) > 
+
+  version of fixpoint with the typing deduced by the system:
+
+  let fixpoint = <(('a -> 'b) -> (('a -> 'b) & 'c)) -> (('a -> 'b) & 'c) > 
+*)
+
+let concat_stub concat x y =
    if x is Nil then y else (fst x, (concat (snd x) y))
 
-let concat = fixpoint concat
+let concat = fixpoint concat_stub
 
-let concat : ['a*] -> ['b*] -> ['a* ; 'b*] = fixpoint concat
+let concat : ['a*] -> ['b*] -> ['a* ; 'b*] = fixpoint concat_stub
 
 let flatten_ocaml flatten (x:['a*]) =
   if x is Nil then nil else
@@ -346,6 +358,13 @@ let reverse_ann : [ ('a)*] -> [('a)*] = fixpoint reverse_aux
 let rev_tl_aux rev_tl l acc  =
      if l is Nil then acc else rev_tl (snd l) (fst l, acc)
 
+(* two different typings for fixpoint:
+let fixpoint = <(('a -> 'b) -> ('a -> 'b)) -> ('a -> 'b) > 
+let fixpoint = <(('a -> 'b) -> (('a -> 'b) & 'c)) -> (('a -> 'b) & 'c) > 
+with the first rev_tl types, with the second it diverges
+*)
+let fixpoint = <(('a -> 'b) -> ('a -> 'b)) -> ('a -> 'b) > 
+
 let rev_tl l = (fixpoint rev_tl_aux) l nil
 
 let foldr_aux foldr f l acc =
@@ -355,9 +374,9 @@ let foldr = fixpoint foldr_aux
 
 let foldr_ann : ('a -> 'b -> 'b ) -> [ 'a* ] -> 'b -> 'b = fixpoint foldr_aux
 
-(* TODO: Why is it so long? *)
-(* let foldr_ann2 : (('a -> 'b -> 'b ) -> [ 'a* ] -> 'b -> 'b) & (Any -> [] -> 'c -> 'c)  =
-    fixpoint foldr_aux *)
+(* TODO: This does not type but it should!!!! *)
+ let foldr_ann2 : (('a -> 'b -> 'b ) -> [ 'a* ] -> 'b -> 'b) & (Any -> [] -> 'c -> 'c)  =
+    fixpoint foldr_aux 
 
 (* FILTER FUNCTION *)
 
@@ -369,7 +388,7 @@ let filter_aux_pure filter f l =
        if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
    else 42(3)    
 
-(* the following loops:
+(* TODO: the following loops:
 let filter : [ Any* ] -> (('a -> True) & ((~'a) -> ~True)) -> [ ('a)* ] = fixpoint filter_aux_pure
 *)
 
@@ -378,7 +397,7 @@ let filter : [ Any* ] -> (('a -> True) & ((~'a) -> ~True)) -> [ ('a)* ] = fixpoi
    characteristic function to be defined on Any
  *)
 
-let new_filter_aux
+let new_filter1_aux
   (filter : ((('_a & '_b) -> True) & (('_a\'_b) -> ~True)) -> [ '_a* ] -> [ ('_a&'_b)* ] )
   (f : (('_a & '_b) -> True) & (('_a\'_b) -> ~True))
   (l : [ ('_a)*  ] )  =
@@ -387,8 +406,11 @@ let new_filter_aux
   else
     if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
 
+let new_filter :  ((('_a & '_b) -> True) & (('_a\'_b) -> ~True)) -> [ '_a* ] -> [ ('_a&'_b)* ] =
+      fixpoint new_filter1_aux
+
 (* here a better version with head and tail: it yields exactly the
-   same type as the version above but 40% slower
+   same type as the version above but 10% slower
  *)
 
 let new_filter_aux
@@ -445,7 +467,8 @@ let filter_classic = fixpoint filter_aux_classic
 
 (* Tail recursive version *)
 
-(* let filter : ((('_a & '_b) -> True) & (('_a\'_b) -> ~True)) -> [ '_a* ] -> [ ('_a&'_b)* ]  =
+(* The following make the type-checker diverge
+ let filter : ((('_a & '_b) -> True) & (('_a\'_b) -> ~True)) -> [ '_a* ] -> [ ('_a&'_b)* ]  =
    fun f -> fun l ->
    let filter_tr_aux  
      (filter : (((('_a & '_b) -> True) & (('_a\'_b) -> ~True)), [ '_a* ] , ['_a*] ) -> [ ('_a&'_b)* ] )
@@ -457,7 +480,8 @@ let filter_classic = fixpoint filter_aux_classic
          let h = fst(l) in
          let t = snd(l) in
          if f h is True then filter (f, t , (h,acc)) else filter (f , t , acc)
-   in (fixpoint filter_tr_aux) (f , l , []) *)
+   in (fixpoint filter_tr_aux) (f , l , []) 
+*)
 
 (* This type checks but it requires the domain of the function to be Any *)
 
@@ -482,33 +506,26 @@ let flatten_pure flatten x =
 
 type Tree 'a = ('a \ [Any*]) | [(Tree 'a)*]
 
-let flatten (flatten : Tree '_a -> ['_a*]) (x : Tree '_a) =
+let flatten_stub (flatten : Tree '_a -> ['_a*]) (x : Tree '_a) =
   if x is Nil then nil else
   if x is [Any*] then concat (flatten (fst x)) (flatten (snd x))
   else (x,nil)
 
 (* let flatten = < (Tree 'a -> ['a*]) -> (Tree 'a -> ['a*]) > *)
 
-(* TODO: Investigate Cduce issue *)
-(* let flatten : (Tree 'a -> ['a*]) = fixpoint flatten *)
+let flatten = fixpoint flatten_stub
 
-let flatten = fixpoint flatten
+let flatten_ann : (Tree 'a -> ['a*]) = fixpoint flatten_stub 
+
 
 let test = flatten ((1,(true,nil)),(((42,(false,nil)),0),"ok"))
 
-type TRUE  =  'a -> 'b -> 'a
-type FALSE =  'a -> 'b -> 'b
+type TRUE 'a 'b  =  'a -> 'b -> 'a
+type FALSE 'a 'b  =  'a -> 'b -> 'b
 
-let ifthenelse (b : TRUE ; FALSE )  x y = b x y
+let ifthenelse (b : TRUE 'a 'b; FALSE 'a 'b )  x y = b x y
 
-(* expected type for the follwoing function
- *   (TRUE -> 'c -> 'd -> 'c)
- * & (FALSE -> 'c -> 'd -> 'd) 
- *
- * BUT
-   let check :    (TRUE -> 'c -> 'd -> 'c) & (FALSE -> 'c -> 'd -> 'd) = ifthenelse
- * does not type
- *)
+let check :    (TRUE 'c 'd -> 'c -> 'd -> 'c) & (FALSE 'c 'd -> 'c -> 'd -> 'd) = ifthenelse
 
 
 (* Parametric types examples *)

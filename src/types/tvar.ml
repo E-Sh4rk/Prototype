@@ -267,7 +267,28 @@ module Raw = struct
     in
     Subst.construct subst
   let rectype = CD.Types.Subst.solve_rectype
-  let tallying_raw ~var_order = CD.Types.Tallying.tallying ~var_order
+
+  let check_tallying_solution constr res =
+    let error = ref false in
+    let res =
+        res |> List.filter_map (fun s ->
+        if (constr |> List.for_all (fun (l,r) ->
+                Base.subtype (Subst.apply s l) (Subst.apply s r)
+            ))
+        then Some s else begin
+            error := true ;
+            (* Format.printf "INVALID SOLUTION REMOVED: %a@." Subst.pp s ; *)
+            None
+        end
+    )
+    in
+    if !error then begin
+        Format.printf "===== WARNING: Cduce tallying issue.@. ====="
+    end ; res
+
+  let tallying_raw ~var_order d cs =
+      CD.Types.Tallying.tallying ~var_order d cs
+      (* |> (check_tallying_solution cs) *)
 
   let print_tallying_instance var_order delta constr =
     Format.printf "Constraints:@." ;
@@ -282,38 +303,19 @@ module Raw = struct
         (Utils.pp_list TVar.pp) var_order
         (Utils.pp_list TVar.pp) (TVarSet.destruct !allvars)
 
-  let check_tallying_solution var_order delta constr res =
-    let error = ref false in
-    let res =
-        res |> List.filter_map (fun s ->
-        if (constr |> List.for_all (fun (l,r) ->
-                Base.subtype (Subst.apply s l) (Subst.apply s r)
-            ))
-        then Some s else begin
-            error := true ;
-            Format.printf "INVALID SOLUTION REMOVED: %a@." Subst.pp s ;
-            None
-        end
-    )
-    in
-    if !error then begin
-        Format.printf "WARNING: Cduce tallying issue.@." ;
-        print_tallying_instance var_order delta constr
-    end ; res
-
   let tallying_infer poly noninfered constr =
     assert (TVarSet.inter (TVarSet.construct poly) noninfered |> TVarSet.is_empty) ;
     Utils.log ~level:2 "Tallying (inference) instance initiated...@?" ;
     let res = tallying_raw ~var_order:poly noninfered constr in
     Utils.log ~level:2 " Done (%i sol).@." (List.length res) ;
-    res |> check_tallying_solution poly noninfered constr
+    res
 
   let tallying mono constr =
     Utils.log ~level:2 "Tallying (no inference) instance initiated...@?" ;
     let var_order = [] in
     let res = tallying_raw ~var_order mono constr in
     Utils.log ~level:2 " Done (%i sol).@." (List.length res) ;
-    res |> check_tallying_solution [] mono constr
+    res
 end
 
 let clean_type ~pos ~neg t =

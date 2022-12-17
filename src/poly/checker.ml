@@ -267,6 +267,7 @@ let simplify_tallying sols res =
   let sols = sols |> List.filter_map (fun sol ->
     let t = Subst.apply sol res in
     let clean = clean_type_subst ~pos:empty ~neg:any t in
+    let t = Subst.apply clean t in
     let sol = Subst.compose clean sol in
     let sol =
       List.fold_left (fun sol v ->
@@ -282,6 +283,9 @@ let simplify_tallying sols res =
           sol
         else sol
       ) sol (Subst.dom sol |> TVarSet.destruct) in
+    (* Decorrelate solutions *)
+    let s = refresh_all (vars_poly t) in
+    let sol = Subst.compose s sol in
     Some sol
     ) in
   (* Remove weaker solutions *)

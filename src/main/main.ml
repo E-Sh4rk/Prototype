@@ -78,7 +78,7 @@ let type_check_program
             if subtype typ t |> not
             then (
               Format.ksprintf pr "===== Warning: Not better than the type obtained by POPL22 system =====\nType was: %s\n"
-              (string_of_type t)
+              (string_of_type_short t)
             )
           end ;
         (varm, env)
@@ -89,11 +89,11 @@ let type_check_program
           begin match typ_legacy with
           | None -> ()
           | Some t ->
-            Format.ksprintf pr "===== Warning: Was typable with POPL22 system =====\nType was: %s\n" (string_of_type t)
+            Format.ksprintf pr "===== Warning: Was typable with POPL22 system =====\nType was: %s\n" (string_of_type_short t)
           end ;
         (varm,env)
         | IncompatibleType t ->
-          Format.ksprintf pr "The type inferred is not a subtype of the provided annotation: %s\n" (string_of_type t) ;
+          Format.ksprintf pr "The type inferred is not a subtype of the provided annotation: %s\n" (string_of_type_short t) ;
           (varm,env)
       end
     in

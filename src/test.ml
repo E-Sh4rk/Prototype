@@ -374,8 +374,7 @@ let foldr = fixpoint foldr_aux
 
 let foldr_ann : ('a -> 'b -> 'b ) -> [ 'a* ] -> 'b -> 'b = fixpoint foldr_aux
 
-(* TODO: This does not type but it should!!!! *)
- let foldr_ann2 : (('a -> 'b -> 'b ) -> [ 'a* ] -> 'b -> 'b) & (Any -> [] -> 'c -> 'c)  =
+let foldr_ann2 : (('a -> 'b -> 'b ) -> [ 'a* ] -> 'b -> 'b) & (Any -> [] -> 'c -> 'c)  =
     fixpoint foldr_aux 
 
 (* FILTER FUNCTION *)

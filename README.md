@@ -10,9 +10,9 @@ Once `opam` is installed, CDuce needs to be installed before running this protot
 ### Installing CDuce
 
 ```
-opam pin add cduce-types 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#dev'
+opam pin add cduce-types 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#types-improvements'
 
-opam pin add cduce 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#dev'
+opam pin add cduce 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#types-improvements'
 
 opam install cduce-types cduce
 ```

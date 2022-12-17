@@ -268,7 +268,7 @@ module Raw = struct
     Subst.construct subst
   let rectype = CD.Types.Subst.solve_rectype
 
-  let check_tallying_solution constr res =
+  let [@warning "-32"] check_tallying_solution constr res =
     let error = ref false in
     let res =
         res |> List.filter_map (fun s ->

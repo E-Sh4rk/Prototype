@@ -63,6 +63,7 @@ module Subst : sig
     val split : t -> TVarSet.t -> t * t
     val is_renaming : t -> bool
     val inverse_renaming : t -> t
+    val short_names : TVarSet.t -> t
     val pp : Format.formatter -> t -> unit
 end
 
@@ -81,6 +82,8 @@ val generalize : TVarSet.t -> Subst.t
 val monomorphize : TVarSet.t -> Subst.t
 val lookup_unregistered : TVarSet.t -> Subst.t
 val register_unregistered : mono:bool -> TVarSet.t -> Subst.t
+val pp_typ_short : Format.formatter -> Base.typ -> unit
+val string_of_type_short : Base.typ -> string
 
 (* Operations on types *)
 

@@ -70,7 +70,7 @@ let type_check_program
         let varm = StrMap.add name var varm in
         let env = Env.add var typ env in
         Format.ksprintf pr "%s (checked in %.02fms (msc:%.02fms, type:%.02fms))\n" 
-          (string_of_type typ) time msc_time typ_time;
+          (string_of_type_short typ) time msc_time typ_time;
         if compare_to_popl () then
           begin match typ_legacy with
           | None -> Format.ksprintf pr "===== Good news: Was untypable with POPL22 system =====\n" 

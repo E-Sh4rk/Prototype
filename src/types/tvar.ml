@@ -158,6 +158,10 @@ module Subst = struct
       | _ -> assert false) |>
     construct
 
+  let short_names vs =
+    let r = CD.Var.full_renaming vs in
+    CD.Var.Map.map TVar.typ r
+
 (* let pp_entry fmt (v,t) =
     Format.fprintf fmt "%a ===> %a" pp_var v pp_typ t
   let pp fmt t =
@@ -229,6 +233,12 @@ let register_unregistered ~mono vars =
   vars |>
     TVarSet.filter TVar.is_unregistered |>
     TVarSet.destruct |> List.map f |> Subst.construct
+
+let pp_typ_short fmt t =
+  let t = Subst.apply (Subst.short_names (vars t)) t in
+  Base.pp_typ fmt t
+let string_of_type_short t =
+  Format.asprintf "%a" pp_typ_short t
 
 (* Operations on types *)
 module Iter = Base.Iter

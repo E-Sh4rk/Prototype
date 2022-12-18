@@ -573,7 +573,10 @@ let simplify_tallying_infer tvars resvars sols =
     let respart =
       resvars |> List.map (fun v ->
         let t =
-          to_merge |> List.map (fun s -> Subst.find' s v) |> conj_o in
+          (* We do not simplify t, because in some cases it can be
+             very complex without being used later (e.g. when no tvar to infer) *)
+          to_merge |> List.map (fun s -> Subst.find' s v) |> conj
+        in
         (v, t)
       ) |> Subst.construct in
     Subst.combine common respart

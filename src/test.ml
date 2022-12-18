@@ -357,9 +357,8 @@ let rev_tl_aux rev_tl l acc  =
 (* two different typings for fixpoint:
 let fixpoint = <(('a -> 'b) -> ('a -> 'b)) -> ('a -> 'b) >
 let fixpoint = <(('a -> 'b) -> (('a -> 'b) & 'c)) -> (('a -> 'b) & 'c) >
-with the first rev_tl types, with the second it diverges
 *)
-let fixpoint = <(('a -> 'b) -> ('a -> 'b)) -> ('a -> 'b) >
+let fixpoint = <(('a -> 'b) -> (('a -> 'b) & 'c)) -> (('a -> 'b) & 'c) >
 
 let rev_tl l = (fixpoint rev_tl_aux) l nil
 

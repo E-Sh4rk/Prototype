@@ -483,9 +483,9 @@ let is_valid_refinement env gamma =
 
 let subst_more_general s1 s2 =
   let s2m = Subst.codom s2 |> monomorphize in
-  let s2 = Subst.apply_to_subst s2m s2 in
+  let s2 = Subst.compose s2m s2 in
   let s1g = Subst.codom s1 |> generalize in
-  let s1 = Subst.apply_to_subst s1g s1 in
+  let s1 = Subst.compose s1g s1 in
   Subst.destruct s1 |> List.map (fun (v,t1) ->
     let t2 = Subst.find' s2 v in
     [(t1, t2) ; (t2, t1)]
@@ -505,9 +505,12 @@ let simplify_tallying_infer tvars resvars sols =
       else None
       ) |> Subst.construct
   in
-  let nb_new_vars sol =
+  let mono_vars sol =
     let sol = Subst.restrict sol tvars in
-    let nv = TVarSet.diff (Subst.codom sol) tvars in
+    TVarSet.union (Subst.codom sol) tvars
+  in
+  let nb_new_vars sol =
+    let nv = TVarSet.diff (mono_vars sol) tvars in
     nv |> TVarSet.destruct |> List.length
   in
   let better_sol sol1 sol2 =
@@ -537,6 +540,18 @@ let simplify_tallying_infer tvars resvars sols =
     | sol::_ -> Some sol
   in
   sols
+  (* Generalize vars in the result when possible *)
+  |> List.map (fun sol ->
+    let tvars' = mono_vars sol in
+    List.fold_left (fun sol v ->
+      let t = Subst.find' sol v in
+      let g = generalize (TVarSet.diff (vars t) tvars') in
+      let t = Subst.apply g t in
+      let clean = clean_type_subst ~pos:empty ~neg:any t in
+      let g = Subst.apply_to_subst clean g in
+      Subst.compose g sol
+    ) sol (resvars |> TVarSet.destruct)
+  )
   (* Simplify (light) *)
   |> List.map (fun sol ->
     let new_dom = TVarSet.inter (Subst.dom sol) tvars in
@@ -545,6 +560,23 @@ let simplify_tallying_infer tvars resvars sols =
       let s = replace_toplevel t v in
       Subst.compose s sol
     ) sol (new_dom |> TVarSet.destruct)
+  )
+  (* Merge substitutions when possible *)
+  |> regroup_equiv (fun s1 s2 ->
+    let s1 = Subst.restrict s1 tvars in
+    let s2 = Subst.restrict s2 tvars in
+    Subst.equiv s1 s2
+    )
+  |> List.map (fun to_merge ->
+    let common = Subst.restrict (List.hd to_merge) tvars in
+    let resvars = TVarSet.diff resvars tvars |> TVarSet.destruct in
+    let respart =
+      resvars |> List.map (fun v ->
+        let t =
+          to_merge |> List.map (fun s -> Subst.find' s v) |> conj_o in
+        (v, t)
+      ) |> Subst.construct in
+    Subst.combine common respart
   )
   (* Simplify (heavy) *)
   |> List.map (fun sol ->

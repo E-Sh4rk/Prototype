@@ -320,10 +320,6 @@ let and_ = fun x -> fun y ->
     (0,Int) | (Int\0,Any) -> Int
 *)
 
-(* Problem here. If I comment out the fixpoint below then the type-checking
-   of concat fails.
-   If I do not comment it out, then it fails?! *)
-
 (*
   version of fixpoint with simpler typing:
 
@@ -359,11 +355,11 @@ let rev_tl_aux rev_tl l acc  =
      if l is Nil then acc else rev_tl (snd l) (fst l, acc)
 
 (* two different typings for fixpoint:
-let fixpoint = <(('a -> 'b) -> ('a -> 'b)) -> ('a -> 'b) > 
-let fixpoint = <(('a -> 'b) -> (('a -> 'b) & 'c)) -> (('a -> 'b) & 'c) > 
+let fixpoint = <(('a -> 'b) -> ('a -> 'b)) -> ('a -> 'b) >
+let fixpoint = <(('a -> 'b) -> (('a -> 'b) & 'c)) -> (('a -> 'b) & 'c) >
 with the first rev_tl types, with the second it diverges
 *)
-let fixpoint = <(('a -> 'b) -> ('a -> 'b)) -> ('a -> 'b) > 
+let fixpoint = <(('a -> 'b) -> ('a -> 'b)) -> ('a -> 'b) >
 
 let rev_tl l = (fixpoint rev_tl_aux) l nil
 

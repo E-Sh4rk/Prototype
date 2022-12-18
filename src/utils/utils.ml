@@ -56,11 +56,16 @@ let do_not_memoize f =
     f aux input
   in aux
 
-let rec remove_duplicates equiv lst =
-  let remove elt = List.filter (fun e -> equiv elt e |> not) in
+let rec regroup_equiv equiv lst =
+  let extract_eq elt = List.partition (equiv elt) in
   match lst with
   | [] -> []
-  | e::lst -> e::(remove e lst |> remove_duplicates equiv)
+  | e::lst ->
+    let (es, lst) = extract_eq e lst in
+    (e::es)::(regroup_equiv equiv lst)
+
+let remove_duplicates equiv lst =
+  regroup_equiv equiv lst |> List.map List.hd
 
 let keep_only_minimal leq lst =
   let remove_greater elt = List.filter (fun e -> leq elt e |> not) in

@@ -396,7 +396,7 @@ let rec infer_inst_a vardef tenv env pannot_a a =
     let res = if res = [] then tallying t1 t2 else res in
     let res = simplify_tallying res (TVar.typ alpha) in
     let (s1, s2) = res |> List.map (fun s ->
-      (Subst.apply_to_subst s r1, Subst.apply_to_subst s r2)
+      (Subst.compose_restr s r1, Subst.compose_restr s r2)
     ) |> List.split in
     AppA (s1, s2)
   | Ite (v, s, _, _), PartialA ->
@@ -523,10 +523,10 @@ let simplify_tallying_infer tvars resvars sols =
     let t = Subst.apply g t in
     let res = tallying [(TVar.typ v, t) ; (t, TVar.typ v)]
     |> List.map (fun s ->
-      let s = Subst.apply_to_subst s g in
-      let s = Subst.apply_to_subst m s in
+      let s = Subst.compose_restr s g in
+      let s = Subst.compose_restr m s in
       let mono_subst = monomorphize (Subst.codom s) in
-      Subst.apply_to_subst mono_subst s
+      Subst.compose_restr mono_subst s
     )
     |> List.filter (fun s ->
       let sol' = Subst.compose s sol in
@@ -548,7 +548,7 @@ let simplify_tallying_infer tvars resvars sols =
       let g = generalize (TVarSet.diff (vars t) tvars') in
       let t = Subst.apply g t in
       let clean = clean_type_subst ~pos:empty ~neg:any t in
-      let g = Subst.apply_to_subst clean g in
+      let g = Subst.compose_restr clean g in
       Subst.compose g sol
     ) sol (resvars |> TVarSet.destruct)
   )

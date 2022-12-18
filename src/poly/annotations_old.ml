@@ -65,7 +65,7 @@ module Annot = struct
       Format.fprintf fmt "----- Subst %i -----@.%a@." i Subst.pp s
     )
   let apply_subst_substs s ss =
-    List.map (fun s' -> Subst.apply_to_subst s s') ss
+    List.map (fun s' -> Subst.compose_restr s s') ss
 
   type split = (typ*(bool*t)) list
   [@@deriving show]

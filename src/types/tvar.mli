@@ -54,9 +54,9 @@ module Subst : sig
     val find' : t -> TVar.t -> Base.typ
     val equiv : t -> t -> bool
     val apply : t -> Base.typ -> Base.typ
-    val apply_to_subst : t -> t -> t
     val destruct : t -> (TVar.t * Base.typ) list
     val compose : t -> t -> t
+    val compose_restr : t -> t -> t
     val combine : t -> t -> t
     val restrict : t -> TVarSet.t -> t
     val remove : t -> TVarSet.t -> t

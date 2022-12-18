@@ -127,7 +127,7 @@ module Subst = struct
       let only_s2 = destruct s2 |>
           List.filter (fun (v, _) -> mem s1 v |> not) in
       construct ((apply_to_subst s2 s1)@only_s2)
-  let apply_to_subst s2 s1 = apply_to_subst s2 s1 |> construct
+  let compose_restr s2 s1 = apply_to_subst s2 s1 |> construct
   let combine s1 s2 =
       assert (TVarSet.inter (dom s1) (dom s2) |> TVarSet.is_empty) ;
       let s1 = destruct s1 in
@@ -352,8 +352,8 @@ let tallying constr =
   let lkp_subst = lookup_unregistered codom in
   let reg_subst = register_unregistered ~mono:false codom in
   res
-    |> List.map (Subst.apply_to_subst lkp_subst)
-    |> List.map (Subst.apply_to_subst reg_subst)
+    |> List.map (Subst.compose_restr lkp_subst)
+    |> List.map (Subst.compose_restr reg_subst)
 
 let tallying_infer constr =
   (* TODO: set var_order for the tallying instance *)
@@ -373,10 +373,10 @@ let tallying_infer constr =
       (Subst.apply gen a, Subst.apply gen b))
   in
   tallying constr |> List.map (fun s ->
-    let s = Subst.apply_to_subst s gen in
-    let s = Subst.apply_to_subst mon s in
+    let s = Subst.compose_restr s gen in
+    let s = Subst.compose_restr mon s in
     let mono_subst = monomorphize (Subst.codom s) in
-    Subst.apply_to_subst mono_subst s
+    Subst.compose_restr mono_subst s
   )
 
 (* Some additions *)

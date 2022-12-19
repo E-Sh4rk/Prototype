@@ -552,7 +552,7 @@ let apply_subst_simplify s t =
 
 let instantiate ss t =
     List.map (fun s -> apply_subst_simplify s t) ss
-    |> conj
+    |> conj_o
 
 module RawExt = struct
     let bot_instance mono t =

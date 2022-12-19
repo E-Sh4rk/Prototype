@@ -491,9 +491,8 @@ let subst_more_general s1 s2 =
     [(t1, t2) ; (t2, t1)]
   ) |> List.flatten |> tallying <> []
 
-let simplify_tallying_infer tvars resvars sols =
+let simplify_tallying_infer tvars res sols =
   let tvars = TVarSet.filter TVar.is_mono tvars in
-  let resvars = TVarSet.construct resvars in
   let replace_toplevel t v =
     let involved = TVarSet.diff (top_vars t) tvars in
     vars_with_polarity t |> List.filter_map (fun (v', k) ->
@@ -529,9 +528,11 @@ let simplify_tallying_infer tvars resvars sols =
       Subst.compose_restr mono_subst s
     )
     |> List.filter (fun s ->
-      let sol' = Subst.compose s sol in
-      let sol' = Subst.restrict sol' resvars in
-      subst_more_general sol' sol
+      let res = Subst.apply sol res in
+      let res' = Subst.apply s res in
+      let g = vars res' |> generalize in
+      let res' = Subst.apply g res' in
+      subtype_poly res' res
       (* ignore s ; false *)
     )
     in
@@ -543,14 +544,12 @@ let simplify_tallying_infer tvars resvars sols =
   (* Generalize vars in the result when possible *)
   |> List.map (fun sol ->
     let tvars' = mono_vars sol in
-    List.fold_left (fun sol v ->
-      let t = Subst.find' sol v in
-      let g = generalize (TVarSet.diff (vars t) tvars') in
-      let t = Subst.apply g t in
-      let clean = clean_type_subst ~pos:empty ~neg:any t in
-      let g = Subst.compose_restr clean g in
-      Subst.compose g sol
-    ) sol (resvars |> TVarSet.destruct)
+    let res = Subst.apply sol res in
+    let g = generalize (TVarSet.diff (vars res) tvars') in
+    let res = Subst.apply g res in
+    let clean = clean_type_subst ~pos:empty ~neg:any res in
+    let g = Subst.compose_restr clean g in
+    Subst.compose g sol
   )
   (* Simplify (light) *)
   |> List.map (fun sol ->
@@ -569,7 +568,7 @@ let simplify_tallying_infer tvars resvars sols =
     )
   |> List.map (fun to_merge ->
     let common = Subst.restrict (List.hd to_merge) tvars in
-    let resvars = TVarSet.diff resvars tvars |> TVarSet.destruct in
+    let resvars = TVarSet.diff (vars res) tvars |> TVarSet.destruct in
     let respart =
       resvars |> List.map (fun v ->
         let t =
@@ -724,7 +723,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       res |> List.iter (fun s ->
         log ~level:3 "Solution: %a@." Subst.pp s
       ) ;
-      let res = simplify_tallying_infer (Env.tvars env) [alpha] res in
+      let res = simplify_tallying_infer (Env.tvars env) (TVar.typ alpha) res in
       res |> List.iter (fun s ->
         log ~level:3 "Solution (simplified): %a@." Subst.pp s
       ) ;
@@ -734,14 +733,14 @@ let rec infer_branches_a vardef tenv env pannot_a a =
   | RecordUpdate (v, _, None), InferA IMain ->
     if memvar v then
       let res = tallying_infer [(vartype v, record_any)] in
-      let res = simplify_tallying_infer (Env.tvars env) [] res in
+      let res = simplify_tallying_infer (Env.tvars env) record_any res in
       Subst (packannot PartialA res)
     else
       needvar [v] (InferA IMain)
   | RecordUpdate (v, _, Some v'), InferA IMain ->
     if memvar v && memvar v' then
       let res = tallying_infer [(vartype v, record_any)] in
-      let res = simplify_tallying_infer (Env.tvars env) [] res in
+      let res = simplify_tallying_infer (Env.tvars env) record_any res in
       Subst (packannot PartialA res)
     else
       needvar [v ; v'] (InferA IMain)
@@ -757,7 +756,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       res |> List.iter (fun s ->
         log ~level:3 "Solution: %a@." Subst.pp s
       ) ;
-      let res = simplify_tallying_infer (Env.tvars env) [alpha] res in
+      let res = simplify_tallying_infer (Env.tvars env) (TVar.typ alpha) res in
       res |> List.iter (fun s ->
         log ~level:3 "Solution (simplified): %a@." Subst.pp s
       ) ;
@@ -776,7 +775,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
         res |> List.iter (fun s ->
           log ~level:3 "Solution: %a@." Subst.pp s
         ) ;
-        let res = simplify_tallying_infer (Env.tvars env) [] res in
+        let res = simplify_tallying_infer (Env.tvars env) empty res in
         res |> List.iter (fun s ->
           log ~level:3 "Solution (simplified): %a@." Subst.pp s
         ) ;

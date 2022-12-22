@@ -61,9 +61,9 @@ let instantiate_alias env args name =
     | Not_found -> raise (TypeDefinitionError (Printf.sprintf "Type %s undefined!" name))
     | Invalid_argument _ -> raise (TypeDefinitionError (Printf.sprintf "Wrong arity for type %s!" name))
 
-let no_infer_prefix = "_"
+let infer_prefix = "_"
 let is_infer_var_name name =
-    String.starts_with ~prefix:no_infer_prefix name |> not
+    String.starts_with ~prefix:infer_prefix name
 
 let derecurse_types env venv defs =
     let open Cduce_core in

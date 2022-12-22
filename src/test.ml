@@ -337,7 +337,7 @@ let concat = fixpoint concat_stub
 
 let concat : ['a*] -> ['b*] -> ['a* ; 'b*] = fixpoint concat_stub
 
-let flatten_ocaml flatten (x:['a*]) =
+let flatten_ocaml flatten (x:['_a*]) =
   if x is Nil then nil else
   if x is (Any, Any) then concat (fst x) (flatten (snd x)) else
   (x,nil)
@@ -392,15 +392,15 @@ let filter : [ Any* ] -> (('a -> True) & ((~'a) -> ~True)) -> [ ('a)* ] = fixpoi
  *)
 
 let new_filter1_aux
-  (filter : ((('_a & '_b) -> True) & (('_a\'_b) -> ~True)) -> [ '_a* ] -> [ ('_a&'_b)* ] )
-  (f : (('_a & '_b) -> True) & (('_a\'_b) -> ~True))
-  (l : [ ('_a)*  ] )  =
+  (filter : ((('a & 'b) -> True) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ] )
+  (f : (('a & 'b) -> True) & (('a\'b) -> ~True))
+  (l : [ ('a)*  ] )  =
   (* filter f l = *)
   if l is Nil then nil
   else
     if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
 
-let new_filter :  ((('_a & '_b) -> True) & (('_a\'_b) -> ~True)) -> [ '_a* ] -> [ ('_a&'_b)* ] =
+let new_filter :  ((('a & 'b) -> True) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ] =
       fixpoint new_filter1_aux
 
 (* here a better version with head and tail: it yields exactly the
@@ -408,15 +408,15 @@ let new_filter :  ((('_a & '_b) -> True) & (('_a\'_b) -> ~True)) -> [ '_a* ] -> 
  *)
 
 let new_filter_aux
-  (filter : ((('_a & '_b) -> True) & (('_a\'_b) -> ~True)) -> [ '_a* ] -> [ ('_a&'_b)* ] )
-  (f : (('_a & '_b) -> True) & (('_a\'_b) -> ~True))
-  (l : [ ('_a)*  ] )  =
+  (filter : ((('a & 'b) -> True) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ] )
+  (f : (('a & 'b) -> True) & (('a\'b) -> ~True))
+  (l : [ ('a)*  ] )  =
    if l is Nil then nil else
        let h = fst(l) in
        let t = snd(l) in
        if f h is True then (h ,filter f t) else filter f t
 
-let new_filter :  ((('_a & '_b) -> True) & (('_a\'_b) -> ~True)) -> [ '_a* ] -> [ ('_a&'_b)* ] =
+let new_filter :  ((('a & 'b) -> True) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ] =
       fixpoint new_filter_aux
 
 (* Notice that with the following version the result of the application is much less precise
@@ -424,15 +424,15 @@ let new_filter :  ((('_a & '_b) -> True) & (('_a\'_b) -> ~True)) -> [ '_a* ] -> 
  *)
 
 let new_filter_2_aux
-  (filter : ((('_a) -> True) & (('_b) -> ~True)) -> [ ('_a|'_b)* ] -> [ ('_a)* ] )
-  (f : (('_a) -> True) & (('_b) -> ~True))
-  (l : [ ('_a|'_b)* ] )  =
+  (filter : ((('a) -> True) & (('b) -> ~True)) -> [ ('a|'b)* ] -> [ ('a)* ] )
+  (f : (('a) -> True) & (('b) -> ~True))
+  (l : [ ('a|'b)* ] )  =
    if l is Nil then nil else
        let h = fst(l) in
        let t = snd(l) in
        if f h is True then (h ,filter f t) else filter f t
 
-let new_filter_2 : ((('_a) -> True) & (('_b) -> ~True)) -> [ ('_a|'_b)* ] -> [ ('_a)* ]  = fixpoint new_filter_2_aux
+let new_filter_2 : ((('a) -> True) & (('b) -> ~True)) -> [ ('a|'b)* ] -> [ ('a)* ]  = fixpoint new_filter_2_aux
 
 
 let xi = <(Int -> True) & (Bool -> False)>
@@ -443,14 +443,14 @@ let filter_2_test = new_filter_2 xi (1, (3, (true,(42,nil))))
 
 (* cross typing on the two versions *)
 
-let new_filter_2_as_1 :  ((('_a & '_b) -> True) & (('_a\'_b) -> ~True)) -> [ '_a* ] -> [ ('_a&'_b)* ] =
+let new_filter_2_as_1 :  ((('a & 'b) -> True) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ] =
       fixpoint new_filter_2_aux
 
-let new_filter_1_as_2 : ((('_a) -> True) & (('_b) -> ~True)) -> [ ('_a|'_b)* ] -> [ ('_a)* ]  =
+let new_filter_1_as_2 : ((('a) -> True) & (('b) -> ~True)) -> [ ('a|'b)* ] -> [ ('a)* ]  =
       fixpoint new_filter_aux
 
 let filter_aux_classic
-(filter : (('_a) -> Bool) -> [ ('_a)* ] -> [ ('_a)* ] ) ( f : '_a -> Bool) (l : [ ('_a)* ] )  =
+(filter : (('a) -> Bool) -> [ ('a)* ] -> [ ('a)* ] ) ( f : 'a -> Bool) (l : [ ('a)* ] )  =
   (* filter f l = *)
   if l is Nil then nil
   else
@@ -462,11 +462,11 @@ let filter_classic = fixpoint filter_aux_classic
 (* Tail recursive version *)
 
 (* The following make the type-checker diverge
- let filter : ((('_a & '_b) -> True) & (('_a\'_b) -> ~True)) -> [ '_a* ] -> [ ('_a&'_b)* ]  =
+ let filter : ((('a & 'b) -> True) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ]  =
    fun f -> fun l ->
    let filter_tr_aux  
-     (filter : (((('_a & '_b) -> True) & (('_a\'_b) -> ~True)), [ '_a* ] , ['_a*] ) -> [ ('_a&'_b)* ] )
-     (args : (((('_a & '_b) -> True) & (('_a\'_b) -> ~True)), [ ('_a)* ], [ ('_a)* ]) )  =
+     (filter : (((('a & 'b) -> True) & (('a\'b) -> ~True)), [ 'a* ] , ['a*] ) -> [ ('a&'b)* ] )
+     (args : (((('a & 'b) -> True) & (('a\'b) -> ~True)), [ ('a)* ], [ ('a)* ]) )  =
       let f = fst args in
       let l = fst (snd args) in
       let acc = snd (snd args) in
@@ -479,7 +479,7 @@ let filter_classic = fixpoint filter_aux_classic
 
 (* This type checks but it requires the domain of the function to be Any *)
 
-let filter_aux (filter : (('_a -> True) & ((~('_a)) -> ~True)) -> [ Any* ] -> [ ('_a)* ] ) ( f : (('_a -> True) & ((~('_a)) -> ~True))) (l : [ Any* ] )  =
+let filter_aux (filter : (('a -> True) & ((~('a)) -> ~True)) -> [ Any* ] -> [ ('a)* ] ) ( f : (('a -> True) & ((~('a)) -> ~True))) (l : [ Any* ] )  =
    if l is Nil then nil else
    if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
 
@@ -500,7 +500,7 @@ let flatten_pure flatten x =
 
 type Tree 'a = ('a \ [Any*]) | [(Tree 'a)*]
 
-let flatten_stub (flatten : Tree '_a -> ['_a*]) (x : Tree '_a) =
+let flatten_stub (flatten : Tree 'a -> ['a*]) (x : Tree 'a) =
   if x is Nil then nil else
   if x is [Any*] then concat (flatten (fst x)) (flatten (snd x))
   else (x,nil)

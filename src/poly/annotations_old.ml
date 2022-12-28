@@ -75,7 +75,7 @@ module Annot = struct
 
   and a =
     | NoneA | ProjA of substs | IteA of substs | AppA of (substs * substs)
-    | RecordUpdateA of substs
+    | RecordUpdateA of substs | ConstraintA of substs
     | LambdaA of branches (* Fully Explored *) * branches (* Remaining *)
     [@@deriving show]
 
@@ -95,6 +95,7 @@ module Annot = struct
   | AppA (ss1, ss2) -> AppA (apply_subst_substs s ss1, apply_subst_substs s ss2)
   | RecordUpdateA ss -> RecordUpdateA (apply_subst_substs s ss)
   | LambdaA (b1,b2) -> LambdaA (apply_subst_branches s b1, apply_subst_branches s b2)
+  | ConstraintA ss -> ConstraintA (apply_subst_substs s ss)
   and apply_subst s t =
   if Subst.is_identity s then t
   else match t with
@@ -111,6 +112,7 @@ module Annot = struct
     | Alias _ | Abstract _ | Const _ | Pair _ | Let _ -> NoneA
     | Ite _ -> IteA []
     | Projection _ -> ProjA []
+    | TypeConstr _ -> ConstraintA []
     | RecordUpdate _ -> RecordUpdateA []
     | App _ -> AppA ([], [])
     | Lambda (_, Parsing.Ast.Unnanoted, v, e) ->

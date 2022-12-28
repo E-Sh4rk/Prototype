@@ -106,6 +106,7 @@ let rec typeof_a vardef tenv env mono annot_a a =
   | Lambda (_, Parsing.Ast.AArrow _, _, _), LambdaA _ ->
     raise (Untypeable (pos, "Invalid lambda: explicitely typed lambdas not supported."))
   | Lambda (_, _, v, e), LambdaA (annot, _) -> type_lambda env annot v e
+  | TypeConstr _, _ -> failwith "Type constr unsupported."
   | _, _ -> raise (Untypeable (pos, "Invalid annotations."))
   end
   |> RawExt.bot_instance mono |> simplify_typ
@@ -187,6 +188,7 @@ let refine_a env mono a t = (* empty possibilites are often omitted *)
   | Ite (v, s, v1, v2) ->
     [Env.construct_dup [(v,s);(v1,t)] ; Env.construct_dup [(v,neg s);(v2,t)]]
   | Let (_, v2) -> [Env.singleton v2 t]
+  | TypeConstr _ -> failwith "Type constr unsupported."
 
 (* ===== INFER ===== *)
 
@@ -576,6 +578,7 @@ let rec infer_a' vardef tenv env mono annot_a a =
     (Variable.show v) (List.length b2) (pp_list pp_typ) (List.map fst b2) ; *)
     if b1@b2 |> List.for_all (fun (s,_) -> is_empty s)
     then Subst [] else lambda v (b1,b2) e
+  | TypeConstr _, _ -> failwith "Type constr unsupported."
   | _, _ -> assert false
   with NeedVarE (v, _) ->
     log ~level:1 "Variable %s needed. Going up.@." (Variable.show v) ;

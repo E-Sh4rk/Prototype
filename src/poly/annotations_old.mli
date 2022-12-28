@@ -18,7 +18,7 @@ module Annot : sig
     and branches = (typ*split) list
     and a =
         | NoneA | ProjA of substs | IteA of substs | AppA of (substs * substs)
-        | RecordUpdateA of substs
+        | RecordUpdateA of substs | ConstraintA of substs
         | LambdaA of branches (* Fully Explored *) * branches (* Remaining *)
     and t =
         | VarA | DoA of (a * typ option * split) | SkipA of t | DoSkipA of (a * split * t)

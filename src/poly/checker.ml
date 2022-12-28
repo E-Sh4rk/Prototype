@@ -113,6 +113,7 @@ let rec typeof_a vardef tenv env annot_a a =
       let right_record = mk_record false [label, cons t'] in
       merge_records t right_record  
     else untypeable ("Invalid field update: not a record.")
+  | TypeConstr _, _ -> failwith "TODO"
   | App (v1, v2), AppA (ss1, ss2) ->
     let apply t1 t2 =
       if subtype t1 arrow_any
@@ -229,6 +230,7 @@ let refine_a env a t =
         let ti = remove_field_info ti label in
         Env.construct_dup [(v, ti) ; (x, field_type)]
       )
+  | TypeConstr _ -> failwith "TODO"
   | App (v1, v2) ->
     let dnf = Env.find v1 env |> dnf in
     let singl = List.length dnf <= 1 in
@@ -364,6 +366,7 @@ let rec infer_inst_a vardef tenv env pannot_a a =
     let res = simplify_tallying res record_any in
     let r = refresh_all (vartype v2 |> vars_poly) in
     RecordUpdateA (res, Some r)
+  | TypeConstr _, _ -> failwith "TODO"
   | App (v1, v2), PartialA ->
     let t1 = vartype v1 in
     let t2 = vartype v2 in
@@ -755,6 +758,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       Subst (packannot PartialA res)
     else
       needvar [v ; v'] (InferA IMain)
+  | TypeConstr _, _ -> failwith "TODO"
   | App (v1, v2), InferA IMain ->
     if memvar v1 && memvar v2 then
       let t1 = vartype v1 in

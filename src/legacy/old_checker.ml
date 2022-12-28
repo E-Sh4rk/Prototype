@@ -119,6 +119,7 @@ let rec typeof_a ~legacy pos tenv env a =
     if Env.mem_not_absent v1 env
     then var_type pos v2 env
     else raise (Ill_typed (pos, "Unable to type the definition."))
+  | TypeConstr _ -> failwith "Type constr unsupported."
 
 and typeof ~legacy tenv env e =
   match e with
@@ -464,6 +465,7 @@ and infer_legacy_a' (*pos*)_ tenv env a t =
   | Lambda (va, (Ast.AArrow s as lt), v, e) ->
     let t = cap_o t s in
     type_lambda va lt v e t ~maxdom:(domain s)
+  | TypeConstr _ -> failwith "Type constr unsupported."
   end
 
 let rec infer_legacy_iterated tenv e =
@@ -680,6 +682,7 @@ let rec infer_a' pos tenv env a t =
     | Lambda (va, (Ast.AArrow s as lt), v, e) ->
       let t = cap_o t s in
       type_lambda va lt v e t ~maxdom:(domain s)
+    | TypeConstr _ -> failwith "Type constr unsupported."
     end
   end
 

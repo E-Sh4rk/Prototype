@@ -385,7 +385,8 @@ struct
   let rec initial_a a : a =
     match a with
     | Alias _ | Abstract _ | Const _ | Ite _ | Pair _
-    | Projection _ | RecordUpdate _ | Let _ -> EmptyAtomA
+    | Projection _ | RecordUpdate _ | Let _ | TypeConstr _
+    -> EmptyAtomA
     | App _ -> AppA (any_or_absent, false)
     | Lambda (_, Ast.Unnanoted, _, e) ->
       let initial_e = initial_e e in
@@ -486,7 +487,7 @@ struct
     match a with
     | Alias _ | Abstract _ | Const _ | Ite _ | Pair _
     | RecordUpdate _ | Let _ -> PEmptyAtomA
-    | Projection _ | App _ -> PInstA []
+    | Projection _ | App _ | TypeConstr _ -> PInstA []
     | Lambda (_, Ast.Unnanoted, v, e) ->
       let initial_e = initial_e e in
       PLambdaA (any_or_absent,

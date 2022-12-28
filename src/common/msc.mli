@@ -13,6 +13,7 @@ type 'va a =
   | Projection of Ast.projection * Variable.t
   | RecordUpdate of Variable.t * string * Variable.t option
   | Let of Variable.t * Variable.t
+  | TypeConstr of Variable.t * typ
 
 and 'va e =
   | Bind of 'va * Variable.t * 'va a * 'va e

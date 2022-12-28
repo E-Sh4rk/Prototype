@@ -14,6 +14,7 @@ type 'va a =
   | Projection of Ast.projection * Variable.t
   | RecordUpdate of Variable.t * string * Variable.t option
   | Let of Variable.t * Variable.t
+  | TypeConstr of Variable.t * typ
   [@@deriving show]
 
 and 'va e =
@@ -34,6 +35,7 @@ let map ef af =
     | Projection (p, v) -> Projection (p, v)
     | RecordUpdate (v, str, vo) -> RecordUpdate (v, str, vo)
     | Let (v1, v2) -> Let (v1, v2)
+    | TypeConstr (v, t) -> TypeConstr (v, t)
     end
     |> af
   and aux_e e =
@@ -59,6 +61,7 @@ let rec map_annot_a ef af a =
     | Projection (p, v) -> Projection (p, v)
     | RecordUpdate (v, str, vo) -> RecordUpdate (v, str, vo)
     | Let (v1, v2) -> Let (v1, v2)
+    | TypeConstr (v, t) -> TypeConstr (v, t)
 and map_annot_e ef af e =
     match e with
     | Bind (va, v, a, e) -> Bind (ef va, v, map_annot_a ef af a, map_annot_e ef af e)
@@ -68,7 +71,8 @@ let fold ef af =
   let rec aux_a a =
     begin match a with
     | Alias _ | Abstract _ | Const _ | App _ | Pair _
-    | Projection _ | RecordUpdate _ | Ite _ | Let _ -> []
+    | Projection _ | RecordUpdate _ | Ite _ | Let _
+    | TypeConstr _ -> []
     | Lambda (_, _, _, e) -> [aux_e e]
     end
     |> af a
@@ -92,8 +96,8 @@ let fv_a' a acc =
   let acc = List.fold_left VarSet.union VarSet.empty acc in
   match a with
   | Lambda (_, _, v, _) -> VarSet.remove v acc
-  | Alias v | Projection (_, v) | RecordUpdate (v, _, None) ->
-    VarSet.add v acc
+  | Alias v | Projection (_, v) | RecordUpdate (v, _, None)
+  | TypeConstr (v, _) -> VarSet.add v acc
   | Ite (v, _, x1, x2) -> VarSet.add v acc |> VarSet.add x1 |> VarSet.add x2
   | App (v1, v2) | Pair (v1, v2) | Let (v1, v2) | RecordUpdate (v1, _, Some v2) ->
     VarSet.add v1 acc |> VarSet.add v2
@@ -190,8 +194,9 @@ let convert_to_msc ast =
         let (defs, expr_var_map, x) = to_defs_and_x expr_var_map e in
         let (defs', expr_var_map, x') = to_defs_and_x expr_var_map e' in
         (defs'@defs, expr_var_map, RecordUpdate (x, str, Some x'))
-      | Ast.TypeConstr (_, _) ->
-        failwith "TODO"
+      | Ast.TypeConstr (e, t) ->
+        let (defs, expr_var_map, x) = to_defs_and_x expr_var_map e in
+        (defs, expr_var_map, TypeConstr (x, t))
 
     and to_defs_and_x ?(name=None) expr_var_map ast =
       let ((_, pos), _) = ast in

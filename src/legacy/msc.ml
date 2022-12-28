@@ -26,6 +26,7 @@ let rec aux_a a1 a2 =
   | Projection (p, v), _ -> Projection (p, v)
   | RecordUpdate (v, str, vo), _ -> RecordUpdate (v, str, vo)
   | Let (v1, v2), _ -> Let (v1, v2)
+  | TypeConstr (v, t), _ -> TypeConstr (v, t)
 and aux_e e1 e2 =
   match e1, e2 with
   | Var v, _ -> Var v

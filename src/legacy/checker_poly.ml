@@ -175,6 +175,7 @@ let rec typeof_a pos tenv env mono anns a =
     if Env.mem_not_absent v1 env
     then var_type pos v2 env
     else raise (Ill_typed (pos, "Unable to type the definition."))
+  | TypeConstr _ -> failwith "Type constr unsupported."
 
 and typeof tenv env mono anns e =
   match e with
@@ -263,6 +264,7 @@ let sufficient_a env mono a prev_t t =
     [ env |>
     option_chain [Ref_env.refine v1 any ; Ref_env.refine v2 t]]
     |> filter_options
+  | TypeConstr _ -> failwith "Type constr unsupported."
 
 let propagate_a env mono a prev_t t =
   let sufficient = sufficient_a (Ref_env.push env) mono a prev_t t in
@@ -539,6 +541,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env mono anns a ts =
       type_lambda v e ts va ~former_typ
     | Lambda (_, Ast.AArrow _, _, _), PLambdaA _ -> ([], false)
     | Lambda _, _ -> assert false
+    | TypeConstr _, _ -> failwith "Type constr unsupported."
   end
 
 and infer' tenv env mono anns e' t =

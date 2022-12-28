@@ -13,6 +13,7 @@ let contains_records e =
   and aux_a a =
     match a with
     | Abstract t -> aux_t t
+    | TypeConstr (_, t) -> aux_t t
     | Const EmptyRecord -> true
     | Const _ -> false
     | Lambda (_, Parsing.Ast.Unnanoted, _, e) -> aux e

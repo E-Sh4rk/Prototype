@@ -151,6 +151,7 @@ let rec typeof_a pos tenv env anns a =
     if Env.mem_not_absent v1 env
     then var_type pos v2 env
     else raise (Ill_typed (pos, "Unable to type the definition."))
+  | TypeConstr _ -> failwith "Type constr unsupported."
 
 and typeof tenv env anns e =
   match e with
@@ -240,6 +241,7 @@ let refine_a ~sufficient tenv env a prev_t t =
     [ env |>
     option_chain [Ref_env.refine v1 any ; Ref_env.refine v2 t]]
     |> filter_options
+  | TypeConstr _, _ -> failwith "Type constr unsupported."
 
 (* ===== INFER ===== *)
 
@@ -483,6 +485,7 @@ let rec infer_a' ?(no_lambda_ua=false) pos tenv env anns a ts =
       type_lambda v e ts va ~opt_branches_maxdom:empty ~former_typ
     | Lambda (_, Ast.AArrow _, _, _), LambdaA _ -> ([], false)
     | Lambda _, _ -> assert false
+    | TypeConstr _, _ -> failwith "Type constr unsupported."
   end
 
 and infer' tenv env anns e' t =

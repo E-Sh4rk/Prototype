@@ -59,7 +59,7 @@
 %token ANY EMPTY BOOL CHAR (*FLOAT*) INT TRUE FALSE UNIT NIL STRING LIST
 %token DOUBLEDASH TIMES PLUS MINUS DIV
 %token LBRACE RBRACE DOUBLEPOINT WITH EQUAL_OPT POINT LT GT
-%token ATOMS TYPE TYPE_AND REGEX_OR
+%token ATOMS TYPE TYPE_AND PAT_OR PAT_AND
 %token LBRACKET RBRACKET SEMICOLON
 %token<string> ID
 %token<string> TID
@@ -285,7 +285,7 @@ simple_re:
 | re=alt_re { re }
 
 alt_re:
-  lhs=simple_re REGEX_OR rhs=atomic_re { ReAlt (lhs, rhs) }
+  lhs=simple_re PAT_OR rhs=atomic_re { ReAlt (lhs, rhs) }
 
 atomic_re:
   t=typ { ReType t }

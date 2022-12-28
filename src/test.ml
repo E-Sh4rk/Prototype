@@ -437,7 +437,7 @@ let new_filter_2 : ((('a) -> True) & (('b) -> ~True)) -> [ ('a|'b)* ] -> [ ('a)*
 
 let xi = <(Int -> True) & (Bool -> False)>
 
-let filter_test = new_filter xi (1, (3, (true,(42,nil))))
+let filter_test = new_filter xi [1;3;true;42]
 
 let filter_2_test = new_filter_2 xi (1, (3, (true,(42,nil))))
 

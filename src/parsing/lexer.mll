@@ -41,7 +41,8 @@ rule token = parse
 | "atom"  { ATOMS }
 | "type"  { TYPE }
 | "and"   { TYPE_AND }
-| "||"    { REGEX_OR }
+| "||"    { PAT_OR }
+| "||"    { PAT_AND }
 | "(*"    { comment 0 lexbuf }
 | "->"    { ARROW }
 | "&"     { AND }

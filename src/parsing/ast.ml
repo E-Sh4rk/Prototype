@@ -41,6 +41,7 @@ type ('a, 'typ, 'v) ast =
 | Pair of ('a, 'typ, 'v) t * ('a, 'typ, 'v) t
 | Projection of projection * ('a, 'typ, 'v) t
 | RecordUpdate of ('a, 'typ, 'v) t * string * ('a, 'typ, 'v) t option
+| TypeConstr of ('a, 'typ, 'v) t * 'typ
 [@@deriving ord]
 
 and ('a, 'typ, 'v) t = 'a * ('a, 'typ, 'v) ast
@@ -143,6 +144,9 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
         | Projection (p, e) -> Projection (p, aux vtenv env e)
         | RecordUpdate (e1, l, e2) ->
             RecordUpdate (aux vtenv env e1, l, Option.map (aux vtenv env) e2)
+        | TypeConstr (e, t) ->
+            let (t, vtenv) = type_expr_to_typ tenv vtenv t in
+            TypeConstr (aux vtenv env e, t)
         in
         ((exprid,pos),e)
     in
@@ -161,6 +165,7 @@ let rec unannot (_,e) =
     | Projection (p, e) -> Projection (p, unannot e)
     | RecordUpdate (e1, l, e2) ->
         RecordUpdate (unannot e1, l, Option.map unannot e2)
+    | TypeConstr (e, t) -> TypeConstr (unannot e, t)
     in
     ( (), e )
 
@@ -188,6 +193,7 @@ let normalize_bvs e =
         | Projection (p, e) -> Projection (p, aux depth map e)
         | RecordUpdate (e1, l, e2) ->
             RecordUpdate (aux depth map e1, l, Option.map (aux depth map) e2)
+        | TypeConstr (e, t) -> TypeConstr (aux depth map e, t)
         in (a, e)
     in aux 0 VarMap.empty e
 
@@ -230,6 +236,7 @@ let substitute aexpr v (annot', expr') =
       | Some e2 -> Some (aux e2)
       | None -> None
       in RecordUpdate (aux e1, f, e2)
+    | TypeConstr (e, t) -> TypeConstr (aux e, t)
     in
     (annot', expr)
   in aux aexpr

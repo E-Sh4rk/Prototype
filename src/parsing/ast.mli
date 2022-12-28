@@ -36,6 +36,7 @@ type ('a, 'typ, 'v) ast =
 | Pair of ('a, 'typ, 'v) t * ('a, 'typ, 'v) t
 | Projection of projection * ('a, 'typ, 'v) t
 | RecordUpdate of ('a, 'typ, 'v) t * string * ('a, 'typ, 'v) t option
+| TypeConstr of ('a, 'typ, 'v) t * 'typ
 
 and ('a, 'typ, 'v) t = 'a * ('a, 'typ, 'v) ast
 

@@ -190,6 +190,8 @@ let convert_to_msc ast =
         let (defs, expr_var_map, x) = to_defs_and_x expr_var_map e in
         let (defs', expr_var_map, x') = to_defs_and_x expr_var_map e' in
         (defs'@defs, expr_var_map, RecordUpdate (x, str, Some x'))
+      | Ast.TypeConstr (_, _) ->
+        failwith "TODO"
 
     and to_defs_and_x ?(name=None) expr_var_map ast =
       let ((_, pos), _) = ast in

@@ -313,6 +313,17 @@ let approximate_app t1 t2 resvar =
     if inst <> [] then Some inst else None
   | _ -> None *)
 
+let is_opened_arrow t =
+  subtype t arrow_any &&
+  dnf t |> List.exists (fun conj ->
+    conj |> List.exists (fun (a,b) ->
+        subtype a arrow_any &&
+        subtype b arrow_any &&
+        TVarSet.inter (vars_poly a) (vars_poly b)
+        |> TVarSet.is_empty |> not
+      )
+  )
+
 let rec infer_inst_a vardef tenv env pannot_a a =
   let open PartialAnnot in
   let open FullAnnot in
@@ -374,7 +385,7 @@ let rec infer_inst_a vardef tenv env pannot_a a =
     in
     (* NOTE: Approximation for fixpoint combinator applications *)
     let res =
-      if subtype t2 arrow_any
+      if is_opened_arrow t2
       then begin
         let inst_for_arrows arrows =
           arrows |> List.map (fun (s,t) ->

@@ -18,6 +18,13 @@
     let pos_right = Ast.position_of_expr right in
     (Ast.new_annot (Position.join pos_left pos_right), Pair (left,right))
 
+  let rec pattern_tuple = function
+    | [] -> PatType (TBase TUnit)
+    | [x] -> x
+    | x::xs ->
+    let left = x in let right = pattern_tuple xs in
+    PatPair (left,right)
+
   let rec product = function
     | [] -> TBase TUnit
     | [t] -> t
@@ -58,8 +65,8 @@
 %token ARROW AND OR NEG DIFF
 %token ANY EMPTY BOOL CHAR (*FLOAT*) INT TRUE FALSE UNIT NIL STRING LIST
 %token DOUBLEDASH TIMES PLUS MINUS DIV
-%token LBRACE RBRACE DOUBLEPOINT WITH EQUAL_OPT POINT LT GT
-%token ATOMS TYPE TYPE_AND PAT_OR PAT_AND
+%token LBRACE RBRACE DOUBLEPOINT MATCH WITH END EQUAL_OPT POINT LT GT
+%token ATOMS TYPE TYPE_AND DOUBLE_OR DOUBLE_AND
 %token LBRACKET RBRACKET SEMICOLON
 %token<string> ID
 %token<string> TID
@@ -117,7 +124,9 @@ term:
 | t=simple_term { t }
 | IF t=term IS ty=typ THEN t1=term ELSE t2=term { annot $startpos $endpos (Ite (t,ty,t1,t2)) }
 | IF t=term THEN t1=term ELSE t2=term { annot $startpos $endpos (Ite (t,TBase TTrue,t1,t2)) }
-| t=simple_term COLON ty=typ { annot $startpos $endpos (TypeConstr (t,ty)) }
+| MATCH t=term WITH pats=patterns END
+| MATCH t=term WITH OR pats=patterns END
+{ annot $startpos $endpos (PatMatch (t,pats)) }
 
 simple_term:
   a=simple_term b=atomic_term { annot $startpos $endpos (App (a, b)) }
@@ -134,7 +143,7 @@ simple_term:
 | a=atomic_term { a }
 
 field_term:
-  id=identifier EQUAL t=simple_term { (id, t) }
+  id=identifier EQUAL t=(*simple_term*)term { (id, t) }
 
 infix_term:
   x=infix { annot $startpos $endpos (var_or_primitive x) }
@@ -154,6 +163,7 @@ atomic_term:
 { record_update a fs }
 | LBRACKET lst=separated_list(SEMICOLON, term) RBRACKET
 { list_of_elts (Position.lex_join $startpos $endpos) lst }
+| LPAREN t=term COLON ty=typ RPAREN { annot $startpos $endpos (TypeConstr (t,ty)) }
 
 literal:
 (*f=LFLOAT { Float f }*)
@@ -286,7 +296,7 @@ simple_re:
 | re=alt_re { re }
 
 alt_re:
-  lhs=simple_re PAT_OR rhs=atomic_re { ReAlt (lhs, rhs) }
+  lhs=simple_re DOUBLE_OR rhs=atomic_re { ReAlt (lhs, rhs) }
 
 atomic_re:
   t=typ { ReType t }
@@ -295,3 +305,22 @@ atomic_re:
 | re=atomic_re TIMES { ReStar re }
 | re=atomic_re PLUS { ReSeq (re, ReStar re) }
 | re=atomic_re INTERROGATION_MARK { ReAlt (re, ReEpsilon) }
+
+pattern:
+  p=atomic_pattern {p}
+| lhs=pattern AND rhs=atomic_pattern { PatAnd (lhs, rhs) }
+| lhs=pattern OR rhs=atomic_pattern { PatOr (lhs, rhs) }
+
+atomic_pattern:
+  COLON t=atomic_typ { PatType t }
+| v=ID  { PatVar v }
+| LPAREN ps=separated_list(COMMA, pattern) RPAREN
+{ pattern_tuple ps }
+| v=ID EQUAL l=literal (* TODO: It seems restrictive! *)
+{ PatAssign (v, l) }
+
+pat_line:
+  p=pattern ARROW t=(*simple_term*)term { (p,t) }
+
+patterns:
+  lst=separated_nonempty_list(OR, pat_line) {lst}

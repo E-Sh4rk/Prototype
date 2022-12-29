@@ -35,6 +35,7 @@ module FullAnnot : sig
         | ProjA of inst
         | EmptyA of inst | ThenA | ElseA
         | RecordUpdateA of inst * (renaming option)
+        | ConstrA of inst
     and t =
         | BVar of renaming
         | Keep of (a * generalization * typ option (* (optimisation) *) * branches)

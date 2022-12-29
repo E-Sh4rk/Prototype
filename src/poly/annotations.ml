@@ -58,6 +58,7 @@ module FullAnnot = struct
       | ProjA of inst
       | EmptyA of inst | ThenA | ElseA
       | RecordUpdateA of inst * (renaming option)
+      | ConstrA of inst
   [@@deriving show]
   and t =
       | BVar of renaming

@@ -30,6 +30,16 @@ type projection = Fst | Snd | Field of string
 type 'typ type_annot = Unnanoted | ADomain of 'typ list | AArrow of 'typ
 [@@deriving show, ord]
 
+type ('typ, 'v) pattern =
+| PatType of 'typ
+| PatVar of 'v
+| PatAnd of ('typ, 'v) pattern * ('typ, 'v) pattern
+| PatOr of ('typ, 'v) pattern * ('typ, 'v) pattern
+| PatPair of ('typ, 'v) pattern * ('typ, 'v) pattern
+(* PatRecord *)
+| PatAssign of 'v * const
+[@@deriving ord]
+
 type ('a, 'typ, 'v) ast =
 | Abstract of 'typ
 | Const of const
@@ -42,6 +52,7 @@ type ('a, 'typ, 'v) ast =
 | Projection of projection * ('a, 'typ, 'v) t
 | RecordUpdate of ('a, 'typ, 'v) t * string * ('a, 'typ, 'v) t option
 | TypeConstr of ('a, 'typ, 'v) t * 'typ
+| PatMatch of ('a, 'typ, 'v) t * (('typ, 'v) pattern * ('a, 'typ, 'v) t) list
 [@@deriving ord]
 
 and ('a, 'typ, 'v) t = 'a * ('a, 'typ, 'v) ast
@@ -147,8 +158,54 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
         | TypeConstr (e, t) ->
             let (t, vtenv) = type_expr_to_typ tenv vtenv t in
             TypeConstr (aux vtenv env e, t)
+        | PatMatch (e, pats) ->
+            PatMatch (aux vtenv env e, List.map (aux_pat pos vtenv env) pats)
         in
         ((exprid,pos),e)
+    and aux_pat pos vtenv env (pat, e) =
+        let merge_disj =
+            StrMap.union (fun _ v1 v2 ->
+                if Variable.equals v1 v2 then Some v1
+                else failwith "Variable names are conflicting.")
+        in
+        let rec aux_p vtenv env pat =
+            let find_or_def_var str =
+                if StrMap.mem str env
+                then StrMap.find str env
+                else
+                    let var = Variable.create ~binding:false (Some str) in
+                    Variable.attach_location var pos ;
+                    var
+            in
+            match pat with
+            | PatType t ->
+                let (t, vtenv) = type_expr_to_typ tenv vtenv t in
+                (PatType t, vtenv, StrMap.empty)
+            | PatVar str ->
+                let var = find_or_def_var str in
+                (PatVar var, vtenv, StrMap.singleton str var)
+            | PatAnd (p1, p2) ->
+                let (p1, vtenv, env1) = aux_p vtenv env p1 in
+                let (p2, vtenv, env2) = aux_p vtenv env p2 in
+                (PatAnd (p1, p2), vtenv, merge_disj env1 env2)
+            | PatOr (p1, p2) ->
+                let (p1, vtenv, env1) = aux_p vtenv env p1 in
+                let env = merge_disj env env1 in 
+                let (p2, vtenv, env2) = aux_p vtenv env p2 in
+                if StrMap.equal (Variable.equals) env1 env2 |> not
+                then failwith "Missing variables in pattern." ;
+                (PatOr (p1, p2), vtenv, env1)
+            | PatPair (p1, p2) ->
+                let (p1, vtenv, env1) = aux_p vtenv env p1 in
+                let (p2, vtenv, env2) = aux_p vtenv env p2 in
+                (PatPair (p1, p2), vtenv, merge_disj env1 env2)
+            | PatAssign (str, c) ->
+                let var = find_or_def_var str in
+                (PatAssign (var, c), vtenv, StrMap.singleton str var)
+        in
+        let (pat, vtenv, env') = aux_p vtenv StrMap.empty pat in
+        let env = StrMap.add_seq (StrMap.to_seq env') env in
+        (pat, aux vtenv env e)
     in
     aux vtenv name_var_map e
 
@@ -166,6 +223,9 @@ let rec unannot (_,e) =
     | RecordUpdate (e1, l, e2) ->
         RecordUpdate (unannot e1, l, Option.map unannot e2)
     | TypeConstr (e, t) -> TypeConstr (unannot e, t)
+    | PatMatch (e, pats) ->
+        PatMatch (unannot e, pats |>
+            List.map (fun (p, e) -> (p, unannot e)))
     in
     ( (), e )
 
@@ -185,15 +245,23 @@ let normalize_bvs e =
         | App (e1, e2) ->
             App (aux depth map e1, aux depth map e2)
         | Let (v, e1, e2) ->
+            let e1 = aux depth map e1 in
             let v' = get_predefined_var depth in
             let map = VarMap.add v v' map in
-            Let (v', aux (depth+1) map e1, aux (depth+1) map e2)
+            Let (v', e1, aux (depth+1) map e2)
         | Pair (e1, e2) ->
             Pair (aux depth map e1, aux depth map e2)
         | Projection (p, e) -> Projection (p, aux depth map e)
         | RecordUpdate (e1, l, e2) ->
             RecordUpdate (aux depth map e1, l, Option.map (aux depth map) e2)
         | TypeConstr (e, t) -> TypeConstr (aux depth map e, t)
+        | PatMatch (e, pats) ->
+            let e = aux depth map e in
+            (* NOTE: We do not normalize pattern variables,
+               as two pattern matchings will almost never be
+               syntactically equivalent anyway. *)
+            let pats = pats |> List.map (fun (p,e) -> (p, aux depth map e)) in
+            PatMatch (e, pats)
         in (a, e)
     in aux 0 VarMap.empty e
 
@@ -223,12 +291,14 @@ let substitute aexpr v (annot', expr') =
     | Const c -> Const c
     | Var v' when Variable.equals v v' -> expr'
     | Var v' -> Var v'
-    | Lambda (ta, v', e) when Variable.equals v v' -> Lambda (ta, v', e)
-    | Lambda (ta, v', e) -> Lambda (ta, v', aux e)
+    | Lambda (ta, v', e) ->
+        assert (Variable.equals v v' |> not) ;
+        Lambda (ta, v', aux e)
     | Ite (e, t, e1, e2) -> Ite (aux e, t, aux e1, aux e2)
     | App (e1, e2) -> App (aux e1, aux e2)
-    | Let (v', e1, e2) when Variable.equals v v' -> Let (v', aux e1, e2)
-    | Let (v', e1, e2) -> Let (v', aux e1, aux e2)
+    | Let (v', e1, e2) ->
+        assert (Variable.equals v v' |> not) ;
+        Let (v', aux e1, aux e2)
     | Pair (e1, e2) -> Pair (aux e1, aux e2)
     | Projection (p, e) -> Projection (p, aux e)
     | RecordUpdate (e1, f, e2) ->
@@ -237,6 +307,10 @@ let substitute aexpr v (annot', expr') =
       | None -> None
       in RecordUpdate (aux e1, f, e2)
     | TypeConstr (e, t) -> TypeConstr (aux e, t)
+    | PatMatch (e, pats) ->
+        let e = aux e in
+        let pats = pats |> List.map (fun (p,e) -> (p, aux e)) in
+        PatMatch (e, pats)
     in
     (annot', expr)
   in aux aexpr

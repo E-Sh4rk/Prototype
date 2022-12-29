@@ -25,6 +25,15 @@ type projection = Fst | Snd | Field of string
 
 type 'typ type_annot = Unnanoted | ADomain of 'typ list | AArrow of 'typ
 
+type ('typ, 'v) pattern =
+| PatType of 'typ
+| PatVar of 'v
+| PatAnd of ('typ, 'v) pattern * ('typ, 'v) pattern
+| PatOr of ('typ, 'v) pattern * ('typ, 'v) pattern
+| PatPair of ('typ, 'v) pattern * ('typ, 'v) pattern
+(* TODO: PatRecord *)
+| PatAssign of 'v * const
+
 type ('a, 'typ, 'v) ast =
 | Abstract of 'typ
 | Const of const
@@ -37,6 +46,7 @@ type ('a, 'typ, 'v) ast =
 | Projection of projection * ('a, 'typ, 'v) t
 | RecordUpdate of ('a, 'typ, 'v) t * string * ('a, 'typ, 'v) t option
 | TypeConstr of ('a, 'typ, 'v) t * 'typ
+| PatMatch of ('a, 'typ, 'v) t * (('typ, 'v) pattern * ('a, 'typ, 'v) t) list
 
 and ('a, 'typ, 'v) t = 'a * ('a, 'typ, 'v) ast
 

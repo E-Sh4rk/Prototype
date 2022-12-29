@@ -197,6 +197,7 @@ let convert_to_msc ast =
       | Ast.TypeConstr (e, t) ->
         let (defs, expr_var_map, x) = to_defs_and_x expr_var_map e in
         (defs, expr_var_map, TypeConstr (x, t))
+      | Ast.PatMatch _ -> failwith "TODO"
 
     and to_defs_and_x ?(name=None) expr_var_map ast =
       let ((_, pos), _) = ast in

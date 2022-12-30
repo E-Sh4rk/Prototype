@@ -341,9 +341,12 @@ let map_ast f e =
         in
         f (annot, e)
     and aux_p p =
-        match p with
-        | PatAssign (v, e) -> PatAssign (v, aux e)
-        | p -> p
+        let pa p =
+            match p with
+            | PatAssign (v, e) -> PatAssign (v, aux e)
+            | p -> p
+        in
+        map_p pa p
     in
     aux e
 

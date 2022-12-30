@@ -155,6 +155,7 @@ let rec vars_of_pat pat =
   let open Ast in
   match pat with
   | PatType _ -> VarSet.empty
+  | PatVar x when Variable.equals x dummy_pat_var -> VarSet.empty
   | PatVar x -> VarSet.singleton x
   | PatAnd (p1, p2) ->
     VarSet.union (vars_of_pat p1) (vars_of_pat p2)
@@ -165,6 +166,7 @@ let rec vars_of_pat pat =
   | PatAssign (x,_) -> VarSet.singleton x
 
 let rec def_of_var_pat pat v e =
+  assert (Variable.equals v Ast.dummy_pat_var |> not) ;
   let open Ast in
   let (annot, _) = e in
   match pat with

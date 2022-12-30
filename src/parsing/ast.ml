@@ -107,6 +107,10 @@ let new_annot p =
 let copy_annot a =
     new_annot (Position.position a)
 
+let dummy_pat_var_str = "_"
+let dummy_pat_var =
+    Variable.create ~binding:false (Some dummy_pat_var_str)
+
 let parser_expr_to_annot_expr tenv vtenv name_var_map e =
     let rec aux vtenv env ((exprid,pos),e) =
         let e = match e with
@@ -183,8 +187,11 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
                 let (t, vtenv) = type_expr_to_typ tenv vtenv t in
                 (PatType t, vtenv, StrMap.empty)
             | PatVar str ->
-                let var = find_or_def_var str in
-                (PatVar var, vtenv, StrMap.singleton str var)
+                if String.equal str dummy_pat_var_str
+                then (PatVar dummy_pat_var, vtenv, StrMap.empty)
+                else
+                    let var = find_or_def_var str in
+                    (PatVar var, vtenv, StrMap.singleton str var)
             | PatAnd (p1, p2) ->
                 let (p1, vtenv, env1) = aux_p vtenv env p1 in
                 let (p2, vtenv, env2) = aux_p vtenv env p2 in
@@ -201,6 +208,7 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
                 let (p2, vtenv, env2) = aux_p vtenv env p2 in
                 (PatPair (p1, p2), vtenv, merge_disj env1 env2)
             | PatAssign (str, e) ->
+                if String.equal str dummy_pat_var_str then failwith "Invalid var name for assignement." ;
                 let var = find_or_def_var str in
                 let e = aux vtenv expr_env e in
                 (PatAssign (var, e), vtenv, StrMap.singleton str var)

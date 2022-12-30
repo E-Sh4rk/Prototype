@@ -138,6 +138,54 @@ let filter_expr_map vals em =
 
 exception IsVar of Variable.t
 
+let rec type_of_pat pat =
+  let open Ast in
+  match pat with
+  | PatType t -> t
+  | PatVar _ -> any
+  | PatAnd (p1, p2) ->
+    cap (type_of_pat p1) (type_of_pat p2)
+  | PatOr (p1, p2) ->
+    cup (type_of_pat p1) (type_of_pat p2)
+  | PatPair (p1, p2) ->
+    mk_times (type_of_pat p1 |> cons) (type_of_pat p2 |> cons)
+  | PatAssign _ -> any
+
+let rec vars_of_pat pat =
+  let open Ast in
+  match pat with
+  | PatType _ -> VarSet.empty
+  | PatVar x -> VarSet.singleton x
+  | PatAnd (p1, p2) ->
+    VarSet.union (vars_of_pat p1) (vars_of_pat p2)
+  | PatOr (p1, p2) ->
+    VarSet.inter (vars_of_pat p1) (vars_of_pat p2)
+  | PatPair (p1, p2) ->
+    VarSet.union (vars_of_pat p1) (vars_of_pat p2)
+  | PatAssign (x,_) -> VarSet.singleton x
+
+let [@warning "-32"] rec def_of_var_pat pat v e =
+  let open Ast in
+  let (annot, _) = e in
+  match pat with
+  | PatVar v' when Variable.equals v v' -> e
+  | PatVar _ -> assert false
+  | PatAnd (p1, p2) ->
+    if vars_of_pat p1 |> VarSet.mem v
+    then def_of_var_pat p1 v e
+    else def_of_var_pat p2 v e
+  | PatPair (p1, p2) ->
+    if vars_of_pat p1 |> VarSet.mem v
+    then def_of_var_pat p1 v (annot, Projection (Fst, e))
+    else def_of_var_pat p2 v (annot, Projection (Snd, e))
+  | PatOr (p1, p2) ->
+    let case = Ite (e, type_of_pat p1,
+      def_of_var_pat p1 v e, def_of_var_pat p2 v e) in
+    (annot, case)
+  | PatAssign (v', c) when Variable.equals v v' -> (annot, Const c)
+  | PatAssign _ -> assert false
+  | PatType _ -> assert false
+  
 let convert_to_msc ast =
   let aux expr_var_map ast =
     let rec to_defs_and_a expr_var_map ast =

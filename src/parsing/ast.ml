@@ -284,36 +284,42 @@ let unannot_and_normalize e = e |> unannot |> normalize_bvs
     end
   | Debug (_, e) -> fv e*)
 
+let map_ast f e =
+    let rec aux (annot, e) =
+        let e = match e with
+        | Abstract t -> Abstract t
+        | Const c -> Const c
+        | Var v -> Var v
+        | Lambda (annot, v, e) -> Lambda (annot, v, aux e)
+        | Ite (e, t, e1, e2) -> Ite (aux e, t, aux e1, aux e2)
+        | App (e1, e2) -> App (aux e1, aux e2)
+        | Let (v, e1, e2) -> Let (v, aux e1, aux e2)
+        | Pair (e1, e2) -> Pair (aux e1, aux e2)
+        | Projection (p, e) -> Projection (p, aux e)
+        | RecordUpdate (e, str, eo) -> RecordUpdate (aux e, str, Option.map aux eo)
+        | TypeConstr (e, t) -> TypeConstr (aux e, t)
+        | PatMatch (e, pats) ->
+            let pats = pats |> List.map (fun (p,e) -> (p, aux e)) in
+            PatMatch (aux e, pats)
+        in
+        f (annot, e)
+    in
+    aux e
+
 let substitute aexpr v (annot', expr') =
-  let rec aux (_, expr) =
+  let aux (_, expr) =
     let expr = match expr with
-    | Abstract t -> Abstract t
-    | Const c -> Const c
     | Var v' when Variable.equals v v' -> expr'
-    | Var v' -> Var v'
     | Lambda (ta, v', e) ->
         assert (Variable.equals v v' |> not) ;
-        Lambda (ta, v', aux e)
-    | Ite (e, t, e1, e2) -> Ite (aux e, t, aux e1, aux e2)
-    | App (e1, e2) -> App (aux e1, aux e2)
+        Lambda (ta, v', e)
     | Let (v', e1, e2) ->
         assert (Variable.equals v v' |> not) ;
-        Let (v', aux e1, aux e2)
-    | Pair (e1, e2) -> Pair (aux e1, aux e2)
-    | Projection (p, e) -> Projection (p, aux e)
-    | RecordUpdate (e1, f, e2) ->
-      let e2 = match e2 with
-      | Some e2 -> Some (aux e2)
-      | None -> None
-      in RecordUpdate (aux e1, f, e2)
-    | TypeConstr (e, t) -> TypeConstr (aux e, t)
-    | PatMatch (e, pats) ->
-        let e = aux e in
-        let pats = pats |> List.map (fun (p,e) -> (p, aux e)) in
-        PatMatch (e, pats)
+        Let (v', e1, e2)
+    | e -> e
     in
     (annot', expr)
-  in aux aexpr
+  in map_ast aux aexpr
 
 let const_to_typ c =
     match c with

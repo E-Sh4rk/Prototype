@@ -19,11 +19,11 @@ let switch2 s f a b =
 (* ======================================= *)
 
 let typeof x =
-  if x is String then "String"
+  if x is Unit|Nil then "Nil"
+  else if x is String then "String"
   else if x is Char then "Char"
   else if x is Int then "Number"
   else if x is Bool then "Boolean"
-  else if x is Unit|Nil then "Nil"
   else "Object"
 
 (* ======================================= *)
@@ -529,3 +529,51 @@ let a = <Tree' Int>
 
 type Rec 'a = Rec 'a -> 'a
 let b = <Rec 'b>
+
+(* Pattern matching *)
+
+let test_patterns x =
+  match x with (a,_) -> a end
+
+let test2_patterns x =
+  match x with (a,_)&(_,b) -> (a,b) end
+
+let typeof_patterns x =
+  match x with
+  | :Unit | :Nil -> "Nil"
+  | :String -> "String"
+  | :Char -> "Char"
+  | :Int -> "Number"
+  | :Bool -> "Boolean"
+  | :Any -> "Object"
+  end
+
+let land_patterns a b =
+  match (a,b) with
+  | (:True, :True) -> true
+  | :Any -> false
+  end
+
+let fact_pat fact n =
+  match n with
+  | :0 -> 1
+  | n -> (fact (n-1))*n
+  end
+
+let fact = fixpoint fact_pat
+
+let length_pat length lst =
+  match lst with
+  | :[] -> 0
+  | (_, tl & :List) -> succ (length tl)
+  end
+
+let length = fixpoint length_pat
+
+let map_pat map f lst =
+  match lst with
+  | :[] -> []
+  | (hd, tl) & :List -> (f hd, map f tl)
+  end
+
+let map = fixpoint map_pat

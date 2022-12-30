@@ -316,8 +316,8 @@ atomic_pattern:
 | v=ID  { PatVar v }
 | LPAREN ps=separated_list(COMMA, pattern) RPAREN
 { pattern_tuple ps }
-| v=ID EQUAL l=literal (* TODO: It seems restrictive! *)
-{ PatAssign (v, l) }
+| v=ID EQUAL t=term
+{ PatAssign (v, t) }
 
 pat_line:
   p=pattern ARROW t=(*simple_term*)term { (p,t) }

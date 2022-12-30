@@ -30,17 +30,17 @@ type projection = Fst | Snd | Field of string
 type 'typ type_annot = Unnanoted | ADomain of 'typ list | AArrow of 'typ
 [@@deriving show, ord]
 
-type ('typ, 'v) pattern =
+type ('a, 'typ, 'v) pattern =
 | PatType of 'typ
 | PatVar of 'v
-| PatAnd of ('typ, 'v) pattern * ('typ, 'v) pattern
-| PatOr of ('typ, 'v) pattern * ('typ, 'v) pattern
-| PatPair of ('typ, 'v) pattern * ('typ, 'v) pattern
+| PatAnd of ('a, 'typ, 'v) pattern * ('a, 'typ, 'v) pattern
+| PatOr of ('a, 'typ, 'v) pattern * ('a, 'typ, 'v) pattern
+| PatPair of ('a, 'typ, 'v) pattern * ('a, 'typ, 'v) pattern
 (* PatRecord *)
-| PatAssign of 'v * const
+| PatAssign of 'v * ('a, 'typ, 'v) t
 [@@deriving ord]
 
-type ('a, 'typ, 'v) ast =
+and ('a, 'typ, 'v) ast =
 | Abstract of 'typ
 | Const of const
 | Var of 'v
@@ -52,7 +52,7 @@ type ('a, 'typ, 'v) ast =
 | Projection of projection * ('a, 'typ, 'v) t
 | RecordUpdate of ('a, 'typ, 'v) t * string * ('a, 'typ, 'v) t option
 | TypeConstr of ('a, 'typ, 'v) t * 'typ
-| PatMatch of ('a, 'typ, 'v) t * (('typ, 'v) pattern * ('a, 'typ, 'v) t) list
+| PatMatch of ('a, 'typ, 'v) t * (('a, 'typ, 'v) pattern * ('a, 'typ, 'v) t) list
 [@@deriving ord]
 
 and ('a, 'typ, 'v) t = 'a * ('a, 'typ, 'v) ast
@@ -168,6 +168,7 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
                 if Variable.equals v1 v2 then Some v1
                 else failwith "Variable names are conflicting.")
         in
+        let expr_env = env in
         let rec aux_p vtenv env pat =
             let find_or_def_var str =
                 if StrMap.mem str env
@@ -199,15 +200,31 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
                 let (p1, vtenv, env1) = aux_p vtenv env p1 in
                 let (p2, vtenv, env2) = aux_p vtenv env p2 in
                 (PatPair (p1, p2), vtenv, merge_disj env1 env2)
-            | PatAssign (str, c) ->
+            | PatAssign (str, e) ->
                 let var = find_or_def_var str in
-                (PatAssign (var, c), vtenv, StrMap.singleton str var)
+                let e = aux vtenv expr_env e in
+                (PatAssign (var, e), vtenv, StrMap.singleton str var)
         in
         let (pat, vtenv, env') = aux_p vtenv StrMap.empty pat in
         let env = StrMap.add_seq (StrMap.to_seq env') env in
         (pat, aux vtenv env e)
     in
     aux vtenv name_var_map e
+
+let map_p f p =
+    let rec aux p =
+        let p =
+            match p with
+            | PatAssign (v, e) -> PatAssign (v, e)
+            | PatType t -> PatType t
+            | PatVar v -> PatVar v
+            | PatAnd (p1, p2) -> PatAnd (aux p1, aux p2)
+            | PatOr (p1, p2) -> PatOr (aux p1, aux p2)
+            | PatPair (p1, p2) -> PatPair (aux p1, aux p2)
+        in
+        f p
+    in
+    aux p
 
 let rec unannot (_,e) =
     let e = match e with
@@ -225,9 +242,21 @@ let rec unannot (_,e) =
     | TypeConstr (e, t) -> TypeConstr (unannot e, t)
     | PatMatch (e, pats) ->
         PatMatch (unannot e, pats |>
-            List.map (fun (p, e) -> (p, unannot e)))
+            List.map (fun (p, e) -> (unannot_pat p, unannot e)))
     in
     ( (), e )
+
+and unannot_pat pat =
+    let rec aux pat = 
+        match pat with
+        | PatAssign (v, e) -> PatAssign (v, unannot e)
+        | PatType t -> PatType t
+        | PatVar v -> PatVar v
+        | PatAnd (p1, p2) -> PatAnd (aux p1, aux p2)
+        | PatOr (p1, p2) -> PatOr (aux p1, aux p2)
+        | PatPair (p1, p2) -> PatPair (aux p1, aux p2)
+    in
+    aux pat
 
 let normalize_bvs e =
     let rec aux depth map (a, e) =
@@ -260,9 +289,17 @@ let normalize_bvs e =
             (* NOTE: We do not normalize pattern variables,
                as two pattern matchings will almost never be
                syntactically equivalent anyway. *)
-            let pats = pats |> List.map (fun (p,e) -> (p, aux depth map e)) in
+            let pats = pats |> List.map (fun (p,e) ->
+                (aux_p depth map p, aux depth map e)) in
             PatMatch (e, pats)
         in (a, e)
+    and aux_p depth map pat =
+        let pa pat =
+            match pat with
+            | PatAssign (v, e) -> PatAssign (v, aux depth map e)
+            | p -> p
+        in
+        map_p pa pat
     in aux 0 VarMap.empty e
 
 let unannot_and_normalize e = e |> unannot |> normalize_bvs
@@ -299,10 +336,14 @@ let map_ast f e =
         | RecordUpdate (e, str, eo) -> RecordUpdate (aux e, str, Option.map aux eo)
         | TypeConstr (e, t) -> TypeConstr (aux e, t)
         | PatMatch (e, pats) ->
-            let pats = pats |> List.map (fun (p,e) -> (p, aux e)) in
+            let pats = pats |> List.map (fun (p,e) -> (aux_p p, aux e)) in
             PatMatch (aux e, pats)
         in
         f (annot, e)
+    and aux_p p =
+        match p with
+        | PatAssign (v, e) -> PatAssign (v, aux e)
+        | p -> p
     in
     aux e
 

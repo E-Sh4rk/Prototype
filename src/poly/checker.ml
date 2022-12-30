@@ -372,7 +372,7 @@ let rec infer_inst_a vardef tenv env pannot_a a =
     RecordUpdateA (res, Some r)
   | TypeConstr (v, s), PartialA ->
     let res = tallying [(vartype v, s)] in
-    ProjA res
+    ConstrA res
   | App (v1, v2), PartialA ->
     let t1 = vartype v1 in
     let t2 = vartype v2 in

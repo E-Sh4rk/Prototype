@@ -164,7 +164,7 @@ let rec vars_of_pat pat =
     VarSet.union (vars_of_pat p1) (vars_of_pat p2)
   | PatAssign (x,_) -> VarSet.singleton x
 
-let [@warning "-32"] rec def_of_var_pat pat v e =
+let rec def_of_var_pat pat v e =
   let open Ast in
   let (annot, _) = e in
   match pat with
@@ -185,6 +185,41 @@ let [@warning "-32"] rec def_of_var_pat pat v e =
   | PatAssign (v', c) when Variable.equals v v' -> (annot, Const c)
   | PatAssign _ -> assert false
   | PatType _ -> assert false
+
+let remove_pattern_matching e =
+  let aux (annot,e) =
+    let e =
+      match e with
+      | Ast.PatMatch (e, pats) ->
+        let x = Variable.create ~binding:false None in
+        Variable.attach_location x (Position.position annot) ;
+        let xe = (annot, Ast.Var x) in
+        let t = pats |> List.map fst |> List.map type_of_pat
+          |> Types.Additions.disj in
+        let e = (annot, Ast.TypeConstr (e, t)) in
+        let body_of_pat pat e =
+          let vars = vars_of_pat pat in
+          let add_def acc v =
+            let d = def_of_var_pat pat v xe in
+            (annot, Ast.Let (v, d, acc))
+          in
+          List.fold_left add_def e (VarSet.elements vars)
+        in
+        let add_branch acc (t, e) =
+          (annot, Ast.Ite (xe, t, e, acc))
+        in
+        let pats = pats |> List.map (fun (pat, e) ->
+          (type_of_pat pat, body_of_pat pat e)) |> List.rev in
+        let e' = match pats with
+        | [] -> assert false 
+        | (_, e)::pats -> List.fold_left add_branch e pats
+        in
+        Ast.Let (x, e, e')
+      | e -> e
+    in
+    (annot, e)
+  in
+  Ast.map_ast aux e
   
 let convert_to_msc ast =
   let aux expr_var_map ast =
@@ -245,7 +280,7 @@ let convert_to_msc ast =
       | Ast.TypeConstr (e, t) ->
         let (defs, expr_var_map, x) = to_defs_and_x expr_var_map e in
         (defs, expr_var_map, TypeConstr (x, t))
-      | Ast.PatMatch _ -> failwith "TODO"
+      | Ast.PatMatch _ -> assert false
 
     and to_defs_and_x ?(name=None) expr_var_map ast =
       let ((_, pos), _) = ast in
@@ -271,4 +306,4 @@ let convert_to_msc ast =
     let (defs, _, x) = to_defs_and_x expr_var_map ast in
     defs_and_x_to_e defs x
 
-  in aux ExprMap.empty ast
+  in aux ExprMap.empty (remove_pattern_matching ast)

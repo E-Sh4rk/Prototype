@@ -264,6 +264,45 @@ let refine_a env a t =
 (* =============== INFER I ============== *)
 (* ====================================== *)
 
+let types_equiv_modulo_renaming mono t1 t2 =
+  let (v1s, v2s) = (TVarSet.diff (vars t1) mono, TVarSet.diff (vars t2) mono) in
+  let (v1s, v2s) = (TVarSet.diff v1s v2s, TVarSet.diff v2s v1s) in
+  let (v1s, v2s) = (TVarSet.destruct v1s, TVarSet.destruct v2s) in
+  if List.length v1s <> List.length v2s
+  then None
+  else
+    perm v2s |> List.find_map (fun v2s ->
+      let subst = List.map2 (fun v1 v2 ->
+        (v1, TVar.typ v2)
+        ) v1s v2s |> Subst.construct in
+        let t1 = Subst.apply subst t1 in
+        if equiv t1 t2 then Some subst else None 
+    )
+
+let rec try_factorize res res_model =
+  let aux (a,b) (a',b') =
+    let mono = TVarSet.union (vars_mono a) (vars_mono a') in
+    let mono2 = TVarSet.diff (vars_poly b) (vars_poly a) in
+    match types_equiv_modulo_renaming (TVarSet.union mono mono2) a a' with
+    | None -> Subst.identity
+    | Some s ->
+      let s' = try_factorize (Subst.apply s b) b' in
+      Subst.compose s' s
+  in
+  if subtype res arrow_any && subtype res_model arrow_any
+  then
+    dnf res |> List.fold_left (fun acc arrows ->
+      arrows |> List.fold_left (fun acc (a,b) ->
+        dnf res_model |> List.fold_left (fun acc arrows_res ->
+          arrows_res |> List.fold_left (fun acc (a',b') ->
+            let s = aux (Subst.apply acc a, Subst.apply acc b) (a', b') in
+            Subst.compose s acc
+          ) acc
+        ) acc
+      ) acc
+    ) Subst.identity
+  else Subst.identity
+
 let simplify_tallying sols res =
   let is_better_sol s1 s2 =
     let t1 = Subst.apply s1 res in
@@ -295,7 +334,19 @@ let simplify_tallying sols res =
     Some sol
     ) in
   (* Remove weaker solutions *)
-  sols |> keep_only_minimal is_better_sol
+  let sols = sols |> keep_only_minimal is_better_sol in
+  (* Rename vars to allow factorisation of arrows *)
+  List.fold_left (fun sols sol ->
+    let sol_res = apply_subst_simplify sol res in
+    let sols_res = List.map snd sols in
+    let (sol, sol_res) =
+      sols_res |> List.fold_left (fun (sol, sol_res) sol_res' ->
+        let s = try_factorize sol_res sol_res' in
+        (Subst.compose s sol, apply_subst_simplify s sol_res)
+      ) (sol, sol_res)
+    in
+    (sol, sol_res)::sols
+  ) [] sols |> List.map fst
 
 let approximate_app t1 t2 resvar =
   (* NOTE: Approximation for tallying instances for the application *)
@@ -625,21 +676,6 @@ let simplify_tallying_infer tvars res sols =
     res
   ) *)
 
-let types_equiv_modulo_renaming mono t1 t2 =
-  let (v1s, v2s) = (TVarSet.diff (vars t1) mono, TVarSet.diff (vars t2) mono) in
-  let (v1s, v2s) = (TVarSet.diff v1s v2s, TVarSet.diff v2s v1s) in
-  let (v1s, v2s) = (TVarSet.destruct v1s, TVarSet.destruct v2s) in
-  if List.length v1s <> List.length v2s
-  then false
-  else
-    perm v2s |> List.exists (fun v2s ->
-      let subst = List.map2 (fun v1 v2 ->
-        (v1, TVar.typ v2)
-        ) v1s v2s |> Subst.construct in
-        let t1 = Subst.apply subst t1 in
-        equiv t1 t2
-    )
-
 let decorrelate_branches mono pannot_a =
   let open PartialAnnot in
   let rename_vars (t, pannot) =
@@ -701,7 +737,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
                   let pannot' = apply_subst subst_cur pannot' in
                   (* If it is equivalent to an existing branch modulo renaming, don't add it. *)
                   let ts = (List.map fst b)@explored in
-                  if ts |> List.exists (types_equiv_modulo_renaming x s)
+                  if ts |> List.exists (fun t -> types_equiv_modulo_renaming x s t <> None)
                   then None else Some (s, pannot')
                 else None
               )

@@ -3,9 +3,6 @@
   open Ast
   open Types.Additions
 
-  let parsing_error pos msg =
-    raise (SyntaxError (Position.string_of_pos pos, msg))
-
   let var_or_primitive = function
     | x -> Var x
 
@@ -66,7 +63,7 @@
 %token ANY EMPTY BOOL CHAR (*FLOAT*) INT TRUE FALSE UNIT NIL STRING LIST
 %token DOUBLEDASH TIMES PLUS MINUS DIV
 %token LBRACE RBRACE DOUBLEPOINT MATCH WITH END EQUAL_OPT POINT LT GT
-%token ATOMS TYPE TYPE_AND DOUBLE_OR DOUBLE_AND
+%token ATOMS TYPE TYPE_AND DOUBLE_OR (*DOUBLE_AND*)
 %token LBRACKET RBRACKET SEMICOLON
 %token<string> ID
 %token<string> TID
@@ -95,14 +92,8 @@
 %%
 
 program: e=element* EOF { e }
-| error {
-  parsing_error (Position.lex_join $startpos $endpos) "Syntax error."
-}
 
 unique_term: t=term EOF { t }
-| error {
-  parsing_error (Position.lex_join $startpos $endpos) "Syntax error."
-}
 
 element:
   a=definition { Definition (Utils.log_disabled, a) }

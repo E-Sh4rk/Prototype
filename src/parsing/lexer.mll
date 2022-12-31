@@ -1,6 +1,8 @@
 { (* Emacs, use -*- tuareg -*- to open this file. *)
   open Parser
 
+  exception LexerError of string
+
   let enter_newline lexbuf =
     Lexing.new_line lexbuf;
     lexbuf
@@ -42,7 +44,7 @@ rule token = parse
 | "type"  { TYPE }
 | "and"   { TYPE_AND }
 | "||"    { DOUBLE_OR }
-| "&&"    { DOUBLE_AND }
+(* | "&&"    { DOUBLE_AND } *)
 | "(*"    { comment 0 lexbuf }
 | "->"    { ARROW }
 | "&"     { AND }
@@ -110,10 +112,7 @@ rule token = parse
 | type_id as s { TID s }
 | type_var as s { TVAR (String.sub s 1 ((String.length s) - 1)) }
 | eof     { EOF }
-| _ as c  {
-  raise (Ast.LexicalError (lexbuf.Lexing.lex_curr_pos,
-      Printf.sprintf "Unexpected `%c'" c))
-}
+| _ { raise (LexerError ("Unexpected char: " ^ Lexing.lexeme lexbuf)) }
 
 and comment depth = parse
 | newline { enter_newline lexbuf |> comment depth }
@@ -123,10 +122,7 @@ and comment depth = parse
 | "(*" {
   comment (depth + 1) lexbuf
 }
-| eof {
-    raise (Ast.LexicalError (lexbuf.Lexing.lex_curr_pos,
-      "Unexecpted EOF inside comments."))
-}
+| eof { EOF }
 | _ {
   comment depth lexbuf
 }

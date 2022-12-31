@@ -5,7 +5,7 @@ open Pomap
 
 exception UndefinedSymbol of string
 
-exception LexicalError of int * string
+exception LexicalError of string * string
 exception SyntaxError of string * string (* position * msg *)
 
 type varname = string

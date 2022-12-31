@@ -124,11 +124,11 @@ let main f =
     type_check_program ast print_result print_ill_typed
   with
     | Ast.LexicalError(pos, msg) ->
-        Format.fprintf !err_fmt "Lexical error at position %d, %s\n%!" pos msg
-    | Ast.SyntaxError (spos, msg) ->
-       Format.fprintf !err_fmt "%s, %s\n%!" spos msg
+        Format.fprintf !err_fmt "Lexical error at position %s: %s\n%!" pos msg
+    | Ast.SyntaxError (pos, msg) ->
+       Format.fprintf !err_fmt "Syntax error at position %s: %s\n%!" pos msg
     | Ast.UndefinedSymbol s ->
-      Format.fprintf  !err_fmt "Error: undefined symbol `%s'\n%!" s
+      Format.fprintf  !err_fmt "Error: undefined symbol '%s'\n%!" s
     | e ->
       let msg = Printexc.to_string e
       and stack = Printexc.get_backtrace () in

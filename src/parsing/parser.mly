@@ -35,8 +35,6 @@
     | [] -> annot startpos endpos (Const Nil)
     | x::xs ->
     let left = x in let right = list_of_elts startpos endpos xs in
-    let pos_left = Ast.position_of_expr left in
-    let pos_right = Ast.position_of_expr right in
     annot startpos endpos (Pair (left,right))
 
   let rec record_update startpos endpos base = function
@@ -87,17 +85,13 @@ unique_term: t=term EOF { t }
 
 element:
   i=optional_debug a=toplevel_definition { Definition (i, a) }
-| a=atoms      { Atoms a }
-| a=types_def  { Types a }
+| ATOMS a=ID* { Atoms a }
+| TYPE ts=separated_nonempty_list(TYPE_AND, param_type_def) { Types ts }
 
 %inline optional_debug:
   { Utils.log_disabled }
 | DEBUG {Utils.log_full}
 | DEBUG i=lint { i }
-
-atoms: ATOMS a=ID* { a }
-
-types_def: TYPE ts=separated_nonempty_list(TYPE_AND, param_type_def) { ts }
 
 %inline param_type_def: name=TID params=list(TVAR) EQUAL t=typ { (name, params, t) }
 
@@ -157,7 +151,7 @@ atomic_term:
 | LBRACE obr=optional_base_record fs=separated_nonempty_list(COMMA, field_term) RBRACE
 { record_update $startpos $endpos obr fs }
 | LBRACKET lst=separated_list(SEMICOLON, term) RBRACKET
-{ list_of_elts (Position.lex_join $startpos $endpos) lst }
+{ list_of_elts $startpos $endpos lst }
 | LPAREN t=term COLON ty=typ RPAREN { annot $startpos $endpos (TypeConstr (t,ty)) }
 
 %inline optional_base_record:

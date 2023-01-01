@@ -15,13 +15,6 @@
     let pos_right = Ast.position_of_expr right in
     (Ast.new_annot (Position.join pos_left pos_right), Pair (left,right))
 
-  let rec product = function
-    | [] -> TBase TUnit
-    | [t] -> t
-    | t::ts ->
-    let left = t in let right = product ts in
-    TPair (left, right)
-
   let rec list_of_elts pos = function
     | [] -> (Ast.new_annot pos, Const Nil)
     | x::xs ->
@@ -83,8 +76,6 @@
 %right ARROW
 %left OR
 %left AND
-(*%left PLUS MINUS
-%left TIMES DIV*)
 %nonassoc DIFF
 %nonassoc NEG
 
@@ -223,28 +214,37 @@ prefix:
 (* ===== TYPES ===== *)
 
 typ:
+  { TBase TUnit }
+| t=simple_typ { t }
+| lhs=simple_typ COMMA rhs=typ { TPair (lhs, rhs) }
+
+nonempty_typ:
+  t=simple_typ { t }
+| lhs=simple_typ COMMA rhs=typ { TPair (lhs, rhs) }
+
+simple_typ:
   t=atomic_typ { t }
 | s=TID ts=nonempty_list(atomic_typ) { TCustom(ts, s) }
-| lhs=typ ARROW rhs=typ { TArrow (lhs, rhs) }
-| NEG t=typ { TNeg t }
-| lhs=typ OR rhs=typ  { TCup (lhs, rhs) }
-| lhs=typ AND rhs=typ { TCap (lhs, rhs) }
-| lhs=typ DIFF rhs=typ  { TDiff (lhs, rhs) }
+| lhs=simple_typ ARROW rhs=simple_typ { TArrow (lhs, rhs) }
+| NEG t=simple_typ { TNeg t }
+| lhs=simple_typ OR rhs=simple_typ  { TCup (lhs, rhs) }
+| lhs=simple_typ AND rhs=simple_typ { TCap (lhs, rhs) }
+| lhs=simple_typ DIFF rhs=simple_typ  { TDiff (lhs, rhs) }
 
 atomic_typ:
   x=type_constant { TBase x }
 | s=TID { TCustom ([], s) }
 | s=TVAR { TVar s }
-| LPAREN ts=separated_list(COMMA, typ) RPAREN { product ts }
+| LPAREN t=typ RPAREN { t }
 | LBRACE fs=separated_list(COMMA, typ_field) RBRACE { TRecord (false, fs) }
 | LBRACE fs=separated_list(COMMA, typ_field) DOUBLEPOINT RBRACE { TRecord (true, fs) }
 | LBRACKET re=typ_re RBRACKET { TSList re }
 
-typ_field:
-  id=identifier EQUAL t=typ { (id, t, false) }
-| id=identifier EQUAL_OPT t=typ { (id, t, true) }
+%inline typ_field:
+  id=identifier EQUAL t=simple_typ { (id, t, false) }
+| id=identifier EQUAL_OPT t=simple_typ { (id, t, true) }
 
-type_constant:
+%inline type_constant:
 (*  FLOAT { TyFloat }*)
   INT { TInt (None, None) }
 | i=lint { TInt (Some i, Some i) }
@@ -262,13 +262,15 @@ type_constant:
 | LIST { TList }
 | str=LSTRING { TSString str }
 
-type_interval:
+%inline type_interval:
   lb=lint DOUBLEDASH ub=lint { TInt (Some lb, Some ub) }
 | LPAREN DOUBLEDASH ub=lint RPAREN { TInt (None, Some ub) }
 | LPAREN lb=lint DOUBLEDASH RPAREN { TInt (Some lb, None) }
 | LPAREN DOUBLEDASH RPAREN { TInt (None, None) }
 
 (* ===== REGEX ===== *)
+
+(* TODO: Get rid of DOUBLE_OR by requiring atomic typ? *)
 
 typ_re:
   { ReEpsilon }
@@ -284,7 +286,7 @@ simple_re:
 | lhs=simple_re DOUBLE_OR rhs=atomic_re { ReAlt (lhs, rhs) }
 
 atomic_re:
-  t=typ { ReType t }
+  t=nonempty_typ { ReType t }
 | LPAREN re=strict_re RPAREN { re }
 | re=atomic_re TIMES { ReStar re }
 | re=atomic_re PLUS { ReSeq (re, ReStar re) }

@@ -3,10 +3,7 @@
   open Ast
   open Types.Additions
 
-  let var_or_primitive = function
-    | x -> Var x
-
-  let rec tuple pos = function
+  let rec tuple pos = function (* TODO: remove *)
     | [] -> (Ast.new_annot pos, Const Unit)
     | [x] -> x
     | x::xs ->
@@ -14,21 +11,6 @@
     let pos_left = Ast.position_of_expr left in
     let pos_right = Ast.position_of_expr right in
     (Ast.new_annot (Position.join pos_left pos_right), Pair (left,right))
-
-  let rec list_of_elts pos = function
-    | [] -> (Ast.new_annot pos, Const Nil)
-    | x::xs ->
-    let left = x in let right = list_of_elts pos xs in
-    let pos_left = Ast.position_of_expr left in
-    let pos_right = Ast.position_of_expr right in
-    (Ast.new_annot (Position.join pos_left pos_right), Pair (left,right))
-
-  let rec record_update base = function
-    | [] -> base
-    | (label,e)::fields ->
-      let pos = Position.join (position_of_expr base) (position_of_expr e) in
-      let base = (Ast.new_annot pos, RecordUpdate (base, label, Some e)) in
-      record_update base fields
 
   let annot sp ep e =
     (Ast.new_annot (Position.lex_join sp ep), e)
@@ -44,6 +26,24 @@
         annot startpos endpos (Lambda (annotation, tmp_var, body))
     in
     List.rev lst |> List.fold_left step t
+
+  let double_app startpos endpos f a b =
+    let app1 = annot startpos endpos (App (f, a)) in
+    annot startpos endpos (App (app1, b))
+
+  let rec list_of_elts startpos endpos = function
+    | [] -> annot startpos endpos (Const Nil)
+    | x::xs ->
+    let left = x in let right = list_of_elts startpos endpos xs in
+    let pos_left = Ast.position_of_expr left in
+    let pos_right = Ast.position_of_expr right in
+    annot startpos endpos (Pair (left,right))
+
+  let rec record_update startpos endpos base = function
+    | [] -> base
+    | (label,e)::fields ->
+      let base = annot startpos endpos (RecordUpdate (base, label, Some e)) in
+      record_update startpos endpos base fields
 
 %}
 
@@ -86,66 +86,84 @@ program: e=element* EOF { e }
 unique_term: t=term EOF { t }
 
 element:
-  a=definition { Definition (Utils.log_disabled, a) }
-| DEBUG a=definition { Definition (Utils.log_full, a) }
-| DEBUG i=LINT a=definition { Definition (i, a) }
+  i=optional_debug a=toplevel_definition { Definition (i, a) }
 | a=atoms      { Atoms a }
 | a=types_def  { Types a }
+
+%inline optional_debug:
+  { Utils.log_disabled }
+| DEBUG {Utils.log_full}
+| DEBUG i=LINT { i }
 
 atoms: ATOMS a=ID* { a }
 
 types_def: TYPE ts=separated_nonempty_list(TYPE_AND, param_type_def) { ts }
 
-param_type_def: name=TID params=list(TVAR) EQUAL t=typ { (name, params, t) }
+%inline param_type_def: name=TID params=list(TVAR) EQUAL t=typ { (name, params, t) }
+
+%inline toplevel_definition:
+  LET i=toplevel_identifier ais=parameter* ty=optional_type_annot EQUAL t=term
+  {
+    let t = multi_param_abstraction $startpos $endpos ais t in
+    (i, t, ty)
+  }
+
+%inline optional_type_annot:
+    { None }
+  | COLON t=typ { Some t }
+
+%inline definition:
+  d=toplevel_definition { d }
+  (* TODO: case of a single pattern *)
+
+%inline optional_test_type:
+  { TBase TTrue }
+| IS t=typ { t }
 
 term:
-  a=abstraction { a }
+  t=simple_term { t }
+  (* Explicitely annotated lambdas are not supported anymore *)
+| FUN ais=parameter+ ARROW t = term { multi_param_abstraction $startpos $endpos ais t }
 | d=definition IN t=term { annot $startpos $endpos (Let (Utils.fst3 d, Utils.snd3 d, t)) }
-(*| lhs=term b=binop rhs=term { App (App (Primitive b, lhs), rhs) }*)
-| t=simple_term { t }
-| IF t=term IS ty=typ THEN t1=term ELSE t2=term { annot $startpos $endpos (Ite (t,ty,t1,t2)) }
-| IF t=term THEN t1=term ELSE t2=term { annot $startpos $endpos (Ite (t,TBase TTrue,t1,t2)) }
-| MATCH t=term WITH pats=patterns END
-| MATCH t=term WITH OR pats=patterns END
-{ annot $startpos $endpos (PatMatch (t,pats)) }
+| IF t=term ott=optional_test_type THEN t1=term ELSE t2=term { annot $startpos $endpos (Ite (t,ott,t1,t2)) }
+| MATCH t=term WITH pats=patterns END { annot $startpos $endpos (PatMatch (t,pats)) }
 
 simple_term:
-  a=simple_term b=atomic_term { annot $startpos $endpos (App (a, b)) }
+  a=atomic_term { a }
+| a=simple_term b=atomic_term { annot $startpos $endpos (App (a, b)) }
 | FST a=atomic_term { annot $startpos $endpos (Projection (Fst, a)) }
 | SND a=atomic_term { annot $startpos $endpos (Projection (Snd, a)) }
-| a=atomic_term s=infix_term b=atomic_term
-{ let app1 = annot $startpos $endpos (App (s, a)) in
-  annot $startpos $endpos (App (app1, b)) }
+| a=atomic_term s=infix_term b=atomic_term { double_app $startpos $endpos s a b }
 | p=prefix_term a=atomic_term { annot $startpos $endpos (App (p, a)) }
-| a=atomic_term POINT id=identifier { annot $startpos $endpos (Projection (Field id, a)) }
-| a=atomic_term DIFF id=identifier { annot $startpos $endpos (RecordUpdate (a,id,None)) }
+| a=atomic_term POINT id=toplevel_identifier { annot $startpos $endpos (Projection (Field id, a)) }
+| a=atomic_term DIFF id=toplevel_identifier { annot $startpos $endpos (RecordUpdate (a,id,None)) }
 | LT t=typ GT { annot $startpos $endpos (Abstract t) }
-(*| m=MINUS t=atomic_term { App (Primitive Neg, t) }*)
-| a=atomic_term { a }
-
-field_term:
-  id=identifier EQUAL t=term { (id, t) }
 
 infix_term:
-  x=infix { annot $startpos $endpos (var_or_primitive x) }
+  x=infix { annot $startpos $endpos (Var x) }
 
 prefix_term:
-  x=prefix { annot $startpos $endpos (var_or_primitive x) }
+  x=prefix { annot $startpos $endpos (Var x) }
 
 atomic_term:
-  x=identifier { annot $startpos $endpos (var_or_primitive x) }
+  x=toplevel_identifier { annot $startpos $endpos (Var x) }
 | l=literal { annot $startpos $endpos (Const l) }
 | MAGIC { annot $startpos $endpos (Abstract (TBase TEmpty)) }
-| LBRACE fs=separated_list(COMMA, field_term) RBRACE
-{ record_update (annot $startpos $endpos (Const EmptyRecord)) fs }
 | LPAREN ts=separated_list(COMMA, term) RPAREN
-(* TODO: get rid of compulsory parentheses (and of the "tuple" function) *)
+(* TODO: get rid of compulsory parentheses *)
 { tuple (Position.lex_join $startpos $endpos) ts }
-| LBRACE a=atomic_term WITH fs=separated_nonempty_list(COMMA, field_term) RBRACE
-{ record_update a fs }
+| LBRACE obr=optional_base_record fs=separated_nonempty_list(COMMA, field_term) RBRACE
+{ record_update $startpos $endpos obr fs }
 | LBRACKET lst=separated_list(SEMICOLON, term) RBRACKET
 { list_of_elts (Position.lex_join $startpos $endpos) lst }
 | LPAREN t=term COLON ty=typ RPAREN { annot $startpos $endpos (TypeConstr (t,ty)) }
+
+%inline optional_base_record:
+  { annot $startpos $endpos (Const EmptyRecord) }
+| a=atomic_term WITH { a }
+
+%inline field_term:
+  id=toplevel_identifier EQUAL t=term { (id, t) }
 
 literal:
 (*f=LFLOAT { Float f }*)
@@ -161,19 +179,7 @@ lint:
 | LPAREN PLUS i=LINT RPAREN { i }
 | LPAREN MINUS i=LINT RPAREN { -i }
 
-%inline abstraction:
-(* Deactivated as we do not support explicitely annotated lambdas anymore *)
-//   FUN LPAREN ty=typ RPAREN hd=identifier tl=parameter* ARROW t=term
-// {
-//   let t = multi_param_abstraction $startpos $endpos tl t in
-//   annot $startpos $endpos (Lambda (AArrow ty, hd, t))
-// }
-| FUN ais=parameter+ ARROW t = term
-{
-  multi_param_abstraction $startpos $endpos ais t
-}
-
-%inline parameter:
+parameter:
   arg = ID { (Unnanoted, PatVar arg) }
   (* TODO: allow atomic_pattern to make tuples without parentheses *)
 | LPAREN arg = atomic_pattern opta = optional_param_type_annot RPAREN
@@ -183,18 +189,7 @@ lint:
     { Unnanoted }
   | COLON tys = separated_nonempty_list(SEMICOLON, typ) { ADomain tys }
 
-%inline definition:
-  LET i=identifier ais=parameter* ty=optional_type_annot EQUAL t=term
-  {
-    let t = multi_param_abstraction $startpos $endpos ais t in
-    (i, t, ty)
-  } (* TODO: Allow pattern matching on the identifier (but not at top-level) *)
-
-%inline optional_type_annot:
-    { None }
-  | COLON t=typ { Some t }
-
-identifier:
+toplevel_identifier:
   | x=ID | LPAREN x=prefix RPAREN | LPAREN x=infix RPAREN { x }
 
 infix:
@@ -235,13 +230,16 @@ atomic_typ:
 | s=TID { TCustom ([], s) }
 | s=TVAR { TVar s }
 | LPAREN t=typ RPAREN { t }
-| LBRACE fs=separated_list(COMMA, typ_field) RBRACE { TRecord (false, fs) }
-| LBRACE fs=separated_list(COMMA, typ_field) DOUBLEPOINT RBRACE { TRecord (true, fs) }
+| LBRACE fs=separated_list(COMMA, typ_field) o=optional_open RBRACE { TRecord (o, fs) }
 | LBRACKET re=typ_re RBRACKET { TSList re }
 
+%inline optional_open:
+  { false }
+| DOUBLEPOINT { true }
+
 %inline typ_field:
-  id=identifier EQUAL t=simple_typ { (id, t, false) }
-| id=identifier EQUAL_OPT t=simple_typ { (id, t, true) }
+  id=toplevel_identifier EQUAL t=simple_typ { (id, t, false) }
+| id=toplevel_identifier EQUAL_OPT t=simple_typ { (id, t, true) }
 
 %inline type_constant:
 (*  FLOAT { TyFloat }*)
@@ -293,6 +291,7 @@ atomic_re:
 
 %inline patterns:
   lst=separated_nonempty_list(OR, pat_line) {lst}
+| OR lst=separated_nonempty_list(OR, pat_line) {lst}
 
 %inline pat_line:
   p=pattern ARROW t=term { (p,t) }

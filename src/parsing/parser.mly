@@ -168,8 +168,7 @@ lint:
 
 parameter:
   arg = ID { (Unnanoted, PatVar arg) }
-  (* TODO: allow atomic_pattern to make tuples without parentheses *)
-| LPAREN arg = atomic_pattern opta = optional_param_type_annot RPAREN
+| LPAREN arg = pattern opta = optional_param_type_annot RPAREN
 { (opta, arg) }
 
 %inline optional_param_type_annot:
@@ -281,8 +280,7 @@ atomic_re:
   p=pattern ARROW t=term { (p,t) }
 
 pattern:
-  { PatType (TBase TUnit) }
-| p=simple_pattern { p }
+  p=simple_pattern { p }
 | lhs=simple_pattern COMMA rhs=pattern { PatPair (lhs, rhs) }
 
 simple_pattern:
@@ -294,4 +292,5 @@ simple_pattern:
 atomic_pattern:
   COLON t=atomic_typ { PatType t }
 | v=ID  { PatVar v }
+| LPAREN RPAREN { PatType (TBase TUnit) }
 | LPAREN p=pattern RPAREN { p }

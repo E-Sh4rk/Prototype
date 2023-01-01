@@ -15,13 +15,6 @@
     let pos_right = Ast.position_of_expr right in
     (Ast.new_annot (Position.join pos_left pos_right), Pair (left,right))
 
-  let rec pattern_tuple = function
-    | [] -> PatType (TBase TUnit)
-    | [x] -> x
-    | x::xs ->
-    let left = x in let right = pattern_tuple xs in
-    PatPair (left,right)
-
   let rec product = function
     | [] -> TBase TUnit
     | [t] -> t
@@ -47,11 +40,17 @@
   let annot sp ep e =
     (Ast.new_annot (Position.lex_join sp ep), e)
 
+  let tmp_var = "__gen__"
   let multi_param_abstraction startpos endpos lst t =
-    List.rev lst |> List.fold_left (
-      fun acc (annotation, v) ->
-        annot startpos endpos (Lambda (annotation, v, acc))
-    ) t
+    let step acc (annotation, pat) =
+      match pat with
+      | PatVar v -> annot startpos endpos (Lambda (annotation, v, acc))
+      | pat ->
+        let test = annot startpos endpos (Var tmp_var) in
+        let body = annot startpos endpos (PatMatch (test, [(pat, acc)])) in
+        annot startpos endpos (Lambda (annotation, tmp_var, body))
+    in
+    List.rev lst |> List.fold_left step t
 
 %}
 
@@ -134,7 +133,7 @@ simple_term:
 | a=atomic_term { a }
 
 field_term:
-  id=identifier EQUAL t=(*simple_term*)term { (id, t) }
+  id=identifier EQUAL t=term { (id, t) }
 
 infix_term:
   x=infix { annot $startpos $endpos (var_or_primitive x) }
@@ -149,6 +148,7 @@ atomic_term:
 | LBRACE fs=separated_list(COMMA, field_term) RBRACE
 { record_update (annot $startpos $endpos (Const EmptyRecord)) fs }
 | LPAREN ts=separated_list(COMMA, term) RPAREN
+(* TODO: get rid of compulsory parentheses (and of the "tuple" function) *)
 { tuple (Position.lex_join $startpos $endpos) ts }
 | LBRACE a=atomic_term WITH fs=separated_nonempty_list(COMMA, field_term) RBRACE
 { record_update a fs }
@@ -171,35 +171,37 @@ lint:
 | LPAREN MINUS i=LINT RPAREN { -i }
 
 %inline abstraction:
-  FUN LPAREN ty=typ RPAREN hd=identifier tl=annoted_identifier* ARROW t=term
-{
-  let t = multi_param_abstraction $startpos $endpos tl t in
-  annot $startpos $endpos (Lambda (AArrow ty, hd, t))
-}
-| FUN ais=annoted_identifier+ ARROW t = term
+(* Deactivated as we do not support explicitely annotated lambdas anymore *)
+//   FUN LPAREN ty=typ RPAREN hd=identifier tl=parameter* ARROW t=term
+// {
+//   let t = multi_param_abstraction $startpos $endpos tl t in
+//   annot $startpos $endpos (Lambda (AArrow ty, hd, t))
+// }
+| FUN ais=parameter+ ARROW t = term
 {
   multi_param_abstraction $startpos $endpos ais t
 }
 
-%inline annoted_identifier:
-  arg = identifier { (Unnanoted, arg) }
-| LPAREN arg = identifier COLON tys = separated_nonempty_list(SEMICOLON, typ) RPAREN
-{ (ADomain tys, arg) }
+%inline parameter:
+  arg = ID { (Unnanoted, PatVar arg) }
+  (* TODO: allow atomic_pattern to make tuples without parentheses *)
+| LPAREN arg = atomic_pattern opta = optional_param_type_annot RPAREN
+{ (opta, arg) }
+
+%inline optional_param_type_annot:
+    { Unnanoted }
+  | COLON tys = separated_nonempty_list(SEMICOLON, typ) { ADomain tys }
 
 %inline definition:
-  LET i=identifier ais=annoted_identifier* ty=optional_type_annot EQUAL t=term
+  LET i=identifier ais=parameter* ty=optional_type_annot EQUAL t=term
   {
     let t = multi_param_abstraction $startpos $endpos ais t in
     (i, t, ty)
-  }
+  } (* TODO: Allow pattern matching on the identifier (but not at top-level) *)
 
 %inline optional_type_annot:
     { None }
   | COLON t=typ { Some t }
-
-(*%inline binop :
-| PLUS  { Add }
-| TIMES { Mul }*)
 
 identifier:
   | x=ID | LPAREN x=prefix RPAREN | LPAREN x=infix RPAREN { x }
@@ -217,6 +219,8 @@ infix:
 prefix:
   | x=PREFIX {x}
   | INTERROGATION_MARK {"?"}
+
+(* ===== TYPES ===== *)
 
 typ:
   t=atomic_typ { t }
@@ -259,59 +263,53 @@ type_constant:
 | str=LSTRING { TSString str }
 
 type_interval:
-(*  LBRACKET lb=lint SEMICOLON ub=lint RBRACKET { TInt (Some lb, Some ub) }
-| LBRACKET SEMICOLON ub=lint RBRACKET { TInt (None, Some ub) }
-| LBRACKET lb=lint SEMICOLON RBRACKET { TInt (Some lb, None) }
-| LBRACKET SEMICOLON RBRACKET { TInt (None, None) }*)
   lb=lint DOUBLEDASH ub=lint { TInt (Some lb, Some ub) }
-| COLON DOUBLEDASH ub=lint { TInt (None, Some ub) }
-| lb=lint DOUBLEDASH COLON { TInt (Some lb, None) }
-| COLON DOUBLEDASH COLON { TInt (None, None) }
+| LPAREN DOUBLEDASH ub=lint RPAREN { TInt (None, Some ub) }
+| LPAREN lb=lint DOUBLEDASH RPAREN { TInt (Some lb, None) }
+| LPAREN DOUBLEDASH RPAREN { TInt (None, None) }
 
-(*%inline annoted(X): x=X {
-  (Position.with_poss $startpos $endpos (unique_exprid ()), x)
-}*)
+(* ===== REGEX ===== *)
 
 typ_re:
-  re=seq_re { re }
+  { ReEpsilon }
 | re=simple_re { re }
-| { ReEpsilon }
-(* rs=separated_list(SEMICOLON, simple_re)
-{ List.fold_left (fun acc r -> ReSeq (acc, r)) ReEpsilon rs }*)
-
-seq_re:
-  lhs=typ_re SEMICOLON rhs=simple_re { ReSeq (lhs, rhs) }
+| lhs=typ_re SEMICOLON rhs=simple_re { ReSeq (lhs, rhs) }
 
 simple_re:
   re=atomic_re { re }
-| re=alt_re { re }
+| lhs=simple_re DOUBLE_OR rhs=atomic_re { ReAlt (lhs, rhs) }
 
-alt_re:
-  lhs=simple_re DOUBLE_OR rhs=atomic_re { ReAlt (lhs, rhs) }
+%inline strict_re:
+| lhs=typ_re SEMICOLON rhs=simple_re { ReSeq (lhs, rhs) }
+| lhs=simple_re DOUBLE_OR rhs=atomic_re { ReAlt (lhs, rhs) }
 
 atomic_re:
   t=typ { ReType t }
-| LPAREN re=alt_re RPAREN { re }
-| LPAREN re=seq_re RPAREN { re }
+| LPAREN re=strict_re RPAREN { re }
 | re=atomic_re TIMES { ReStar re }
 | re=atomic_re PLUS { ReSeq (re, ReStar re) }
 | re=atomic_re INTERROGATION_MARK { ReAlt (re, ReEpsilon) }
 
+(* ===== PATTERNS ===== *)
+
+%inline patterns:
+  lst=separated_nonempty_list(OR, pat_line) {lst}
+
+%inline pat_line:
+  p=pattern ARROW t=term { (p,t) }
+
 pattern:
-  p=atomic_pattern {p}
-| lhs=pattern AND rhs=atomic_pattern { PatAnd (lhs, rhs) }
-| lhs=pattern OR rhs=atomic_pattern { PatOr (lhs, rhs) }
+  { PatType (TBase TUnit) }
+| p=simple_pattern { p }
+| lhs=simple_pattern COMMA rhs=pattern { PatPair (lhs, rhs) }
+
+simple_pattern:
+  p=atomic_pattern { p }
+| lhs=simple_pattern AND rhs=atomic_pattern { PatAnd (lhs, rhs) }
+| lhs=simple_pattern OR rhs=atomic_pattern { PatOr (lhs, rhs) }
+| v=ID EQUAL t=term { PatAssign (v, t) }
 
 atomic_pattern:
   COLON t=atomic_typ { PatType t }
 | v=ID  { PatVar v }
-| LPAREN ps=separated_list(COMMA, pattern) RPAREN
-{ pattern_tuple ps }
-| v=ID EQUAL t=term
-{ PatAssign (v, t) }
-
-pat_line:
-  p=pattern ARROW t=(*simple_term*)term { (p,t) }
-
-patterns:
-  lst=separated_nonempty_list(OR, pat_line) {lst}
+| LPAREN p=pattern RPAREN { p }

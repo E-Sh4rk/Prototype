@@ -3,15 +3,6 @@
   open Ast
   open Types.Additions
 
-  let rec tuple pos = function (* TODO: remove *)
-    | [] -> (Ast.new_annot pos, Const Unit)
-    | [x] -> x
-    | x::xs ->
-    let left = x in let right = tuple pos xs in
-    let pos_left = Ast.position_of_expr left in
-    let pos_right = Ast.position_of_expr right in
-    (Ast.new_annot (Position.join pos_left pos_right), Pair (left,right))
-
   let annot sp ep e =
     (Ast.new_annot (Position.lex_join sp ep), e)
 
@@ -123,6 +114,7 @@ term:
 | d=definition IN t=term { annot $startpos $endpos (Let (Utils.fst3 d, Utils.snd3 d, t)) }
 | IF t=term ott=optional_test_type THEN t1=term ELSE t2=term { annot $startpos $endpos (Ite (t,ott,t1,t2)) }
 | MATCH t=term WITH pats=patterns END { annot $startpos $endpos (PatMatch (t,pats)) }
+| lhs=simple_term COMMA rhs=term { annot $startpos $endpos (Pair (lhs, rhs)) }
 
 simple_term:
   a=atomic_term { a }
@@ -145,9 +137,8 @@ atomic_term:
   x=toplevel_identifier { annot $startpos $endpos (Var x) }
 | l=literal { annot $startpos $endpos (Const l) }
 | MAGIC { annot $startpos $endpos (Abstract (TBase TEmpty)) }
-| LPAREN ts=separated_list(COMMA, term) RPAREN
-(* TODO: get rid of compulsory parentheses *)
-{ tuple (Position.lex_join $startpos $endpos) ts }
+| LPAREN RPAREN { annot $startpos $endpos (Const Unit) }
+| LPAREN t=term RPAREN { t }
 | LBRACE obr=optional_base_record fs=separated_nonempty_list(COMMA, field_term) RBRACE
 { record_update $startpos $endpos obr fs }
 | LBRACKET lst=separated_list(SEMICOLON, term) RBRACKET
@@ -159,7 +150,7 @@ atomic_term:
 | a=atomic_term WITH { a }
 
 %inline field_term:
-  id=toplevel_identifier EQUAL t=term { (id, t) }
+  id=toplevel_identifier EQUAL t=simple_term { (id, t) }
 
 literal:
 (*f=LFLOAT { Float f }*)
@@ -205,10 +196,6 @@ prefix:
 (* ===== TYPES ===== *)
 
 typ:
-  { TBase TUnit }
-| t=nonempty_typ { t }
-
-%inline nonempty_typ:
   t=simple_typ { t }
 | lhs=simple_typ COMMA rhs=typ { TPair (lhs, rhs) }
 
@@ -225,6 +212,7 @@ atomic_typ:
   x=type_constant { TBase x }
 | s=TID { TCustom ([], s) }
 | s=TVAR { TVar s }
+| LPAREN RPAREN { TBase TUnit }
 | LPAREN t=typ RPAREN { t }
 | LBRACE fs=separated_list(COMMA, typ_field) o=optional_open RBRACE { TRecord (o, fs) }
 | LBRACKET re=typ_re RBRACKET { TSList re }
@@ -277,7 +265,7 @@ simple_re:
 | lhs=simple_re DOUBLE_OR rhs=atomic_re { ReAlt (lhs, rhs) }
 
 atomic_re:
-  t=nonempty_typ { ReType t }
+  t=typ { ReType t }
 | LPAREN re=strict_re RPAREN { re }
 | re=atomic_re TIMES { ReStar re }
 | re=atomic_re PLUS { ReSeq (re, ReStar re) }
@@ -301,7 +289,7 @@ simple_pattern:
   p=atomic_pattern { p }
 | lhs=simple_pattern AND rhs=atomic_pattern { PatAnd (lhs, rhs) }
 | lhs=simple_pattern OR rhs=atomic_pattern { PatOr (lhs, rhs) }
-| v=ID EQUAL t=term { PatAssign (v, t) }
+| v=ID EQUAL t=simple_term { PatAssign (v, t) }
 
 atomic_pattern:
   COLON t=atomic_typ { PatType t }

@@ -215,10 +215,9 @@ prefix:
 
 typ:
   { TBase TUnit }
-| t=simple_typ { t }
-| lhs=simple_typ COMMA rhs=typ { TPair (lhs, rhs) }
+| t=nonempty_typ { t }
 
-nonempty_typ:
+%inline nonempty_typ:
   t=simple_typ { t }
 | lhs=simple_typ COMMA rhs=typ { TPair (lhs, rhs) }
 
@@ -269,8 +268,6 @@ atomic_typ:
 | LPAREN DOUBLEDASH RPAREN { TInt (None, None) }
 
 (* ===== REGEX ===== *)
-
-(* TODO: Get rid of DOUBLE_OR by requiring atomic typ? *)
 
 typ_re:
   { ReEpsilon }

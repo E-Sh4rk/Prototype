@@ -112,6 +112,8 @@ types_def: TYPE ts=separated_nonempty_list(TYPE_AND, param_type_def) { ts }
     { None }
   | COLON t=typ { Some t }
 
+(* ===== TERMS ===== *)
+
 %inline definition:
   d=toplevel_definition { d }
   (* TODO: case of a single pattern *)

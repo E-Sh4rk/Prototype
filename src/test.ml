@@ -532,11 +532,15 @@ let b = <Rec 'b>
 
 (* Pattern matching *)
 
-let test_patterns x =
-  match x with (a,_) -> a end
+let test_patterns (a,_) = a
 
 let test2_patterns x =
   match x with (a,_)&(_,b) -> (a,b) end
+
+let test3_patterns x y =
+  let pack x y = (x,y) in
+  let (y,x) = pack x y in
+  pack x y
 
 let typeof_patterns x =
   match x with
@@ -549,8 +553,8 @@ let typeof_patterns x =
   end
 
 let land_patterns a b =
-  match (a,b) with
-  | (:True, :True) -> true
+  match a,b with
+  | :True, :True -> true
   | :Any -> false
   end
 

@@ -18,6 +18,11 @@
     in
     List.rev lst |> List.fold_left step t
 
+  let let_pattern startpos endpos pat d t =
+    match pat with
+    | PatVar v -> annot startpos endpos (Let (v, d, t))
+    | pat -> annot startpos endpos (PatMatch (d, [(pat, t)]))
+
   let double_app startpos endpos f a b =
     let app1 = annot startpos endpos (App (f, a)) in
     annot startpos endpos (App (app1, b))
@@ -75,7 +80,7 @@ program: e=element* EOF { e }
 unique_term: t=term EOF { t }
 
 element:
-  i=optional_debug a=toplevel_definition { Definition (i, a) }
+  i=optional_debug a=function_definition { Definition (i, a) }
 | ATOMS a=ID* { Atoms a }
 | TYPE ts=separated_nonempty_list(TYPE_AND, param_type_def) { Types ts }
 
@@ -86,8 +91,8 @@ element:
 
 %inline param_type_def: name=TID params=list(TVAR) EQUAL t=typ { (name, params, t) }
 
-%inline toplevel_definition:
-  LET i=toplevel_identifier ais=parameter* ty=optional_type_annot EQUAL t=term
+%inline function_definition:
+  LET i=generalized_identifier ais=parameter* ty=optional_type_annot EQUAL t=term
   {
     let t = multi_param_abstraction $startpos $endpos ais t in
     (i, t, ty)
@@ -99,9 +104,8 @@ element:
 
 (* ===== TERMS ===== *)
 
-%inline definition:
-  d=toplevel_definition { d }
-  (* TODO: case of a single pattern *)
+%inline pattern_definition:
+  LET LPAREN p = pattern RPAREN EQUAL t=term { (p, t) }
 
 %inline optional_test_type:
   { TBase TTrue }
@@ -111,7 +115,8 @@ term:
   t=simple_term { t }
   (* Explicitely annotated lambdas are not supported anymore *)
 | FUN ais=parameter+ ARROW t = term { multi_param_abstraction $startpos $endpos ais t }
-| d=definition IN t=term { annot $startpos $endpos (Let (Utils.fst3 d, Utils.snd3 d, t)) }
+| d=function_definition IN t=term { annot $startpos $endpos (Let (Utils.fst3 d, Utils.snd3 d, t)) }
+| d=pattern_definition IN t=term { let_pattern $startpos $endpos (fst d) (snd d) t }
 | IF t=term ott=optional_test_type THEN t1=term ELSE t2=term { annot $startpos $endpos (Ite (t,ott,t1,t2)) }
 | MATCH t=term WITH pats=patterns END { annot $startpos $endpos (PatMatch (t,pats)) }
 | lhs=simple_term COMMA rhs=term { annot $startpos $endpos (Pair (lhs, rhs)) }
@@ -123,8 +128,8 @@ simple_term:
 | SND a=atomic_term { annot $startpos $endpos (Projection (Snd, a)) }
 | a=atomic_term s=infix_term b=atomic_term { double_app $startpos $endpos s a b }
 | p=prefix_term a=atomic_term { annot $startpos $endpos (App (p, a)) }
-| a=atomic_term POINT id=toplevel_identifier { annot $startpos $endpos (Projection (Field id, a)) }
-| a=atomic_term DIFF id=toplevel_identifier { annot $startpos $endpos (RecordUpdate (a,id,None)) }
+| a=atomic_term POINT id=ID { annot $startpos $endpos (Projection (Field id, a)) }
+| a=atomic_term DIFF id=ID { annot $startpos $endpos (RecordUpdate (a,id,None)) }
 | LT t=typ GT { annot $startpos $endpos (Abstract t) }
 
 infix_term:
@@ -134,7 +139,7 @@ prefix_term:
   x=prefix { annot $startpos $endpos (Var x) }
 
 atomic_term:
-  x=toplevel_identifier { annot $startpos $endpos (Var x) }
+  x=generalized_identifier { annot $startpos $endpos (Var x) }
 | l=literal { annot $startpos $endpos (Const l) }
 | MAGIC { annot $startpos $endpos (Abstract (TBase TEmpty)) }
 | LPAREN RPAREN { annot $startpos $endpos (Const Unit) }
@@ -150,7 +155,7 @@ atomic_term:
 | a=atomic_term WITH { a }
 
 %inline field_term:
-  id=toplevel_identifier EQUAL t=simple_term { (id, t) }
+  id=ID EQUAL t=simple_term { (id, t) }
 
 literal:
 (*f=LFLOAT { Float f }*)
@@ -175,7 +180,7 @@ parameter:
     { Unnanoted }
   | COLON tys = separated_nonempty_list(SEMICOLON, typ) { ADomain tys }
 
-toplevel_identifier:
+generalized_identifier:
   | x=ID | LPAREN x=prefix RPAREN | LPAREN x=infix RPAREN { x }
 
 infix:
@@ -221,8 +226,8 @@ atomic_typ:
 | DOUBLEPOINT { true }
 
 %inline typ_field:
-  id=toplevel_identifier EQUAL t=simple_typ { (id, t, false) }
-| id=toplevel_identifier EQUAL_OPT t=simple_typ { (id, t, true) }
+  id=ID EQUAL t=simple_typ { (id, t, false) }
+| id=ID EQUAL_OPT t=simple_typ { (id, t, true) }
 
 %inline type_constant:
 (*  FLOAT { TyFloat }*)

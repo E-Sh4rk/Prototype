@@ -93,7 +93,7 @@ element:
 %inline optional_debug:
   { Utils.log_disabled }
 | DEBUG {Utils.log_full}
-| DEBUG i=LINT { i }
+| DEBUG i=lint { i }
 
 atoms: ATOMS a=ID* { a }
 

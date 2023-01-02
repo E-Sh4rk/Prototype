@@ -755,8 +755,9 @@ let rec infer_branches_a vardef tenv env pannot_a a =
   in
   match a, pannot_a with
   | _, PartialA -> Ok (PartialA)
-  | Alias _, InferA IMain | Abstract _, InferA IMain
-  | Const _, InferA IMain -> Ok (PartialA)
+  | Alias v, InferA IMain when memvar v -> Ok (PartialA)
+  | Alias _, InferA IMain -> Subst []
+  | Abstract _, InferA IMain | Const _, InferA IMain -> Ok (PartialA)
   | Pair (v1, v2), InferA IMain | Let (v1, v2), InferA IMain ->
     needvar [v1; v2] PartialA
   | Projection (p, v), InferA IMain ->

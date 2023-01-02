@@ -88,9 +88,6 @@ let pp_list pp_elt fmt lst =
   List.iter (fun elt -> Format.fprintf fmt "%a ; " pp_elt elt) lst ;
   Format.fprintf fmt "]"
 
-let assert_with b msg =
-  if not b then failwith msg
-
 let fst3 (a,_,_) = a
 let snd3 (_,b,_) = b
 let trd3 (_,_,c) = c

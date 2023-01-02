@@ -112,9 +112,10 @@ let type_check_program
     in
     ignore (List.fold_left treat_elem (empty_tenv, Ast.empty_name_var_map, Env.empty) program)
 
+type parsing_result =
+| PSuccess of Ast.parser_program
 
 let main f =
-  Printexc.record_backtrace true;
   try
     let ast =
       match f with
@@ -127,9 +128,7 @@ let main f =
         Format.fprintf !err_fmt "Lexical error at position %s: %s\n%!" pos msg
     | Ast.SyntaxError (pos, msg) ->
        Format.fprintf !err_fmt "Syntax error at position %s: %s\n%!" pos msg
-    | Ast.UndefinedSymbol s ->
-      Format.fprintf  !err_fmt "Error: undefined symbol '%s'\n%!" s
-    | e ->
-      let msg = Printexc.to_string e
-      and stack = Printexc.get_backtrace () in
-      Format.fprintf !err_fmt "Uncaught exception: %s%s\n%!" msg stack
+    | Ast.SymbolError msg ->
+      Format.fprintf !err_fmt "Symbol error: %s\n%!" msg
+    | TypeDefinitionError msg ->
+      Format.fprintf !err_fmt "Type definition error: %s\n%!" msg

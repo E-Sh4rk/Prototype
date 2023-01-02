@@ -3,7 +3,7 @@ open Types.Additions
 open Variable
 open Pomap
 
-exception UndefinedSymbol of string
+exception SymbolError of string
 exception LexicalError of string * string
 exception SyntaxError of string * string (* position * msg *)
 

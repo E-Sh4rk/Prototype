@@ -3,8 +3,7 @@ open Types.Additions
 open Variable
 open Pomap
 
-exception UndefinedSymbol of string
-
+exception SymbolError of string
 exception LexicalError of string * string
 exception SyntaxError of string * string (* position * msg *)
 
@@ -123,7 +122,7 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
             then Var (StrMap.find str env)
             else if has_atom tenv str
             then Const (Atom str)
-            else raise (UndefinedSymbol (str))
+            else raise (SymbolError ("undefined symbol "^str))
         | Lambda (t,str,e) ->
             let (t, vtenv) = match t with
             | Unnanoted -> (Unnanoted, vtenv)
@@ -146,7 +145,7 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
             let (t, vtenv) = type_expr_to_typ tenv vtenv t in
             if is_test_type t
             then Ite (aux vtenv env e, t, aux vtenv env e1, aux vtenv env e2)
-            else failwith "This is not a valid test type."
+            else raise (SymbolError ("typecases must use a valid test type"))
         | App (e1, e2) ->
             App (aux vtenv env e1, aux vtenv env e2)
         | Let (str, e1, e2) ->
@@ -168,9 +167,9 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
         ((exprid,pos),e)
     and aux_pat pos vtenv env (pat, e) =
         let merge_disj =
-            StrMap.union (fun _ v1 v2 ->
+            StrMap.union (fun str v1 v2 ->
                 if Variable.equals v1 v2 then Some v1
-                else failwith "Variable names are conflicting.")
+                else raise (SymbolError ("matched variables "^str^" are conflicting")))
         in
         let expr_env = env in
         let rec aux_p vtenv env pat =
@@ -185,7 +184,9 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
             match pat with
             | PatType t ->
                 let (t, vtenv) = type_expr_to_typ tenv vtenv t in
-                (PatType t, vtenv, StrMap.empty)
+                if is_test_type t
+                then (PatType t, vtenv, StrMap.empty)
+                else raise (SymbolError ("typecases must use a valid test type"))
             | PatVar str ->
                 if String.equal str dummy_pat_var_str
                 then (PatVar dummy_pat_var, vtenv, StrMap.empty)
@@ -201,14 +202,15 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
                 let env = merge_disj env env1 in 
                 let (p2, vtenv, env2) = aux_p vtenv env p2 in
                 if StrMap.equal (Variable.equals) env1 env2 |> not
-                then failwith "Missing variables in pattern." ;
+                then raise (SymbolError ("missing matched variables in pattern")) ;
                 (PatOr (p1, p2), vtenv, env1)
             | PatPair (p1, p2) ->
                 let (p1, vtenv, env1) = aux_p vtenv env p1 in
                 let (p2, vtenv, env2) = aux_p vtenv env p2 in
                 (PatPair (p1, p2), vtenv, merge_disj env1 env2)
             | PatAssign (str, e) ->
-                if String.equal str dummy_pat_var_str then failwith "Invalid var name for assignement." ;
+                if String.equal str dummy_pat_var_str
+                then raise (SymbolError "invalid variable name for a pattern assignement") ;
                 let var = find_or_def_var str in
                 let e = aux vtenv expr_env e in
                 (PatAssign (var, e), vtenv, StrMap.singleton str var)
@@ -383,8 +385,7 @@ let const_to_typ c =
     | Int i -> interval (Some i) (Some i)
     | Char c -> single_char c
     | String str -> single_string str
-    | Atom t ->
-        failwith (Printf.sprintf "Can't retrieve the type of the atom %s." t)
+    | Atom t -> raise (SymbolError ("undefined atom "^t))
 
 type parser_element =
 | Definition of (int * (string * parser_expr * type_expr option))

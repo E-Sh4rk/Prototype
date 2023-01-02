@@ -4,12 +4,11 @@ open Variable
 open Pomap
 
 exception SymbolError of string
-exception LexicalError of string * string
-exception SyntaxError of string * string (* position * msg *)
+exception LexicalError of Position.t * string
+exception SyntaxError of Position.t * string
 
 type varname = string
 type exprid = int
-
 
 type annotation = exprid Position.located
 
@@ -392,4 +391,4 @@ type parser_element =
 | Atoms of string list
 | Types of (string * string list * type_expr) list
 
-type parser_program = parser_element list
+type parser_program = (annotation * parser_element) list

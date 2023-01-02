@@ -49,7 +49,7 @@ let typecheck code =
   Js.string (to_string res)
 
 let _ =
-  Js.export "typecheck"
+  Js.export "checker"
     (object%js
        method typecheck code = typecheck code
      end)

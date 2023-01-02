@@ -26,8 +26,7 @@ let () =
         let txt = textarea##.value in
         begin match parse_and_resolve (`String (Js.to_string txt)) with
         | PSuccess (tenv, lst) ->
-            List.fold_left (fun env (ll, (v, e, ta)) ->
-                Utils.log_level := ll ;
+            List.fold_left (fun env (_, (v, e, ta)) ->
                 Format.fprintf ofmt "%s: %!" (Parsing.Variable.Variable.get_name v |> Option.get) ;
                 match type_check_def tenv env (v,e,ta) with
                 | TSuccess (t, env, (tmsc, ttype)) ->

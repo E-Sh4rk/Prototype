@@ -13,9 +13,9 @@ type typecheck_result =
 | TFailure of (Position.t list) * string
 
 exception IncompatibleType of typ
-let type_check_def tenv env (var,(annot,expr),typ_annot) =
+let type_check_def tenv env (var,expr,typ_annot) =
   let time0 = Unix.gettimeofday () in
-  let nf_expr = Msc.convert_to_msc (annot, expr) in
+  let nf_expr = Msc.convert_to_msc expr in
   let time1 = Unix.gettimeofday () in
   try
     Utils.log "%a@." Poly.Msc.pp_e nf_expr ;
@@ -38,7 +38,7 @@ let type_check_def tenv env (var,(annot,expr),typ_annot) =
   with
   | Poly.Checker.Untypeable (pos, str) -> TFailure (pos, str)
   | IncompatibleType _ ->
-    TFailure ([Position.position annot],
+    TFailure (Variable.get_locations var,
       "the type inferred is not a subtype of the type specified")
 
 type parsing_result =
@@ -63,6 +63,7 @@ let parse_and_resolve f =
         in
         let expr = Ast.parser_expr_to_annot_expr tenv empty_vtenv varm expr in
         let var = Variable.create ~binding:false (Some name) in
+        Variable.attach_location var (Position.position annot) ;
         let varm = StrMap.add name var varm in
         (tenv,varm,(log,(var,expr,tyo))::defs)
       | Ast.Atoms lst ->

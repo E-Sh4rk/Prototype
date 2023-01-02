@@ -24,7 +24,7 @@ Once CDuce is installed, our prototype can be built using
 ```
 git clone git@github.com:E-Sh4rk/Prototype.git
 cd Prototype/src
-opam install ppx_deriving ppx_inline_test ppx_expect menhir pomap
+opam install ppx_deriving ppx_inline_test ppx_expect yojson menhir pomap
 make
 ```
 

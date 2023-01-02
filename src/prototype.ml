@@ -1,7 +1,4 @@
 open Main
-  
-let print_result str =
-    Format.printf "%s@?" str
 
 let () =
     Printexc.record_backtrace true;

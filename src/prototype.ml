@@ -5,8 +5,7 @@ let () =
     try
         let fn = ref "test.ml" in
         if Array.length Sys.argv > 1 then fn := Sys.argv.(1) ;
-        match parse_and_resolve (`File !fn)
-        with
+        match parse_and_resolve (`File !fn) with
         | PSuccess (tenv, lst) ->
             List.fold_left (fun env (ll, (v, e, ta)) ->
                 Utils.log_level := ll ;

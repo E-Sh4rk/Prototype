@@ -33,7 +33,7 @@ let () =
                     Format.fprintf ofmt "%s (checked in %.02fms (msc:%.02fms, type:%.02fms))\n%!" 
                         (Types.Tvar.string_of_type_short t) (tmsc +. ttype) tmsc ttype ;
                     env
-                | TFailure (pos, msg) ->
+                | TFailure (pos, msg, _) ->
                     Format.fprintf efmt "Ill typed\n%!" ;
                     Utils.error efmt pos msg ;
                     env

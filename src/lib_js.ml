@@ -32,9 +32,10 @@ let typecheck code =
                   ("typeable", `Bool true) ; ("type", `String typ) ; ("time", `Float time)]
                 in
                 (env, typ::res)
-            | TFailure (pos, msg) ->
+            | TFailure (pos, msg, (tmsc, ttype)) ->
+              let time = tmsc +. ttype in
               let untyp =
-                `Assoc [("name", `String name) ; ("def_pos", json_of_pos def_pos) ;
+                `Assoc [("name", `String name) ; ("def_pos", json_of_pos def_pos) ; ("time", `Float time) ;
                 ("typeable", `Bool false) ; ("message", `String msg) ; ("pos", json_of_pos_list pos)]
               in
               (env, untyp::res)

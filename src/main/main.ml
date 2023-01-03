@@ -10,13 +10,19 @@ type def = Variable.t * Ast.annot_expr * typ option
 
 type typecheck_result =
 | TSuccess of typ * Env.t * (float * float)
-| TFailure of (Position.t list) * string
+| TFailure of (Position.t list) * string * (float * float)
 
 exception IncompatibleType of typ
 let type_check_def tenv env (var,expr,typ_annot) =
   let time0 = Unix.gettimeofday () in
   let nf_expr = Msc.convert_to_msc expr in
   let time1 = Unix.gettimeofday () in
+  let retrieve_times () =
+    let time2 = Unix.gettimeofday () in
+    let msc_time = (time1 -. time0 ) *. 1000. in
+    let typ_time = (time2 -. time1) *. 1000. in
+    (msc_time, typ_time)
+  in
   try
     Utils.log "%a@." Poly.Msc.pp_e nf_expr ;
     let typ = Poly.Checker.typeof_simple tenv env nf_expr in
@@ -30,16 +36,15 @@ let type_check_def tenv env (var,expr,typ_annot) =
           Subst.apply g typ'
         else raise (IncompatibleType typ)
     in
-    let time2 = Unix.gettimeofday () in
-    let msc_time = (time1 -. time0 ) *. 1000. in
-    let typ_time = (time2 -. time1) *. 1000. in
     let env = Env.add var typ env in
-    TSuccess (typ, env, (msc_time, typ_time))
+    TSuccess (typ, env, retrieve_times ())
   with
-  | Poly.Checker.Untypeable (pos, str) -> TFailure (pos, str)
+  | Poly.Checker.Untypeable (pos, str) ->
+    TFailure (pos, str, retrieve_times ())
   | IncompatibleType _ ->
     TFailure (Variable.get_locations var,
-      "the type inferred is not a subtype of the type specified")
+      "the type inferred is not a subtype of the type specified",
+      retrieve_times ())
 
 type parsing_result =
 | PSuccess of type_env * ((int * def) list)

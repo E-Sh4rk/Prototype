@@ -15,7 +15,7 @@ let () =
                     Format.printf "%s (checked in %.02fms (msc:%.02fms, type:%.02fms))\n%!" 
                         (Types.Tvar.string_of_type_short t) (tmsc +. ttype) tmsc ttype ;
                     env
-                | TFailure (pos, msg) ->
+                | TFailure (pos, msg, _) ->
                     Format.printf "Ill typed\n%!" ;
                     Utils.error Format.std_formatter pos msg ;
                     env

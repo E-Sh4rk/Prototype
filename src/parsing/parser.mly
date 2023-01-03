@@ -80,9 +80,9 @@ program: e=element* EOF { e }
 unique_term: t=term EOF { t }
 
 element:
-  i=optional_debug a=function_definition { annot $startpos $endpos (Definition (i, a)) }
-| ATOMS a=ID* { annot $startpos $endpos (Atoms a) }
-| TYPE ts=separated_nonempty_list(TYPE_AND, param_type_def) { annot $startpos $endpos (Types ts) }
+  i=optional_debug a=function_definition { annot $symbolstartpos $endpos (Definition (i, a)) }
+| ATOMS a=ID* { annot $symbolstartpos $endpos (Atoms a) }
+| TYPE ts=separated_nonempty_list(TYPE_AND, param_type_def) { annot $symbolstartpos $endpos (Types ts) }
 
 %inline optional_debug:
   { Utils.log_disabled }

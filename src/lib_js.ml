@@ -22,19 +22,19 @@ let typecheck code =
         let (_, res) =
           List.fold_left (fun (env, res) (_, (v, e, ta)) ->
             let name = Parsing.Variable.Variable.get_name v |> Option.get in
-            let def_pos = Parsing.Variable.Variable.get_locations v in
+            let def_pos = Parsing.Variable.Variable.get_locations v |> List.hd in
             match type_check_def tenv env (v,e,ta) with
             | TSuccess (t, env, (tmsc, ttype)) ->
                 let typ = Types.Tvar.string_of_type_short t in
                 let time = tmsc +. ttype in
                 let typ =
-                  `Assoc [("name", `String name) ; ("def_pos", json_of_pos_list def_pos) ;
+                  `Assoc [("name", `String name) ; ("def_pos", json_of_pos def_pos) ;
                   ("typeable", `Bool true) ; ("type", `String typ) ; ("time", `Float time)]
                 in
                 (env, typ::res)
             | TFailure (pos, msg) ->
               let untyp =
-                `Assoc [("name", `String name) ; ("def_pos", json_of_pos_list def_pos) ;
+                `Assoc [("name", `String name) ; ("def_pos", json_of_pos def_pos) ;
                 ("typeable", `Bool false) ; ("message", `String msg) ; ("pos", json_of_pos_list pos)]
               in
               (env, untyp::res)

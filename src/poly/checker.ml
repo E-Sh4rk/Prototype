@@ -705,6 +705,8 @@ let rec infer_branches_a vardef tenv env pannot_a a =
           let g = generalize nvs in let m = Subst.inverse_renaming g in
           Subst.apply g t |> clean_type ~pos:any ~neg:empty |> Subst.apply m) *)
         |> disj in
+      (* TODO: For each branch s, remove in s the conjunctions of arrows
+          that contain a branch with an empty codomain. *)
       let b = b |> List.filter
         (fun (s,_) -> subtype s explored_domain |> not) in
       match b with

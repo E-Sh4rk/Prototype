@@ -64,6 +64,9 @@ val column : Lexing.position -> int
 (** [column p] returns the line number of to the Lexing.position [p]. *)
 val line : Lexing.position -> int
 
+(** [column p] returns the offset from the beginning of the Lexing.position [p]. *)
+val offset : Lexing.position -> int
+
 (** [characters p1 p2] returns the character interval
     between [p1] and [p2] assuming they are located in the same
     line. *)

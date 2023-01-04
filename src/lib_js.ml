@@ -6,10 +6,11 @@ module Html = Dom_html
 
 let json_of_pos pos =
   let open Position in
-  let start = start_of_position pos in
-  let endd = end_of_position pos in
-  `Assoc [("startLine", `Int (line start)) ; ("startCol", `Int (column start)) ;
-  ("endLine", `Int (line endd)) ; ("endCol", `Int (column endd))]
+  let startp = start_of_position pos in
+  let endp = end_of_position pos in
+  `Assoc [("startLine", `Int (line startp)) ; ("startCol", `Int (column startp)) ;
+  ("endLine", `Int (line endp)) ; ("endCol", `Int (column endp)) ;
+  ("startOffset", `Int (offset startp)) ; ("endOffset", `Int (offset endp))]
 
 let json_of_pos_list pos =
   `List (List.map json_of_pos pos)

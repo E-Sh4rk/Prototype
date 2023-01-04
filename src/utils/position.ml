@@ -62,6 +62,9 @@ let line p =
 let column p =
   p.pos_cnum - p.pos_bol
 
+let offset p =
+  p.pos_cnum
+
 let characters p1 p2 =
   (column p1, p2.pos_cnum - p1.pos_bol) (* intentionally [p1.pos_bol] *)
 

@@ -385,14 +385,6 @@ let filter_aux_pure filter (f: ('a->True) & ('b -> ~True)) (l:[('a|'b)*]) =
 
 let filter = fixpoint filter_aux_pure
 
-(* TODO: Why is the type so complicated?
-   It also seems non-symetrical regarding the (True ; ~True) possibilities explored. *)
-let filter_aux_pure_unanotated filter f l =
-  if l is Nil then nil else
-  if l is [Any+] then
-      if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
-  else 42(3)
-
 (*
    A new variation that does not require the
    characteristic function to be defined on Any

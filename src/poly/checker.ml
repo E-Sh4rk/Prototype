@@ -709,6 +709,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
           let g = generalize nvs in let m = Subst.inverse_renaming g in
           Subst.apply g t |> clean_type ~pos:any ~neg:empty |> Subst.apply m) *)
         |> disj in
+      (* Remove branches with a domain that has already been explored *)
       let b = b |> List.filter
         (fun (s,_) -> subtype s explored_domain |> not) in
       match b with
@@ -869,8 +870,18 @@ let rec infer_branches_a vardef tenv env pannot_a a =
   | Lambda ((), AArrow _, _, _), InferA IMain ->
     raise (Untypeable ([], "Arrows with full annotations are not supported."))
   | Lambda ((), _, v, e), LambdaA (b1, b2) ->
-    if b1@b2 |> List.for_all (fun (s,_) -> is_empty s)
-    then Subst [] else lambda v (b1,b2) e
+    (* Remove branches that want an argument too strong *)
+    let is_interesting (s, _) =
+      subtype s arrow_any |> not ||
+      dnf s |> List.for_all (fun conjuncts -> conjuncts |>
+        List.exists (fun (a, b) -> non_empty a && is_empty b)
+      ) |> not
+    in
+    (* NOTE: we cannot remove branches that are already treated if
+        the type of this lambda has already been used somewhere. *)
+    let b1 = if b2 <> [] then b1 |> List.filter is_interesting else b1 in
+    let b2 = b2 |> List.filter is_interesting in
+    if b1@b2 = [] then Subst [] else lambda v (b1,b2) e
   | _, _ -> assert false
 
 and infer_branches tenv env pannot e =

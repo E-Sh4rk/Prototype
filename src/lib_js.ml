@@ -15,17 +15,21 @@ let json_of_pos pos =
 let json_of_pos_list pos =
   `List (List.map json_of_pos pos)
 
-let typecheck code =
+let typecheck code callback =
   let res =
     try (
       match parse_and_resolve (`String (Js.to_string code)) with
       | PSuccess (tenv, lst) ->
+        let ok_answer res =
+          `Assoc [("exit_code", `Int 0); ("results", `List (List.rev res))]
+        in
         let (_, res) =
           List.fold_left (fun (env, res) (_, (v, e, ta)) ->
             let name = Parsing.Variable.Variable.get_name v |> Option.get in
             let def_pos = Parsing.Variable.Variable.get_locations v |> List.hd in
-            match type_check_def tenv env (v,e,ta) with
-            | TSuccess (t, env, (tmsc, ttype)) ->
+            let (env, res) =
+              match type_check_def tenv env (v,e,ta) with
+              | TSuccess (t, env, (tmsc, ttype)) ->
                 let typ = Types.Tvar.string_of_type_short t in
                 let time = tmsc +. ttype in
                 let typ =
@@ -33,16 +37,22 @@ let typecheck code =
                   ("typeable", `Bool true) ; ("type", `String typ) ; ("time", `Float time)]
                 in
                 (env, typ::res)
-            | TFailure (pos, msg, (tmsc, ttype)) ->
-              let time = tmsc +. ttype in
-              let untyp =
-                `Assoc [("name", `String name) ; ("def_pos", json_of_pos def_pos) ; ("time", `Float time) ;
-                ("typeable", `Bool false) ; ("message", `String msg) ; ("pos", json_of_pos_list pos)]
+              | TFailure (pos, msg, (tmsc, ttype)) ->
+                let time = tmsc +. ttype in
+                let untyp =
+                  `Assoc [("name", `String name) ; ("def_pos", json_of_pos def_pos) ; ("time", `Float time) ;
+                  ("typeable", `Bool false) ; ("message", `String msg) ; ("pos", json_of_pos_list pos)]
+                in
+                (env, untyp::res)
               in
-              (env, untyp::res)
+              if Js.Opt.test callback then (
+                let intermediate_answer = ok_answer res |> to_string |> Js.string in
+                Js.Unsafe.fun_call callback [| intermediate_answer |> Js.Unsafe.inject |] |> ignore
+              ) ;
+              (env, res)
           ) (Common.Env.empty, []) lst
         in
-        `Assoc [("exit_code", `Int 0); ("results", `List (List.rev res))]
+        ok_answer res
       | PFailure (pos, msg) ->
         `Assoc [("exit_code", `Int (-2)); ("message", `String msg); ("pos", json_of_pos_list [pos])]
     ) with _ ->
@@ -53,5 +63,5 @@ let typecheck code =
 let _ =
   Js.export "checker"
     (object%js
-       method typecheck code = typecheck code
+       method typecheck code callback = typecheck code callback
      end)

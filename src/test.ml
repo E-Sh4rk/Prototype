@@ -4,6 +4,9 @@ let (+) = <Int->Int->Int>
 let ( * ) = <Int->Int->Int>
 let succ = <Int->Int>
 
+let more_than_declarative (x : Any -> Any) = 
+    let y = x in if x y is Int then (y x) + 1 else 42
+
 let impossible_branch = fun x ->
     if x is Int then x + 1 else (42 3)
 
@@ -461,7 +464,7 @@ let filter_classic = fixpoint filter_aux_classic
 
 (* Tail recursive version *)
 
-(* The following make the type-checker diverge
+(* The following make the type-checker diverge 
  let filter : ((('a & 'b) -> True) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ]  =
    fun f -> fun l ->
    let filter_tr_aux  

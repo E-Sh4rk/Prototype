@@ -651,6 +651,12 @@ let simplify_tallying_infer tvars res sols =
       ) |> Subst.construct in
     Subst.combine common respart
   )
+  (* Remove "empty" solutions *)
+  |> (fun sols -> if bot_instance res |> is_empty then sols
+      else sols |> List.filter (fun sol ->
+        Subst.restrict sol tvars |> Subst.is_identity ||
+        Subst.apply sol res |> bot_instance |> non_empty
+    ))
   (* Simplify (heavy) *)
   |> List.map (fun sol ->
     let new_dom = TVarSet.inter (Subst.dom sol) tvars in
@@ -663,11 +669,8 @@ let simplify_tallying_infer tvars res sols =
   )
   (* Remove "less general" solutions *)
   |> keep_only_minimal better_sol
-  (* Restrict and normalize *)
+  (* Restrict and remove duplicates *)
   |> List.map (fun sol -> Subst.restrict sol tvars)
-  (* |> List.filter
-    (fun sol -> sol |> Subst.destruct |> List.for_all (fun (_,t) -> non_empty t)) *)
-    (* TODO: Remove solutions that make the result empty (except if it was empty before) *)
   |> remove_duplicates Subst.equiv
   (* Printing (debug) *)
   (* |> (fun res ->
@@ -706,8 +709,6 @@ let rec infer_branches_a vardef tenv env pannot_a a =
           let g = generalize nvs in let m = Subst.inverse_renaming g in
           Subst.apply g t |> clean_type ~pos:any ~neg:empty |> Subst.apply m) *)
         |> disj in
-      (* TODO: For each branch s, remove in s the conjunctions of arrows
-          that contain a branch with an empty codomain. *)
       let b = b |> List.filter
         (fun (s,_) -> subtype s explored_domain |> not) in
       match b with

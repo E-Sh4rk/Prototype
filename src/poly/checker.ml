@@ -667,6 +667,7 @@ let simplify_tallying_infer tvars res sols =
   |> List.map (fun sol -> Subst.restrict sol tvars)
   (* |> List.filter
     (fun sol -> sol |> Subst.destruct |> List.for_all (fun (_,t) -> non_empty t)) *)
+    (* TODO: Remove solutions that make the result empty (except if it was empty before) *)
   |> remove_duplicates Subst.equiv
   (* Printing (debug) *)
   (* |> (fun res ->
@@ -806,7 +807,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
   | TypeConstr (v, s), InferA IMain ->
     if memvar v then
       let res = tallying_infer [(vartype v, s)] in
-      let res = simplify_tallying_infer (Env.tvars env) empty res in
+      let res = simplify_tallying_infer (Env.tvars env) s res in
       Subst (packannot PartialA res)
     else
       needvar [v] (InferA IMain)

@@ -635,6 +635,7 @@ let simplify_tallying_infer env res sols =
       )
     in
     params_types |> List.for_all (fun t ->
+      TVarSet.inter (vars_mono t) (Subst.dom sol) |> TVarSet.is_empty ||
       is_undesirable t || not (is_undesirable (apply_subst_simplify sol t))
     )
   )

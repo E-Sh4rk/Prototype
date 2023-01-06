@@ -267,6 +267,14 @@ and unannot_pat pat =
     in
     aux pat
 
+let predefined_vars = Hashtbl.create 100
+let get_predefined_var i =
+  if Hashtbl.mem predefined_vars i
+  then Hashtbl.find predefined_vars i
+  else
+    let v = Variable.create_other None in
+    Hashtbl.add predefined_vars i v ;
+    v
 let normalize_bvs e =
     let rec aux depth map (a, e) =
         let e = match e with

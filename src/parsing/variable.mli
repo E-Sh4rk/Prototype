@@ -19,7 +19,5 @@ module Variable : sig
   val get_typevar : t -> int -> TVar.t
 end
 
-val get_predefined_var : int -> Variable.t
-
 module VarMap : Map.S with type key=Variable.t
 module VarSet : Set.S with type elt=Variable.t

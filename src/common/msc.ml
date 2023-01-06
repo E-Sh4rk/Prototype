@@ -193,7 +193,7 @@ let remove_pattern_matching e =
     let e =
       match e with
       | Ast.PatMatch (e, pats) ->
-        let x = Variable.create ~binding:false None in
+        let x = Variable.create_other None in
         Variable.attach_location x (Position.position annot) ;
         let xe = (annot, Ast.Var x) in
         let t = pats |> List.map fst |> List.map type_of_pat
@@ -288,7 +288,7 @@ let convert_to_msc ast =
       let ((_, pos), _) = ast in
       try
         let (defs, expr_var_map, a) = to_defs_and_a expr_var_map ast in
-        let var = Variable.create ~binding:true name in
+        let var = Variable.create_binding name in
         Variable.attach_location var pos ;
         let expr_var_map =
           ExprMap.add (Ast.unannot_and_normalize ast) var expr_var_map in

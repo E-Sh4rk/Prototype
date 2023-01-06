@@ -107,7 +107,7 @@ let copy_annot a =
 
 let dummy_pat_var_str = "_"
 let dummy_pat_var =
-    Variable.create ~binding:false (Some dummy_pat_var_str)
+    Variable.create_other (Some dummy_pat_var_str)
 
 let parser_expr_to_annot_expr tenv vtenv name_var_map e =
     let rec aux vtenv env ((exprid,pos),e) =
@@ -136,7 +136,7 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
                 let (t, vtenv) = type_expr_to_typ tenv vtenv t in
                 (AArrow (t), vtenv)
             in
-            let var = Variable.create ~binding:false (Some str) in
+            let var = Variable.create_lambda (Some str) in
             Variable.attach_location var pos ;
             let env = StrMap.add str var env in
             Lambda (t, var, aux vtenv env e)
@@ -148,7 +148,7 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
         | App (e1, e2) ->
             App (aux vtenv env e1, aux vtenv env e2)
         | Let (str, e1, e2) ->
-            let var = Variable.create ~binding:false (Some str) in
+            let var = Variable.create_other (Some str) in
             Variable.attach_location var pos ;
             let env' = StrMap.add str var env in
             Let (var, aux vtenv env e1, aux vtenv env' e2)
@@ -176,7 +176,7 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
                 if StrMap.mem str env
                 then StrMap.find str env
                 else
-                    let var = Variable.create ~binding:false (Some str) in
+                    let var = Variable.create_other (Some str) in
                     Variable.attach_location var pos ;
                     var
             in

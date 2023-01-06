@@ -562,8 +562,12 @@ let subst_more_general s1 s2 =
     [(t1, t2) ; (t2, t1)]
   ) |> List.flatten |> tallying <> []
 
-let simplify_tallying_infer tvars res sols =
-  let tvars = TVarSet.filter TVar.is_mono tvars in
+let simplify_tallying_infer env res sols =
+  let tvars = Env.tvars env |> TVarSet.filter TVar.is_mono in
+  let params_types = Env.domain env |>
+    List.filter Variable.is_lambda_var |>
+    List.map (fun v -> Env.find v env)
+  in
   let replace_toplevel t v =
     let involved = TVarSet.diff (top_vars t) tvars in
     vars_with_polarity t |> List.filter_map (fun (v', k) ->
@@ -622,6 +626,19 @@ let simplify_tallying_infer tvars res sols =
     let g = Subst.compose_restr clean g in
     Subst.compose g sol
   )
+  (* Remove solutions that require "undesirable" lambda branches *)
+  |> List.filter (fun sol ->
+    let rec is_undesirable s =
+      subtype s arrow_any &&
+      dnf s |> List.for_all (fun conjuncts -> conjuncts |>
+        List.exists (fun (a, b) -> non_empty a && is_undesirable b)
+      )
+    in
+    params_types |> List.for_all (fun t ->
+      is_undesirable t || not (is_undesirable (apply_subst_simplify sol t))
+    )
+  )
+  (* Remove solutions that require "undesirable" lambda branches *)
   (* Simplify (light) *)
   |> List.map (fun sol ->
     let new_dom = TVarSet.inter (Subst.dom sol) tvars in
@@ -651,12 +668,6 @@ let simplify_tallying_infer tvars res sols =
       ) |> Subst.construct in
     Subst.combine common respart
   )
-  (* Remove "empty" solutions *)
-  |> (fun sols -> if bot_instance res |> is_empty then sols
-      else sols |> List.filter (fun sol ->
-        Subst.restrict sol tvars |> Subst.is_identity ||
-        Subst.apply sol res |> bot_instance |> non_empty
-    ))
   (* Simplify (heavy) *)
   |> List.map (fun sol ->
     let new_dom = TVarSet.inter (Subst.dom sol) tvars in
@@ -785,7 +796,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       res |> List.iter (fun s ->
         log ~level:3 "Solution: %a@." Subst.pp s
       ) ;
-      let res = simplify_tallying_infer (Env.tvars env) (TVar.typ alpha) res in
+      let res = simplify_tallying_infer env (TVar.typ alpha) res in
       res |> List.iter (fun s ->
         log ~level:3 "Solution (simplified): %a@." Subst.pp s
       ) ;
@@ -795,21 +806,21 @@ let rec infer_branches_a vardef tenv env pannot_a a =
   | RecordUpdate (v, _, None), InferA IMain ->
     if memvar v then
       let res = tallying_infer [(vartype v, record_any)] in
-      let res = simplify_tallying_infer (Env.tvars env) record_any res in
+      let res = simplify_tallying_infer env empty res in
       Subst (packannot PartialA res)
     else
       needvar [v] (InferA IMain)
   | RecordUpdate (v, _, Some v'), InferA IMain ->
     if memvar v && memvar v' then
       let res = tallying_infer [(vartype v, record_any)] in
-      let res = simplify_tallying_infer (Env.tvars env) record_any res in
+      let res = simplify_tallying_infer env empty res in
       Subst (packannot PartialA res)
     else
       needvar [v ; v'] (InferA IMain)
   | TypeConstr (v, s), InferA IMain ->
     if memvar v then
       let res = tallying_infer [(vartype v, s)] in
-      let res = simplify_tallying_infer (Env.tvars env) s res in
+      let res = simplify_tallying_infer env empty res in
       Subst (packannot PartialA res)
     else
       needvar [v] (InferA IMain)
@@ -825,7 +836,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       res |> List.iter (fun s ->
         log ~level:3 "Solution: %a@." Subst.pp s
       ) ;
-      let res = simplify_tallying_infer (Env.tvars env) (TVar.typ alpha) res in
+      let res = simplify_tallying_infer env (TVar.typ alpha) res in
       res |> List.iter (fun s ->
         log ~level:3 "Solution (simplified): %a@." Subst.pp s
       ) ;
@@ -844,7 +855,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
         res |> List.iter (fun s ->
           log ~level:3 "Solution: %a@." Subst.pp s
         ) ;
-        let res = simplify_tallying_infer (Env.tvars env) empty res in
+        let res = simplify_tallying_infer env empty res in
         res |> List.iter (fun s ->
           log ~level:3 "Solution (simplified): %a@." Subst.pp s
         ) ;
@@ -870,17 +881,6 @@ let rec infer_branches_a vardef tenv env pannot_a a =
   | Lambda ((), AArrow _, _, _), InferA IMain ->
     raise (Untypeable ([], "Arrows with full annotations are not supported."))
   | Lambda ((), _, v, e), LambdaA (b1, b2) ->
-    (* Remove branches that want an argument too strong *)
-    let is_interesting (s, _) =
-      subtype s arrow_any |> not ||
-      dnf s |> List.for_all (fun conjuncts -> conjuncts |>
-        List.exists (fun (a, b) -> non_empty a && is_empty b)
-      ) |> not
-    in
-    (* NOTE: we cannot remove branches that are already treated if
-        the type of this lambda has already been used somewhere. *)
-    let b1 = if b2 <> [] then b1 |> List.filter is_interesting else b1 in
-    let b2 = b2 |> List.filter is_interesting in
     if b1@b2 = [] then Subst [] else lambda v (b1,b2) e
   | _, _ -> assert false
 

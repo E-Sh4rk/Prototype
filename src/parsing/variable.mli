@@ -6,7 +6,10 @@ module Variable : sig
   val show : t -> string
   val compare : t -> t -> int
   val equals : t -> t -> bool
-  val create : binding:bool -> string option -> t
+  (* val create : binding:bool -> lambda:bool -> string option -> t *)
+  val create_binding : string option -> t
+  val create_lambda : string option -> t
+  val create_other : string option -> t
   val attach_location : t -> Position.t -> unit
   val get_locations : t -> Position.t list
   val is_binding_var : t -> bool

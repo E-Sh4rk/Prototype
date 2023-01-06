@@ -67,7 +67,7 @@ let parse_and_resolve f =
         | Some expr -> let (t, _) = type_expr_to_typ tenv empty_vtenv expr in Some t
         in
         let expr = Ast.parser_expr_to_annot_expr tenv empty_vtenv varm expr in
-        let var = Variable.create ~binding:false (Some name) in
+        let var = Variable.create_other (Some name) in
         Variable.attach_location var (Position.position annot) ;
         let varm = StrMap.add name var varm in
         (tenv,varm,(log,(var,expr,tyo))::defs)

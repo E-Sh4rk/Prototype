@@ -265,6 +265,9 @@ simple_re:
 %inline strict_re:
 | lhs=typ_re SEMICOLON rhs=simple_re { ReSeq (lhs, rhs) }
 | lhs=simple_re DOUBLE_OR rhs=atomic_re { ReAlt (lhs, rhs) }
+| re=atomic_re TIMES { ReStar re }
+| re=atomic_re PLUS { ReSeq (re, ReStar re) }
+| re=atomic_re INTERROGATION_MARK { ReAlt (re, ReEpsilon) }
 
 atomic_re:
   t=typ { ReType t }

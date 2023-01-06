@@ -80,7 +80,11 @@ program: e=element* EOF { e }
 unique_term: t=term EOF { t }
 
 element:
-  i=optional_debug a=function_definition { annot $symbolstartpos $endpos (Definition (i, a)) }
+  i=optional_debug LET id=generalized_identifier ais=parameter* ty=optional_type_annot EQUAL t=term
+  { 
+    let t = multi_param_abstraction $startpos $endpos ais t in
+    annot $symbolstartpos $endpos (Definition (i, (id, t, ty)))
+  }
 | ATOMS a=ID* { annot $symbolstartpos $endpos (Atoms a) }
 | TYPE ts=separated_nonempty_list(TYPE_AND, param_type_def) { annot $symbolstartpos $endpos (Types ts) }
 
@@ -91,21 +95,11 @@ element:
 
 %inline param_type_def: name=TID params=list(TVAR) EQUAL t=typ { (name, params, t) }
 
-%inline function_definition:
-  LET i=generalized_identifier ais=parameter* ty=optional_type_annot EQUAL t=term
-  {
-    let t = multi_param_abstraction $startpos $endpos ais t in
-    (i, t, ty)
-  }
-
 %inline optional_type_annot:
     { None }
   | COLON t=typ { Some t }
 
 (* ===== TERMS ===== *)
-
-%inline pattern_definition:
-  LET LPAREN p = pattern RPAREN EQUAL t=term { (p, t) }
 
 %inline optional_test_type:
   { TBase TTrue }
@@ -115,8 +109,12 @@ term:
   t=simple_term { t }
   (* Explicitely annotated lambdas are not supported anymore *)
 | FUN ais=parameter+ ARROW t = term { multi_param_abstraction $startpos $endpos ais t }
-| d=function_definition IN t=term { annot $startpos $endpos (Let (Utils.fst3 d, Utils.snd3 d, t)) }
-| d=pattern_definition IN t=term { let_pattern $startpos $endpos (fst d) (snd d) t }
+| LET id=generalized_identifier ais=parameter* EQUAL td=term IN t=term
+  {
+    let td = multi_param_abstraction $startpos $endpos ais td in
+    annot $startpos $endpos (Let (id, td, t))
+  }
+| LET LPAREN p = pattern RPAREN EQUAL td=term IN t=term { let_pattern $startpos $endpos p td t }
 | IF t=term ott=optional_test_type THEN t1=term ELSE t2=term { annot $startpos $endpos (Ite (t,ott,t1,t2)) }
 | MATCH t=term WITH pats=patterns END { annot $startpos $endpos (PatMatch (t,pats)) }
 | lhs=simple_term COMMA rhs=term { annot $startpos $endpos (Pair (lhs, rhs)) }

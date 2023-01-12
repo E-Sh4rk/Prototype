@@ -300,7 +300,7 @@ type Truthy = ~Falsy
 
 let succ = <Int -> Int>
 
-let and_ = fun x -> fun y ->
+let and_js = fun x -> fun y ->
   if x is Falsy then x else y
 
 (* expected type:    
@@ -308,7 +308,15 @@ let and_ = fun x -> fun y ->
      &(Truthy -> 'b -> 'b)
 *)
 
-let and_ = fun x -> fun y ->
+
+let not_js = fun x -> if x is Falsy then 1 else 0
+
+let or_js = fun x -> fun y ->
+   if x is Truthy then x else y
+
+let identity_js = fun x -> or_js x x
+
+let and_and = fun x -> fun y ->
   if x is Falsy then x else (y, succ x)
 
 (* expected type:

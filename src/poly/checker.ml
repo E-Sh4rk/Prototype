@@ -303,7 +303,7 @@ let rec try_factorize res res_model =
     ) Subst.identity
   else Subst.identity
 
-let simplify_tallying sols res =
+let simplify_tallying res sols =
   let is_better_sol s1 s2 =
     let t1 = Subst.apply s1 res in
     let t2 = Subst.apply s2 res in
@@ -410,15 +410,15 @@ let rec infer_inst_a vardef tenv env pannot_a a =
     log ~level:4 "@.Tallying for %a: %a <= %a@."
       Variable.pp vardef pp_typ t pp_typ s ;
     let res = tallying [(t, s)] in
-    let res = simplify_tallying res (TVar.typ alpha) in
+    let res = simplify_tallying (TVar.typ alpha) res in
     ProjA res
   | RecordUpdate (v, _, None), PartialA ->
     let res = tallying [(vartype v, record_any)] in
-    let res = simplify_tallying res record_any in
+    let res = simplify_tallying record_any res in
     RecordUpdateA (res, None)
   | RecordUpdate (v, _, Some v2), PartialA ->
     let res = tallying [(vartype v, record_any)] in
-    let res = simplify_tallying res record_any in
+    let res = simplify_tallying record_any res in
     let r = refresh_all (vartype v2 |> vars_poly) in
     RecordUpdateA (res, Some r)
   | TypeConstr (v, s), PartialA ->
@@ -465,7 +465,7 @@ let rec infer_inst_a vardef tenv env pannot_a a =
       end else []
     in
     let res = if res = [] then tallying t1 t2 else res in
-    let res = simplify_tallying res (TVar.typ alpha) in
+    let res = simplify_tallying (TVar.typ alpha) res in
     let (s1, s2) = res |> List.map (fun s ->
       (Subst.compose_restr s r1, Subst.compose_restr s r2)
     ) |> List.split in

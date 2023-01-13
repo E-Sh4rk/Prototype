@@ -149,6 +149,8 @@ let rec type_of_pat pat =
     cup (type_of_pat p1) (type_of_pat p2)
   | PatPair (p1, p2) ->
     mk_times (type_of_pat p1 |> cons) (type_of_pat p2 |> cons)
+  | PatRecord (fields, o) ->
+    mk_record o (List.map (fun (str, p) -> (str, type_of_pat p |> cons)) fields)
   | PatAssign _ -> any
 
 let rec vars_of_pat pat =
@@ -163,6 +165,10 @@ let rec vars_of_pat pat =
     VarSet.inter (vars_of_pat p1) (vars_of_pat p2)
   | PatPair (p1, p2) ->
     VarSet.union (vars_of_pat p1) (vars_of_pat p2)
+  | PatRecord (fields, _) ->
+    List.fold_left
+      (fun acc (_, p) -> VarSet.union acc (vars_of_pat p))
+      VarSet.empty fields
   | PatAssign (x,_) -> VarSet.singleton x
 
 let rec def_of_var_pat pat v e =
@@ -180,6 +186,11 @@ let rec def_of_var_pat pat v e =
     if vars_of_pat p1 |> VarSet.mem v
     then def_of_var_pat p1 v (annot, Projection (Fst, e))
     else def_of_var_pat p2 v (annot, Projection (Snd, e))
+  | PatRecord (fields, _) ->
+    let (str, p) =
+      fields |> List.find (fun (_, p) -> vars_of_pat p |> VarSet.mem v)
+    in
+    def_of_var_pat p v (annot, Projection (Field str, e))
   | PatOr (p1, p2) ->
     let case = Ite (e, type_of_pat p1,
       def_of_var_pat p1 v e, def_of_var_pat p2 v e) in

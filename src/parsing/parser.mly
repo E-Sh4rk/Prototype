@@ -299,4 +299,9 @@ atomic_pattern:
   COLON t=atomic_typ { PatType t }
 | v=ID  { PatVar v }
 | LPAREN RPAREN { PatType (TBase TUnit) }
+| LBRACE fs=separated_list(COMMA, pat_field) o=optional_open RBRACE { PatRecord (fs, o) }
 | LPAREN p=pattern RPAREN { p }
+
+%inline pat_field:
+  id=ID EQUAL p=simple_pattern { (id, p) }
+| id=ID { (id, PatVar id) }

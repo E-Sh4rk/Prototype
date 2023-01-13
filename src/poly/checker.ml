@@ -264,6 +264,11 @@ let refine_a env a t =
 (* =============== INFER I ============== *)
 (* ====================================== *)
 
+let tallying_nonempty constr =
+  match tallying constr with
+  | [] -> assert false
+  | sols -> sols
+
 let types_equiv_modulo_renaming mono t1 t2 =
   let (v1s, v2s) = (TVarSet.diff (vars t1) mono, TVarSet.diff (vars t2) mono) in
   let (v1s, v2s) = (TVarSet.diff v1s v2s, TVarSet.diff v2s v1s) in
@@ -303,13 +308,14 @@ let rec try_factorize res res_model =
     ) Subst.identity
   else Subst.identity
 
-let simplify_tallying res sols =
+let simplify_tallying_ext res sols =
+  let map_sols f = List.map (List.map f) in
   let is_better_sol s1 s2 =
     let t1 = Subst.apply s1 res in
     let t2 = Subst.apply s2 res in
     subtype_poly t1 t2
   in
-  let sols = sols |> List.filter_map (fun sol ->
+  let sols = sols |> map_sols (fun sol ->
     let t = Subst.apply sol res in
     let clean = clean_type_subst ~pos:empty ~neg:any t in
     let t = Subst.apply clean t in
@@ -330,11 +336,10 @@ let simplify_tallying res sols =
       ) sol (Subst.dom sol |> TVarSet.destruct) in
     (* Decorrelate solutions *)
     let s = refresh_all (vars_poly t) in
-    let sol = Subst.compose s sol in
-    Some sol
+    Subst.compose s sol
     ) in
   (* Remove weaker solutions *)
-  let sols = sols |> keep_only_minimal is_better_sol in
+  let sols = sols |> List.map (keep_only_minimal is_better_sol) |> List.flatten in
   (* Rename vars to allow factorisation of arrows *)
   List.fold_left (fun sols sol ->
     let sol_res = apply_subst_simplify sol res in
@@ -347,39 +352,61 @@ let simplify_tallying res sols =
     in
     (sol, sol_res)::sols
   ) [] sols |> List.map fst
+let simplify_tallying res sols =
+  simplify_tallying_ext res [sols]
 
-let approximate_app t1 t2 resvar =
-  (* NOTE: Approximation for tallying instances for the application *)
-  (* ignore (t1, t2, resvar) ; None *)
-  let arrow_type = mk_arrow (cons t2) (TVar.typ resvar |> cons) in
-  let inst_for_arrow (t,s) =
-    tallying [(mk_arrow (cons t) (cons s), arrow_type)]
-  in
-  let inst_for_arrows arrows =
-    arrows |> List.map inst_for_arrow |> List.flatten
-  in
-  (* Use the code below to apply the approx even with many conjunctions *)
-  let insts = dnf t1 |> List.map inst_for_arrows in
-  if insts <> [] && List.for_all (fun inst -> inst <> []) insts
-  then Some (List.flatten insts)
-  else None
-  (* Use the code below to only use approx if only 1 conjunction *)
-  (* match dnf t1 with
-  | [arrows] ->
-    let inst = inst_for_arrows arrows in
-    if inst <> [] then Some inst else None
-  | _ -> None *)
-
+exception NoRes
 let is_opened_arrow t =
-  subtype t arrow_any &&
-  dnf t |> List.exists (fun conj ->
-    conj |> List.exists (fun (a,b) ->
-        subtype a arrow_any &&
-        subtype b arrow_any &&
-        TVarSet.inter (vars_poly a) (vars_poly b)
-        |> TVarSet.is_empty |> not
-      )
-  )
+  if subtype t arrow_any then
+    match dnf t with
+    | [conj] ->
+      if conj |> List.exists (fun (a,b) ->
+          subtype a arrow_any &&
+          subtype b arrow_any &&
+          TVarSet.inter (vars_poly a) (vars_poly b)
+          |> TVarSet.is_empty |> not
+        )
+      then Some conj
+      else None
+    | _ -> None
+  else None
+(* NOTE: Approximation for "fixpoint-like" tallying instances *)
+let approximate_app t1 t2 resvar =
+  try
+    match is_opened_arrow t2 with
+    | None -> raise NoRes
+    | Some arrows ->
+      let res =
+        arrows |> List.map (fun (s,t) ->
+          let t2 = mk_arrow (cons s) (cons t) in
+          let arrow_type = mk_arrow (cons t2) (TVar.typ resvar |> cons) in
+          tallying [(t1, arrow_type)]
+        ) |> List.flatten
+      in
+      if res = [] then raise NoRes else res
+  with NoRes ->
+    let arrow_type = mk_arrow (cons t2) (TVar.typ resvar |> cons) in
+    tallying [(t1, arrow_type)]
+(* NOTE: Approximation for tallying instances for the application *)
+let approximate_app t1 t2 resvar =
+  try
+    if subtype t1 arrow_any |> not || is_empty t1 then raise NoRes ;
+    let inst_for_arrow (t,s) =
+      approximate_app (mk_arrow (cons t) (cons s)) t2 resvar
+    in
+    let inst_for_arrows arrows =
+      match arrows |> List.map inst_for_arrow |> List.flatten with
+      | [] -> raise NoRes
+      | sols -> sols
+    in
+    (* Use the code below to apply the approx even with many conjunctions *)
+    dnf t1 |> List.map inst_for_arrows
+    (* Use the code below to only use approx if only 1 conjunction *)
+    (* match dnf t1 with
+    | [arrows] -> inst_for_arrows arrows in
+    | _ -> raise NoRes *)
+  with NoRes ->
+    (match approximate_app t1 t2 resvar with [] -> assert false | sol -> [sol])
 
 let rec infer_inst_a vardef tenv env pannot_a a =
   let open PartialAnnot in
@@ -409,20 +436,20 @@ let rec infer_inst_a vardef tenv env pannot_a a =
     in
     log ~level:4 "@.Tallying for %a: %a <= %a@."
       Variable.pp vardef pp_typ t pp_typ s ;
-    let res = tallying [(t, s)] in
+    let res = tallying_nonempty [(t, s)] in
     let res = simplify_tallying (TVar.typ alpha) res in
     ProjA res
   | RecordUpdate (v, _, None), PartialA ->
-    let res = tallying [(vartype v, record_any)] in
+    let res = tallying_nonempty [(vartype v, record_any)] in
     let res = simplify_tallying record_any res in
     RecordUpdateA (res, None)
   | RecordUpdate (v, _, Some v2), PartialA ->
-    let res = tallying [(vartype v, record_any)] in
+    let res = tallying_nonempty [(vartype v, record_any)] in
     let res = simplify_tallying record_any res in
     let r = refresh_all (vartype v2 |> vars_poly) in
     RecordUpdateA (res, Some r)
   | TypeConstr (v, s), PartialA ->
-    let res = tallying [(vartype v, s)] in
+    let res = tallying_nonempty [(vartype v, s)] in
     ConstrA res
   | App (v1, v2), PartialA ->
     let t1 = vartype v1 in
@@ -432,40 +459,11 @@ let rec infer_inst_a vardef tenv env pannot_a a =
     let t1 = Subst.apply r1 t1 in
     let t2 = Subst.apply r2 t2 in
     let alpha = TVar.mk_poly None in
-    let tallying t1 t2 =
-      match approximate_app t1 t2 alpha with
-      | None ->
-        let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
-        log ~level:4 "@.Tallying for %a: %a <= %a@."
-          Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
-        tallying [(t1, arrow_type)]
-      | Some res ->
-        log ~level:4 "@.Approximate tallying for %a (%i sols).@."
-          Variable.pp vardef (List.length res) ; res
-    in
-    (* NOTE: Approximation for fixpoint combinator applications *)
-    let res =
-      if is_opened_arrow t2
-      then begin
-        let inst_for_arrows arrows =
-          arrows |> List.map (fun (s,t) ->
-            let t2 = mk_arrow (cons s) (cons t) in
-            tallying t1 t2
-          ) |> List.flatten
-        in
-        (* Use the code below to apply the approx even with many conjunctions *)
-        let insts = dnf t2 |> List.map inst_for_arrows in
-        if List.for_all (fun inst -> inst <> []) insts
-        then List.flatten insts
-        else []
-        (* Use the code below to only use approx if only 1 conjunction *)
-        (* match dnf t2 with
-        | [arrows] -> inst_for_arrows arrows
-        | _ -> [] *)
-      end else []
-    in
-    let res = if res = [] then tallying t1 t2 else res in
-    let res = simplify_tallying (TVar.typ alpha) res in
+    let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
+    log ~level:4 "@.Approximate tallying for %a: %a <= %a@."
+      Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
+    let res = approximate_app t1 t2 alpha in
+    let res = simplify_tallying_ext (TVar.typ alpha) res in
     let (s1, s2) = res |> List.map (fun s ->
       (Subst.compose_restr s r1, Subst.compose_restr s r2)
     ) |> List.split in

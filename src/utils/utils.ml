@@ -67,14 +67,14 @@ let rec regroup_equiv equiv lst =
 let remove_duplicates equiv lst =
   regroup_equiv equiv lst |> List.map List.hd
 
+let remove_greater leq elt = List.filter (fun e -> leq elt e |> not)
 let keep_only_minimal leq lst =
-  let remove_greater elt = List.filter (fun e -> leq elt e |> not) in
   let rec aux explored lst =
     match lst with
     | [] -> List.rev explored
     | e::lst ->
-      let explored = remove_greater e explored in
-      let lst = remove_greater e lst in
+      let explored = remove_greater leq e explored in
+      let lst = remove_greater leq e lst in
       aux (e::explored) lst
   in aux [] lst
 

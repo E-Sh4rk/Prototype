@@ -84,21 +84,24 @@ let derecurse_types env venv defs =
         match Hashtbl.find henv name with
         | def, params, lst ->
             if nd then raise (TypeDefinitionError (Printf.sprintf "Cannot use a reference to %s here!" name)) ;
-            let cached = lst |> List.find_opt (fun (args',_) -> List.for_all2 equiv args args') in
+            let cached = lst |> List.find_opt (fun (args',_) ->
+                try List.for_all2 equiv args args' with Invalid_argument _ -> false) in
             begin match cached with
             | None ->
-                let v = Typepat.mk_delayed () in
-                Hashtbl.replace henv name (def, params, (args, v)::lst);
-                let local = List.combine params args |> List.to_seq |> StrMap.of_seq in
-                let t = aux ~nd local def in
-                Typepat.link v t;
-                v
+                begin try
+                    let v = Typepat.mk_delayed () in
+                    Hashtbl.replace henv name (def, params, (args, v)::lst);
+                    let local = List.combine params args |> List.to_seq |> StrMap.of_seq in
+                    let t = aux ~nd local def in
+                    Typepat.link v t;
+                    v
+                with Invalid_argument _ ->
+                    raise (TypeDefinitionError (Printf.sprintf "Wrong arity for type %s!" name))
+                end
             | Some (_, v) -> v
             end
         | exception Not_found -> 
             Typepat.mk_type (instantiate_alias env args name)
-        | exception Invalid_argument _ ->
-            raise (TypeDefinitionError (Printf.sprintf "Wrong arity for type %s!" name))
     and aux ~nd (* no delayed: disallow relying on delayed vars *) lcl t =
         match t with
         | TVar v ->
@@ -260,8 +263,7 @@ let regroup_conjuncts_descr ps =
     List.map (fun (a,b) -> (descr a, descr b))
 
 let simplify_dnf dnf =
-    let splits = List.map branch_type dnf in
-    let splits = List.combine dnf splits in
+    let splits = List.map (fun arrows -> (arrows, branch_type arrows)) dnf in
     let rec rm f kept lst = match lst with
     | [] -> kept
     | (dnf, t)::lst ->

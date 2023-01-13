@@ -12,12 +12,12 @@ clean:
 	rm -f html/prototype_js.js
 
 js:
-	dune build prototype_js.bc.js
+	dune build --profile release prototype_js.bc.js
 	cp _build/default/prototype_js.bc.js html/prototype_js.js
 	chmod +w html/prototype_js.js
 
 libjs:
-	dune build lib_js.bc.js
+	dune build --profile release lib_js.bc.js
 	cp _build/default/lib_js.bc.js html/typechecker.js
 	chmod +w html/typechecker.js
 

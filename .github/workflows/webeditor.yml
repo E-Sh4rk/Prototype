@@ -1,11 +1,12 @@
 name: Update web editor
 
 on:
-  - pull_request
-  - push
+  push:
+    branches:
+      - 'main'
 
 jobs:
-  build:
+  deployment:
     strategy:
       fail-fast: false
       matrix:
@@ -27,7 +28,8 @@ jobs:
         uses: ocaml/setup-ocaml@v2
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
-      - run: |
+      - name: Install OCaml dependencies
+        run: |
           opam pin add cduce-types 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#types-improvements'
           opam pin add cduce 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#types-improvements'
           opam install ppx_inline_test ppx_expect ppx_deriving pomap
@@ -35,12 +37,15 @@ jobs:
       # - run: |
       #     cd src
       #     opam install . --deps-only
-      - run: |
+      - name: Build
+        run: |
           cd src
-          make libjs
+          opam exec -- dune build --profile release lib_js.bc.js
+          cp _build/default/lib_js.bc.js webeditor/typechecker.js
 
       # Node dependencies
-      - uses: actions/setup-node@v3
+      - name: Install Node.js dependencies
+        uses: actions/setup-node@v3
         with:
           node-version: 16
       - run: |
@@ -48,7 +53,8 @@ jobs:
           npm ci
 
       # Upload artifact
-      - uses: actions/configure-pages@v1
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v1
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:

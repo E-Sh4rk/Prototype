@@ -4,13 +4,6 @@
  (modules prototype))
 
 (executable
- (name prototype_js)
- (libraries main)
- (modes js)
- (preprocess (pps js_of_ocaml-ppx))
- (modules prototype_js))
-
-(executable
  (name lib_js)
  (libraries main yojson)
  (modes js)

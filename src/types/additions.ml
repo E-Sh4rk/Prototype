@@ -209,25 +209,23 @@ let branch_type lst =
         |> conj
     end
 
-let full_branch_type ((pvs, nvs), (ps, ns)) =
+let full_branch_type_aux line_typ ((pvs, nvs), (ps, ns)) =
     let pvs = pvs |> List.map TVar.typ |> conj in
     let nvs = nvs |> List.map TVar.typ |> List.map neg |> conj in
     let ps = ps |>
-        List.map (fun (a, b) -> mk_arrow a b) |> conj in
+        List.map (fun l -> line_typ l) |> conj in
     let ns = ns |>
-        List.map (fun (a, b) -> mk_arrow a b |> neg) |> conj in
-    let t = [pvs;nvs;ps;ns] |> conj in
-    cap arrow_any t
+        List.map (fun l -> line_typ l |> neg) |> conj in
+    [pvs;nvs;ps;ns] |> conj
 
-let full_product_branch_type ((pvs, nvs), (ps, ns)) =
-    let pvs = pvs |> List.map TVar.typ |> conj in
-    let nvs = nvs |> List.map TVar.typ |> List.map neg |> conj in
-    let ps = ps |>
-        List.map (fun (a, b) -> mk_times a b) |> conj in
-    let ns = ns |>
-        List.map (fun (a, b) -> mk_times a b |> neg) |> conj in
-    let t = [pvs;nvs;ps;ns] |> conj in
-    cap pair_any t
+let full_branch_type b =
+    cap arrow_any (full_branch_type_aux (fun (a, b) -> mk_arrow a b) b)
+
+let full_product_branch_type b =
+    cap pair_any (full_branch_type_aux (fun (a, b) -> mk_times a b) b)
+
+let full_record_branch_type b =
+    cap record_any (full_branch_type_aux CD.Types.record_fields b)
 
 let rec take_one lst =
     match lst with
@@ -336,7 +334,7 @@ let remove_useless_from_dnf branch_type dnf =
     in
     aux [] dnf
 
-let [@warning "-27"] simplify_raw_dnf _ ~open_nodes ~contravar dnf =
+let simplify_arrow_dnf ~open_nodes dnf =
     let regroup_conjuncts (vars, (ps, ns)) =
         (vars, (regroup_conjuncts ~open_nodes ps, ns))
     in
@@ -344,9 +342,14 @@ let [@warning "-27"] simplify_raw_dnf _ ~open_nodes ~contravar dnf =
     (* Regroup positive conjuncts with similar domain/codomain  *)
     List.map regroup_conjuncts dnf
 
-let [@warning "-27"] simplify_raw_product_dnf _ ~open_nodes ~contravar dnf =
+let simplify_product_dnf ~open_nodes:_ dnf =
     let dnf = remove_useless_from_dnf full_product_branch_type dnf in
     (* TODO: More advanced simplifications for products *)
+    dnf
+
+let simplify_record_dnf ~open_nodes:_ dnf =
+    let dnf = remove_useless_from_dnf full_record_branch_type dnf in
+    (* TODO: More advanced simplifications for records *)
     dnf
 
 let is_test_type t =
@@ -371,45 +374,20 @@ let is_test_type t =
         in aux t
     else false
 
-let pair_vars (a,b) = TVarSet.union (vars (descr a)) (vars (descr b))
-let pairs_vars lst =
-    lst |> List.map pair_vars |>
-    TVarSet.union_many
-let branch_vars ((pvs, nvs), (ps,ns)) =
-    TVarSet.construct (pvs@nvs) |>
-    TVarSet.union (pairs_vars ps) |>
-    TVarSet.union (pairs_vars ns)
-let branches_vars lst =
-    lst |> List.map branch_vars |>
-    TVarSet.union_many
-
-let simplify_typ_aux simplify_arrow simplify_product mono t =
+let simplify_typ t =
     (*Utils.log ~level:2 "Simplifying type...@?" ;*)
     let cache = NHT.create 5 in
-    let rec aux mono contravar node =
-        let aux_pair arrow mono (a,b) =
-            let monoa = TVarSet.union mono (vars (descr a)) in
-            let monob = TVarSet.union mono (vars (descr b)) in
-            (aux monob (arrow <> contravar) a, aux monoa contravar b) in
-        let aux_pairs arrow mono ps =
-            ps |> Utils.add_others |> List.map (fun (ps, others) ->
-                let vs = pairs_vars others in
-                aux_pair arrow (TVarSet.union mono vs) ps
-            )
+    let rec aux node =
+        let aux_pair (a,b) = (aux a, aux b) in
+        let aux_record (b, labelmap) = (b, LabelMap.map aux labelmap) in
+        let aux_lines aux_line ls =
+            ls |> List.map aux_line
         in
-        let aux_branch arrow mono ((pvs, nvs), (ps,ns)) =
-            let mono = TVarSet.construct (pvs@nvs) |> TVarSet.union mono in
-            let ps_vars = ps |> pairs_vars in
-            let ns_vars = ns |> pairs_vars in
-            let ps = aux_pairs arrow (TVarSet.union mono ns_vars) ps in
-            let ns = aux_pairs arrow (TVarSet.union mono ps_vars) ns in
-            ((pvs,nvs),(ps,ns))
+        let aux_branch aux_line ((pvs, nvs), (ps,ns)) =
+            ((pvs,nvs),(aux_lines aux_line ps, aux_lines aux_line ns))
         in
-        let aux_branches arrow mono lst =
-            lst |> Utils.add_others |> List.map (fun (branch, others) ->
-                let vs = branches_vars others in
-                aux_branch arrow (TVarSet.union mono vs) branch
-            )
+        let aux_branches aux_line lst =
+            lst |> List.map (fun branch -> aux_branch aux_line branch)
         in
         match NHT.find_opt cache node with
         | Some n -> n
@@ -426,8 +404,8 @@ let simplify_typ_aux simplify_arrow simplify_product mono t =
                 | Times m ->
                     let module K = (val m) in
                     K.get_vars t |> K.Dnf.get_full
-                    |> simplify_product mono ~open_nodes:cache ~contravar
-                    |> aux_branches false mono
+                    |> simplify_product_dnf ~open_nodes:cache
+                    |> aux_branches aux_pair
                     |> List.map full_product_branch_type |> disj
                 | Xml m ->
                     let module K = (val m) in
@@ -435,28 +413,26 @@ let simplify_typ_aux simplify_arrow simplify_product mono t =
                 | Function m ->
                     let module K = (val m) in
                     K.get_vars t |> K.Dnf.get_full
-                    |> simplify_arrow mono ~open_nodes:cache ~contravar
-                    |> aux_branches true mono
+                    |> simplify_arrow_dnf ~open_nodes:cache
+                    |> aux_branches aux_pair
                     |> List.map full_branch_type |> disj
                 | Record m ->
                     let module K = (val m) in
-                    let dnf = K.get_vars t in
-                    (* TODO: Implement simplify_typ for records *)
-                    K.mk dnf
+                    K.get_vars t |> K.Dnf.get_full
+                    |> simplify_record_dnf ~open_nodes:cache
+                    |> aux_branches aux_record
+                    |> List.map full_record_branch_type |> disj
                 in
                 cup acc t
             ) empty (descr node) in
             define_typ n t ; n
     in
-    let res = aux mono false (cons t) |> descr in
+    let res = aux (cons t) |> descr in
     (* TODO: Uncomment the assert and fix it. *)
     (* if equiv res t |> not then Format.printf "Before:%a@.After:%a@." pp_typ t pp_typ res ; *)
     (* assert (equiv res t) ; *)
     (* Utils.log ~level:2 " Done.@." ;*)
     res
-
-let simplify_typ = simplify_typ_aux
-    simplify_raw_dnf simplify_raw_product_dnf TVarSet.empty
 
 let square_approx f out =
     let res = dnf f |> List.map begin
@@ -622,54 +598,9 @@ module RawExt = struct
         in
         aux t |> compose_res (Subst.identity, t)
 
-    let remove_useless_poly_conjuncts mono branch_type lst =
-        let atom_type (a,b) = branch_type (([],[]),([(a,b)],[])) in
-        let rec aux kept rem =
-            match rem with
-            | [] -> kept
-            | c::rem ->
-                let ct = atom_type c in
-                (* let rt = rem |> List.map atom_type |> conj in
-                let kt = kept |> List.map atom_type |> conj in
-                let others = conj [kt ; rt] in
-                if subtype_poly mono others ct *)
-                let rt = rem |> List.map atom_type in
-                let kt = kept |> List.map atom_type in
-                let others = kt@rt in
-                if List.exists (fun other -> subtype_poly mono other ct) others
-                then aux kept rem else aux (c::kept) rem
-        in
-        aux [] lst
-
-    let [@warning "-27"] simplify_poly_dnf mono ~open_nodes ~contravar dnf =
-        let aux mono ((pvs,nvs),(ps,ns)) =
-            let tvars = TVarSet.construct (pvs@nvs) in
-            let tvars = TVarSet.diff tvars mono in
-            if TVarSet.is_empty tvars |> not && not contravar
-            then ((pvs,nvs),([],[]))
-            else if not contravar then
-                (* (ignore remove_useless_poly_conjuncts ; ((pvs,nvs),(ps,ns))) *)
-                ((pvs,nvs), (remove_useless_poly_conjuncts mono full_branch_type ps, ns))
-            else ((pvs,nvs),(ps,ns))
-        in
-        Utils.add_others dnf |> List.map (fun (branch, others) ->
-            let mono = TVarSet.union mono (branches_vars others) in
-            aux mono branch
-        )
-
-    let [@warning "-27"] simplify_poly_product_dnf mono ~open_nodes ~contravar dnf =
-        (* TODO: poly simplifications for products *)
-        dnf
-
     let simplify_poly_typ mono t =
         let t = bot_instance mono t in
         let (_, t) = remove_redundant_vars mono t in
-        ignore (simplify_poly_dnf, simplify_poly_product_dnf) ;
-        (* NOTE: Advanced simplification disabled because it sometimes raise a Cduce issue,
-        and it is not very efficient anyway (in particular when branches use the same vars). *)
-        (* let t = simplify_typ_aux simplify_poly_dnf simplify_poly_product_dnf mono t in
-        let t = bot_instance mono t in
-        let (_, t) = remove_redundant_vars mono t in *)
         t
 end
 

@@ -1,4 +1,4 @@
-requirejs.config({baseUrl: '.', paths: { vs: 'monaco/min/vs' }});
+requirejs.config({baseUrl: '.', paths: { vs: 'node_modules/monaco-editor/min/vs' }});
 requirejs(['vs/editor/editor.main'], function () {
 
 	monaco.languages.register({ id: 'stml' });

@@ -427,12 +427,7 @@ let simplify_typ t =
             ) empty (descr node) in
             define_typ n t ; n
     in
-    let res = aux (cons t) |> descr in
-    (* TODO: Uncomment the assert and fix it. *)
-    (* if equiv res t |> not then Format.printf "Before:%a@.After:%a@." pp_typ t pp_typ res ; *)
-    (* assert (equiv res t) ; *)
-    (* Utils.log ~level:2 " Done.@." ;*)
-    res
+    aux (cons t) |> descr
 
 let square_approx f out =
     let res = dnf f |> List.map begin

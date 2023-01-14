@@ -18,8 +18,8 @@ js:
 
 libjs:
 	dune build --profile release lib_js.bc.js
-	cp _build/default/lib_js.bc.js html/typechecker.js
-	chmod +w html/typechecker.js
+	cp _build/default/lib_js.bc.js webeditor/typechecker.js
+	chmod +w webeditor/typechecker.js
 
 test:
 	dune runtest

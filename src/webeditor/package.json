@@ -1,0 +1,14 @@
+{
+  "name": "webeditor",
+  "version": "1.0.0",
+  "description": "A Web editor featuring our set-theoretic polymorphic type system",
+  "main": "main.js",
+  "directories": {
+    "example": "examples"
+  },
+  "author": "",
+  "license": "",
+  "dependencies": {
+    "monaco-editor": "^0.34.1"
+  }
+}

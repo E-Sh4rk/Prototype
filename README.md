@@ -1,4 +1,4 @@
-# Occurence Typing with Set-Theoretic Types prototype
+# Set-Theoretic and Polymorphic Type System Prototype
 
 ## Native prototype
 

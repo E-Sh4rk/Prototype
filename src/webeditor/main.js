@@ -19,6 +19,7 @@ requirejs(['vs/editor/editor.main'], function () {
 		theme: 'vs-custom',
 		language: 'stml',
 		automaticLayout: true,
+		minimap: { enabled: false },
 		'bracketPairColorization.enabled': false // TODO
 		// Temporary... until the brackets colorization is fixed
 		// https://github.com/microsoft/monaco-editor/issues/3449

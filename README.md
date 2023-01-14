@@ -1,8 +1,10 @@
 # Set-Theoretic and Polymorphic Type System Prototype
 
-## Native prototype
+The web version of this prototype can be tested [here](https://e-sh4rk.github.io/Prototype/).
 
-The easiest way to build the native prototype is through [opam](https://opam.ocaml.org/), the OCaml Package Manager.
+## Native version
+
+The easiest way to build the native version is through [opam](https://opam.ocaml.org/), the OCaml Package Manager.
 This prototype has been tested on OCaml 4.14.1, that can be installed by doing `opam switch create 4.14.1`.
 
 ### Installing CDuce
@@ -30,10 +32,10 @@ make
 Once compiled, the prototype can be executed with `dune exec -- ./prototype.exe [file]`.
 If no file is given, the file `test.ml` from the current path is used.
 
-## Javascript prototype (web editor)
+## Javascript version (web editor)
 
-You will need [npm](https://www.npmjs.com/) to install the dependencies of the Javascript prototype.
-First, build the native prototype, then:
+You will need [npm](https://www.npmjs.com/) to install the dependencies of the Javascript version.
+First, build the native version, then:
 
 ```
 opam install yojson js_of_ocaml-ppx
@@ -42,5 +44,4 @@ cd webeditor
 npm ci
 ```
 
-Then either serve the whole content of the [src/webeditor/] directory through a Web server or open the file [src/webeditor/index.html]
-directly from a browser (**warning** : the later will not allow you to load the examples nor benefit from web-workers due to security policies).
+Then either serve the whole content of the `src/webeditor/` directory through a Web server or open the file `src/webeditor/index.html` directly from a browser (**warning** : the later will not allow you to load the examples nor benefit from web-workers due to security policies).

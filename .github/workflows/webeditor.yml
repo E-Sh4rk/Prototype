@@ -44,10 +44,11 @@ jobs:
           cp _build/default/lib_js.bc.js webeditor/typechecker.js
 
       # Node dependencies
-      - name: Install Node.js dependencies
+      - name: Use Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 16
+      - name: Install Node.js dependencies
         run: |
           cd src/webeditor
           npm ci

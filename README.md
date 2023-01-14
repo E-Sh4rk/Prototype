@@ -1,8 +1,8 @@
 # Occurence Typing with Set-Theoretic Types prototype
 
-## Compiling from scratch
+## Native prototype
 
-The easiest way to install from scratch is through [opam](https://opam.ocaml.org/), the OCaml Package Manager.
+The easiest way to build the native prototype is through [opam](https://opam.ocaml.org/), the OCaml Package Manager.
 This prototype has been tested on OCaml 4.14.1, that can be installed by doing `opam switch create 4.14.1`.
 
 ### Installing CDuce
@@ -25,12 +25,12 @@ opam install ppx_inline_test ppx_expect ppx_deriving pomap
 make
 ```
 
-## Running the prototype
+### Running the prototype
 
 Once compiled, the prototype can be executed with `dune exec -- ./prototype.exe [file]`.
 If no file is given, the file `test.ml` from the current path is used.
 
-### Building the Javascript prototype
+## Javascript prototype (web editor)
 
 You will need [npm](https://www.npmjs.com/) to install the dependencies of the Javascript prototype.
 First, build the native prototype, then:

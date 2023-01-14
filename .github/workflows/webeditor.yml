@@ -1,0 +1,58 @@
+name: Update web editor
+
+on:
+  - pull_request
+  - push
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          # - macos-latest
+          - ubuntu-latest
+          # - windows-latest
+        ocaml-compiler:
+          - 4.14.1
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # OCaml build
+      - name: Use OCaml ${{ matrix.ocaml-compiler }}
+        uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+      - run: |
+          opam pin add cduce-types 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#types-improvements'
+          opam pin add cduce 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#types-improvements'
+          opam install ppx_inline_test ppx_expect ppx_deriving pomap
+          opam install yojson js_of_ocaml-ppx
+      # - run: |
+      #     cd src
+      #     opam install . --deps-only
+      - run: |
+          cd src
+          make libjs
+
+      # Node dependencies
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - run: |
+          cd src/webeditor
+          npm ci
+
+      # Upload artifact
+      - uses: actions/configure-pages@v1
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: src/webeditor/
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1

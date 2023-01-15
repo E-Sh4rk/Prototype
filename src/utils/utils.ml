@@ -121,6 +121,13 @@ let rec insert x lst =
   | h::t ->
     (x::lst) :: (List.map (fun el -> h::el) (insert x t))
 
+let carthesian_product l1 l2 =
+  l1 |> List.map (fun e1 ->
+    l2 |> List.map (fun e2 ->
+      (e1, e2)
+    )
+  ) |> List.flatten
+
 let rec perm lst =
   match lst with
   | [] -> [[]]

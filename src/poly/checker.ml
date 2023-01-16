@@ -394,14 +394,14 @@ let is_opened_arrow t =
       |> TVarSet.is_empty |> not
     )
   | _ -> false
-(* TODO: apply approximate_app for monomorphic inference too *)
-(* TODO: test examples in flatten.ml, and merge them with test.ml *)
 (* NOTE: Approximation for "fixpoint-like" tallying instances *)
-let approximate_app t1 t2 resvar =
+let approximate_app infer t1 t2 resvar =
   let exception NoApprox in
+  let tallying = if infer then tallying_infer else tallying in
   try
     if is_opened_arrow t2 |> not then raise NoApprox ;
-    let t2s = approximate_arrow TVar.is_poly t2 in
+    let is_poly = if infer then TVar.can_infer else TVar.is_poly in
+    let t2s = approximate_arrow is_poly t2 in
     let res =
       t2s |> List.map (fun t2 ->
         let arrow_type = mk_arrow (cons t2) (TVar.typ resvar |> cons) in
@@ -413,13 +413,14 @@ let approximate_app t1 t2 resvar =
     let arrow_type = mk_arrow (cons t2) (TVar.typ resvar |> cons) in
     tallying [(t1, arrow_type)]
 (* NOTE: Approximation for tallying instances for the application *)
-let approximate_app t1 t2 resvar =
-  let t1s = approximate_arrow TVar.is_poly t1 in
+let approximate_app infer t1 t2 resvar =
+  let is_poly = if infer then TVar.can_infer else TVar.is_poly in
+  let t1s = approximate_arrow is_poly t1 in
   let res =
-    t1s |> List.map (fun t1 -> approximate_app t1 t2 resvar) |> List.flatten
+    t1s |> List.map (fun t1 -> approximate_app infer t1 t2 resvar) |> List.flatten
   in
   if res = [] && List.length t1s > 1
-  then (match approximate_app t1 t2 resvar with [] -> assert false | sols -> sols)
+  then (match approximate_app infer t1 t2 resvar with [] -> assert false | sols -> sols)
   else res
 
 let rec infer_inst_a vardef tenv env pannot_a a =
@@ -476,7 +477,7 @@ let rec infer_inst_a vardef tenv env pannot_a a =
     let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
     log ~level:4 "@.Approximate tallying for %a: %a <= %a@."
       Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
-    let res = approximate_app t1 t2 alpha in
+    let res = approximate_app false t1 t2 alpha in
     let res = simplify_tallying (TVar.typ alpha) res in
     let (s1, s2) = res |> List.map (fun s ->
       (Subst.compose_restr s r1, Subst.compose_restr s r2)
@@ -574,6 +575,11 @@ let subst_more_general s1 s2 =
     [(t1, t2) ; (t2, t1)]
   ) |> List.flatten |> tallying <> []
 
+(* TODO: add simplification that merge two solutions differing by only 1
+  monomorphic subst, and such that the union of their corresponding result
+  gives a type as precise as the two previous results when we apply it to
+  one of the original (non-merged) substs. *)
+(* TODO: test examples in flatten.ml, and merge them with test.ml *)
 let simplify_tallying_infer env res sols =
   let tvars = Env.tvars env |> TVarSet.filter TVar.is_mono in
   let params_types = Env.domain env |>
@@ -845,7 +851,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
       log ~level:3 "@.Tallying (inference) for %a: %a <= %a@."
         Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
-      let res = tallying_infer [(t1, arrow_type)] in
+      let res = approximate_app true t1 t2 alpha in
       res |> List.iter (fun s ->
         log ~level:3 "Solution: %a@." Subst.pp s
       ) ;

@@ -115,6 +115,24 @@ let add_others lst =
 let find_among_others pred lst =
   lst |> add_others |> List.find_opt (fun (a,o) -> pred a o)
 
+let find_map_among_others f lst =
+  lst |> add_others |> List.find_map (fun (a,o) -> f a o)
+
+let merge_when_possible merge_opt lst =
+  let merge_opt a b others =
+    Option.map (fun a -> (a, others)) (merge_opt a b)
+  in
+  let rec aux lst =
+    match lst with
+    | [] -> []
+    | e::lst ->
+      begin match find_map_among_others (fun e' lst -> merge_opt e e' lst) lst with
+      | None -> e::(aux lst)
+      | Some (e, lst) -> aux (e::lst)
+      end
+    in
+    aux lst
+
 let rec insert x lst =
   match lst with
   | [] -> [[x]]

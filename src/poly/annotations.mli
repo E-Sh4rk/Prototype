@@ -5,7 +5,8 @@ module PartialAnnot : sig
     type branches = (typ*t) list
     and a =
         | InferA of infer_state | PartialA
-        | LambdaA of branches (* Fully Explored *) * branches (* Remaining *)
+        | LambdaA of
+            branches list (* Fully Explored, grouped by similarity *) * branches (* Remaining *)
     and t =
         | Infer | Partial
         | Keep of (a * branches)
@@ -29,7 +30,7 @@ module FullAnnot : sig
     type branches = (typ*t) list
     and a =
         | ConstA | AliasA | AbstractA | LetA
-        | LambdaA of branches
+        | LambdaA of branches list
         | PairA of renaming * renaming
         | AppA of inst * inst
         | ProjA of inst

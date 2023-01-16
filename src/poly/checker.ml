@@ -743,7 +743,7 @@ let typeof_a_pannot vardef tenv env pannot_a a =
     let rename_vars (arrow, (s,_,pannot)) =
       let new_vars = TVarSet.diff (vars s) mono in
       let r = refresh_all new_vars in
-      (apply_subst_simplify r arrow, PartialAnnot.apply_subst_branches r pannot)
+      (Subst.apply r arrow, PartialAnnot.apply_subst_branches r pannot)
     in  
     let (t, pannot) =
       branches |> keep_only_minimal gen_leq'
@@ -885,7 +885,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       let t2 = vartype v2 in
       let alpha = Variable.to_typevar vardef in
       let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
-      log ~level:3 "@.Tallying (inference) for %a: %a <= %a@."
+      log ~level:3 "@.Approximate tallying (inference) for %a: %a <= %a@."
         Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
       let res = approximate_app true t1 t2 alpha in
       res |> List.iter (fun s ->

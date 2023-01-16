@@ -507,13 +507,11 @@ let flatten_pure flatten x =
   if x is [Any*] then concat (flatten (fst x)) (flatten (snd x))
   else (x,nil)
 
-
-
 (* let flatten_pure = fixpoint flatten_pure *)
 
 type Tree 'a = ('a \ [Any*]) | [(Tree 'a)*]
 
-let flatten_stub (flatten : Tree 'a -> ['a*]) (x : Tree 'a) =
+let flatten_stub flatten (x : Tree 'a) =
   if x is Nil then nil else
   if x is [Any*] then concat (flatten (fst x)) (flatten (snd x))
   else (x,nil)
@@ -524,8 +522,7 @@ let flatten = fixpoint flatten_stub
 
 let flatten_ann : (Tree 'a -> ['a*]) = fixpoint flatten_stub 
 
-
-let test = flatten ((1,(true,nil)),(((42,(false,nil)),0),"ok"))
+let test_flatten = flatten ((1,(true,nil)),(((42,(false,nil)),0),"ok"))
 
 type TRUE 'a 'b  =  'a -> 'b -> 'a
 type FALSE 'a 'b  =  'a -> 'b -> 'b

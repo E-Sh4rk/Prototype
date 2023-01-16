@@ -578,8 +578,7 @@ let subst_more_general s1 s2 =
     [(t1, t2) ; (t2, t1)]
   ) |> List.flatten |> tallying <> []
 
-(* TODO: store res in the solutions, and get rid of other potential resvars
-   (currently, some operations like the merging are invalid) *)
+let res_var = TVar.mk_mono None
 let simplify_tallying_infer env res sols =
   let tvars = Env.tvars env |> TVarSet.filter TVar.is_mono in
   let params_types = Env.domain env |>
@@ -621,12 +620,11 @@ let simplify_tallying_infer env res sols =
       Subst.compose_restr mono_subst s
     )
     |> List.filter (fun s ->
-      let res = Subst.apply sol res in
+      let res = Subst.find' sol res_var in
       let res' = Subst.apply s res in
       let g = vars res' |> generalize in
       let res' = Subst.apply g res' in
       subtype_poly res' res
-      (* ignore s ; false *)
     )
     in
     match res with
@@ -639,11 +637,23 @@ let simplify_tallying_infer env res sols =
       (v, t)
     ) |> Subst.construct
   in
+  let rec is_undesirable s =
+    subtype s arrow_any &&
+    dnf s |> List.for_all (fun conjuncts -> conjuncts |>
+      List.exists (fun (a, b) -> non_empty a && is_undesirable b)
+    )
+  in
   sols
+  (* Restrict to tvars and store result *)
+  |> List.map (fun sol ->
+    let res = Subst.apply sol res in
+    let sol = Subst.restrict sol tvars in
+    Subst.combine sol (Subst.construct [(res_var, res)])
+  )
   (* Generalize vars in the result when possible *)
   |> List.map (fun sol ->
     let tvars' = mono_vars sol in
-    let res = Subst.apply sol res in
+    let res = Subst.find' sol res_var in
     let g = generalize (TVarSet.diff (vars res) tvars') in
     let res = Subst.apply g res in
     let clean = clean_type_subst ~pos:empty ~neg:any res in
@@ -652,12 +662,6 @@ let simplify_tallying_infer env res sols =
   )
   (* Remove solutions that require "undesirable" lambda branches *)
   |> List.filter (fun sol ->
-    let rec is_undesirable s =
-      subtype s arrow_any &&
-      dnf s |> List.for_all (fun conjuncts -> conjuncts |>
-        List.exists (fun (a, b) -> non_empty a && is_undesirable b)
-      )
-    in
     params_types |> List.for_all (fun t ->
       TVarSet.inter (vars_mono t) (Subst.dom sol) |> TVarSet.is_empty ||
       is_undesirable t || not (is_undesirable (apply_subst_simplify sol t))
@@ -680,10 +684,9 @@ let simplify_tallying_infer env res sols =
     )
   |> List.map (fun to_merge ->
     let common = Subst.restrict (List.hd to_merge) tvars in
-    let resvars = TVarSet.diff (vars res) tvars |> TVarSet.destruct in
     (* We do not simplify t, because in some cases it can be
     very complex without being used later (e.g. when no tvar to infer) *)
-    let respart = merge_on_domain conj resvars to_merge in
+    let respart = merge_on_domain conj [res_var] to_merge in
     Subst.combine common respart
   )
   (* Simplify (heavy) *)

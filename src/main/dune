@@ -5,11 +5,4 @@
  (libraries types parsing common utils poly)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.ord ppx_deriving.eq ppx_expect ppx_inline_test))
- (modules (:standard \ issues)))
-
-(executable
- (name issues)
- (libraries cduce-types)
- (preprocess
-  (pps ppx_deriving.show ppx_deriving.ord ppx_deriving.eq))
- (modules issues))
+ (modules (:standard)))

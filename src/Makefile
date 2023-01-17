@@ -18,7 +18,3 @@ libjs:
 
 test:
 	dune runtest
-
-issues:
-	cd main ; \
-	dune exec ./issues.exe

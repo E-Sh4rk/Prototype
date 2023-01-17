@@ -591,3 +591,17 @@ let map_pat map f lst =
   end
 
 let map = fixpoint map_pat
+
+(* Recursive functions *)
+
+let rec map f lst =
+  match lst with
+  | :[] -> []
+  | (e,lst) & :List -> ((f e), map f lst)
+  end
+
+let rec map f (lst:['a*]) =
+  match lst with
+  | :[] -> []
+  | (e,lst) & :List -> ((f e), map f lst)
+  end

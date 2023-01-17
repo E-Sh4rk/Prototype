@@ -316,7 +316,7 @@ let or_js = fun x -> fun y ->
 
 let identity_js = fun x -> or_js x x
 
-let and_and = fun x -> fun y ->
+let and_pair = fun x -> fun y ->
   if x is Falsy then x else (y, succ x)
 
 (* expected type:

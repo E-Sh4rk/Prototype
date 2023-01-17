@@ -181,7 +181,7 @@ let rec def_of_var_pat pat v e =
   | PatAssign _ -> assert false
   | PatType _ -> assert false
 
-let remove_pattern_matching e =
+let remove_patterns_and_fixpoints e =
   let aux (annot,e) =
     let e =
       match e with
@@ -210,6 +210,7 @@ let remove_pattern_matching e =
         | (_, e)::pats -> List.fold_left add_branch e pats
         in
         Ast.Let (x, e, e')
+      | Ast.Fixpoint _ -> failwith "TODO"
       | e -> e
     in
     (annot, e)
@@ -275,7 +276,7 @@ let convert_to_msc ast =
       | Ast.TypeConstr (e, t) ->
         let (defs, expr_var_map, x) = to_defs_and_x expr_var_map e in
         (defs, expr_var_map, TypeConstr (x, t))
-      | Ast.PatMatch _ -> assert false
+      | Ast.PatMatch _ | Ast.Fixpoint _ -> assert false
 
     and to_defs_and_x ?(name=None) expr_var_map ast =
       let ((_, pos), _) = ast in
@@ -301,4 +302,4 @@ let convert_to_msc ast =
     let (defs, _, x) = to_defs_and_x expr_var_map ast in
     defs_and_x_to_e defs x
 
-  in aux ExprMap.empty (remove_pattern_matching ast)
+  in aux ExprMap.empty (remove_patterns_and_fixpoints ast)

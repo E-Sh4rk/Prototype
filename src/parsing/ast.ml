@@ -43,6 +43,7 @@ and ('a, 'typ, 'v) ast =
 | Const of const
 | Var of 'v
 | Lambda of ('typ type_annot) * 'v * ('a, 'typ, 'v) t
+| Fixpoint of ('a, 'typ, 'v) t
 | Ite of ('a, 'typ, 'v) t * 'typ * ('a, 'typ, 'v) t * ('a, 'typ, 'v) t
 | App of ('a, 'typ, 'v) t * ('a, 'typ, 'v) t
 | Let of 'v * ('a, 'typ, 'v) t * ('a, 'typ, 'v) t
@@ -137,13 +138,13 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
             Variable.attach_location var pos ;
             let env = StrMap.add str var env in
             Lambda (t, var, aux vtenv env e)
+        | Fixpoint e -> Fixpoint (aux vtenv env e)
         | Ite (e, t, e1, e2) ->
             let (t, vtenv) = type_expr_to_typ tenv vtenv t in
             if is_test_type t
             then Ite (aux vtenv env e, t, aux vtenv env e1, aux vtenv env e2)
             else raise (SymbolError ("typecases must use a valid test type"))
-        | App (e1, e2) ->
-            App (aux vtenv env e1, aux vtenv env e2)
+        | App (e1, e2) -> App (aux vtenv env e1, aux vtenv env e2)
         | Let (str, e1, e2) ->
             let var = Variable.create_other (Some str) in
             Variable.attach_location var pos ;
@@ -247,6 +248,7 @@ let rec unannot (_,e) =
     | Const c -> Const c
     | Var v -> Var v
     | Lambda (t, v, e) -> Lambda (t, v, unannot e)
+    | Fixpoint e -> Fixpoint (unannot e)
     | Ite (e, t, e1, e2) -> Ite (unannot e, t, unannot e1, unannot e2)
     | App (e1, e2) -> App (unannot e1, unannot e2)
     | Let (v, e1, e2) -> Let (v, unannot e1, unannot e2)
@@ -294,6 +296,7 @@ let normalize_bvs e =
             let v' = get_predefined_var depth in
             let map = VarMap.add v v' map in
             Lambda (t, v', aux (depth+1) map e)
+        | Fixpoint e -> Fixpoint (aux depth map e)
         | Ite (e, t, e1, e2) ->
             Ite (aux depth map e, t, aux depth map e1, aux depth map e2)
         | App (e1, e2) ->
@@ -353,6 +356,7 @@ let map_ast f e =
         | Const c -> Const c
         | Var v -> Var v
         | Lambda (annot, v, e) -> Lambda (annot, v, aux e)
+        | Fixpoint e -> Fixpoint (aux e)
         | Ite (e, t, e1, e2) -> Ite (aux e, t, aux e1, aux e2)
         | App (e1, e2) -> App (aux e1, aux e2)
         | Let (v, e1, e2) -> Let (v, aux e1, aux e2)

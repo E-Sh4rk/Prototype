@@ -39,6 +39,7 @@ and ('a, 'typ, 'v) ast =
 | Const of const
 | Var of 'v
 | Lambda of ('typ type_annot) * 'v * ('a, 'typ, 'v) t
+| Fixpoint of ('a, 'typ, 'v) t
 | Ite of ('a, 'typ, 'v) t * 'typ * ('a, 'typ, 'v) t * ('a, 'typ, 'v) t
 | App of ('a, 'typ, 'v) t * ('a, 'typ, 'v) t
 | Let of 'v * ('a, 'typ, 'v) t * ('a, 'typ, 'v) t

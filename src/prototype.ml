@@ -19,7 +19,7 @@ let () =
                     Format.printf "Ill typed\n%!" ;
                     Utils.error Format.std_formatter pos msg ;
                     env
-            ) Common.Env.empty lst |> ignore
+            ) Common.Msc.initial_env lst |> ignore
         | PFailure (pos, msg) ->
             Format.printf "Error at pos %s: %s\n%!" (Position.string_of_pos pos) msg
     with e ->

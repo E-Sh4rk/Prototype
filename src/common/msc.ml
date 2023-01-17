@@ -2,6 +2,7 @@ open Parsing
 open Parsing.Variable
 module ExprMap = Parsing.Ast.ExprMap
 open Types.Base
+open Types.Tvar
 
 type a =
   | Alias of Variable.t
@@ -21,6 +22,15 @@ and e =
   | Bind of Variable.t * a * e
   | Var of Variable.t
   [@@deriving show]
+
+let fixpoint_var = Variable.create_other (Some "__builtin_fixpoint")
+let fixpoint_typ =
+  let a = TVar.mk_poly None |> TVar.typ |> cons in
+  let b = TVar.mk_poly None |> TVar.typ |> cons in
+  let res = mk_arrow a b |> cons in
+  let arg = mk_arrow res res |> cons in
+  mk_arrow arg res
+let initial_env = Env.singleton fixpoint_var fixpoint_typ
 
 let map ef af =
   let rec aux_a a =
@@ -210,7 +220,9 @@ let remove_patterns_and_fixpoints e =
         | (_, e)::pats -> List.fold_left add_branch e pats
         in
         Ast.Let (x, e, e')
-      | Ast.Fixpoint _ -> failwith "TODO"
+      | Ast.Fixpoint e ->
+        let lhs = (annot, Ast.Var fixpoint_var) in
+        Ast.App (lhs, e)
       | e -> e
     in
     (annot, e)

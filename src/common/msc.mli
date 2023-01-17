@@ -19,6 +19,8 @@ and e =
   | Bind of Variable.t * a * e
   | Var of Variable.t
 
+val initial_env : Env.t
+
 val convert_to_msc : Ast.annot_expr -> e
 val map_e : (e -> e) -> (a -> a) -> e -> e
 val map_a : (e -> e) -> (a -> a) -> a -> a

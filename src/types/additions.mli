@@ -38,6 +38,7 @@ type var_type_env
 
 val empty_tenv : type_env
 val empty_vtenv : var_type_env
+val infer_prefix : string
 
 val type_base_to_typ : type_base -> typ
 

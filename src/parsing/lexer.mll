@@ -66,6 +66,7 @@ rule token = parse
 | "end"   { END }
 | "fun"   { FUN }
 | "let"   { LET }
+| "rec"   { REC }
 | "in"    { IN }
 | "fst"   { FST }
 | "snd"   { SND }

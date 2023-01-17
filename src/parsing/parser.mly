@@ -6,7 +6,7 @@
   let annot sp ep e =
     (Ast.new_annot (Position.lex_join sp ep), e)
 
-  let tmp_var = "__gen__"
+  let tmp_var = "__internal_encoding"
   let multi_param_abstraction startpos endpos lst t =
     let step acc (annotation, pat) =
       match pat with
@@ -17,6 +17,32 @@
         annot startpos endpos (Lambda (annotation, tmp_var, body))
     in
     List.rev lst |> List.fold_left step t
+
+  let fresh_infer_tvar_id =
+    let last = ref 0 in
+    (fun () ->
+      last := (!last) + 1 ;
+      Format.sprintf "%s_internal_self_%i" infer_prefix (!last))
+  let multi_param_rec_abstraction startpos endpos name lst oty t =
+    let rec aux lst =
+      match lst with
+      | [] ->
+        begin match oty with
+        | None -> TVar (fresh_infer_tvar_id ())
+        | Some ty -> ty
+        end
+      | (Unnanoted, _)::lst -> TArrow (TVar (fresh_infer_tvar_id ()), aux lst)
+      | (ADomain tys, _)::lst ->
+          let arrows = tys |> List.map (fun ty -> TArrow (ty, aux lst)) in
+          begin match arrows with
+          | [] -> assert false
+          | arrow::arrows -> List.fold_left (fun acc elt -> TCap (acc, elt)) arrow arrows
+          end
+    in
+    let self_annot = aux lst in
+    let lst = (ADomain [self_annot], PatVar name)::lst in
+    let t = multi_param_abstraction startpos endpos lst t in
+    annot startpos endpos (Fixpoint t)
 
   let let_pattern startpos endpos pat d t =
     match pat with
@@ -42,7 +68,7 @@
 %}
 
 %token EOF
-%token FUN LET IN FST SND DEBUG
+%token FUN LET REC IN FST SND DEBUG
 %token IF IS THEN ELSE
 %token LPAREN RPAREN EQUAL COMMA COLON INTERROGATION_MARK
 %token ARROW AND OR NEG DIFF
@@ -88,13 +114,22 @@ element:
     let t = multi_param_abstraction $startpos $endpos ais t in
     annot $symbolstartpos $endpos (Definition (i, (id, t, ty)))
   }
+| i=optional_debug LET REC gioa=gen_id_opt_annot ais=parameter* oty=optional_typ EQUAL t=term
+  { 
+    let (id, ty) = gioa in
+    let t = multi_param_rec_abstraction $startpos $endpos id ais oty t in
+    annot $symbolstartpos $endpos (Definition (i, (id, t, ty)))
+  }
 | ATOMS a=ID* { annot $symbolstartpos $endpos (Atoms a) }
 | TYPE ts=separated_nonempty_list(TYPE_AND, param_type_def) { annot $symbolstartpos $endpos (Types ts) }
 
 %inline gen_id_opt_annot:
   id=generalized_identifier { (id, None) }
-| LPAREN id=generalized_identifier RPAREN { (id, None) }
-| LPAREN id=generalized_identifier COLON ty=typ RPAREN { (id, Some ty) }
+| LPAREN id=generalized_identifier oty=optional_typ RPAREN { (id, oty) }
+
+%inline optional_typ:
+| { None }
+| COLON ty=typ { Some ty }
 
 %inline optional_debug:
   { Utils.log_disabled }
@@ -117,6 +152,11 @@ term:
   {
     let td = multi_param_abstraction $startpos $endpos ais td in
     annot $startpos $endpos (Let (id, td, t))
+  }
+| LET REC id=generalized_identifier ais=parameter* oty=optional_typ EQUAL td=term IN t=term
+  { 
+    let td = multi_param_rec_abstraction $startpos $endpos id ais oty td in
+    annot $symbolstartpos $endpos (Let (id, td, t))
   }
 | LET LPAREN p = pattern RPAREN EQUAL td=term IN t=term { let_pattern $startpos $endpos p td t }
 | IF t=term ott=optional_test_type THEN t1=term ELSE t2=term { annot $startpos $endpos (Ite (t,ott,t1,t2)) }

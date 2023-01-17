@@ -12,8 +12,8 @@ This prototype has been tested on OCaml 4.14.1, that can be installed by doing `
 The main dependency is the CDuce library. It can be installed this way:
 
 ```
-opam pin add cduce-types 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#types-improvements'
-opam pin add cduce 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#types-improvements'
+opam pin add cduce-types 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#dev'
+opam pin add cduce 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#dev'
 ```
 
 ### Building the prototype

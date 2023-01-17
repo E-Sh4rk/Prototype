@@ -34,7 +34,7 @@ type ('a, 'typ, 'v) pattern =
 | PatAnd of ('a, 'typ, 'v) pattern * ('a, 'typ, 'v) pattern
 | PatOr of ('a, 'typ, 'v) pattern * ('a, 'typ, 'v) pattern
 | PatPair of ('a, 'typ, 'v) pattern * ('a, 'typ, 'v) pattern
-(* PatRecord *)
+| PatRecord of (string * (('a, 'typ, 'v) pattern)) list * bool
 | PatAssign of 'v * ('a, 'typ, 'v) t
 [@@deriving ord]
 
@@ -207,6 +207,13 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
                 let (p1, vtenv, env1) = aux_p vtenv env p1 in
                 let (p2, vtenv, env2) = aux_p vtenv env p2 in
                 (PatPair (p1, p2), vtenv, merge_disj env1 env2)
+            | PatRecord (fields, o) ->
+                let (fields, vtenv, env) = List.fold_left
+                    (fun (fields, vtenv, acc_env) (name, p) ->
+                        let (p, vtenv, env') = aux_p vtenv env p in
+                        ((name, p)::fields, vtenv, merge_disj acc_env env')
+                ) ([], vtenv, env) fields in
+                (PatRecord (List.rev fields, o), vtenv, env)
             | PatAssign (str, e) ->
                 if String.equal str dummy_pat_var_str
                 then raise (SymbolError "invalid variable name for a pattern assignement") ;
@@ -230,6 +237,8 @@ let map_p f p =
             | PatAnd (p1, p2) -> PatAnd (aux p1, aux p2)
             | PatOr (p1, p2) -> PatOr (aux p1, aux p2)
             | PatPair (p1, p2) -> PatPair (aux p1, aux p2)
+            | PatRecord (fields, o) ->
+                PatRecord (List.map (fun (str, p) -> (str, aux p)) fields, o)
         in
         f p
     in
@@ -264,6 +273,8 @@ and unannot_pat pat =
         | PatAnd (p1, p2) -> PatAnd (aux p1, aux p2)
         | PatOr (p1, p2) -> PatOr (aux p1, aux p2)
         | PatPair (p1, p2) -> PatPair (aux p1, aux p2)
+        | PatRecord (fields, o) ->
+            PatRecord (List.map (fun (str, p) -> (str, aux p)) fields, o)
     in
     aux pat
 

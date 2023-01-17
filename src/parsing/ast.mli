@@ -31,7 +31,7 @@ type ('a, 'typ, 'v) pattern =
 | PatAnd of ('a, 'typ, 'v) pattern * ('a, 'typ, 'v) pattern
 | PatOr of ('a, 'typ, 'v) pattern * ('a, 'typ, 'v) pattern
 | PatPair of ('a, 'typ, 'v) pattern * ('a, 'typ, 'v) pattern
-(* TODO: PatRecord *)
+| PatRecord of (string * (('a, 'typ, 'v) pattern)) list * bool
 | PatAssign of 'v * ('a, 'typ, 'v) t
 
 and ('a, 'typ, 'v) ast =

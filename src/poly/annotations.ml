@@ -8,7 +8,7 @@ module PartialAnnot = struct
 
   and a =
   | InferA of infer_state | PartialA
-  | LambdaA of branches (* Fully Explored *) * branches (* Remaining *)
+  | LambdaA of branches list * branches
   [@@deriving show]
 
   and t =
@@ -28,7 +28,7 @@ module PartialAnnot = struct
   | InferA s -> InferA s
   | PartialA -> PartialA
   | LambdaA (b1, b2) ->
-    LambdaA (apply_subst_branches s b1, apply_subst_branches s b2)
+    LambdaA (List.map (apply_subst_branches s) b1, apply_subst_branches s b2)
   and apply_subst s t =
     if Subst.is_identity s then t
     else match t with
@@ -52,7 +52,7 @@ module FullAnnot = struct
   [@@deriving show]
   and a =
       | ConstA | AliasA | AbstractA | LetA
-      | LambdaA of branches
+      | LambdaA of branches list
       | PairA of renaming * renaming
       | AppA of inst * inst
       | ProjA of inst

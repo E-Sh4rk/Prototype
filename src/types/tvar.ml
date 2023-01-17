@@ -245,38 +245,23 @@ module Iter = Base.Iter
 module type Kind = Base.Kind
 
 module Raw = struct
-(* let subst_vars_with delta s t =
-  let vars = TVarSet.diff (vars t) delta in
-  let subst = vars |> TVarSet.destruct |>
-    List.map (fun v -> (v,s)) |> Subst.construct in
-  Subst.apply subst t *)
-
-  let inf_typ delta t =
-    CD.Types.Subst.min_type delta t (* TODO: This implem is not optimal *)
-    (* CD.Types.Subst.clean_type ~pos:empty ~neg:any delta t |>
-    subst_vars_with delta any *)
-  
-  let sup_typ delta t =
-    CD.Types.Subst.max_type delta t (* TODO: This implem is not optimal *)
-    (* CD.Types.Subst.clean_type ~pos:any ~neg:empty delta t |>
-    subst_vars_with delta any *)
-  
   (* Tallying *)
   let clean_type ~pos ~neg vars t =
     CD.Types.Subst.clean_type ~pos ~neg vars t
-  let clean_type_subst ~pos ~neg mono t =
-    let subst =
-        vars_with_polarity t |>
-        List.filter_map (fun (v,p) ->
-            if TVarSet.mem mono v then None
-            else match p with
-            | `Pos -> Some (v, pos)
-            | `Neg -> Some (v, neg)
-            | `Both -> None
-        )
-    in
-    Subst.construct subst
   let rectype = CD.Types.Subst.solve_rectype
+
+  let [@warning "-32"] print_tallying_instance var_order delta constr =
+    Format.printf "Constraints:@." ;
+    let allvars = ref TVarSet.empty in
+    constr |> List.iter (fun (l,r) ->
+        allvars := TVarSet.union (!allvars) (vars l) ;
+        allvars := TVarSet.union (!allvars) (vars r) ;
+        Format.printf "(%a, %a)@." Base.pp_typ l Base.pp_typ r ;
+    );
+    Format.printf "With delta=%a, var order=%a, and natural var order=%a@."
+        (Utils.pp_list TVar.pp) (TVarSet.destruct delta)
+        (Utils.pp_list TVar.pp) var_order
+        (Utils.pp_list TVar.pp) (TVarSet.destruct !allvars)
 
   let [@warning "-32"] check_tallying_solution constr res =
     let error = ref false in
@@ -296,36 +281,9 @@ module Raw = struct
         Format.printf "===== WARNING: Cduce tallying issue.@. ====="
     end ; res
 
-  let tallying_raw ~var_order d cs =
+  let tallying ~var_order d cs =
       CD.Types.Tallying.tallying ~var_order d cs
       (* |> (check_tallying_solution cs) *)
-
-  let print_tallying_instance var_order delta constr =
-    Format.printf "Constraints:@." ;
-    let allvars = ref TVarSet.empty in
-    constr |> List.iter (fun (l,r) ->
-        allvars := TVarSet.union (!allvars) (vars l) ;
-        allvars := TVarSet.union (!allvars) (vars r) ;
-        Format.printf "(%a, %a)@." Base.pp_typ l Base.pp_typ r ;
-    );
-    Format.printf "With delta=%a, var order=%a, and natural var order=%a@."
-        (Utils.pp_list TVar.pp) (TVarSet.destruct delta)
-        (Utils.pp_list TVar.pp) var_order
-        (Utils.pp_list TVar.pp) (TVarSet.destruct !allvars)
-
-  let tallying_infer poly noninfered constr =
-    assert (TVarSet.inter (TVarSet.construct poly) noninfered |> TVarSet.is_empty) ;
-    Utils.log ~level:2 "Tallying (inference) instance initiated...@?" ;
-    let res = tallying_raw ~var_order:poly noninfered constr in
-    Utils.log ~level:2 " Done (%i sol).@." (List.length res) ;
-    res
-
-  let tallying mono constr =
-    Utils.log ~level:2 "Tallying (no inference) instance initiated...@?" ;
-    let var_order = [] in
-    let res = tallying_raw ~var_order mono constr in
-    Utils.log ~level:2 " Done (%i sol).@." (List.length res) ;
-    res
 end
 
 let clean_type ~pos ~neg t =
@@ -346,7 +304,7 @@ let tallying constr =
     List.map (fun (a,b) -> [vars_mono a ; vars_mono b]) |>
     List.flatten in
   let mono = TVarSet.union_many mono in
-  let res = Raw.tallying_raw ~var_order:[] mono constr in
+  let res = Raw.tallying ~var_order:[] mono constr in
   let codom = List.map Subst.codom res in
   let codom = TVarSet.union_many codom in
   let lkp_subst = lookup_unregistered codom in

@@ -67,14 +67,14 @@ let rec regroup_equiv equiv lst =
 let remove_duplicates equiv lst =
   regroup_equiv equiv lst |> List.map List.hd
 
+let remove_greater leq elt = List.filter (fun e -> leq elt e |> not)
 let keep_only_minimal leq lst =
-  let remove_greater elt = List.filter (fun e -> leq elt e |> not) in
   let rec aux explored lst =
     match lst with
     | [] -> List.rev explored
     | e::lst ->
-      let explored = remove_greater e explored in
-      let lst = remove_greater e lst in
+      let explored = remove_greater leq e explored in
+      let lst = remove_greater leq e lst in
       aux (e::explored) lst
   in aux [] lst
 
@@ -115,11 +115,36 @@ let add_others lst =
 let find_among_others pred lst =
   lst |> add_others |> List.find_opt (fun (a,o) -> pred a o)
 
+let find_map_among_others f lst =
+  lst |> add_others |> List.find_map (fun (a,o) -> f a o)
+
+let merge_when_possible merge_opt lst =
+  let merge_opt a b others =
+    Option.map (fun a -> (a, others)) (merge_opt a b)
+  in
+  let rec aux lst =
+    match lst with
+    | [] -> []
+    | e::lst ->
+      begin match find_map_among_others (fun e' lst -> merge_opt e e' lst) lst with
+      | None -> e::(aux lst)
+      | Some (e, lst) -> aux (e::lst)
+      end
+    in
+    aux lst
+
 let rec insert x lst =
   match lst with
   | [] -> [[x]]
   | h::t ->
     (x::lst) :: (List.map (fun el -> h::el) (insert x t))
+
+let carthesian_product l1 l2 =
+  l1 |> List.map (fun e1 ->
+    l2 |> List.map (fun e2 ->
+      (e1, e2)
+    )
+  ) |> List.flatten
 
 let rec perm lst =
   match lst with

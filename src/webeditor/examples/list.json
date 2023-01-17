@@ -1,0 +1,10 @@
+[
+    {
+        "name": "Fixpoint and recursion",
+        "path": "fixpoint.stml"
+    },
+    {
+        "name": "Pattern matching",
+        "path": "patterns.stml"
+    }
+]

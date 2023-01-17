@@ -3,11 +3,11 @@ open Parsing.Variable
 module ExprMap = Parsing.Ast.ExprMap
 open Types.Base
 
-type 'va a =
+type a =
   | Alias of Variable.t
   | Abstract of typ
   | Const of Ast.const
-  | Lambda of 'va * (typ Ast.type_annot) * Variable.t * 'va e
+  | Lambda of (typ Ast.type_annot) * Variable.t * e
   | Ite of Variable.t * typ * Variable.t * Variable.t
   | App of Variable.t * Variable.t
   | Pair of Variable.t * Variable.t
@@ -17,8 +17,8 @@ type 'va a =
   | TypeConstr of Variable.t * typ
   [@@deriving show]
 
-and 'va e =
-  | Bind of 'va * Variable.t * 'va a * 'va e
+and e =
+  | Bind of Variable.t * a * e
   | Var of Variable.t
   [@@deriving show]
 
@@ -28,7 +28,7 @@ let map ef af =
     | Alias v -> Alias v
     | Abstract t -> Abstract t
     | Const c -> Const c
-    | Lambda (va, ta, v, e) -> Lambda (va, ta, v, aux_e e)
+    | Lambda (ta, v, e) -> Lambda (ta, v, aux_e e)
     | Ite (v, t, x1, x2) -> Ite (v, t, x1, x2)
     | App (v1, v2) -> App (v1, v2)
     | Pair (v1, v2) -> Pair (v1, v2)
@@ -40,7 +40,7 @@ let map ef af =
     |> af
   and aux_e e =
     begin match e with
-    | Bind (va, v, a, e) -> Bind (va, v, aux_a a, aux_e e)
+    | Bind (v, a, e) -> Bind (v, aux_a a, aux_e e)
     | Var v -> Var v
     end
     |> ef
@@ -49,36 +49,18 @@ let map ef af =
 let map_e ef af = map ef af |> fst
 let map_a ef af = map ef af |> snd
 
-let rec map_annot_a ef af a =
-  match a with
-    | Alias v -> Alias v
-    | Abstract t -> Abstract t
-    | Const c -> Const c
-    | Lambda (va, ta, v, e) -> Lambda (af va, ta, v, map_annot_e ef af e)
-    | Ite (v, t, x1, x2) -> Ite (v, t, x1, x2)
-    | App (v1, v2) -> App (v1, v2)
-    | Pair (v1, v2) -> Pair (v1, v2)
-    | Projection (p, v) -> Projection (p, v)
-    | RecordUpdate (v, str, vo) -> RecordUpdate (v, str, vo)
-    | Let (v1, v2) -> Let (v1, v2)
-    | TypeConstr (v, t) -> TypeConstr (v, t)
-and map_annot_e ef af e =
-    match e with
-    | Bind (va, v, a, e) -> Bind (ef va, v, map_annot_a ef af a, map_annot_e ef af e)
-    | Var v -> Var v
-
 let fold ef af =
   let rec aux_a a =
     begin match a with
     | Alias _ | Abstract _ | Const _ | App _ | Pair _
     | Projection _ | RecordUpdate _ | Ite _ | Let _
     | TypeConstr _ -> []
-    | Lambda (_, _, _, e) -> [aux_e e]
+    | Lambda (_, _, e) -> [aux_e e]
     end
     |> af a
   and aux_e e =
     begin match e with
-    | Bind (_, _, a, e) -> [aux_a a ; aux_e e]
+    | Bind (_, a, e) -> [aux_a a ; aux_e e]
     | Var _ -> []
     end
     |> ef e
@@ -90,12 +72,12 @@ let fold_a ef af = fold ef af |> snd
 let fv_e' e acc =
   let acc = List.fold_left VarSet.union VarSet.empty acc in
   match e with
-  | Bind (_, v, _, _) -> VarSet.remove v acc
+  | Bind (v, _, _) -> VarSet.remove v acc
   | Var v -> VarSet.add v acc
 let fv_a' a acc =
   let acc = List.fold_left VarSet.union VarSet.empty acc in
   match a with
-  | Lambda (_, _, v, _) -> VarSet.remove v acc
+  | Lambda (_, v, _) -> VarSet.remove v acc
   | Alias v | Projection (_, v) | RecordUpdate (v, _, None)
   | TypeConstr (v, _) -> VarSet.add v acc
   | Ite (v, _, x1, x2) -> VarSet.add v acc |> VarSet.add x1 |> VarSet.add x2
@@ -108,10 +90,10 @@ let fv_e x = fold_e fv_e' fv_a' x
 
 let bv_e' e acc =
   let acc = List.fold_left VarSet.union VarSet.empty acc in
-  match e with Bind (_, v, _, _) -> VarSet.add v acc | Var _ -> acc
+  match e with Bind (v, _, _) -> VarSet.add v acc | Var _ -> acc
 let bv_a' a acc =
   let acc = List.fold_left VarSet.union VarSet.empty acc in
-  match a with Lambda (_, _, v, _) -> VarSet.add v acc | _ -> acc
+  match a with Lambda (_, v, _) -> VarSet.add v acc | _ -> acc
 
 let bv_a x = fold_a bv_e' bv_a' x
 let bv_e x = fold_e bv_e' bv_a' x
@@ -149,6 +131,8 @@ let rec type_of_pat pat =
     cup (type_of_pat p1) (type_of_pat p2)
   | PatPair (p1, p2) ->
     mk_times (type_of_pat p1 |> cons) (type_of_pat p2 |> cons)
+  | PatRecord (fields, o) ->
+    mk_record o (List.map (fun (str, p) -> (str, type_of_pat p |> cons)) fields)
   | PatAssign _ -> any
 
 let rec vars_of_pat pat =
@@ -163,6 +147,10 @@ let rec vars_of_pat pat =
     VarSet.inter (vars_of_pat p1) (vars_of_pat p2)
   | PatPair (p1, p2) ->
     VarSet.union (vars_of_pat p1) (vars_of_pat p2)
+  | PatRecord (fields, _) ->
+    List.fold_left
+      (fun acc (_, p) -> VarSet.union acc (vars_of_pat p))
+      VarSet.empty fields
   | PatAssign (x,_) -> VarSet.singleton x
 
 let rec def_of_var_pat pat v e =
@@ -180,6 +168,11 @@ let rec def_of_var_pat pat v e =
     if vars_of_pat p1 |> VarSet.mem v
     then def_of_var_pat p1 v (annot, Projection (Fst, e))
     else def_of_var_pat p2 v (annot, Projection (Snd, e))
+  | PatRecord (fields, _) ->
+    let (str, p) =
+      fields |> List.find (fun (_, p) -> vars_of_pat p |> VarSet.mem v)
+    in
+    def_of_var_pat p v (annot, Projection (Field str, e))
   | PatOr (p1, p2) ->
     let case = Ite (e, type_of_pat p1,
       def_of_var_pat p1 v e, def_of_var_pat p2 v e) in
@@ -249,7 +242,7 @@ let convert_to_msc ast =
           filter_expr_map (defs |> List.map fst |> VarSet.of_list) in
         let (defs, defs') = (List.rev defs, List.rev defs') in
         let e = defs_and_x_to_e defs' x in
-        (defs, expr_var_map, Lambda ((), t, v, e))
+        (defs, expr_var_map, Lambda (t, v, e))
       | Ast.Ite (e, t, e1, e2) ->
         let (defs, expr_var_map, x) = to_defs_and_x expr_var_map e in
         let (defs1, expr_var_map, x1) = to_defs_and_x expr_var_map e1 in
@@ -301,7 +294,7 @@ let convert_to_msc ast =
       defs |>
       List.fold_left (
         fun nf (v, d) ->
-        Bind ((), v, d, nf)
+        Bind (v, d, nf)
       ) (Var x)
     in
     

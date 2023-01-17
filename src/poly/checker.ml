@@ -1,4 +1,3 @@
-module PMsc = Msc
 open Types.Base
 open Types.Tvar
 open Types.Additions
@@ -51,7 +50,8 @@ let generalize_check pos r t =
     Subst.codom r |> TVarSet.filter TVar.is_mono |> TVarSet.is_empty
   then Subst.apply r t
   else raise (Untypeable (pos, "Invalid generalization."))  
-  
+
+(* TODO: test examples in flatten.ml, and merge them with test.ml *)
 let rec typeof_a vardef tenv env annot_a a =
   let open FullAnnot in
   let pos = Variable.get_locations vardef in
@@ -65,19 +65,19 @@ let rec typeof_a vardef tenv env annot_a a =
     then untypeable ("Invalid lambda: there must be at least 1 branch.")
     else
       let branches =
-        annot |> List.map (fun (s, annot) ->
-          check_mono s ;
-          let env = Env.add v s env in
-          let t = typeof tenv env annot e in
-          mk_arrow (cons s) (cons t)
+          annot |> List.map (fun group ->
+            let (doms, codoms) =
+              group |> List.map (fun (s, annot) ->
+                check_mono s ;
+                let env = Env.add v s env in
+                let t = typeof tenv env annot e in
+                (s,t)
+              ) |> List.split
+            in
+            let (dom, codom) = (disj_o doms, disj_o codoms) in
+            mk_arrow (cons dom) (cons codom)
         ) in
-      (* NOTE: This is an optimisation (simplification of the type). *)
-      let leq t1 t2 =
-        let gen = TVarSet.diff (vars t1) (Env.tvars env) |> generalize in
-        let t1 = Subst.apply gen t1 in
-        subtype_poly t1 t2
-      in
-      branches |> keep_only_minimal leq |> conj_o
+      branches |> conj_o
   in
   begin match a, annot_a with
   | Alias v, AliasA -> var_type v
@@ -127,17 +127,17 @@ let rec typeof_a vardef tenv env annot_a a =
         else untypeable ("Invalid application: argument not in the domain.")
       else untypeable ("Invalid application: not a function.")
     in
-    (* NOTE: Approximation... this is not what the paper suggests.
-       Disabled because incompatible with app tallying approximations. *)
-    (* let treat_sigma (s1,s2) =
+    (* NOTE: Approximation... this is not what the paper suggests,
+       but given the inference we gain nothing by doing like in the paper. *)
+    let treat_sigma (s1,s2) =
       let t1 = var_type v1 |> instantiate_check [s1] in
       let t2 = var_type v2 |> instantiate_check [s2] in
       apply t1 t2
     in
-    List.combine ss1 ss2 |> List.map treat_sigma |> conj_o *)
-    let t1 = var_type v1 |> instantiate_check ss1 in
+    List.combine ss1 ss2 |> List.map treat_sigma |> conj_o
+    (* let t1 = var_type v1 |> instantiate_check ss1 in
     let t2 = var_type v2 |> instantiate_check ss2 in
-    apply t1 t2
+    apply t1 t2 *)
   | Ite (v, _, _, _), EmptyA ss ->
     let t = var_type v |> instantiate_check ss in
     if is_empty t then empty
@@ -156,9 +156,9 @@ let rec typeof_a vardef tenv env annot_a a =
     if Env.mem v1 env
     then var_type v2
     else untypeable ("Invalid let binding: definition has not been typed.")
-  | Lambda (_, Parsing.Ast.AArrow _, _, _), LambdaA _ ->
+  | Lambda (Parsing.Ast.AArrow _, _, _), LambdaA _ ->
     untypeable ("Invalid lambda: explicitely typed lambdas are not supported.")
-  | Lambda (_, _, v, e), LambdaA branches -> type_lambda env branches v e
+  | Lambda (_, v, e), LambdaA branches -> type_lambda env branches v e
   | _, _ -> untypeable ("Invalid annotations.")
   end
   |> bot_instance |> simplify_typ
@@ -167,7 +167,7 @@ and typeof tenv env annot e =
   let open FullAnnot in
   begin match e, annot with
   | Var v, BVar r -> var_type v env |> rename_check [] r
-  | Bind (_, v, a, e), Keep (annot_a, gen, ty, branches) ->
+  | Bind (v, a, e), Keep (annot_a, gen, ty, branches) ->
     let t = (* NOTE: ty different than None bypass type checking. *)
       begin match ty with
       | None -> typeof_a v tenv env annot_a a
@@ -178,8 +178,7 @@ and typeof tenv env annot e =
     if branches = []
     then untypeable ("Invalid decomposition: cannot be empty.")
     else
-      let dom = branches |> List.map fst |> disj in
-      if subtype t dom
+      if subtype t (branches |> List.map fst |> disj)
       then
         let t = generalize_check pos gen t in
         branches |> List.map (fun (s, annot) ->
@@ -187,7 +186,7 @@ and typeof tenv env annot e =
           typeof tenv env annot e
         ) |> disj_o
       else untypeable ("Invalid decomposition: does not cover the whole domain.")
-  | Bind (_, v, _, e), Skip annot ->
+  | Bind (v, _, e), Skip annot ->
     assert (Env.mem v env |> not) ;
     typeof tenv env annot e
   | _, _ -> raise (Untypeable ([], "Invalid annotations."))
@@ -196,11 +195,11 @@ and typeof tenv env annot e =
 
 let typeof_a_nofail vardef tenv env annot_a a =
   try typeof_a vardef tenv env annot_a a
-  with Untypeable (_, str) -> Format.printf "%a: %s@." PMsc.pp_a a str ; assert false
+  with Untypeable (_, str) -> Format.printf "%a: %s@." pp_a a str ; assert false
 
 let typeof_nofail tenv env annot e =
   try typeof tenv env annot e
-  with Untypeable (_, str) -> Format.printf "%a: %s@." PMsc.pp_e e str ; assert false  
+  with Untypeable (_, str) -> Format.printf "%a: %s@." pp_e e str ; assert false  
 
 (* ====================================== *)
 (* =============== REFINE =============== *)
@@ -264,6 +263,11 @@ let refine_a env a t =
 (* =============== INFER I ============== *)
 (* ====================================== *)
 
+let tallying_nonempty constr =
+  match tallying constr with
+  | [] -> assert false
+  | sols -> sols
+
 let types_equiv_modulo_renaming mono t1 t2 =
   let (v1s, v2s) = (TVarSet.diff (vars t1) mono, TVarSet.diff (vars t2) mono) in
   let (v1s, v2s) = (TVarSet.diff v1s v2s, TVarSet.diff v2s v1s) in
@@ -303,13 +307,14 @@ let rec try_factorize res res_model =
     ) Subst.identity
   else Subst.identity
 
-let simplify_tallying sols res =
+let simplify_tallying res sols =
   let is_better_sol s1 s2 =
     let t1 = Subst.apply s1 res in
     let t2 = Subst.apply s2 res in
     subtype_poly t1 t2
   in
-  let sols = sols |> List.filter_map (fun sol ->
+  let sols = sols |> List.map (fun sol ->
+    (* Basic cleaning *)
     let t = Subst.apply sol res in
     let clean = clean_type_subst ~pos:empty ~neg:any t in
     let t = Subst.apply clean t in
@@ -330,56 +335,93 @@ let simplify_tallying sols res =
       ) sol (Subst.dom sol |> TVarSet.destruct) in
     (* Decorrelate solutions *)
     let s = refresh_all (vars_poly t) in
-    let sol = Subst.compose s sol in
-    Some sol
+    Subst.compose s sol
     ) in
   (* Remove weaker solutions *)
-  let sols = sols |> keep_only_minimal is_better_sol in
+  let sols = keep_only_minimal is_better_sol sols in
   (* Rename vars to allow factorisation of arrows *)
   List.fold_left (fun sols sol ->
-    let sol_res = apply_subst_simplify sol res in
+    let sol_res = Subst.apply sol res in
     let sols_res = List.map snd sols in
     let (sol, sol_res) =
       sols_res |> List.fold_left (fun (sol, sol_res) sol_res' ->
         let s = try_factorize sol_res sol_res' in
-        (Subst.compose s sol, apply_subst_simplify s sol_res)
+        (Subst.compose s sol, Subst.apply s sol_res)
       ) (sol, sol_res)
     in
     (sol, sol_res)::sols
   ) [] sols |> List.map fst
 
-let approximate_app t1 t2 resvar =
-  (* NOTE: Approximation for tallying instances for the application *)
-  (* ignore (t1, t2, resvar) ; None *)
-  let arrow_type = mk_arrow (cons t2) (TVar.typ resvar |> cons) in
-  let inst_for_arrow (t,s) =
-    tallying [(mk_arrow (cons t) (cons s), arrow_type)]
+let rec approximate_arrow is_poly t =
+  let factorize v t =
+    let (f,r) = factorize (TVarSet.construct [v], TVarSet.empty) t in
+    if is_empty f then factorize (TVarSet.empty, TVarSet.construct [v]) t
+    else (f,r)
   in
-  let inst_for_arrows arrows =
-    arrows |> List.map inst_for_arrow |> List.flatten
-  in
-  (* Use the code below to apply the approx even with many conjunctions *)
-  let insts = dnf t1 |> List.map inst_for_arrows in
-  if insts <> [] && List.for_all (fun inst -> inst <> []) insts
-  then Some (List.flatten insts)
-  else None
-  (* Use the code below to only use approx if only 1 conjunction *)
-  (* match dnf t1 with
-  | [arrows] ->
-    let inst = inst_for_arrows arrows in
-    if inst <> [] then Some inst else None
-  | _ -> None *)
+  if subtype t arrow_any
+  then begin
+    let tv = top_vars t |> TVarSet.filter is_poly in
+    match TVarSet.destruct tv with
+    | [] ->
+      dnf t (* |> simplify_dnf *) |> List.map (fun arrows ->
+          (* Keep all branches with no var in their domain, split the others *)
+          (* let (keep, split) = arrows |> List.partition (fun (a,_) ->
+            vars a |> TVarSet.filter is_poly |> TVarSet.is_empty)
+          in *)
+          let (keep, split) = ([], arrows) in
+          split |> List.map (fun arrow -> branch_type (arrow::keep))
+        )
+      |> List.fold_left (fun acc lst ->
+          carthesian_product acc lst
+          |> List.map (fun (a,b) -> cup a b)
+        ) [empty]
+    | v::_ ->
+      let (f,r) = factorize v t in
+      let fres = [f] in
+      let rres = approximate_arrow is_poly r in
+      carthesian_product fres rres |> List.map
+        (fun (f, r) -> cup (cap (TVar.typ v) f) r)
+  end else [t]
 
 let is_opened_arrow t =
   subtype t arrow_any &&
-  dnf t |> List.exists (fun conj ->
+  match dnf t with
+  | [conj] ->
     conj |> List.exists (fun (a,b) ->
-        subtype a arrow_any &&
-        subtype b arrow_any &&
-        TVarSet.inter (vars_poly a) (vars_poly b)
-        |> TVarSet.is_empty |> not
-      )
-  )
+      subtype a arrow_any &&
+      subtype b arrow_any &&
+      TVarSet.inter (vars_poly a) (vars_poly b)
+      |> TVarSet.is_empty |> not
+    )
+  | _ -> false
+(* Approximation for "fixpoint-like" tallying instances *)
+let approximate_app infer t1 t2 resvar =
+  let exception NoApprox in
+  let tallying = if infer then tallying_infer else tallying in
+  try
+    if is_opened_arrow t2 |> not then raise NoApprox ;
+    let is_poly = if infer then TVar.can_infer else TVar.is_poly in
+    let t2s = approximate_arrow is_poly t2 in
+    let res =
+      t2s |> List.map (fun t2 ->
+        let arrow_type = mk_arrow (cons t2) (TVar.typ resvar |> cons) in
+        tallying [(t1, arrow_type)]
+      ) |> List.flatten
+    in
+    if res = [] && List.length t2s > 1 then raise NoApprox else res
+  with NoApprox ->
+    let arrow_type = mk_arrow (cons t2) (TVar.typ resvar |> cons) in
+    tallying [(t1, arrow_type)]
+(* Approximation for tallying instances for the application *)
+let approximate_app infer t1 t2 resvar =
+  let is_poly = if infer then TVar.can_infer else TVar.is_poly in
+  let t1s = approximate_arrow is_poly t1 in
+  let res =
+    t1s |> List.map (fun t1 -> approximate_app infer t1 t2 resvar) |> List.flatten
+  in
+  if res = [] && List.length t1s > 1
+  then (match approximate_app infer t1 t2 resvar with [] -> assert false | sols -> sols)
+  else res
 
 let rec infer_inst_a vardef tenv env pannot_a a =
   let open PartialAnnot in
@@ -409,20 +451,20 @@ let rec infer_inst_a vardef tenv env pannot_a a =
     in
     log ~level:4 "@.Tallying for %a: %a <= %a@."
       Variable.pp vardef pp_typ t pp_typ s ;
-    let res = tallying [(t, s)] in
-    let res = simplify_tallying res (TVar.typ alpha) in
+    let res = tallying_nonempty [(t, s)] in
+    let res = simplify_tallying (TVar.typ alpha) res in
     ProjA res
   | RecordUpdate (v, _, None), PartialA ->
-    let res = tallying [(vartype v, record_any)] in
-    let res = simplify_tallying res record_any in
+    let res = tallying_nonempty [(vartype v, record_any)] in
+    let res = simplify_tallying record_any res in
     RecordUpdateA (res, None)
   | RecordUpdate (v, _, Some v2), PartialA ->
-    let res = tallying [(vartype v, record_any)] in
-    let res = simplify_tallying res record_any in
+    let res = tallying_nonempty [(vartype v, record_any)] in
+    let res = simplify_tallying record_any res in
     let r = refresh_all (vartype v2 |> vars_poly) in
     RecordUpdateA (res, Some r)
   | TypeConstr (v, s), PartialA ->
-    let res = tallying [(vartype v, s)] in
+    let res = tallying_nonempty [(vartype v, s)] in
     ConstrA res
   | App (v1, v2), PartialA ->
     let t1 = vartype v1 in
@@ -432,40 +474,11 @@ let rec infer_inst_a vardef tenv env pannot_a a =
     let t1 = Subst.apply r1 t1 in
     let t2 = Subst.apply r2 t2 in
     let alpha = TVar.mk_poly None in
-    let tallying t1 t2 =
-      match approximate_app t1 t2 alpha with
-      | None ->
-        let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
-        log ~level:4 "@.Tallying for %a: %a <= %a@."
-          Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
-        tallying [(t1, arrow_type)]
-      | Some res ->
-        log ~level:4 "@.Approximate tallying for %a (%i sols).@."
-          Variable.pp vardef (List.length res) ; res
-    in
-    (* NOTE: Approximation for fixpoint combinator applications *)
-    let res =
-      if is_opened_arrow t2
-      then begin
-        let inst_for_arrows arrows =
-          arrows |> List.map (fun (s,t) ->
-            let t2 = mk_arrow (cons s) (cons t) in
-            tallying t1 t2
-          ) |> List.flatten
-        in
-        (* Use the code below to apply the approx even with many conjunctions *)
-        let insts = dnf t2 |> List.map inst_for_arrows in
-        if List.for_all (fun inst -> inst <> []) insts
-        then List.flatten insts
-        else []
-        (* Use the code below to only use approx if only 1 conjunction *)
-        (* match dnf t2 with
-        | [arrows] -> inst_for_arrows arrows
-        | _ -> [] *)
-      end else []
-    in
-    let res = if res = [] then tallying t1 t2 else res in
-    let res = simplify_tallying res (TVar.typ alpha) in
+    let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
+    log ~level:4 "@.Approximate tallying for %a: %a <= %a@."
+      Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
+    let res = approximate_app false t1 t2 alpha in
+    let res = simplify_tallying (TVar.typ alpha) res in
     let (s1, s2) = res |> List.map (fun s ->
       (Subst.compose_restr s r1, Subst.compose_restr s r2)
     ) |> List.split in
@@ -477,13 +490,14 @@ let rec infer_inst_a vardef tenv env pannot_a a =
     else if subtype t s then ThenA
     else if subtype t (neg s) then ElseA
     else assert false
-  | Lambda ((), _, v, e), PartialAnnot.LambdaA (b1, b2) ->
+  | Lambda (_, v, e), PartialAnnot.LambdaA (b1, b2) ->
     assert (b2 = []) ;
-    let branches = b1 |> List.map (fun (s, pannot) ->
-      let env = Env.add v s env in
-      let annot = infer_inst tenv env pannot e in
-      (s, annot)
-    ) in
+    let branches = b1 |> List.map (fun group ->
+      group |> List.map (fun (s, pannot) ->
+        let env = Env.add v s env in
+        let annot = infer_inst tenv env pannot e in
+        (s, annot)
+    )) in
     FullAnnot.LambdaA branches
   | _, _ ->  assert false
 
@@ -495,10 +509,10 @@ and infer_inst tenv env pannot e =
   | Var v, Partial ->
     let r = refresh_all (vartype v |> vars_poly) in
     BVar r
-  | Bind ((), _, _, e), PartialAnnot.Skip pannot ->
+  | Bind (_, _, e), PartialAnnot.Skip pannot ->
     let annot = infer_inst tenv env pannot e in
     FullAnnot.Skip annot
-  | Bind ((), v, a, e), PartialAnnot.Keep (pannot_a, branches) ->
+  | Bind (v, a, e), PartialAnnot.Keep (pannot_a, branches) ->
     let annot_a = infer_inst_a v tenv env pannot_a a in
     let t = typeof_a_nofail v tenv env annot_a a in
     let gen = TVarSet.diff (vars t) (Env.tvars env) |> generalize in
@@ -554,14 +568,15 @@ let is_valid_refinement env gamma =
 
 let subst_more_general s1 s2 =
   let s2m = Subst.codom s2 |> monomorphize in
-  let s2 = Subst.compose s2m s2 in
   let s1g = Subst.codom s1 |> generalize in
-  let s1 = Subst.compose s1g s1 in
   Subst.destruct s1 |> List.map (fun (v,t1) ->
     let t2 = Subst.find' s2 v in
+    let t2 = Subst.apply s2m t2 in
+    let t1 = Subst.apply s1g t1 in
     [(t1, t2) ; (t2, t1)]
   ) |> List.flatten |> tallying <> []
 
+let res_var = TVar.mk_mono None
 let simplify_tallying_infer env res sols =
   let tvars = Env.tvars env |> TVarSet.filter TVar.is_mono in
   let params_types = Env.domain env |>
@@ -603,23 +618,40 @@ let simplify_tallying_infer env res sols =
       Subst.compose_restr mono_subst s
     )
     |> List.filter (fun s ->
-      let res = Subst.apply sol res in
+      let res = Subst.find' sol res_var in
       let res' = Subst.apply s res in
       let g = vars res' |> generalize in
       let res' = Subst.apply g res' in
       subtype_poly res' res
-      (* ignore s ; false *)
     )
     in
     match res with
     | [] -> None
     | sol::_ -> Some sol
   in
+  let merge_on_domain merge dom lst =
+    dom |> List.map (fun v ->
+      let t = lst |> List.map (fun s -> Subst.find' s v) |> merge in
+      (v, t)
+    ) |> Subst.construct
+  in
+  let rec is_undesirable s =
+    subtype s arrow_any &&
+    dnf s |> List.for_all (fun conjuncts -> conjuncts |>
+      List.exists (fun (a, b) -> non_empty a && is_undesirable b)
+    )
+  in
   sols
+  (* Restrict to tvars and store result *)
+  |> List.map (fun sol ->
+    let res = Subst.apply sol res in
+    let sol = Subst.restrict sol tvars in
+    Subst.combine sol (Subst.construct [(res_var, res)])
+  )
   (* Generalize vars in the result when possible *)
   |> List.map (fun sol ->
     let tvars' = mono_vars sol in
-    let res = Subst.apply sol res in
+    let res = Subst.find' sol res_var in
     let g = generalize (TVarSet.diff (vars res) tvars') in
     let res = Subst.apply g res in
     let clean = clean_type_subst ~pos:empty ~neg:any res in
@@ -628,18 +660,11 @@ let simplify_tallying_infer env res sols =
   )
   (* Remove solutions that require "undesirable" lambda branches *)
   |> List.filter (fun sol ->
-    let rec is_undesirable s =
-      subtype s arrow_any &&
-      dnf s |> List.for_all (fun conjuncts -> conjuncts |>
-        List.exists (fun (a, b) -> non_empty a && is_undesirable b)
-      )
-    in
     params_types |> List.for_all (fun t ->
       TVarSet.inter (vars_mono t) (Subst.dom sol) |> TVarSet.is_empty ||
-      is_undesirable t || not (is_undesirable (apply_subst_simplify sol t))
+      is_undesirable t || not (is_undesirable (Subst.apply sol t))
     )
   )
-  (* Remove solutions that require "undesirable" lambda branches *)
   (* Simplify (light) *)
   |> List.map (fun sol ->
     let new_dom = TVarSet.inter (Subst.dom sol) tvars in
@@ -657,16 +682,9 @@ let simplify_tallying_infer env res sols =
     )
   |> List.map (fun to_merge ->
     let common = Subst.restrict (List.hd to_merge) tvars in
-    let resvars = TVarSet.diff (vars res) tvars |> TVarSet.destruct in
-    let respart =
-      resvars |> List.map (fun v ->
-        let t =
-          (* We do not simplify t, because in some cases it can be
-             very complex without being used later (e.g. when no tvar to infer) *)
-          to_merge |> List.map (fun s -> Subst.find' s v) |> conj
-        in
-        (v, t)
-      ) |> Subst.construct in
+    (* conj instead of conj_o, because in some cases it can be very complex types
+       without being used later (e.g. when there is no tvar to infer) *)
+    let respart = merge_on_domain conj [res_var] to_merge in
     Subst.combine common respart
   )
   (* Simplify (heavy) *)
@@ -691,19 +709,53 @@ let simplify_tallying_infer env res sols =
     res |> List.iter (fun s -> Format.printf "%a@." Subst.pp s) ;
     res
   ) *)
-
-let decorrelate_branches mono pannot_a =
-  let open PartialAnnot in
-  let rename_vars (t, pannot) =
-    let new_vars = TVarSet.diff (vars t) mono in
-    let r = refresh_all new_vars in
-    (apply_subst_simplify r t, apply_subst r pannot)
+  
+let typeof_a_pannot vardef tenv env pannot_a a =
+  let open FullAnnot in
+  let annot_a = infer_inst_a vardef tenv env pannot_a a in
+  let type_lambda env annot pannot v e =
+    let annot = List.flatten annot in
+    let pannot = List.flatten pannot in
+    let branches =
+      List.map2 (fun (s, annot) pannot ->
+        let env = Env.add v s env in
+        let t = typeof_nofail tenv env annot e in
+        (mk_arrow (cons s) (cons t), (s, t, [pannot]))
+      ) annot pannot in
+    (* NOTE: We do several simplifications to the branches (removing, merging) *)
+    let gen_leq a b =
+      let gen = TVarSet.diff (vars a) (Env.tvars env) |> generalize in
+      let a = Subst.apply gen a in
+      subtype_poly a b
+    in
+    let gen_leq' (a,_) (b,_) = gen_leq a b in
+    let merge_branches_opt (a,(sa,ta,annota)) (b,(sb,tb,annotb)) =
+      let dom = cup sa sb in
+      let codom = cup ta tb in
+      let t = mk_arrow (cons dom) (cons codom) in
+      if gen_leq t a && gen_leq t b
+      then Some (t, (dom, codom, annota@annotb))
+      else None
+    in
+    let mono = Env.tvars env in
+    let rename_vars (arrow, (s,_,pannot)) =
+      let new_vars = TVarSet.diff (vars s) mono in
+      let r = refresh_all new_vars in
+      (Subst.apply r arrow, PartialAnnot.apply_subst_branches r pannot)
+    in  
+    let (t, pannot) =
+      branches |> keep_only_minimal gen_leq'
+      |> merge_when_possible merge_branches_opt
+      |> List.map rename_vars |> List.split
+    in
+    (t |> conj_o |> bot_instance |> simplify_typ, pannot)
   in
-  match pannot_a with
-  | LambdaA (branches, []) ->
-    LambdaA (List.map rename_vars branches, [])
-  | LambdaA _ -> assert false
-  | pannot_a -> pannot_a
+  begin match a, annot_a, pannot_a with
+  | Lambda (_, v, e), LambdaA branches, PartialAnnot.LambdaA (pbranches, []) ->
+    let (t, pbranches) = type_lambda env branches pbranches v e in
+    (t, PartialAnnot.LambdaA (pbranches, []))
+  | _, _, _ -> (typeof_a_nofail vardef tenv env annot_a a, pannot_a)
+  end
 
 let rec infer_branches_a vardef tenv env pannot_a a =
   let memvar v = Env.mem v env in
@@ -736,7 +788,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
         begin match infer_branches_iterated tenv env' pannot e with
         | Ok pannot ->
           aux (s::explored) b
-          |> map_res (fun (b1, b2) -> ((s, pannot)::b1, b2))
+          |> map_res (fun (b1, b2) -> ([(s, pannot)]::b1, b2))
         | Subst lst ->
           let x = Env.tvars env in
           let sigma = lst |>
@@ -767,7 +819,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
         | res -> map_res (fun pannot -> ([], (s, pannot)::b)) res
         end
     in
-    aux (b1 |> List.map fst) b2 |>
+    aux (b1 |> List.flatten |> List.map fst) b2 |>
       map_res (fun (b1', b2') -> LambdaA (b1@b1', b2'))
   in
   match a, pannot_a with
@@ -831,9 +883,9 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       let t2 = vartype v2 in
       let alpha = Variable.to_typevar vardef in
       let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
-      log ~level:3 "@.Tallying (inference) for %a: %a <= %a@."
+      log ~level:3 "@.Approximate tallying (inference) for %a: %a <= %a@."
         Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
-      let res = tallying_infer [(t1, arrow_type)] in
+      let res = approximate_app true t1 t2 alpha in
       res |> List.iter (fun s ->
         log ~level:3 "Solution: %a@." Subst.pp s
       ) ;
@@ -872,17 +924,17 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       needvar [v] (InferA IMain)
   | Ite (_, _, v1, _), InferA IThen -> needvar [v1] PartialA
   | Ite (_, _, _, v2), InferA IElse -> needvar [v2] PartialA
-  | Lambda ((), Unnanoted, _, _), InferA IMain ->
+  | Lambda (Unnanoted, _, _), InferA IMain ->
     let alpha = Variable.to_typevar vardef in
     let pannot_a = LambdaA ([], [(TVar.typ alpha, Infer)]) in
     infer_branches_a vardef tenv env pannot_a a
-  | Lambda ((), ADomain ts, _, _), InferA IMain ->
+  | Lambda (ADomain ts, _, _), InferA IMain ->
     let pannot_a = LambdaA ([], packannot Infer ts) in
     infer_branches_a vardef tenv env pannot_a a
-  | Lambda ((), AArrow _, _, _), InferA IMain ->
+  | Lambda (AArrow _, _, _), InferA IMain ->
     raise (Untypeable ([], "Arrows with full annotations are not supported."))
-  | Lambda ((), _, v, e), LambdaA (b1, b2) ->
-    if b1@b2 = [] then Subst [] else lambda v (b1,b2) e
+  | Lambda (_, v, e), LambdaA (b1, b2) ->
+    if (List.flatten b1)@b2 = [] then Subst [] else lambda v (b1,b2) e
   | _, _ -> assert false
 
 and infer_branches tenv env pannot e =
@@ -922,7 +974,7 @@ and infer_branches tenv env pannot e =
   | Bind _, Infer ->
     let pannot = Skip Infer in
     infer_branches tenv env pannot e
-  | Bind ((), v, _, e), Skip pannot ->
+  | Bind (v, _, e), Skip pannot ->
     begin match infer_branches_iterated tenv env pannot e with
     | NeedVar (vs, pannot, Some pannot') when VarSet.mem v vs ->
       log ~level:0 "Var %a needed (optional).@." Variable.pp v ;
@@ -935,7 +987,7 @@ and infer_branches tenv env pannot e =
       NeedVar (VarSet.remove v vs, pannot, None)
     | res -> map_res (fun pannot -> Skip pannot) res
     end
-  | Bind ((), v, a, _), KeepSkip (pannot_a, splits, pannot) ->
+  | Bind (v, a, _), KeepSkip (pannot_a, splits, pannot) ->
     log ~level:1 "Typing var %a (optional).@." Variable.pp v ;
     begin match infer_branches_a_iterated v tenv env pannot_a a with
     | Ok pannot_a ->
@@ -953,11 +1005,10 @@ and infer_branches tenv env pannot e =
     | res ->
       map_res (fun pannot_a -> KeepSkip (pannot_a, splits, pannot)) res
     end
-  | Bind ((), v, a, e), Keep (pannot_a, splits) ->
+  | Bind (v, a, e), Keep (pannot_a, splits) ->
     log ~level:1 "Typing var %a.@." Variable.pp v ;
     begin match infer_branches_a_iterated v tenv env pannot_a a with
     | Ok pannot_a ->
-      let pannot_a = decorrelate_branches (Env.tvars env) pannot_a in
       let propagate = splits |> List.find_map (fun (s,_) ->
         let gammas = refine_a env a (neg s) in
         gammas |> List.find_opt (is_valid_refinement env)
@@ -966,8 +1017,7 @@ and infer_branches tenv env pannot e =
       begin match propagate with
       | Some env' -> Split (env', Keep (pannot_a, splits))
       | None ->
-        let annot_a = infer_inst_a v tenv env pannot_a a in
-        let t = typeof_a_nofail v tenv env annot_a a in
+        let (t, pannot_a) = typeof_a_pannot v tenv env pannot_a a in
         let gen = TVarSet.diff (vars t) (Env.tvars env) |> generalize in
         let t = Subst.apply gen t in
         log ~level:1 "Var %a typed with type %a.@." Variable.pp v pp_typ t ;

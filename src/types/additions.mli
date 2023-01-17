@@ -93,36 +93,6 @@ val remove_field_info : typ -> string -> typ
 val apply_subst_simplify : Subst.t -> typ -> typ
 val instantiate : Subst.t list -> typ -> typ
 
-module RawExt : sig
-    val simplify_poly_typ : TVarSet.t -> typ -> typ
-    val remove_redundant_vars : TVarSet.t -> typ -> Subst.t * typ
-    val bot_instance : TVarSet.t -> typ -> typ
-    val fresh : TVarSet.t -> typ -> TVarSet.t * Subst.t * typ
-    val subtype_poly : TVarSet.t -> typ -> typ -> bool
-    val triangle_poly : TVarSet.t -> typ -> typ -> typ
-    val triangle_split_poly : TVarSet.t -> typ -> typ -> (typ * typ) list
-end
-
 val bot_instance : typ -> typ
 val top_instance : typ -> typ
 val subtype_poly : typ -> typ -> bool
-
-(* Operations on jokers (legacy) *)
-
-module Joker : sig
-    type joker_kind = Min | Max
-    val reserved_name_for_joker : joker_kind -> string
-
-    val joker : joker_kind -> typ
-    val jokers : joker_kind -> typ -> TVarSet.t
-    val top_jokers : joker_kind -> typ -> TVarSet.t
-
-    val substitute_jokers : joker_kind -> typ -> typ -> typ
-    val substitute_all_jokers : typ -> typ -> typ
-    val optimal : typ -> typ
-    val worst : typ -> typ
-    val substitute_top_jokers : joker_kind -> typ -> typ -> typ
-
-    val decompose_branches : (typ*typ) list -> ((typ*typ) list) (* Jokerized branches *) * ((typ*typ) list)
-    val share_jokerized_arrows : typ list -> typ list
-end

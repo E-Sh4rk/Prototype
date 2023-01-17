@@ -24,7 +24,7 @@ let type_check_def tenv env (var,expr,typ_annot) =
     (msc_time, typ_time)
   in
   try
-    Utils.log "%a@." Poly.Msc.pp_e nf_expr ;
+    Utils.log "%a@." Msc.pp_e nf_expr ;
     let typ = Poly.Checker.typeof_simple tenv env nf_expr in
     let typ =
       match typ_annot with

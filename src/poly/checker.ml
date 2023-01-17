@@ -1,4 +1,3 @@
-module PMsc = Msc
 open Types.Base
 open Types.Tvar
 open Types.Additions
@@ -157,9 +156,9 @@ let rec typeof_a vardef tenv env annot_a a =
     if Env.mem v1 env
     then var_type v2
     else untypeable ("Invalid let binding: definition has not been typed.")
-  | Lambda (_, Parsing.Ast.AArrow _, _, _), LambdaA _ ->
+  | Lambda (Parsing.Ast.AArrow _, _, _), LambdaA _ ->
     untypeable ("Invalid lambda: explicitely typed lambdas are not supported.")
-  | Lambda (_, _, v, e), LambdaA branches -> type_lambda env branches v e
+  | Lambda (_, v, e), LambdaA branches -> type_lambda env branches v e
   | _, _ -> untypeable ("Invalid annotations.")
   end
   |> bot_instance |> simplify_typ
@@ -168,7 +167,7 @@ and typeof tenv env annot e =
   let open FullAnnot in
   begin match e, annot with
   | Var v, BVar r -> var_type v env |> rename_check [] r
-  | Bind (_, v, a, e), Keep (annot_a, gen, ty, branches) ->
+  | Bind (v, a, e), Keep (annot_a, gen, ty, branches) ->
     let t = (* NOTE: ty different than None bypass type checking. *)
       begin match ty with
       | None -> typeof_a v tenv env annot_a a
@@ -179,8 +178,7 @@ and typeof tenv env annot e =
     if branches = []
     then untypeable ("Invalid decomposition: cannot be empty.")
     else
-      let dom = branches |> List.map fst |> disj in
-      if subtype t dom
+      if subtype t (branches |> List.map fst |> disj)
       then
         let t = generalize_check pos gen t in
         branches |> List.map (fun (s, annot) ->
@@ -188,7 +186,7 @@ and typeof tenv env annot e =
           typeof tenv env annot e
         ) |> disj_o
       else untypeable ("Invalid decomposition: does not cover the whole domain.")
-  | Bind (_, v, _, e), Skip annot ->
+  | Bind (v, _, e), Skip annot ->
     assert (Env.mem v env |> not) ;
     typeof tenv env annot e
   | _, _ -> raise (Untypeable ([], "Invalid annotations."))
@@ -197,11 +195,11 @@ and typeof tenv env annot e =
 
 let typeof_a_nofail vardef tenv env annot_a a =
   try typeof_a vardef tenv env annot_a a
-  with Untypeable (_, str) -> Format.printf "%a: %s@." PMsc.pp_a a str ; assert false
+  with Untypeable (_, str) -> Format.printf "%a: %s@." pp_a a str ; assert false
 
 let typeof_nofail tenv env annot e =
   try typeof tenv env annot e
-  with Untypeable (_, str) -> Format.printf "%a: %s@." PMsc.pp_e e str ; assert false  
+  with Untypeable (_, str) -> Format.printf "%a: %s@." pp_e e str ; assert false  
 
 (* ====================================== *)
 (* =============== REFINE =============== *)
@@ -343,12 +341,12 @@ let simplify_tallying res sols =
   let sols = keep_only_minimal is_better_sol sols in
   (* Rename vars to allow factorisation of arrows *)
   List.fold_left (fun sols sol ->
-    let sol_res = apply_subst_simplify sol res in
+    let sol_res = Subst.apply sol res in
     let sols_res = List.map snd sols in
     let (sol, sol_res) =
       sols_res |> List.fold_left (fun (sol, sol_res) sol_res' ->
         let s = try_factorize sol_res sol_res' in
-        (Subst.compose s sol, apply_subst_simplify s sol_res)
+        (Subst.compose s sol, Subst.apply s sol_res)
       ) (sol, sol_res)
     in
     (sol, sol_res)::sols
@@ -396,7 +394,7 @@ let is_opened_arrow t =
       |> TVarSet.is_empty |> not
     )
   | _ -> false
-(* NOTE: Approximation for "fixpoint-like" tallying instances *)
+(* Approximation for "fixpoint-like" tallying instances *)
 let approximate_app infer t1 t2 resvar =
   let exception NoApprox in
   let tallying = if infer then tallying_infer else tallying in
@@ -414,7 +412,7 @@ let approximate_app infer t1 t2 resvar =
   with NoApprox ->
     let arrow_type = mk_arrow (cons t2) (TVar.typ resvar |> cons) in
     tallying [(t1, arrow_type)]
-(* NOTE: Approximation for tallying instances for the application *)
+(* Approximation for tallying instances for the application *)
 let approximate_app infer t1 t2 resvar =
   let is_poly = if infer then TVar.can_infer else TVar.is_poly in
   let t1s = approximate_arrow is_poly t1 in
@@ -492,7 +490,7 @@ let rec infer_inst_a vardef tenv env pannot_a a =
     else if subtype t s then ThenA
     else if subtype t (neg s) then ElseA
     else assert false
-  | Lambda ((), _, v, e), PartialAnnot.LambdaA (b1, b2) ->
+  | Lambda (_, v, e), PartialAnnot.LambdaA (b1, b2) ->
     assert (b2 = []) ;
     let branches = b1 |> List.map (fun group ->
       group |> List.map (fun (s, pannot) ->
@@ -511,10 +509,10 @@ and infer_inst tenv env pannot e =
   | Var v, Partial ->
     let r = refresh_all (vartype v |> vars_poly) in
     BVar r
-  | Bind ((), _, _, e), PartialAnnot.Skip pannot ->
+  | Bind (_, _, e), PartialAnnot.Skip pannot ->
     let annot = infer_inst tenv env pannot e in
     FullAnnot.Skip annot
-  | Bind ((), v, a, e), PartialAnnot.Keep (pannot_a, branches) ->
+  | Bind (v, a, e), PartialAnnot.Keep (pannot_a, branches) ->
     let annot_a = infer_inst_a v tenv env pannot_a a in
     let t = typeof_a_nofail v tenv env annot_a a in
     let gen = TVarSet.diff (vars t) (Env.tvars env) |> generalize in
@@ -664,7 +662,7 @@ let simplify_tallying_infer env res sols =
   |> List.filter (fun sol ->
     params_types |> List.for_all (fun t ->
       TVarSet.inter (vars_mono t) (Subst.dom sol) |> TVarSet.is_empty ||
-      is_undesirable t || not (is_undesirable (apply_subst_simplify sol t))
+      is_undesirable t || not (is_undesirable (Subst.apply sol t))
     )
   )
   (* Simplify (light) *)
@@ -684,8 +682,8 @@ let simplify_tallying_infer env res sols =
     )
   |> List.map (fun to_merge ->
     let common = Subst.restrict (List.hd to_merge) tvars in
-    (* We do not simplify t, because in some cases it can be
-    very complex without being used later (e.g. when no tvar to infer) *)
+    (* conj instead of conj_o, because in some cases it can be very complex types
+       without being used later (e.g. when there is no tvar to infer) *)
     let respart = merge_on_domain conj [res_var] to_merge in
     Subst.combine common respart
   )
@@ -753,7 +751,7 @@ let typeof_a_pannot vardef tenv env pannot_a a =
     (t |> conj_o |> bot_instance |> simplify_typ, pannot)
   in
   begin match a, annot_a, pannot_a with
-  | Lambda (_, _, v, e), LambdaA branches, PartialAnnot.LambdaA (pbranches, []) ->
+  | Lambda (_, v, e), LambdaA branches, PartialAnnot.LambdaA (pbranches, []) ->
     let (t, pbranches) = type_lambda env branches pbranches v e in
     (t, PartialAnnot.LambdaA (pbranches, []))
   | _, _, _ -> (typeof_a_nofail vardef tenv env annot_a a, pannot_a)
@@ -926,16 +924,16 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       needvar [v] (InferA IMain)
   | Ite (_, _, v1, _), InferA IThen -> needvar [v1] PartialA
   | Ite (_, _, _, v2), InferA IElse -> needvar [v2] PartialA
-  | Lambda ((), Unnanoted, _, _), InferA IMain ->
+  | Lambda (Unnanoted, _, _), InferA IMain ->
     let alpha = Variable.to_typevar vardef in
     let pannot_a = LambdaA ([], [(TVar.typ alpha, Infer)]) in
     infer_branches_a vardef tenv env pannot_a a
-  | Lambda ((), ADomain ts, _, _), InferA IMain ->
+  | Lambda (ADomain ts, _, _), InferA IMain ->
     let pannot_a = LambdaA ([], packannot Infer ts) in
     infer_branches_a vardef tenv env pannot_a a
-  | Lambda ((), AArrow _, _, _), InferA IMain ->
+  | Lambda (AArrow _, _, _), InferA IMain ->
     raise (Untypeable ([], "Arrows with full annotations are not supported."))
-  | Lambda ((), _, v, e), LambdaA (b1, b2) ->
+  | Lambda (_, v, e), LambdaA (b1, b2) ->
     if (List.flatten b1)@b2 = [] then Subst [] else lambda v (b1,b2) e
   | _, _ -> assert false
 
@@ -976,7 +974,7 @@ and infer_branches tenv env pannot e =
   | Bind _, Infer ->
     let pannot = Skip Infer in
     infer_branches tenv env pannot e
-  | Bind ((), v, _, e), Skip pannot ->
+  | Bind (v, _, e), Skip pannot ->
     begin match infer_branches_iterated tenv env pannot e with
     | NeedVar (vs, pannot, Some pannot') when VarSet.mem v vs ->
       log ~level:0 "Var %a needed (optional).@." Variable.pp v ;
@@ -989,7 +987,7 @@ and infer_branches tenv env pannot e =
       NeedVar (VarSet.remove v vs, pannot, None)
     | res -> map_res (fun pannot -> Skip pannot) res
     end
-  | Bind ((), v, a, _), KeepSkip (pannot_a, splits, pannot) ->
+  | Bind (v, a, _), KeepSkip (pannot_a, splits, pannot) ->
     log ~level:1 "Typing var %a (optional).@." Variable.pp v ;
     begin match infer_branches_a_iterated v tenv env pannot_a a with
     | Ok pannot_a ->
@@ -1007,7 +1005,7 @@ and infer_branches tenv env pannot e =
     | res ->
       map_res (fun pannot_a -> KeepSkip (pannot_a, splits, pannot)) res
     end
-  | Bind ((), v, a, e), Keep (pannot_a, splits) ->
+  | Bind (v, a, e), Keep (pannot_a, splits) ->
     log ~level:1 "Typing var %a.@." Variable.pp v ;
     begin match infer_branches_a_iterated v tenv env pannot_a a with
     | Ok pannot_a ->

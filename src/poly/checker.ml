@@ -156,8 +156,6 @@ let rec typeof_a vardef tenv env annot_a a =
     if Env.mem v1 env
     then var_type v2
     else untypeable ("Invalid let binding: definition has not been typed.")
-  | Lambda (Parsing.Ast.AArrow _, _, _), LambdaA _ ->
-    untypeable ("Invalid lambda: explicitely typed lambdas are not supported.")
   | Lambda (_, v, e), LambdaA branches -> type_lambda env branches v e
   | _, _ -> untypeable ("Invalid annotations.")
   end
@@ -931,8 +929,6 @@ let rec infer_branches_a vardef tenv env pannot_a a =
   | Lambda (ADomain ts, _, _), InferA IMain ->
     let pannot_a = LambdaA ([], packannot Infer ts) in
     infer_branches_a vardef tenv env pannot_a a
-  | Lambda (AArrow _, _, _), InferA IMain ->
-    raise (Untypeable ([], "Arrows with full annotations are not supported."))
   | Lambda (_, v, e), LambdaA (b1, b2) ->
     if (List.flatten b1)@b2 = [] then Subst [] else lambda v (b1,b2) e
   | _, _ -> assert false

@@ -23,7 +23,7 @@ type const =
 
 type projection = Fst | Snd | Field of string
 
-type 'typ type_annot = Unnanoted | ADomain of 'typ list | AArrow of 'typ
+type 'typ type_annot = Unnanoted | ADomain of 'typ list
 
 type ('a, 'typ, 'v) pattern =
 | PatType of 'typ

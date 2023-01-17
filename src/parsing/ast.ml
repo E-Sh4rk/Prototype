@@ -25,7 +25,7 @@ type const =
 type projection = Fst | Snd | Field of string
 [@@deriving show, ord]
 
-type 'typ type_annot = Unnanoted | ADomain of 'typ list | AArrow of 'typ
+type 'typ type_annot = Unnanoted | ADomain of 'typ list
 [@@deriving show, ord]
 
 type ('a, 'typ, 'v) pattern =
@@ -132,9 +132,6 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
                     vtenv := vtenv' ; t
                 ) ts in
                 (ADomain (ts), !vtenv)
-            | AArrow t ->
-                let (t, vtenv) = type_expr_to_typ tenv vtenv t in
-                (AArrow (t), vtenv)
             in
             let var = Variable.create_lambda (Some str) in
             Variable.attach_location var pos ;

@@ -80,13 +80,21 @@ program: e=element* EOF { e }
 unique_term: t=term EOF { t }
 
 element:
-  i=optional_debug LET id=generalized_identifier ais=parameter* ty=optional_type_annot EQUAL t=term
+  i=optional_debug LET id=generalized_identifier COLON ty=typ EQUAL t=term
+  { annot $symbolstartpos $endpos (Definition (i, (id, t, Some ty))) }
+| i=optional_debug LET gioa=gen_id_opt_annot ais=parameter* EQUAL t=term
   { 
+    let (id, ty) = gioa in
     let t = multi_param_abstraction $startpos $endpos ais t in
     annot $symbolstartpos $endpos (Definition (i, (id, t, ty)))
   }
 | ATOMS a=ID* { annot $symbolstartpos $endpos (Atoms a) }
 | TYPE ts=separated_nonempty_list(TYPE_AND, param_type_def) { annot $symbolstartpos $endpos (Types ts) }
+
+%inline gen_id_opt_annot:
+  id=generalized_identifier { (id, None) }
+| LPAREN id=generalized_identifier RPAREN { (id, None) }
+| LPAREN id=generalized_identifier COLON ty=typ RPAREN { (id, Some ty) }
 
 %inline optional_debug:
   { Utils.log_disabled }
@@ -94,10 +102,6 @@ element:
 | DEBUG i=lint { i }
 
 %inline param_type_def: name=TID params=list(TVAR) EQUAL t=typ { (name, params, t) }
-
-%inline optional_type_annot:
-    { None }
-  | COLON t=typ { Some t }
 
 (* ===== TERMS ===== *)
 

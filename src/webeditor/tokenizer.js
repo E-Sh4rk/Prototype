@@ -7,7 +7,7 @@ function getTokenizer() {
             'atoms', 'atom', 'type', 'and', 'if', 'is', 'then',
             'else', 'match', 'with', 'end', 'fun', 'let', 'in',
             'fst', 'snd',  'magic', 'true', 'false',
-            'nil', 'unit'
+            'nil', 'unit', 'rec'
         ],
 
         typeids: [

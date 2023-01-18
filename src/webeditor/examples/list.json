@@ -1,5 +1,9 @@
 [
     {
+        "name": "Examples from the paper",
+        "path": "paper.stml"
+    },
+    {
         "name": "Fixpoint and recursion",
         "path": "fixpoint.stml"
     },

@@ -16,11 +16,13 @@ let id = ['a'-'z''_']['a'-'z''A'-'Z''0'-'9''_''\'']*
 
 let type_id = ['A'-'Z']['a'-'z''A'-'Z''0'-'9''_''\'']*
 
-let decimal = ['0'-'9']+
+let decimal = ['0'-'9']+ ('_'+ ['0'-'9']+)*
 
 let int = decimal
 
-(*let fn = (int "." decimal?) | (int? "." decimal)*)
+let float_e = decimal ['e' 'E'] (['-' '+']? decimal)?
+let float_comma = decimal '.' decimal (['e' 'E'] ['-' '+']? decimal)?
+let float = (float_e | float_comma)
 
 let type_var = '\'' ['a'-'z''A'-'Z''0'-'9''_']+
 
@@ -75,7 +77,7 @@ rule token = parse
 | "Empty" { EMPTY }
 | "Bool"  { BOOL }
 | "Char"  { CHAR }
-(*| "Float" { FLOAT }*)
+| "Float" { FLOAT }
 | "Int"   { INT }
 | "Unit"  { UNIT }
 | "True"  { TRUE }
@@ -100,7 +102,7 @@ rule token = parse
 | "<"     { LT }
 | ">"     { GT }
 | int as i { LINT (int_of_string i) }
-(*| fn as f { LFLOAT (float_of_string f) }*)
+| float as f { LFLOAT (float_of_string f) }
 | "true"  { LBOOL true }
 | "false" { LBOOL false }
 | "nil"   { LNIL }

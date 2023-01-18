@@ -12,7 +12,7 @@ exception TypeDefinitionError of string
 type type_base =
     | TInt of int option * int option | TSChar of char | TSString of string
     | TBool | TTrue | TFalse | TUnit | TChar | TAny | TEmpty | TNil
-    | TString | TList
+    | TString | TList | TFloat
 
 type type_regexp =
     | ReEpsilon | ReEmpty
@@ -44,6 +44,7 @@ let empty_vtenv = StrMap.empty
 let type_base_to_typ t =
     match t with
     | TInt (lb,ub) -> interval lb ub
+    | TFloat -> float_typ
     | TSChar c -> single_char c
     | TSString str -> single_string str
     | TBool -> bool_typ | TNil -> nil_typ

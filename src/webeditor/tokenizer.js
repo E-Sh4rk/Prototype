@@ -63,7 +63,10 @@ function getTokenizer() {
                 // [/0(@octaldigits)[Ll]?/, 'number.octal'],
                 // [/0[bB](@binarydigits)[Ll]?/, 'number.binary'],
                 // [/(@digits)[fFdD]/, 'number.float'],
-                [/(@digits)[lL]?/, 'number'],
+                //[/(@digits)[lL]?/, 'number'],
+                [/(@digits)[eE]([\-+]?(@digits))?/, 'number.float'],
+                [/(@digits)\.(@digits)([eE][\-+]?(@digits))?/, 'number.float'],
+                [/(@digits)/, 'number'],
     
                 // delimiters: after number because of .\d floats
                 [/@delimiters/, 'delimiter'],

@@ -24,6 +24,7 @@ val true_typ : typ
 val false_typ : typ
 val bool_typ : typ
 val int_typ : typ
+val float_typ : typ
 val char_typ : typ
 val unit_typ : typ
 val nil_typ : typ

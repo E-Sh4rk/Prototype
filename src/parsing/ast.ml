@@ -17,6 +17,7 @@ type const =
 | EmptyRecord
 | Bool of bool
 | Int of int
+| Float of float
 | Char of char
 | String of string
 | Atom of string
@@ -402,6 +403,7 @@ let const_to_typ c =
     | Bool true -> true_typ
     | Bool false -> false_typ
     | Int i -> interval (Some i) (Some i)
+    | Float _ -> float_typ
     | Char c -> single_char c
     | String str -> single_string str
     | Atom t -> raise (SymbolError ("undefined atom "^t))

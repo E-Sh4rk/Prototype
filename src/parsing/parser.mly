@@ -72,7 +72,7 @@
 %token IF IS THEN ELSE
 %token LPAREN RPAREN EQUAL COMMA COLON INTERROGATION_MARK
 %token ARROW AND OR NEG DIFF
-%token ANY EMPTY BOOL CHAR (*FLOAT*) INT TRUE FALSE UNIT NIL STRING LIST
+%token ANY EMPTY BOOL CHAR FLOAT INT TRUE FALSE UNIT NIL STRING LIST
 %token DOUBLEDASH TIMES PLUS MINUS DIV
 %token LBRACE RBRACE DOUBLEPOINT MATCH WITH END EQUAL_OPT POINT LT GT
 %token ATOMS TYPE TYPE_AND DOUBLE_OR (*DOUBLE_AND*)
@@ -80,7 +80,7 @@
 %token<string> ID
 %token<string> TID
 %token<string> TVAR
-(*%token<float> LFLOAT*)
+%token<float> LFLOAT
 %token<int> LINT
 %token<bool> LBOOL
 %token<char> LCHAR
@@ -146,7 +146,6 @@ element:
 
 term:
   t=simple_term { t }
-  (* Explicitely annotated lambdas are not supported anymore *)
 | FUN ais=parameter+ ARROW t = term { multi_param_abstraction $startpos $endpos ais t }
 | LET id=generalized_identifier ais=parameter* EQUAL td=term IN t=term
   {
@@ -200,8 +199,8 @@ atomic_term:
   id=ID EQUAL t=simple_term { (id, t) }
 
 literal:
-(*f=LFLOAT { Float f }*)
-  i=lint   { Int i }
+  f=LFLOAT { Float f }
+| i=lint   { Int i }
 | c=LCHAR  { Char c }
 | b=LBOOL  { Bool b }
 | s=LSTRING{ String s }
@@ -272,8 +271,8 @@ atomic_typ:
 | id=ID EQUAL_OPT t=simple_typ { (id, t, true) }
 
 %inline type_constant:
-(*  FLOAT { TyFloat }*)
-  INT { TInt (None, None) }
+  FLOAT { TFloat }
+| INT { TInt (None, None) }
 | i=lint { TInt (Some i, Some i) }
 | i=type_interval { i }
 | CHAR { TChar }

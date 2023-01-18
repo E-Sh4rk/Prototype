@@ -63,6 +63,7 @@ let true_typ = CD.Builtin_defs.true_type
 let false_typ = CD.Builtin_defs.false_type
 let bool_typ = cup true_typ false_typ
 let int_typ = CD.Types.Int.any
+let float_typ = CD.Builtin_defs.float
 let char_typ = CD.Types.Char.any
 let unit_typ = mk_atom "unit"
 let nil_typ = CD.Types.Sequence.nil_type

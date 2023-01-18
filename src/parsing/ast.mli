@@ -17,6 +17,7 @@ type const =
 | EmptyRecord
 | Bool of bool
 | Int of int
+| Float of float
 | Char of char
 | String of string
 | Atom of string

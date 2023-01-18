@@ -55,8 +55,8 @@ let typecheck code callback =
         ok_answer res
       | PFailure (pos, msg) ->
         `Assoc [("exit_code", `Int (-2)); ("message", `String msg); ("pos", json_of_pos_list [pos])]
-    ) with _ ->
-      `Assoc [("exit_code", `Int (-1)); ("message", `String ("internal error")); ("pos", `List [])]
+    ) with e ->
+      `Assoc [("exit_code", `Int (-1)); ("message", `String ("internal error: "^(Printexc.to_string e))); ("pos", `List [])]
   in
   Js.string (to_string res)
 

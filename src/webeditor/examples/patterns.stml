@@ -1,9 +1,5 @@
 
-let (-) = <Int->Int->Int>
-let ( * ) = <Int->Int->Int>
 let succ = <Int->Int>
-
-let fixpoint = < (('a -> 'b) -> ('a -> 'b)) -> 'a -> 'b >
 
 
 let test_patterns (a,_) = a
@@ -32,29 +28,26 @@ let land_patterns a b =
   | :Any -> false
   end
 
-
-let fact_pat fact n =
+let rec fact n =
   match n with
   | :0 -> 1
   | n -> (fact (n-1))*n
   end
 
-let fact = fixpoint fact_pat
-
-
-let length_pat length lst =
+let rec length lst =
   match lst with
   | :[] -> 0
   | (_, tl & :List) -> succ (length tl)
   end
 
-let length = fixpoint length_pat
-
-
-let map_pat map f lst =
+let rec map f lst =
   match lst with
   | :[] -> []
-  | (hd, tl) & :List -> (f hd, map f tl)
+  | (e,lst) & :List -> ((f e), map f lst)
   end
 
-let map = fixpoint map_pat
+let rec map f (lst:['a*]) =
+  match lst with
+  | :[] -> []
+  | (e,lst) & :List -> ((f e), map f lst)
+  end

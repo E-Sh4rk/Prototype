@@ -18,7 +18,7 @@ let json_of_pos_list pos =
 let typecheck code callback =
   let res =
     try (
-      match parse_and_resolve (`String (Js.to_string code)) with
+      match parse_and_resolve (`String (Js.to_string code)) initial_varm with
       | PSuccess (tenv, lst) ->
         let ok_answer res =
           `Assoc [("exit_code", `Int 0); ("results", `List (List.rev res))]
@@ -50,7 +50,7 @@ let typecheck code callback =
                 Js.Unsafe.fun_call callback [| intermediate_answer |> Js.Unsafe.inject |] |> ignore
               ) ;
               (env, res)
-          ) (Common.Msc.initial_env, []) lst
+          ) (initial_env, []) lst
         in
         ok_answer res
       | PFailure (pos, msg) ->

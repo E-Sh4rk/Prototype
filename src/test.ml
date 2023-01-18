@@ -1,7 +1,3 @@
-
-let (-) = <Int->Int->Int>
-let (+) = <Int->Int->Int>
-let ( * ) = <Int->Int->Int>
 let succ = <Int->Int>
 
 let more_than_declarative (x : Any -> Any) = 

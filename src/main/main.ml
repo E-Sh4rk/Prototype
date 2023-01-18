@@ -50,7 +50,32 @@ type parsing_result =
 | PSuccess of type_env * ((int * def) list)
 | PFailure of Position.t * string
 
-let parse_and_resolve f =
+let builtin_functions =
+  let arith_operators_typ =
+    let int = cons int_typ in
+    mk_arrow int int
+  in
+  [
+    ("+", arith_operators_typ) ;
+    ("-", arith_operators_typ) ;
+    ("*", arith_operators_typ) ;
+    ("/", arith_operators_typ) ;
+    ("%", arith_operators_typ)
+  ]
+
+let initial_varm =
+  builtin_functions |> List.fold_left (fun varm (name, _) ->
+    let var = Variable.create_other (Some name) in
+    StrMap.add name var varm
+  ) Ast.empty_name_var_map
+
+let initial_env =
+  builtin_functions |> List.fold_left (fun env (name, t) ->
+    let var = StrMap.find name initial_varm in
+    Env.add var t env
+  ) Msc.initial_env
+
+let parse_and_resolve f varm =
   let last_pos = ref Position.dummy in
   try
     let ast =
@@ -79,7 +104,7 @@ let parse_and_resolve f =
         (tenv,varm,defs)
     in
     let (tenv, _, defs) =
-      List.fold_left treat_elem (empty_tenv, Ast.empty_name_var_map, []) ast in
+      List.fold_left treat_elem (empty_tenv, varm, []) ast in
     PSuccess (tenv, List.rev defs)
   with
     | Ast.LexicalError(pos, msg) -> PFailure (pos, msg)

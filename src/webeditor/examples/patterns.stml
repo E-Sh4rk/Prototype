@@ -49,5 +49,5 @@ let rec map f lst =
 let rec map f (lst:['a*]) =
   match lst with
   | :[] -> []
-  | (e,lst) & :List -> ((f e), map f lst)
+  | (e,lst) -> ((f e), map f lst)
   end

@@ -53,7 +53,7 @@ type parsing_result =
 let builtin_functions =
   let arith_operators_typ =
     let int = cons int_typ in
-    mk_arrow int int
+    mk_arrow int (mk_arrow int int |> cons)
   in
   [
     ("+", arith_operators_typ) ;

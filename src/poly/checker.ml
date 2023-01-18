@@ -318,9 +318,12 @@ let simplify_tallying res sols =
       ) sol (Subst.dom sol |> TVarSet.destruct)
     in
     (* Decorrelate solutions *)
-    let t = Subst.apply sol res in
+    (* NOTE: Disabled because it can cause two branches
+       with a common domain to separate *)
+    (* let t = Subst.apply sol res in
     let s = refresh_all (vars_poly t) in
-    Subst.compose s sol
+    Subst.compose s sol *)
+    sol
     ) in
   (* Remove weaker solutions *)
   let sols = keep_only_minimal is_better_sol sols in

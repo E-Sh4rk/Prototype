@@ -203,6 +203,12 @@ let typeof_nofail tenv env annot e =
 (* =============== REFINE =============== *)
 (* ====================================== *)
 
+let rec is_undesirable s =
+  subtype s arrow_any &&
+  dnf s |> List.for_all (fun conjuncts -> conjuncts |>
+    List.exists (fun (a, b) -> non_empty a && is_undesirable b)
+  )
+
 let refine_a env a t =
   log ~level:5 "refine_a@." ;
   match a with
@@ -252,7 +258,8 @@ let refine_a env a t =
       )
     ) |> List.flatten
     |> List.filter
-      (fun env -> env |> Env.bindings |> List.for_all (fun (_,t) -> is_mono_typ t))
+      (fun env -> env |> Env.bindings |> List.for_all (fun (_,t) ->
+        is_mono_typ t && not (is_undesirable t)))
   | Ite (v, s, v1, v2) ->
     [Env.construct_dup [(v,s);(v1,t)] ; Env.construct_dup [(v,neg s);(v2,t)]]
   | Let (_, v2) -> [Env.singleton v2 t]
@@ -632,12 +639,6 @@ let simplify_tallying_infer env res sols =
       let t = lst |> List.map (fun s -> Subst.find' s v) |> merge in
       (v, t)
     ) |> Subst.construct
-  in
-  let rec is_undesirable s =
-    subtype s arrow_any &&
-    dnf s |> List.for_all (fun conjuncts -> conjuncts |>
-      List.exists (fun (a, b) -> non_empty a && is_undesirable b)
-    )
   in
   sols
   (* Restrict to tvars and store result *)

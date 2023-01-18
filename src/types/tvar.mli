@@ -37,6 +37,7 @@ module TVarSet : sig
     val inter_many : t list -> t
     val diff : t -> t -> t
     val rm : TVar.t -> t -> t
+    val equal : t -> t -> bool
     val destruct : t -> TVar.t list
     val pp : Format.formatter -> t -> unit
 end

@@ -255,11 +255,44 @@ let rec regroup_conjuncts ~open_nodes conjuncts =
         let ((l,r),lst) = aux (l,r) lst in
         (l,r)::(regroup_conjuncts ~open_nodes lst)
 
+let regroup_disjuncts ~open_nodes disjuncts =
+    let merge_disjuncts ((pvs,nvs), (ps,ns)) ((pvs',nvs'), (ps',ns')) =
+        let (pvss, nvss, pvss', nvss') =
+            (TVarSet.construct pvs, TVarSet.construct nvs,
+            TVarSet.construct pvs', TVarSet.construct nvs') in
+        if TVarSet.equal pvss pvss' && TVarSet.equal nvss nvss'
+            && ns = [] && ns' = []
+        then
+            match ps, ps' with
+            | [(l,r)], [(l',r')] ->
+                if (NHT.mem open_nodes r |> not) && (NHT.mem open_nodes r' |> not)
+                    && equiv (descr l) (descr l')
+                then Some ((pvs,nvs), ([(l, cup (descr r) (descr r') |> cons)],[]))
+                else if (NHT.mem open_nodes l |> not) && (NHT.mem open_nodes l' |> not)
+                    && equiv (descr r) (descr r')
+                then Some ((pvs,nvs), ([(cap (descr l) (descr l') |> cons, r)],[]))
+                else None
+            | _, _ -> None
+        else None
+    in
+    Utils.merge_when_possible merge_disjuncts disjuncts
+
 let regroup_conjuncts_descr ps =
     ps |>
     List.map (fun (a,b) -> (cons a, cons b)) |>
     regroup_conjuncts ~open_nodes:(NHT.create 0) |>
     List.map (fun (a,b) -> (descr a, descr b))
+
+let regroup_disjuncts_simpl ds =
+    ds |>
+    List.map (fun ps ->
+        let ps = ps |> List.map (fun (a,b) -> (cons a, cons b)) in
+        (([], []), (ps,[]))
+    ) |>
+    regroup_disjuncts ~open_nodes:(NHT.create 0) |>
+    List.map (fun (_,(ps,_)) ->
+        ps |> List.map (fun (a,b) -> (descr a, descr b))
+    )
 
 let simplify_dnf dnf =
     let splits = List.map (fun arrows -> (arrows, branch_type arrows)) dnf in
@@ -279,7 +312,8 @@ let simplify_dnf dnf =
         conjuncts |> List.split |> fst |> regroup_conjuncts_descr
     in
     rm (fun t ts -> subtype t (disj ts)) [] splits
-    |> List.map simplify_conjuncts        
+    |> List.map simplify_conjuncts
+    |> regroup_disjuncts_simpl
 
 let remove_useless_conjuncts branch_type ~n dc cc lst =
     let atom_type (a,b) =
@@ -342,6 +376,7 @@ let simplify_arrow_dnf ~open_nodes dnf =
     let dnf = remove_useless_from_dnf full_branch_type dnf in
     (* Regroup positive conjuncts with similar domain/codomain  *)
     List.map regroup_conjuncts dnf
+    |> regroup_disjuncts ~open_nodes
 
 let simplify_product_dnf ~open_nodes:_ dnf =
     let dnf = remove_useless_from_dnf full_product_branch_type dnf in

@@ -89,6 +89,7 @@ module TVarSet = struct
   let inter_many = List.fold_left inter empty
   let diff = CD.Var.Set.diff
   let rm = CD.Var.Set.remove
+  let equal = CD.Var.Set.equal
   let destruct = CD.Var.Set.get
   let pp fmt t =
     destruct t |> Format.fprintf fmt "%a@." (Utils.pp_list TVar.pp)

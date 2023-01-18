@@ -11,7 +11,7 @@ function getTokenizer() {
         ],
 
         typeids: [
-            'Any', 'Empty', 'Bool', 'Char', 'Int',
+            'Any', 'Empty', 'Bool', 'Char', 'Int', 'Float',
             'Unit', 'True', 'False', 'String', 'List'
         ],
     
@@ -63,7 +63,7 @@ function getTokenizer() {
                 // [/0(@octaldigits)[Ll]?/, 'number.octal'],
                 // [/0[bB](@binarydigits)[Ll]?/, 'number.binary'],
                 // [/(@digits)[fFdD]/, 'number.float'],
-                //[/(@digits)[lL]?/, 'number'],
+                // [/(@digits)[lL]?/, 'number'],
                 [/(@digits)[eE]([\-+]?(@digits))?/, 'number.float'],
                 [/(@digits)\.(@digits)([eE][\-+]?(@digits))?/, 'number.float'],
                 [/(@digits)/, 'number'],

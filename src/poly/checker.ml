@@ -288,29 +288,15 @@ let types_equiv_modulo_renaming mono t1 t2 =
         if equiv t1 t2 then Some subst else None 
     )
 
-let rec try_factorize res res_model =
-  let aux (a,b) (a',b') =
-    let mono = TVarSet.union (vars_mono a) (vars_mono a') in
-    let mono2 = TVarSet.diff (vars_poly b) (vars_poly a) in
-    match types_equiv_modulo_renaming (TVarSet.union mono mono2) a a' with
-    | None -> Subst.identity
-    | Some s ->
-      let s' = try_factorize (Subst.apply s b) b' in
-      Subst.compose s' s
-  in
-  if subtype res arrow_any && subtype res_model arrow_any
-  then
-    dnf res |> List.fold_left (fun acc arrows ->
-      arrows |> List.fold_left (fun acc (a,b) ->
-        dnf res_model |> List.fold_left (fun acc arrows_res ->
-          arrows_res |> List.fold_left (fun acc (a',b') ->
-            let s = aux (Subst.apply acc a, Subst.apply acc b) (a', b') in
-            Subst.compose s acc
-          ) acc
-        ) acc
-      ) acc
-    ) Subst.identity
-  else Subst.identity
+let replace_vars t vs v =
+  vars_with_polarity t |> List.filter_map (fun (v', k) ->
+    if TVarSet.mem vs v' then
+    match k with
+    | `Pos -> Some (v', TVar.typ v)
+    | `Neg -> Some (v', TVar.typ v |> neg)
+    | `Both -> None
+    else None
+    ) |> Subst.construct
 
 let simplify_tallying res sols =
   let is_better_sol s1 s2 =
@@ -322,40 +308,23 @@ let simplify_tallying res sols =
     (* Basic cleaning *)
     let t = Subst.apply sol res in
     let clean = clean_type_subst ~pos:empty ~neg:any t in
-    let t = Subst.apply clean t in
     let sol = Subst.compose clean sol in
+    (* Simplify (light) *)
     let sol =
       List.fold_left (fun sol v ->
         let t = Subst.find' sol v in
-        let (a,b) = factorize (TVarSet.construct [v], TVarSet.empty) t in
-        if is_empty b
-        then
-          (* Clean main var *)
-          let clean = Subst.construct [(v, a)] in
-          let sol = Subst.compose clean sol in
-          let lst = Subst.rm v sol |> Subst.destruct in
-          let sol = (v,a)::lst |> Subst.construct in
-          sol
-        else sol
-      ) sol (Subst.dom sol |> TVarSet.destruct) in
+        let s = replace_vars t (top_vars t |> TVarSet.filter TVar.is_poly) v in
+        Subst.compose s sol
+      ) sol (Subst.dom sol |> TVarSet.destruct)
+    in
     (* Decorrelate solutions *)
+    let t = Subst.apply sol res in
     let s = refresh_all (vars_poly t) in
     Subst.compose s sol
     ) in
   (* Remove weaker solutions *)
   let sols = keep_only_minimal is_better_sol sols in
-  (* Rename vars to allow factorisation of arrows *)
-  List.fold_left (fun sols sol ->
-    let sol_res = Subst.apply sol res in
-    let sols_res = List.map snd sols in
-    let (sol, sol_res) =
-      sols_res |> List.fold_left (fun (sol, sol_res) sol_res' ->
-        let s = try_factorize sol_res sol_res' in
-        (Subst.compose s sol, Subst.apply s sol_res)
-      ) (sol, sol_res)
-    in
-    (sol, sol_res)::sols
-  ) [] sols |> List.map fst
+  sols
 
 let rec approximate_arrow is_poly t =
   let factorize v t =
@@ -588,17 +557,6 @@ let simplify_tallying_infer env res sols =
     List.filter Variable.is_lambda_var |>
     List.map (fun v -> Env.find v env)
   in
-  let replace_toplevel t v =
-    let involved = TVarSet.diff (top_vars t) tvars in
-    vars_with_polarity t |> List.filter_map (fun (v', k) ->
-      if TVarSet.mem involved v' then
-      match k with
-      | `Pos -> Some (v', TVar.typ v)
-      | `Neg -> Some (v', TVar.typ v |> neg)
-      | `Both -> None
-      else None
-      ) |> Subst.construct
-  in
   let mono_vars sol =
     let sol = Subst.restrict sol tvars in
     TVarSet.union (Subst.codom sol) tvars
@@ -669,7 +627,7 @@ let simplify_tallying_infer env res sols =
     let new_dom = TVarSet.inter (Subst.dom sol) tvars in
     List.fold_left (fun sol v ->
       let t = Subst.find' sol v in
-      let s = replace_toplevel t v in
+      let s = replace_vars t (TVarSet.diff (top_vars t) tvars) v in
       Subst.compose s sol
     ) sol (new_dom |> TVarSet.destruct)
   )

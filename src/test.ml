@@ -601,3 +601,9 @@ let rec map f (lst:['a*]) =
   | :[] -> []
   | (e,lst) & :List -> ((f e), map f lst)
   end
+
+let rec concat lst1 lst2 =
+  match lst1 with
+  | :[] -> lst2
+  | (e,lst1) & :List -> (e, concat lst1 lst2)
+  end

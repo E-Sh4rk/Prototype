@@ -239,7 +239,7 @@ let refine_a env a t =
       )
   | TypeConstr (v, _) -> [Env.singleton v t]
   | App (v1, v2) ->
-    let dnf = Env.find v1 env |> dnf in
+    let dnf = Env.find v1 env |> dnf |> simplify_dnf in
     let singl = List.length dnf <= 1 in
     dnf |> List.map (fun lst ->
       let ti = branch_type lst in
@@ -340,7 +340,7 @@ let rec approximate_arrow is_poly t =
     let tv = top_vars t |> TVarSet.filter is_poly in
     match TVarSet.destruct tv with
     | [] ->
-      dnf t (* |> simplify_dnf *) |> List.map (fun arrows ->
+      dnf t |> simplify_dnf |> List.map (fun arrows ->
           (* Keep all branches with no var in their domain, split the others *)
           (* let (keep, split) = arrows |> List.partition (fun (a,_) ->
             vars a |> TVarSet.filter is_poly |> TVarSet.is_empty)
@@ -967,10 +967,12 @@ and infer_branches tenv env pannot e =
     log ~level:1 "Typing var %a.@." Variable.pp v ;
     begin match infer_branches_a_iterated v tenv env pannot_a a with
     | Ok pannot_a ->
-      let propagate = splits |> List.find_map (fun (s,_) ->
-        let gammas = refine_a env a (neg s) in
-        gammas |> List.find_opt (is_valid_refinement env)
-      )
+      let propagate =
+        if List.length splits <= 1 then None
+        else splits |> List.find_map (fun (s,_) ->
+          let gammas = refine_a env a (neg s) in
+          gammas |> List.find_opt (is_valid_refinement env)
+        )
       in
       begin match propagate with
       | Some env' -> Split (env', Keep (pannot_a, splits))

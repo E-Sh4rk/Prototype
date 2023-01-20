@@ -964,7 +964,7 @@ and infer_branches tenv env pannot e =
       map_res (fun pannot_a -> KeepSkip (pannot_a, splits, pannot)) res
     end
   | Bind (v, a, e), Keep (pannot_a, splits) ->
-    log ~level:1 "Typing var %a.@." Variable.pp v ;
+    log ~level:1 "Inferring var %a.@." Variable.pp v ;
     begin match infer_branches_a_iterated v tenv env pannot_a a with
     | Ok pannot_a ->
       let propagate =
@@ -975,7 +975,9 @@ and infer_branches tenv env pannot e =
         )
       in
       begin match propagate with
-      | Some env' -> Split (env', Keep (pannot_a, splits))
+      | Some env' ->
+        log ~level:1 "Var %a is ok but a split must be propagated.@." Variable.pp v ;
+        Split (env', Keep (pannot_a, splits))
       | None ->
         let (t, pannot_a) = typeof_a_pannot v tenv env pannot_a a in
         let gen = TVarSet.diff (vars t) (Env.tvars env) |> generalize in

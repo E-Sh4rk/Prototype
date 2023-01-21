@@ -66,13 +66,6 @@ val branch_type : (typ*typ) list -> typ
 
 val is_test_type : typ -> bool
 
-val square_split : typ -> typ -> (typ * typ) list
-val square_approx : typ -> typ -> typ
-val square_exact : typ -> typ -> typ
-
-val triangle_split : typ -> typ -> (typ * typ) list
-val triangle_exact : typ -> typ -> typ
-
 (* Record manipulation *)
 
 val record_any_with : string -> typ

@@ -115,6 +115,9 @@ let add_others lst =
 let find_among_others pred lst =
   lst |> add_others |> List.find_opt (fun (a,o) -> pred a o)
 
+let filter_among_others pred lst =
+  lst |> add_others |> List.filter (fun (a,o) -> pred a o) |> List.map fst
+
 let find_map_among_others f lst =
   lst |> add_others |> List.find_map (fun (a,o) -> f a o)
 

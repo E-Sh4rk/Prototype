@@ -197,10 +197,45 @@ let has_atom (_, atoms) name =
 
 (* Operations on types *)
 
+module NHT = Hashtbl.Make(CD.Types.Node)
+
 let conj ts = List.fold_left cap any ts
 let disj ts = List.fold_left cup empty ts
 let conj_o ts = List.fold_left cap_o any ts
 let disj_o ts = List.fold_left cup_o empty ts
+
+let is_test_type t =
+    let is_non_trivial_arrow t =
+        let arrow_part = cap t arrow_any in
+        (is_empty arrow_part || subtype arrow_any arrow_part) |> not
+    in
+    let exception NotTestType in
+    try
+        let cache = NHT.create 5 in
+        if vars t |> TVarSet.is_empty |> not then raise NotTestType ;
+        let rec aux n =
+            try NHT.find cache n
+            with Not_found -> begin
+                NHT.add cache n () ;
+                let open Iter in
+                iter (fun pack t ->
+                    match pack with
+                    | Absent | Abstract _ | Char _ | Int _ | Atom _ | Xml _ -> ()
+                    | Times m ->
+                        let module K = (val m) in
+                        K.get_vars t |> K.Dnf.get_full |> List.iter (fun (_, (ps, ns)) ->
+                            ps@ns |> List.iter (fun (a,b) -> aux a ; aux b)
+                        )
+                    | Function _ -> if is_non_trivial_arrow t then raise NotTestType
+                    | Record m ->
+                        let module K = (val m) in
+                        K.get_vars t |> K.Dnf.get_full |> List.iter (fun (_, (ps, ns)) ->
+                            ps@ns |> List.iter (fun (_,lm) -> LabelMap.iter aux lm)
+                        )
+                ) (descr n)
+            end
+        in aux (cons t) ; true
+    with NotTestType -> false
 
 let branch_type lst =
     if lst = [] then arrow_any
@@ -228,7 +263,8 @@ let full_product_branch_type b =
 let full_record_branch_type b =
     cap record_any (full_branch_type_aux CD.Types.record_fields b)
 
-module NHT = Hashtbl.Make(CD.Types.Node)
+(* Simplification of types *)
+
 let regroup_conjuncts ~open_nodes conjuncts =
     let merge_conjuncts (l,r) (l',r') =
         if (NHT.mem open_nodes r |> not) && (NHT.mem open_nodes r' |> not)
@@ -315,87 +351,41 @@ let remove_useless_conjuncts branch_type dc ((pvs, nvs), (ps, ns)) =
 
 let remove_useless_from_dnf branch_type dnf =
     (* Remove useless conjuncts *)
-    let rec aux treated rem =
-        match rem with
-        | [] -> treated
-        | c::rem ->
-            let rt = rem |> List.map branch_type |> disj in
-            let tt = treated |> List.map branch_type |> disj in
-            let others = cup tt rt in
-            let c = remove_useless_conjuncts branch_type others c in
-            aux (c::treated) rem
-    in
-    let dnf = aux [] dnf in
+    dnf |> Utils.map_among_others (fun c others ->
+        let ot = others |> List.map branch_type |> disj in
+        remove_useless_conjuncts branch_type ot c
+    ) |>
     (* Remove useless disjuncts *)
-    let rec aux kept rem =
-        match rem with
-        | [] -> kept
-        | c::rem ->
-            let ct = branch_type c in
-            let rt = rem |> List.map branch_type |> disj in
-            let kt = kept |> List.map branch_type |> disj in
-            let others = cup kt rt in
-            if subtype ct others then aux kept rem
-            else aux (c::kept) rem
-    in
-    aux [] dnf
+    Utils.filter_among_others (fun c others ->
+        let ct = branch_type c in
+        let ot = List.map branch_type others |> disj in
+        subtype ct ot |> not
+    )
 
 let simplify_arrow_dnf ~open_nodes dnf =
-    let regroup_conjuncts (vars, (ps, ns)) =
-        (vars, (regroup_conjuncts ~open_nodes ps, ns))
-    in
-    let dnf = remove_useless_from_dnf full_branch_type dnf in
-    (* Regroup positive conjuncts with similar domain/codomain  *)
-    List.map regroup_conjuncts dnf
+    dnf |> remove_useless_from_dnf full_branch_type
+    |> List.map
+        (fun (vars, (ps, ns)) -> (vars, (regroup_conjuncts ~open_nodes ps, ns)))
     |> regroup_disjuncts ~open_nodes
 
 let simplify_product_dnf ~open_nodes:_ dnf =
-    let dnf = remove_useless_from_dnf full_product_branch_type dnf in
     (* TODO: More advanced simplifications for products *)
-    dnf
+    dnf |> remove_useless_from_dnf full_product_branch_type
 
 let simplify_record_dnf ~open_nodes:_ dnf =
-    let dnf = remove_useless_from_dnf full_record_branch_type dnf in
     (* TODO: More advanced simplifications for records *)
-    dnf
-
-let is_test_type t =
-    if vars t |> TVarSet.is_empty
-    then
-        let is_non_trivial_arrow t =
-            let arrow_part = cap t arrow_any in
-            (is_empty arrow_part || subtype arrow_any arrow_part) |> not
-        in
-        let memo = Hashtbl.create 10 in
-        let rec aux t =
-            try Hashtbl.find memo t
-            with Not_found -> begin
-                if is_non_trivial_arrow t
-                then (Hashtbl.add memo t false ; false)
-                else begin
-                    Hashtbl.add memo t true ;
-                    split_pair t |>
-                    List.for_all (fun (x,y) -> aux x && aux y)
-                end
-            end
-        in aux t
-    else false
+    dnf |> remove_useless_from_dnf full_record_branch_type
 
 let simplify_typ t =
-    (*Utils.log ~level:2 "Simplifying type...@?" ;*)
     let cache = NHT.create 5 in
     let rec aux node =
         let aux_pair (a,b) = (aux a, aux b) in
         let aux_record (b, labelmap) = (b, LabelMap.map aux labelmap) in
-        let aux_lines aux_line ls =
-            ls |> List.map aux_line
-        in
+        let aux_lines aux_line = List.map aux_line in
         let aux_branch aux_line ((pvs, nvs), (ps,ns)) =
             ((pvs,nvs),(aux_lines aux_line ps, aux_lines aux_line ns))
         in
-        let aux_branches aux_line lst =
-            lst |> List.map (fun branch -> aux_branch aux_line branch)
-        in
+        let aux_branches aux_line = List.map (aux_branch aux_line) in
         match NHT.find_opt cache node with
         | Some n -> n
         | None ->
@@ -437,16 +427,16 @@ let simplify_typ t =
     aux (cons t) |> descr
 
 (* Record manipulation *)
+
 let record_any_with l = mk_record true [l, any_node]
 
 let record_any_without l = mk_record true [l, (or_absent empty |> cons)]
 
 let split_record t =
   let to_node (is_absent, t) =
-    if is_absent then
-      cons (CD.Types.Record.or_absent t)
-    else
-      cons t
+    if is_absent
+    then cons (CD.Types.Record.or_absent t)
+    else cons t
   in
   let to_record (labels, is_open, _) =
     let labels = LabelMap.map to_node labels in
@@ -459,7 +449,8 @@ let remove_field_info t label =
     let singleton = mk_record false [label, any_or_absent_node] in
     merge_records t singleton
 
-(* Operations on type vars *)
+(* Operations on type variables *)
+
 let apply_subst_simplify s t =
     if TVarSet.inter (Subst.dom s) (vars t) |> TVarSet.is_empty
     then t else Subst.apply s t |> simplify_typ

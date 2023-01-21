@@ -158,7 +158,6 @@ let pi2 t =
 let split_pair t =
   CD.Types.Product.normal ~kind:`Normal t
 
-
 let mk_record is_open fields =
   let fields = List.map (fun (str,node) -> (to_label str,node)) fields in
   let fields = LabelMap.from_list_disj fields in
@@ -192,7 +191,6 @@ let merge_records = CD.Types.Record.merge
 
 let remove_field record field =
   CD.Types.Record.remove_field record (to_label field)
-
 
 (* Maybe not optimised (if no memoisation for Arrow.get). We'll see that later. *)
 let mk_arrow = CD.Types.arrow

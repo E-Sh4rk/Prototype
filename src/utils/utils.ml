@@ -115,21 +115,25 @@ let add_others lst =
 let find_among_others pred lst =
   lst |> add_others |> List.find_opt (fun (a,o) -> pred a o)
 
+let find_map_among_others f lst =
+  lst |> add_others |> List.find_map (fun (a,o) -> f a o)  
+
 (* let filter_among_others pred lst =
   lst |> add_others |> List.filter (fun (a,o) -> pred a o) |> List.map fst *)
 
-let filter_among_others pred lst =
-  let rec aux kept rem =
+let fold_acc_rem f lst =
+  let rec aux acc rem =
     match rem with
-    | [] -> kept
-    | c::rem ->
-        let kept = if pred c (rem@kept) then c::kept else kept in
-        aux kept rem
+    | [] -> acc
+    | c::rem -> aux (f c acc rem) rem
   in
-  aux [] lst |> List.rev
+  aux [] (List.rev lst)
 
-let find_map_among_others f lst =
-  lst |> add_others |> List.find_map (fun (a,o) -> f a o)
+let filter_among_others pred =
+  fold_acc_rem (fun c acc rem -> if pred c (acc@rem) then c::acc else acc)
+
+let map_among_others f =
+  fold_acc_rem (fun c acc rem -> (f c (acc@rem))::acc)
 
 let merge_when_possible merge_opt lst =
   let merge_opt a b others =

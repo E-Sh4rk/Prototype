@@ -281,7 +281,7 @@ let regroup_disjuncts_simpl ds =
     )
 
 let simplify_dnf dnf =
-    let simplify_conjuncts (conjuncts, _) =
+    let simplify_conjuncts conjuncts =
         conjuncts |>
         List.map (fun (a, b) -> ((a,b), mk_arrow (cons a) (cons b))) |>
         Utils.filter_among_others (fun (_,t) ts -> subtype (List.map snd ts |> conj) t |> not)
@@ -289,7 +289,7 @@ let simplify_dnf dnf =
     in
     List.map (fun arrows -> (arrows, branch_type arrows)) dnf |>
     Utils.filter_among_others (fun (_,t) ts -> subtype t (List.map snd ts |> disj) |> not)
-    |> List.map simplify_conjuncts
+    |> List.map fst |> List.map simplify_conjuncts
     |> regroup_disjuncts_simpl
 
 let remove_useless_conjuncts branch_type ~n dc cc lst =
@@ -297,20 +297,14 @@ let remove_useless_conjuncts branch_type ~n dc cc lst =
         if n then branch_type (([],[]),([],[(a,b)]))
         else branch_type (([],[]),([(a,b)],[]))
     in
-    let rec aux kept rem =
-        match rem with
-        | [] -> kept
-        | c::rem ->
-            let ct = atom_type c in
-            let rt = rem |> List.map atom_type |> conj in
-            let kt = kept |> List.map atom_type |> conj in
-            let others = conj [kt ; rt ; cc] in
-            let t' = cup dc others in
-            let t  = cup dc (cap others ct) in
-            if subtype t' t then aux kept rem
-            else aux (c::kept) rem
-    in
-    aux [] lst
+    lst |> Utils.filter_among_others (fun c o ->
+        let ct = atom_type c in
+        let ot = o |> List.map atom_type |> conj in
+        let ot = cap ot cc in
+        let t  = cup dc (cap ot ct) in
+        let t' = cup dc ot in
+        subtype t' t |> not
+    )
 
 let remove_useless_conjuncts branch_type dc ((pvs, nvs), (ps, ns)) =
     let context = branch_type ((pvs, nvs), ([], ns)) in

@@ -470,8 +470,8 @@ let filter_classic = fixpoint filter_aux_classic
 
 (* Tail recursive version *)
 
-(* The following make the type-checker diverge 
- let filter : ((('a & 'b) -> True) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ]  =
+(* The following make the type-checker diverge *)
+ (* let filter : ((('a & 'b) -> True) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ]  =
    fun f -> fun l ->
    let filter_tr_aux  
      (filter : (((('a & 'b) -> True) & (('a\'b) -> ~True)), [ 'a* ] , ['a*] ) -> [ ('a&'b)* ] )
@@ -483,8 +483,7 @@ let filter_classic = fixpoint filter_aux_classic
          let h = fst(l) in
          let t = snd(l) in
          if f h is True then filter (f, t , (h,acc)) else filter (f , t , acc)
-   in (fixpoint filter_tr_aux) (f , l , []) 
-*)
+   in (fixpoint filter_tr_aux) (f , l , []) *)
 
 (* This type checks but it requires the domain of the function to be Any *)
 

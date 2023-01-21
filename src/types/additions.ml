@@ -277,7 +277,15 @@ let regroup_conjuncts ~open_nodes conjuncts =
     in
     Utils.merge_when_possible merge_conjuncts conjuncts
 
-let regroup_disjuncts ~open_nodes disjuncts =
+let regroup_conjuncts_descr ps =
+    ps |>
+    List.map (fun (a,b) -> (cons a, cons b)) |>
+    regroup_conjuncts ~open_nodes:(NHT.create 0) |>
+    List.map (fun (a,b) -> (descr a, descr b))
+
+(* NOTE: regroup_disjuncts does not preserve equivalence but could be used
+   sometimes to approximate a type with a larger and simpler one? *)
+(* let regroup_disjuncts ~open_nodes disjuncts =
     let merge_disjuncts ((pvs,nvs), (ps,ns)) ((pvs',nvs'), (ps',ns')) =
         let (pvss, nvss, pvss', nvss') =
             (TVarSet.construct pvs, TVarSet.construct nvs,
@@ -297,15 +305,9 @@ let regroup_disjuncts ~open_nodes disjuncts =
             | _, _ -> None
         else None
     in
-    Utils.merge_when_possible merge_disjuncts disjuncts
+    Utils.merge_when_possible merge_disjuncts disjuncts *)
 
-let regroup_conjuncts_descr ps =
-    ps |>
-    List.map (fun (a,b) -> (cons a, cons b)) |>
-    regroup_conjuncts ~open_nodes:(NHT.create 0) |>
-    List.map (fun (a,b) -> (descr a, descr b))
-
-let regroup_disjuncts_simpl ds =
+(* let regroup_disjuncts_simpl ds =
     ds |>
     List.map (fun ps ->
         let ps = ps |> List.map (fun (a,b) -> (cons a, cons b)) in
@@ -314,7 +316,7 @@ let regroup_disjuncts_simpl ds =
     regroup_disjuncts ~open_nodes:(NHT.create 0) |>
     List.map (fun (_,(ps,_)) ->
         ps |> List.map (fun (a,b) -> (descr a, descr b))
-    )
+    ) *)
 
 let simplify_dnf dnf =
     let simplify_conjuncts conjuncts =
@@ -326,7 +328,7 @@ let simplify_dnf dnf =
     List.map (fun arrows -> (arrows, branch_type arrows)) dnf |>
     Utils.filter_among_others (fun (_,t) ts -> subtype t (List.map snd ts |> disj) |> not)
     |> List.map fst |> List.map simplify_conjuncts
-    |> regroup_disjuncts_simpl
+    (* |> regroup_disjuncts_simpl *)
 
 let remove_useless_conjuncts branch_type ~n dc cc lst =
     let atom_type (a,b) =
@@ -366,7 +368,7 @@ let simplify_arrow_dnf ~open_nodes dnf =
     dnf |> remove_useless_from_dnf full_branch_type
     |> List.map
         (fun (vars, (ps, ns)) -> (vars, (regroup_conjuncts ~open_nodes ps, ns)))
-    |> regroup_disjuncts ~open_nodes
+    (* |> regroup_disjuncts ~open_nodes *)
 
 let simplify_product_dnf ~open_nodes:_ dnf =
     (* TODO: More advanced simplifications for products *)
@@ -424,7 +426,8 @@ let simplify_typ t =
             ) empty (descr node) in
             define_typ n t ; n
     in
-    aux (cons t) |> descr
+    let t' = aux (cons t) |> descr in
+    assert (equiv t t') ; t'
 
 (* Record manipulation *)
 

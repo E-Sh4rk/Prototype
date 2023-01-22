@@ -205,10 +205,6 @@ let conj_o ts = List.fold_left cap_o any ts
 let disj_o ts = List.fold_left cup_o empty ts
 
 let is_test_type t =
-    let is_non_trivial_arrow t =
-        let arrow_part = cap t arrow_any in
-        (is_empty arrow_part || subtype arrow_any arrow_part) |> not
-    in
     let exception NotTestType in
     try
         let cache = NHT.create 5 in
@@ -226,7 +222,11 @@ let is_test_type t =
                         K.get_vars t |> K.Dnf.get_full |> List.iter (fun (_, (ps, ns)) ->
                             ps@ns |> List.iter (fun (a,b) -> aux a ; aux b)
                         )
-                    | Function _ -> if is_non_trivial_arrow t then raise NotTestType
+                    | Function m ->
+                        let module K = (val m) in
+                        let f = K.get_vars t |> K.mk in
+                        if (is_empty f || subtype arrow_any f) |> not
+                        then raise NotTestType
                     | Record m ->
                         let module K = (val m) in
                         K.get_vars t |> K.Dnf.get_full |> List.iter (fun (_, (ps, ns)) ->

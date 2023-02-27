@@ -158,7 +158,9 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
             RecordUpdate (aux vtenv env e1, l, Option.map (aux vtenv env) e2)
         | TypeConstr (e, t) ->
             let (t, vtenv) = type_expr_to_typ tenv vtenv t in
-            TypeConstr (aux vtenv env e, t)
+            if is_test_type t
+            then TypeConstr (aux vtenv env e, t)
+            else raise (SymbolError ("type constraints must be a valid test type"))
         | PatMatch (e, pats) ->
             PatMatch (aux vtenv env e, List.map (aux_pat pos vtenv env) pats)
         in

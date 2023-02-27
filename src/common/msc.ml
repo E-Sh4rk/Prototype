@@ -187,7 +187,7 @@ let rec def_of_var_pat pat v e =
     let case = Ite (e, type_of_pat p1,
       def_of_var_pat p1 v e, def_of_var_pat p2 v e) in
     (annot, case)
-  | PatAssign (v', e) when Variable.equals v v' -> e
+  | PatAssign (v', c) when Variable.equals v v' -> (annot, Const c)
   | PatAssign _ -> assert false
   | PatType _ -> assert false
 

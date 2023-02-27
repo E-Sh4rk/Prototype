@@ -36,7 +36,7 @@ type ('a, 'typ, 'v) pattern =
 | PatOr of ('a, 'typ, 'v) pattern * ('a, 'typ, 'v) pattern
 | PatPair of ('a, 'typ, 'v) pattern * ('a, 'typ, 'v) pattern
 | PatRecord of (string * (('a, 'typ, 'v) pattern)) list * bool
-| PatAssign of 'v * ('a, 'typ, 'v) t
+| PatAssign of 'v * const
 [@@deriving ord]
 
 and ('a, 'typ, 'v) ast =
@@ -171,7 +171,7 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
                 if Variable.equals v1 v2 then Some v1
                 else raise (SymbolError ("matched variables "^str^" are conflicting")))
         in
-        let expr_env = env in
+        (* let expr_env = env in *)
         let rec aux_p vtenv env pat =
             let find_or_def_var str =
                 if StrMap.mem str env
@@ -215,12 +215,13 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
                         ((name, p)::fields, vtenv, merge_disj acc_env env')
                 ) ([], vtenv, env) fields in
                 (PatRecord (List.rev fields, o), vtenv, env)
-            | PatAssign (str, e) ->
+            | PatAssign (str, c) ->
                 if String.equal str dummy_pat_var_str
                 then raise (SymbolError "invalid variable name for a pattern assignement") ;
                 let var = find_or_def_var str in
-                let e = aux vtenv expr_env e in
-                (PatAssign (var, e), vtenv, StrMap.singleton str var)
+                (* let e = aux vtenv expr_env e in
+                (PatAssign (var, e), vtenv, StrMap.singleton str var) *)
+                (PatAssign (var, c), vtenv, StrMap.singleton str var)
         in
         let (pat, vtenv, env') = aux_p vtenv StrMap.empty pat in
         let env = StrMap.add_seq (StrMap.to_seq env') env in
@@ -269,7 +270,7 @@ let rec unannot (_,e) =
 and unannot_pat pat =
     let rec aux pat = 
         match pat with
-        | PatAssign (v, e) -> PatAssign (v, unannot e)
+        | PatAssign (v, c) -> PatAssign (v, c (* unannot e *))
         | PatType t -> PatType t
         | PatVar v -> PatVar v
         | PatAnd (p1, p2) -> PatAnd (aux p1, aux p2)
@@ -324,10 +325,10 @@ let normalize_bvs e =
                 (aux_p depth map p, aux depth map e)) in
             PatMatch (e, pats)
         in (a, e)
-    and aux_p depth map pat =
+    and aux_p (*depth map*) _ _ pat =
         let pa pat =
             match pat with
-            | PatAssign (v, e) -> PatAssign (v, aux depth map e)
+            | PatAssign (v, c) -> PatAssign (v, c (* aux depth map e *))
             | p -> p
         in
         map_p pa pat
@@ -375,7 +376,7 @@ let map_ast f e =
     and aux_p p =
         let pa p =
             match p with
-            | PatAssign (v, e) -> PatAssign (v, aux e)
+            | PatAssign (v, c) -> PatAssign (v, c (* aux e *))
             | p -> p
         in
         map_p pa p

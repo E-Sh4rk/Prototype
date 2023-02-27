@@ -336,7 +336,7 @@ simple_pattern:
   p=atomic_pattern { p }
 | lhs=simple_pattern AND rhs=atomic_pattern { PatAnd (lhs, rhs) }
 | lhs=simple_pattern OR rhs=atomic_pattern { PatOr (lhs, rhs) }
-| v=ID EQUAL t=simple_term { PatAssign (v, t) }
+// | v=ID EQUAL t=simple_term { PatAssign (v, t) }
 
 atomic_pattern:
   COLON t=atomic_typ { PatType t }
@@ -344,6 +344,7 @@ atomic_pattern:
 | LPAREN RPAREN { PatType (TBase TUnit) }
 | LBRACE fs=separated_list(COMMA, pat_field) o=optional_open RBRACE { PatRecord (fs, o) }
 | LPAREN p=pattern RPAREN { p }
+| v=ID EQUAL c=literal { PatAssign (v, c) }
 
 %inline pat_field:
   id=ID EQUAL p=simple_pattern { (id, p) }

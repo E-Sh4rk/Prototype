@@ -4,7 +4,7 @@ open Types.Additions
 open Common
 open Parsing.Variable
 open Msc
-open Annotations
+open AnnotationsOld
 open Utils
 
 (* ====================================== *)
@@ -35,12 +35,7 @@ let instantiate_check pos ss t =
 let check_mono pos t =
   if is_mono_typ t
   then ()
-  else raise (Untypeable (pos, "Invalid branch: a branch should be monomorphic."))
-
-let check_novar pos t =
-  if is_novar_typ t
-    then ()
-    else raise (Untypeable (pos, "Invalid split: a split shouldn't contain type variables."))  
+  else raise (Untypeable (pos, "Invalid branch: abstracted variable should be monomorphic."))
 
 let rename_check pos r t =
   if Subst.is_renaming r &&
@@ -170,22 +165,22 @@ and typeof tenv env annot e =
   let open FullAnnot in
   begin match e, annot with
   | Var v, BVar r -> var_type v env |> rename_check [] r
-  | Bind (v, a, e), Keep (annot_a, gen, ty, splits) ->
-    let t = (* NOTE: ty different than None bypasses type checking. *)
+  | Bind (v, a, e), Keep (annot_a, gen, ty, branches) ->
+    let t = (* NOTE: ty different than None bypass type checking. *)
       begin match ty with
       | None -> typeof_a v tenv env annot_a a
       | Some t -> t
       end in
     let pos = Variable.get_locations v in
     let untypeable str = raise (Untypeable (pos, str)) in
-    if splits = []
+    if branches = []
     then untypeable ("Invalid decomposition: cannot be empty.")
     else
-      if subtype t (splits |> List.map fst |> disj)
+      if subtype t (branches |> List.map fst |> disj)
       then
         let t = generalize_check pos gen t in
-        splits |> List.map (fun (s, annot) ->
-          check_novar pos s ;
+        branches |> List.map (fun (s, annot) ->
+          check_mono pos s ;
           let env = Env.add v (cap t s) env in
           typeof tenv env annot e
         ) |> disj_o

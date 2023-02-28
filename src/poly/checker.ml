@@ -49,10 +49,11 @@ let rename_check pos r t =
   then Subst.apply r t
   else raise (Untypeable (pos, "Invalid renaming."))
 
-let generalize_check pos r t =
+let generalize_check pos env r t =
   if Subst.is_renaming r &&
     Subst.dom r |> TVarSet.filter TVar.is_poly |> TVarSet.is_empty &&
-    Subst.codom r |> TVarSet.filter TVar.is_mono |> TVarSet.is_empty
+    Subst.codom r |> TVarSet.filter TVar.is_mono |> TVarSet.is_empty &&
+    Subst.dom r |> TVarSet.inter (Env.tvars env) |> TVarSet.is_empty
   then Subst.apply r t
   else raise (Untypeable (pos, "Invalid generalization."))  
 
@@ -70,7 +71,7 @@ let rec typeof_a vardef tenv env annot_a a =
     then untypeable ("Invalid lambda: there must be at least 1 branch.")
     else
       let branches =
-          annot |> List.map (fun group ->
+          annot |> List.map (fun (group, gen) ->
             let (doms, codoms) =
               group |> List.map (fun (s, annot) ->
                 check_mono s ;
@@ -81,6 +82,7 @@ let rec typeof_a vardef tenv env annot_a a =
             in
             let (dom, codom) = (disj_o doms, disj_o codoms) in
             mk_arrow (cons dom) (cons codom)
+            |> generalize_check pos env gen
         ) in
       branches |> conj_o
   in
@@ -170,7 +172,7 @@ and typeof tenv env annot e =
   let open FullAnnot in
   begin match e, annot with
   | Var v, BVar r -> var_type v env |> rename_check [] r
-  | Bind (v, a, e), Keep (annot_a, gen, ty, splits) ->
+  | Bind (v, a, e), Keep (annot_a, ty, splits) ->
     let t = (* NOTE: ty different than None bypasses type checking. *)
       begin match ty with
       | None -> typeof_a v tenv env annot_a a
@@ -183,7 +185,6 @@ and typeof tenv env annot e =
     else
       if subtype t (splits |> List.map fst |> disj)
       then
-        let t = generalize_check pos gen t in
         splits |> List.map (fun (s, annot) ->
           check_novar pos s ;
           let env = Env.add v (cap t s) env in
@@ -208,6 +209,8 @@ let typeof_nofail tenv env annot e =
 (* ====================================== *)
 (* =============== REFINE =============== *)
 (* ====================================== *)
+
+(* TODO *)
 
 let rec is_undesirable s =
   subtype s arrow_any &&

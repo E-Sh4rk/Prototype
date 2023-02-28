@@ -6,6 +6,9 @@ module PartialAnnot = struct
   type branches = (typ*t) list
   [@@deriving show]
 
+  and splits = (typ*t) list
+  [@@deriving show]
+
   and a =
   | InferA of infer_state | PartialA
   | LambdaA of branches list * branches
@@ -13,9 +16,9 @@ module PartialAnnot = struct
 
   and t =
   | Infer | Partial
-  | Keep of (a * branches)
+  | Keep of (a * splits)
   | Skip of t
-  | KeepSkip of (a * branches * t)
+  | KeepSkip of (a * splits * t)
   [@@deriving show]
 
   and infer_state = IMain | IThen | IElse
@@ -23,6 +26,9 @@ module PartialAnnot = struct
 
   let rec apply_subst_branches s lst =
     let aux (ty, t) = (apply_subst_simplify s ty, apply_subst s t) in
+    List.map aux lst
+  and apply_subst_splits s lst =
+    let aux (ty, t) = (ty, apply_subst s t) in
     List.map aux lst
   and apply_subst_a s a = match a with
   | InferA s -> InferA s
@@ -50,19 +56,23 @@ module FullAnnot = struct
   [@@deriving show]
   type branches = (typ*t) list
   [@@deriving show]
+  and grouped_branches = (branches * generalization) list
+  [@@deriving show]
+  and splits = (typ*t) list
+  [@@deriving show]
   and a =
-      | ConstA | AliasA | AbstractA | LetA
-      | LambdaA of branches list
-      | PairA of renaming * renaming
-      | AppA of inst * inst
-      | ProjA of inst
-      | EmptyA of inst | ThenA | ElseA
-      | RecordUpdateA of inst * (renaming option)
-      | ConstrA of inst
+    | ConstA | AliasA | AbstractA | LetA
+    | LambdaA of grouped_branches
+    | PairA of renaming * renaming
+    | AppA of inst * inst
+    | ProjA of inst
+    | EmptyA of inst | ThenA | ElseA
+    | RecordUpdateA of inst * (renaming option)
+    | ConstrA of inst
   [@@deriving show]
   and t =
-      | BVar of renaming
-      | Keep of (a * generalization * typ option (* (optimisation) *) * branches)
-      | Skip of t
+    | BVar of renaming
+    | Keep of (a * typ option (* (optimisation) *) * splits)
+    | Skip of t
   [@@deriving show]
 end

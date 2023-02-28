@@ -210,18 +210,19 @@ let typeof_nofail tenv env annot e =
 (* =============== REFINE =============== *)
 (* ====================================== *)
 
-(* TODO *)
-
 let rec is_undesirable s =
   subtype s arrow_any &&
-  dnf s |> List.for_all (fun conjuncts -> conjuncts |>
-    List.exists (fun (a, b) -> non_empty a && is_undesirable b)
-  )
+  dnf s |> List.for_all
+    (List.exists (fun (a, b) -> non_empty a && is_undesirable b))
 
-let refine_a env a t =
+let refine_a tenv env a t =
   log ~level:5 "refine_a@." ;
   match a with
-  | Alias _ | Abstract _ | Const _ | Lambda _ -> []
+  | Lambda _ -> []
+  | Abstract t' when subtype t' t -> [Env.empty]
+  | Const c when subtype (typeof_const_atom tenv c) t -> [Env.empty] 
+  | Alias v when subtype (Env.find v env) t -> [Env.empty]
+  | Alias _ | Abstract _ | Const _ -> []
   | Pair (v1, v2) ->
     split_pair t
     |> List.map (
@@ -252,7 +253,6 @@ let refine_a env a t =
     let singl = List.length dnf <= 1 in
     dnf |> List.map (fun lst ->
       let ti = branch_type lst in
-      let ti = bot_instance ti in
       let alpha = TVar.mk_poly None in
       let constr = [ (ti, mk_arrow (TVar.typ alpha |> cons) (cons t)) ] in
       let res = tallying constr in
@@ -262,13 +262,16 @@ let refine_a env a t =
         let clean_subst =  clean_type_subst ~pos:any ~neg:empty argt in
         let ti = Subst.apply clean_subst ti in
         let argt = Subst.apply clean_subst argt in
+        let clean_subst =  clean_type_subst ~pos:any ~neg:empty ti in
+        let ti = Subst.apply clean_subst ti in
+        let argt = Subst.apply clean_subst argt in
         if singl then Env.singleton v2 argt (* Optimisation *)
         else Env.construct_dup [ (v1, ti) ; (v2, argt) ]
       )
     ) |> List.flatten
-    |> List.filter
-      (fun env -> env |> Env.bindings |> List.for_all (fun (_,t) ->
-        is_mono_typ t && not (is_undesirable t)))
+    |> List.filter (fun env -> env |> Env.tvars |> TVarSet.is_empty)
+    |> List.filter (fun env -> Env.bindings env |>
+        List.for_all (fun (_,t) -> not (is_undesirable t)))
   | Ite (v, s, v1, v2) ->
     [Env.construct_dup [(v,s);(v1,t)] ; Env.construct_dup [(v,neg s);(v2,t)]]
   | Let (_, v2) -> [Env.singleton v2 t]
@@ -276,6 +279,8 @@ let refine_a env a t =
 (* ====================================== *)
 (* =============== INFER I ============== *)
 (* ====================================== *)
+
+(* TODO *)
 
 let tallying_nonempty constr =
   match tallying constr with

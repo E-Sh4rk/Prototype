@@ -522,19 +522,17 @@ and infer_inst tenv env pannot e =
 (* =============== INFER B ============== *)
 (* ====================================== *)
 
-(* TODO *)
-
 type 'a res =
   | Ok of 'a
-  | Split of Env.t * 'a
+  | Split of Env.t * 'a * 'a
   | Subst of (Subst.t * 'a) list
   | NeedVar of (VarSet.t * 'a * 'a option)
 
 let map_res f res =
   match res with
   | Ok a -> Ok (f a)
-  | Split (env, a) ->
-    Split (env, f a)
+  | Split (env, a1, a2) ->
+    Split (env, f a1, f a2)
   | Subst lst ->
     Subst (lst |> List.map (fun (s, a) -> (s, f a)))
   | NeedVar (vs, a, ao) ->
@@ -545,21 +543,15 @@ let needvar env vs a =
   let vs = VarSet.diff vs (Env.domain env |> VarSet.of_list) in
   NeedVar (vs, a, None)
 
-let is_valid_refinement env gamma =
-  if VarSet.subset
+let is_compatible env gamma =
+  VarSet.subset
     (Env.domain gamma |> VarSet.of_list)
     (Env.domain env |> VarSet.of_list)
-  then
-    let bindings = Env.bindings gamma in
-    bindings |> List.for_all (fun (v,s) ->
-      let t = Env.find v env in
-      is_empty t || (cap t s |> non_empty)
-    ) &&
-    bindings |> List.exists (fun (v,s) ->
-      let t = Env.find v env in
-      cap t s |> non_empty && cap t (neg s) |> non_empty
-    )
-  else false
+  &&
+  Env.bindings gamma |> List.for_all (fun (v,s) ->
+    let t = Env.find v env in
+    is_empty t || (cap t s |> non_empty)
+  )
 
 let subst_more_general s1 s2 =
   let s2m = Subst.codom s2 |> monomorphize in
@@ -687,7 +679,9 @@ let simplify_tallying_infer env res sols =
     res |> List.iter (fun s -> Format.printf "%a@." Subst.pp s) ;
     res
   ) *)
-  
+
+(* TODO *)
+
 let typeof_a_pannot vardef tenv env pannot_a a =
   let open FullAnnot in
   let annot_a = infer_inst_a vardef tenv env pannot_a a in

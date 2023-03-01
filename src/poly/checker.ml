@@ -280,8 +280,6 @@ let refine_a tenv env a t =
 (* =============== INFER I ============== *)
 (* ====================================== *)
 
-(* TODO *)
-
 let tallying_nonempty constr =
   match tallying constr with
   | [] -> assert false
@@ -484,11 +482,17 @@ let rec infer_inst_a vardef tenv env pannot_a a =
   | Lambda (_, v, e), PartialAnnot.LambdaA (b1, b2) ->
     assert (b2 = []) ;
     let branches = b1 |> List.map (fun group ->
-      group |> List.map (fun (s, pannot) ->
-        let env = Env.add v s env in
-        let annot = infer_inst tenv env pannot e in
-        (s, annot)
-    )) in
+      let group =
+        group |> List.map (fun (s, pannot) ->
+          let env = Env.add v s env in
+          let annot = infer_inst tenv env pannot e in
+          (s, annot)
+        )
+      in
+      let gvars = group |> List.map fst |> List.map vars_mono |> TVarSet.union_many in
+      let gvars = TVarSet.diff gvars (Env.tvars env) in
+      (group, generalize gvars)
+    ) in
     FullAnnot.LambdaA branches
   | _, _ ->  assert false
 
@@ -506,19 +510,19 @@ and infer_inst tenv env pannot e =
   | Bind (v, a, e), PartialAnnot.Keep (pannot_a, branches) ->
     let annot_a = infer_inst_a v tenv env pannot_a a in
     let t = typeof_a_nofail v tenv env annot_a a in
-    let gen = TVarSet.diff (vars t) (Env.tvars env) |> generalize in
-    let t = Subst.apply gen t in
     let branches = branches |> List.map (fun (si, pannot) ->
       let t = cap_o t si in
       let env = Env.add v t env in
       (si, infer_inst tenv env pannot e)
     ) in
-    FullAnnot.Keep (annot_a, gen, None, branches)
+    FullAnnot.Keep (annot_a, None, branches)
   | _, _ ->  assert false
 
 (* ====================================== *)
 (* =============== INFER B ============== *)
 (* ====================================== *)
+
+(* TODO *)
 
 type 'a res =
   | Ok of 'a

@@ -553,6 +553,13 @@ let is_compatible env gamma =
     is_empty t || (cap t s |> non_empty)
   )
 
+let should_iterate res =
+  match res with
+  | Split (gamma, pannot, _) when Env.is_empty gamma -> Some pannot
+  | Subst [(subst, pannot)] when Subst.is_identity subst -> Some pannot
+  | NeedVar (vs, pannot, _) when VarSet.is_empty vs -> Some pannot
+  | _ -> None
+
 let subst_more_general s1 s2 =
   let s2m = Subst.codom s2 |> monomorphize in
   let s1g = Subst.codom s1 |> generalize in
@@ -901,50 +908,64 @@ let rec infer_branches_a vardef tenv env pannot_a a =
 
 (* TODO *)
 
+and infer_branches_splits tenv env v a e t splits =
+  (*
+  let propagate =
+    if List.length splits <= 1 then None
+    else splits |> List.find_map (fun (s,_) ->
+      let gammas = refine_a env a (neg s) in
+      gammas |> List.find_opt (is_valid_refinement env)
+    )
+  in
+  begin match propagate with
+  | Some env' ->
+    log ~level:1 "Var %a is ok but a split must be propagated.@." Variable.pp v ;
+    Split (env', Keep (pannot_a, splits))
+  | None ->   
+  end
+  *)
+  (* assert (splits <> []) ;
+  let splits =
+    match List.filter (fun (s, _) -> disjoint s t |> not) splits with
+    | [] -> [List.hd splits]
+    | splits -> splits
+  in
+  log ~level:2 "Typing binding for %a with splits %a.@."
+    Variable.pp v (pp_list pp_typ) (List.map fst splits) ;
+  let rec aux splits =
+    match splits with
+    | [] -> Ok []
+    | (s, pannot)::splits ->
+      log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
+      let env = Env.add v (cap_o t s) env in
+      begin match infer_branches_iterated tenv env pannot e with
+      | Ok pannot ->
+        aux splits |> map_res (fun splits -> (s, pannot)::splits)
+      | Split (env', pannot) ->
+        let s' = Env.find v (Env.strengthen v s env') in
+        let new_splits = [ s' ; diff_o s s' ] |> List.filter non_empty in
+        let new_splits = new_splits |> List.map (fun s -> (s, pannot)) in
+        Split (Env.rm v env', new_splits@splits)
+      | res -> res |> map_res (fun pannot -> (s, pannot)::splits)
+      end
+  in
+  aux splits *)
+  failwith "TODO"
+
 and infer_branches tenv env pannot e =
   let needvar = needvar env in
   let open PartialAnnot in
-  let split_body v t splits e =
-    assert (splits <> []) ;
-    let splits =
-      match List.filter (fun (s, _) -> disjoint s t |> not) splits with
-      | [] -> [List.hd splits]
-      | splits -> splits
-    in
-    log ~level:2 "Typing binding for %a with splits %a.@."
-      Variable.pp v (pp_list pp_typ) (List.map fst splits) ;
-    let rec aux splits =
-      match splits with
-      | [] -> Ok []
-      | (s, pannot)::splits ->
-        log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
-        let env = Env.add v (cap_o t s) env in
-        begin match infer_branches_iterated tenv env pannot e with
-        | Ok pannot ->
-          aux splits |> map_res (fun splits -> (s, pannot)::splits)
-        | Split (env', pannot) ->
-          let s' = Env.find v (Env.strengthen v s env') in
-          let new_splits = [ s' ; diff_o s s' ] |> List.filter non_empty in
-          let new_splits = new_splits |> List.map (fun s -> (s, pannot)) in
-          Split (Env.rm v env', new_splits@splits)
-        | res -> res |> map_res (fun pannot -> (s, pannot)::splits)
-        end
-    in
-    aux splits
-  in
   match e, pannot with
   | Var _, Partial -> Ok Partial
   | Var v, Infer -> needvar [v] Partial
-  | Bind _, Infer ->
-    let pannot = Skip Infer in
-    infer_branches tenv env pannot e
+  | Bind _, Infer -> infer_branches tenv env (Skip Infer) e
   | Bind (v, _, e), Skip pannot ->
     begin match infer_branches_iterated tenv env pannot e with
-    | NeedVar (vs, pannot, Some pannot') when VarSet.mem v vs ->
+    | NeedVar (vs, pannot1, Some pannot2) when VarSet.mem v vs ->
       log ~level:0 "Var %a needed (optional).@." Variable.pp v ;
-      let pannot = KeepSkip (InferA IMain, [(any, pannot)], pannot') in
-      let pannot' = Skip pannot' in
-      NeedVar (VarSet.remove v vs, pannot, Some pannot')
+      let pannot1 = KeepSkip (InferA IMain, [(any, pannot1)], pannot2) in
+      let pannot2 = Skip pannot2 in
+      NeedVar (VarSet.remove v vs, pannot1, Some pannot2)
     | NeedVar (vs, pannot, None) when VarSet.mem v vs ->
       log ~level:0 "Var %a needed.@." Variable.pp v ;
       let pannot = Keep (InferA IMain, [(any, pannot)]) in
@@ -954,68 +975,50 @@ and infer_branches tenv env pannot e =
   | Bind (v, a, _), KeepSkip (pannot_a, splits, pannot) ->
     log ~level:1 "Typing var %a (optional).@." Variable.pp v ;
     begin match infer_branches_a_iterated v tenv env pannot_a a with
-    | Ok pannot_a ->
-      let pannot = Keep (pannot_a, splits) in
-      infer_branches tenv env pannot e
+    | Ok pannot_a -> infer_branches tenv env (Keep (pannot_a, splits)) e
     | Subst lst when
       List.for_all (fun (s,_) -> Subst.is_identity s |> not) lst ->
       let lst = lst |> List.map (fun (s, pannot_a) ->
         (s, KeepSkip (pannot_a, splits, pannot))
       ) in
-      let lst = lst@[(Subst.identity, Skip pannot)] in
-      Subst lst
+      Subst (lst@[(Subst.identity, Skip pannot)])
     | NeedVar (vs, pannot_a, None) ->
       NeedVar (vs, KeepSkip (pannot_a, splits, pannot), Some (Skip pannot))
-    | res ->
-      map_res (fun pannot_a -> KeepSkip (pannot_a, splits, pannot)) res
+    | res -> map_res (fun pannot_a -> KeepSkip (pannot_a, splits, pannot)) res
     end
   | Bind (v, a, e), Keep (pannot_a, splits) ->
     log ~level:1 "Inferring var %a.@." Variable.pp v ;
     begin match infer_branches_a_iterated v tenv env pannot_a a with
     | Ok pannot_a ->
-      let propagate =
-        if List.length splits <= 1 then None
-        else splits |> List.find_map (fun (s,_) ->
-          let gammas = refine_a env a (neg s) in
-          gammas |> List.find_opt (is_valid_refinement env)
-        )
-      in
-      begin match propagate with
-      | Some env' ->
-        log ~level:1 "Var %a is ok but a split must be propagated.@." Variable.pp v ;
-        Split (env', Keep (pannot_a, splits))
-      | None ->
-        let (t, pannot_a) = typeof_a_pannot v tenv env pannot_a a in
-        let gen = TVarSet.diff (vars t) (Env.tvars env) |> generalize in
-        let t = Subst.apply gen t in
-        log ~level:1 "Var %a typed with type %a.@." Variable.pp v pp_typ t ;
-        split_body v t splits e |> map_res (fun splits -> Keep (pannot_a, splits))
-      end
+      let annot_a = infer_inst_a v tenv env pannot_a a in
+      let t = typeof_a_nofail v tenv env annot_a a in
+      log ~level:1 "Var %a typed with type %a.@." Variable.pp v pp_typ t ;
+      infer_branches_splits_iterated tenv env v a e t splits
+      |> map_res (fun splits -> Keep (pannot_a, splits))
     | res -> res |> map_res (fun pannot_a -> Keep (pannot_a, splits))
     end
   | _, _ -> assert false
 
 and infer_branches_a_iterated vardef tenv env pannot_a a =
   log ~level:5 "infer_branches_a_iterated@." ;
-  match infer_branches_a vardef tenv env pannot_a a with
-  | Split (gamma, pannot_a, _) when Env.is_empty gamma ->
-    infer_branches_a_iterated vardef tenv env pannot_a a
-  | Subst [(subst, pannot_a)] when Subst.is_identity subst ->
-    infer_branches_a_iterated vardef tenv env pannot_a a
-  | NeedVar (vs, pannot_a, _) when VarSet.is_empty vs ->
-    infer_branches_a_iterated vardef tenv env pannot_a a
-  | res -> res
+  let res = infer_branches_a vardef tenv env pannot_a a in
+  match should_iterate res with
+  | None -> res
+  | Some pannot_a -> infer_branches_a_iterated vardef tenv env pannot_a a
+
+and infer_branches_splits_iterated tenv env v a e t splits =
+  log ~level:5 "infer_branches_splits_iterated@." ;
+  let res = infer_branches_splits tenv env v a e t splits in
+  match should_iterate res with
+  | None -> res
+  | Some splits -> infer_branches_splits tenv env v a e t splits
 
 and infer_branches_iterated tenv env pannot e =
-  log ~level:5 "infer_branches_e_iterated@." ;
-  match infer_branches tenv env pannot e with
-  | Split (gamma, pannot, _) when Env.is_empty gamma ->
-    infer_branches_iterated tenv env pannot e
-  | Subst [(subst, pannot)] when Subst.is_identity subst ->
-    infer_branches_iterated tenv env pannot e
-  | NeedVar (vs, pannot, _) when VarSet.is_empty vs ->
-    infer_branches_iterated tenv env pannot e
-  | res -> res
+  log ~level:5 "infer_branches_iterated@." ;
+  let res = infer_branches tenv env pannot e in
+  match should_iterate res with
+  | None -> res
+  | Some pannot -> infer_branches_iterated tenv env pannot e
 
 (* ====================================== *)
 (* ================ INFER =============== *)

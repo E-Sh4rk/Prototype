@@ -34,7 +34,8 @@ module FullAnnot : sig
     and grouped_branches = (branches * generalization) list
     and splits = (typ*t) list
     and a =
-        | ConstA | AliasA | AbstractA | LetA
+        | ConstA | AliasA | LetA
+        | AbstractA of generalization
         | LambdaA of grouped_branches
         | PairA of renaming * renaming
         | AppA of inst * inst

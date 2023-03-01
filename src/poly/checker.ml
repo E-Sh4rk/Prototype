@@ -88,8 +88,8 @@ let rec typeof_a vardef tenv env annot_a a =
   in
   begin match a, annot_a with
   | Alias v, AliasA -> var_type v
-  | Abstract t, AbstractA -> t
   | Const c, ConstA -> typeof_const_atom tenv c
+  | Abstract t, AbstractA gen -> generalize_check pos env gen t
   | Pair (v1, v2), PairA (r1, r2) ->
     let t1 = var_type v1 |> rename_check r1 in
     let t2 = var_type v2 |> rename_check r2 in
@@ -418,9 +418,11 @@ let rec infer_inst_a vardef tenv env pannot_a a =
   let vartype v = Env.find v env in
   match a, pannot_a with
   | Alias _, PartialA -> AliasA
-  | Abstract _, PartialA -> AbstractA
   | Const _, PartialA -> ConstA
   | Let _, PartialA -> LetA
+  | Abstract t, PartialA ->
+    let gvars = TVarSet.diff (vars_mono t) (Env.tvars env) in
+    AbstractA (generalize gvars)
   | Pair (v1, v2), PartialA ->
     let r1 = refresh_all (vartype v1 |> vars_poly) in
     let r2 = refresh_all (vartype v2 |> vars_poly) in

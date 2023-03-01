@@ -680,54 +680,49 @@ let simplify_tallying_infer env res sols =
     res
   ) *)
 
-(* TODO *)
-
-let typeof_a_pannot vardef tenv env pannot_a a =
+let insert_new_branch tenv env x e groups branch =
   let open FullAnnot in
-  let annot_a = infer_inst_a vardef tenv env pannot_a a in
-  let type_lambda env annot pannot v e =
-    let annot = List.flatten annot in
-    let pannot = List.flatten pannot in
-    let branches =
-      List.map2 (fun (s, annot) pannot ->
-        let env = Env.add v s env in
-        let t = typeof_nofail tenv env annot e in
-        (mk_arrow (cons s) (cons t), (s, t, [pannot]))
-      ) annot pannot in
-    (* NOTE: We do several simplifications to the branches (removing, merging) *)
-    let gen_leq a b =
-      let gen = TVarSet.diff (vars a) (Env.tvars env) |> generalize in
-      let a = Subst.apply gen a in
-      subtype_poly a b
-    in
-    let gen_leq' (a,_) (b,_) = gen_leq a b in
-    let merge_branches_opt (a,(sa,ta,annota)) (b,(sb,tb,annotb)) =
-      let dom = cup sa sb in
-      let codom = cup ta tb in
-      let t = mk_arrow (cons dom) (cons codom) in
-      if gen_leq t a && gen_leq t b
-      then Some (t, (dom, codom, annota@annotb))
-      else None
-    in
-    let mono = Env.tvars env in
-    let rename_vars (arrow, (s,_,pannot)) =
-      let new_vars = TVarSet.diff (vars s) mono in
-      let r = refresh_all new_vars in
-      (Subst.apply r arrow, PartialAnnot.apply_subst_branches r pannot)
-    in  
-    let (t, pannot) =
-      branches |> keep_only_minimal gen_leq'
-      |> merge_when_possible merge_branches_opt
-      |> List.map rename_vars |> List.split
-    in
-    (t |> conj_o |> bot_instance |> simplify_typ, pannot)
+  let type_branch (s, pannot) =
+    let env = Env.add x s env in
+    let annot = infer_inst tenv env pannot e in
+    let t = typeof_nofail tenv env annot e in
+    (s, t, (s, pannot))
   in
-  begin match a, annot_a, pannot_a with
-  | Lambda (_, v, e), LambdaA branches, PartialAnnot.LambdaA (pbranches, []) ->
-    let (t, pbranches) = type_lambda env branches pbranches v e in
-    (t, PartialAnnot.LambdaA (pbranches, []))
-  | _, _, _ -> (typeof_a_nofail vardef tenv env annot_a a, pannot_a)
-  end
+  let groups = groups |> List.map (fun branches ->
+      let (ds, rs, branches) =
+        branches |> List.map type_branch |> Utils.split3
+      in
+      let (d, r) = (disj ds, disj rs) in
+      let t = mk_arrow (cons d) (cons r) in
+      (t, d, r, branches)
+    )
+  in
+  let (d, r, branch) = type_branch branch in
+  let t = mk_arrow (cons d) (cons r) in
+  let subtype_gen a b =
+    let gen = TVarSet.diff (vars a) (Env.tvars env) |> generalize in
+    let a = Subst.apply gen a in
+    subtype_poly a b
+  in
+  let last4 (_,_,_,e) = e in
+  if groups |> List.exists (fun (t',_,_,_) -> subtype_gen t' t)
+  then
+    (* Don't insert the branch if it does not strictly strengthen the groups *)
+    List.map last4 groups
+  else
+    (* Insert the branch, but inside a group if possible *)
+    let can_be_merged_in (t',d',r',_) _ =
+      let dom = cup d d' in
+      let codom = cup r r' in
+      let nt = mk_arrow (cons dom) (cons codom) in
+      subtype_gen nt t && subtype_gen nt t'
+    in
+    match Utils.find_among_others can_be_merged_in groups with
+    | None -> [branch]::(List.map last4 groups)
+    | Some ((_,_,_,group),groups) ->
+      (branch::group)::(List.map last4 groups)
+
+(* TODO *)
 
 let rec infer_branches_a vardef tenv env pannot_a a =
   let memvar v = Env.mem v env in

@@ -729,16 +729,10 @@ let rec infer_branches_a vardef tenv env pannot_a a =
   let packannot a = List.map (fun s -> (s, a)) in
   let open PartialAnnot in
   let lambda v (b1, b2) e =
-    (* TODO *)
     log ~level:2 "Typing lambda for %a with unexplored branches %a.@."
       Variable.pp v (pp_list pp_typ) (List.map fst b2) ;
     let rec aux explored b =
-      let explored_domain = explored
-        (* |> List.map (fun t ->
-          let nvs = TVarSet.diff (vars t) (Env.tvars env) in
-          let g = generalize nvs in let m = Subst.inverse_renaming g in
-          Subst.apply g t |> clean_type ~pos:any ~neg:empty |> Subst.apply m) *)
-        |> disj in
+      let explored_domain = explored |> disj in
       (* Remove branches with a domain that has already been explored *)
       let b = b |> List.filter
         (fun (s,_) -> subtype s explored_domain |> not) in
@@ -754,7 +748,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
         begin match infer_branches_iterated tenv env' pannot e with
         | Ok pannot ->
           aux (s::explored) b
-          |> map_res (fun (b1, b2) -> ([(s, pannot)]::b1, b2))
+          |> map_res (fun (b1, b2) -> ((s, pannot)::b1, b2))
         | Subst lst ->
           let x = Env.tvars env in
           let sigma = lst |>
@@ -786,7 +780,10 @@ let rec infer_branches_a vardef tenv env pannot_a a =
         end
     in
     aux (b1 |> List.flatten |> List.map fst) b2 |>
-      map_res (fun (b1', b2') -> LambdaA (b1@b1', b2'))
+      map_res (fun (b1', b2') ->
+        let b1' = List.fold_left (insert_new_branch tenv env v e) b1 b1' in
+        LambdaA (b1', b2')
+      )
   in
   match a, pannot_a with
   | _, PartialA -> Ok (PartialA)

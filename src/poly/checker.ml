@@ -722,8 +722,6 @@ let insert_new_branch tenv env x e groups branch =
     | Some ((_,_,_,group),groups) ->
       (branch::group)::(List.map last4 groups)
 
-(* TODO *)
-
 let rec infer_branches_a vardef tenv env pannot_a a =
   let memvar v = Env.mem v env in
   let vartype v = Env.find v env in
@@ -731,6 +729,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
   let packannot a = List.map (fun s -> (s, a)) in
   let open PartialAnnot in
   let lambda v (b1, b2) e =
+    (* TODO *)
     log ~level:2 "Typing lambda for %a with unexplored branches %a.@."
       Variable.pp v (pp_list pp_typ) (List.map fst b2) ;
     let rec aux explored b =
@@ -886,7 +885,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
         else
           Subst ((packannot PartialA res)@[(Subst.identity, InferA IElse)])
       end else
-        Split (Env.singleton v tau, InferA IMain)
+        Split (Env.singleton v tau, InferA IMain, InferA IMain)
     else
       needvar [v] (InferA IMain)
   | Ite (_, _, v1, _), InferA IThen -> needvar [v1] PartialA
@@ -899,8 +898,11 @@ let rec infer_branches_a vardef tenv env pannot_a a =
     let pannot_a = LambdaA ([], packannot Infer ts) in
     infer_branches_a vardef tenv env pannot_a a
   | Lambda (_, v, e), LambdaA (b1, b2) ->
-    if (List.flatten b1)@b2 = [] then Subst [] else lambda v (b1,b2) e
+    if (List.flatten b1)@b2 |> List.map fst |> disj |> is_empty
+    then Subst [] else lambda v (b1,b2) e
   | _, _ -> assert false
+
+(* TODO *)
 
 and infer_branches tenv env pannot e =
   let needvar = needvar env in
@@ -999,7 +1001,7 @@ and infer_branches tenv env pannot e =
 and infer_branches_a_iterated vardef tenv env pannot_a a =
   log ~level:5 "infer_branches_a_iterated@." ;
   match infer_branches_a vardef tenv env pannot_a a with
-  | Split (gamma, pannot_a) when Env.is_empty gamma ->
+  | Split (gamma, pannot_a, _) when Env.is_empty gamma ->
     infer_branches_a_iterated vardef tenv env pannot_a a
   | Subst [(subst, pannot_a)] when Subst.is_identity subst ->
     infer_branches_a_iterated vardef tenv env pannot_a a
@@ -1010,7 +1012,7 @@ and infer_branches_a_iterated vardef tenv env pannot_a a =
 and infer_branches_iterated tenv env pannot e =
   log ~level:5 "infer_branches_e_iterated@." ;
   match infer_branches tenv env pannot e with
-  | Split (gamma, pannot) when Env.is_empty gamma ->
+  | Split (gamma, pannot, _) when Env.is_empty gamma ->
     infer_branches_iterated tenv env pannot e
   | Subst [(subst, pannot)] when Subst.is_identity subst ->
     infer_branches_iterated tenv env pannot e
@@ -1030,7 +1032,7 @@ let infer tenv env e =
   | NeedVar (vs, _, _) ->
     Format.printf "NeedVar %a@." (pp_list Variable.pp) (VarSet.to_seq vs |> List.of_seq) ;
     assert false
-  | Split (gamma, _) ->
+  | Split (gamma, _, _) ->
     Format.printf "Split %a@." Env.pp gamma ;
     assert false
   | Subst lst ->

@@ -688,7 +688,6 @@ let simplify_tallying_infer env res sols =
   ) *)
 
 let insert_new_branch tenv env x e groups branch =
-  let open FullAnnot in
   let type_branch (s, pannot) =
     let env = Env.add x s env in
     let annot = infer_inst tenv env pannot e in
@@ -906,51 +905,48 @@ let rec infer_branches_a vardef tenv env pannot_a a =
     then Subst [] else lambda v (b1,b2) e
   | _, _ -> assert false
 
-(* TODO *)
-
 and infer_branches_splits tenv env v a e t splits =
-  (*
-  let propagate =
-    if List.length splits <= 1 then None
-    else splits |> List.find_map (fun (s,_) ->
-      let gammas = refine_a env a (neg s) in
-      gammas |> List.find_opt (is_valid_refinement env)
-    )
-  in
-  begin match propagate with
-  | Some env' ->
-    log ~level:1 "Var %a is ok but a split must be propagated.@." Variable.pp v ;
-    Split (env', Keep (pannot_a, splits))
-  | None ->   
-  end
-  *)
-  (* assert (splits <> []) ;
-  let splits =
-    match List.filter (fun (s, _) -> disjoint s t |> not) splits with
-    | [] -> [List.hd splits]
-    | splits -> splits
-  in
-  log ~level:2 "Typing binding for %a with splits %a.@."
-    Variable.pp v (pp_list pp_typ) (List.map fst splits) ;
-  let rec aux splits =
-    match splits with
-    | [] -> Ok []
-    | (s, pannot)::splits ->
-      log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
-      let env = Env.add v (cap_o t s) env in
-      begin match infer_branches_iterated tenv env pannot e with
-      | Ok pannot ->
-        aux splits |> map_res (fun splits -> (s, pannot)::splits)
-      | Split (env', pannot) ->
-        let s' = Env.find v (Env.strengthen v s env') in
-        let new_splits = [ s' ; diff_o s s' ] |> List.filter non_empty in
-        let new_splits = new_splits |> List.map (fun s -> (s, pannot)) in
-        Split (Env.rm v env', new_splits@splits)
-      | res -> res |> map_res (fun pannot -> (s, pannot)::splits)
+  if is_empty t
+  then
+    let (_, pannot) = List.hd splits in
+    let env = Env.add v empty env in
+    infer_branches_iterated tenv env pannot e
+    |> map_res (fun pannot -> [(empty, pannot)])
+  else
+    let propagate =
+      splits |> Utils.find_map_among_others (fun (s,_) others ->
+        if subtype t s then None
+        else
+          refine_a tenv env a (neg s)
+          |> List.find_opt (is_compatible env) |> Option.map (fun x -> (x, others))
+      )
+    in
+    begin match propagate with
+    | Some (env', splits') ->
+      log ~level:1 "Var %a is ok but a split must be propagated.@." Variable.pp v ;
+      let env' = Env.filter (fun v t -> subtype (Env.find v env) t |> not) env' in
+      Split (env', splits', splits)
+    | None ->
+      log ~level:2 "Typing binding for %a with splits %a.@."
+        Variable.pp v (pp_list pp_typ) (List.map fst splits) ;
+      begin match splits with
+      | [] -> Ok []
+      | (s, pannot)::splits ->
+        log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
+        let env' = Env.add v (cap_o t s) env in
+        begin match infer_branches_iterated tenv env' pannot e with
+        | Ok pannot ->
+          infer_branches_splits_iterated tenv env v a e t splits
+          |> map_res (fun splits -> (s, pannot)::splits)
+        | Split (env', pannot1, pannot2) when Env.mem v env' ->
+          let s' = Env.find v env' in
+          let splits1 = [ (cap_o s s', pannot1) ; (diff_o s s', pannot2) ]@splits in
+          let splits2 = [ (s,pannot2) ]@splits in
+          Split (Env.rm v env', splits1, splits2)
+        | res -> res |> map_res (fun pannot -> (s, pannot)::splits)
+        end  
       end
-  in
-  aux splits *)
-  failwith "TODO"
+    end
 
 and infer_branches tenv env pannot e =
   let needvar = needvar env in
@@ -988,6 +984,7 @@ and infer_branches tenv env pannot e =
     end
   | Bind (v, a, e), Keep (pannot_a, splits) ->
     log ~level:1 "Inferring var %a.@." Variable.pp v ;
+    assert (splits <> []) ;
     begin match infer_branches_a_iterated v tenv env pannot_a a with
     | Ok pannot_a ->
       let annot_a = infer_inst_a v tenv env pannot_a a in

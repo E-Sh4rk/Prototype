@@ -300,6 +300,12 @@ let clean_type_subst ~pos ~neg t =
       | `Both -> None
   ) |> Subst.construct
 
+let ground_inf =
+  CD.Types.Subst.min_type TVarSet.empty
+
+let ground_sup =
+  CD.Types.Subst.max_type TVarSet.empty
+
 let tallying constr =
   let mono = constr |>
     List.map (fun (a,b) -> [vars_mono a ; vars_mono b]) |>

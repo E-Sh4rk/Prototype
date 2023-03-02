@@ -263,13 +263,13 @@ let refine_a tenv env a t =
         let ti = Subst.apply clean_subst ti in
         let argt = Subst.apply clean_subst argt in
         let clean_subst =  clean_type_subst ~pos:any ~neg:empty ti in
-        let ti = Subst.apply clean_subst ti in
-        let argt = Subst.apply clean_subst argt in
+        let ti = Subst.apply clean_subst ti |> ground_inf in
+        let argt = Subst.apply clean_subst argt |> ground_inf in
         if singl then Env.singleton v2 argt (* Optimisation *)
         else Env.construct_dup [ (v1, ti) ; (v2, argt) ]
       )
     ) |> List.flatten
-    |> List.filter (fun env -> env |> Env.tvars |> TVarSet.is_empty)
+    (* |> List.filter (fun env -> env |> Env.tvars |> TVarSet.is_empty) *)
     |> List.filter (fun env -> Env.bindings env |>
         List.for_all (fun (_,t) -> not (is_undesirable t)))
   | Ite (v, s, v1, v2) ->

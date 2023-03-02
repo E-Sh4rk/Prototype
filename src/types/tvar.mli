@@ -100,6 +100,8 @@ end
 
 val clean_type : pos:Base.typ -> neg:Base.typ -> Base.typ -> Base.typ
 val clean_type_subst : pos:Base.typ -> neg:Base.typ -> Base.typ -> Subst.t
+val ground_inf : Base.typ -> Base.typ (* ground type smaller than every instance of t *)
+val ground_sup : Base.typ -> Base.typ (* ground type larger than every instance of t *)
 val tallying : (Base.typ * Base.typ) list -> Subst.t list
 val tallying_infer : (Base.typ * Base.typ) list -> Subst.t list
 

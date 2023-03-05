@@ -25,7 +25,7 @@ let type_check_def tenv env (var,expr,typ_annot) =
   in
   try
     Utils.log "%a@." Msc.pp_e nf_expr ;
-    let typ = Poly.Checker.typeof_simple tenv env nf_expr in
+    let typ = Poly.CheckerOld.typeof_simple tenv env nf_expr in
     let typ =
       match typ_annot with
       | None -> typ
@@ -39,7 +39,7 @@ let type_check_def tenv env (var,expr,typ_annot) =
     let env = Env.add var typ env in
     TSuccess (typ, env, retrieve_times ())
   with
-  | Poly.Checker.Untypeable (pos, str) ->
+  | Poly.CheckerOld.Untypeable (pos, str) ->
     TFailure (pos, str, retrieve_times ())
   | IncompatibleType _ ->
     TFailure (Variable.get_locations var,

@@ -300,11 +300,15 @@ let clean_type_subst ~pos ~neg t =
       | `Both -> None
   ) |> Subst.construct
 
-let ground_inf =
-  CD.Types.Subst.min_type TVarSet.empty
+let ground_inf t =
+  (* CD.Types.Subst.min_type TVarSet.empty t *)
+  (* TODO: Fix min_type function in Cduce... *)
+  if vars t |> TVarSet.is_empty then t else Base.empty
 
-let ground_sup =
-  CD.Types.Subst.max_type TVarSet.empty
+let ground_sup t =
+  (* CD.Types.Subst.max_type TVarSet.empty t *)
+  (* TODO: Fix max_type function in Cduce... *)
+  if vars t |> TVarSet.is_empty then t else Base.any
 
 let tallying constr =
   let mono = constr |>

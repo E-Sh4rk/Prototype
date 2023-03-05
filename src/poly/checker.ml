@@ -35,12 +35,7 @@ let instantiate_check pos ss t =
 let check_mono pos t =
   if is_mono_typ t
   then ()
-  else raise (Untypeable (pos, "Invalid branch: a branch should be monomorphic."))
-
-let check_novar pos t =
-  if is_novar_typ t
-    then ()
-    else raise (Untypeable (pos, "Invalid split: a split shouldn't contain type variables."))  
+  else raise (Untypeable (pos, "Invalid type: lambda domains and splits should be monomorphic."))
 
 let rename_check pos r t =
   if Subst.is_renaming r &&
@@ -49,47 +44,29 @@ let rename_check pos r t =
   then Subst.apply r t
   else raise (Untypeable (pos, "Invalid renaming."))
 
-let generalize_check pos env r t =
-  if Subst.is_renaming r &&
-    Subst.dom r |> TVarSet.filter TVar.is_poly |> TVarSet.is_empty &&
-    Subst.codom r |> TVarSet.filter TVar.is_mono |> TVarSet.is_empty &&
-    Subst.dom r |> TVarSet.inter (Env.tvars env) |> TVarSet.is_empty
-  then Subst.apply r t
-  else raise (Untypeable (pos, "Invalid generalization."))  
-
 (* TODO: test examples in flatten.ml, and merge them with test.ml *)
+let typeof_inter typeof_branch pos branches =
+  let untypeable str = raise (Untypeable (pos, str)) in
+  if branches = []
+  then untypeable ("Invalid intersection: there must be at least 1 branch.")
+  else
+    branches
+    |> List.map (fun annot -> typeof_branch annot)
+    |> conj_o
+
 let rec typeof_a vardef tenv env annot_a a =
   let open FullAnnot in
   let pos = Variable.get_locations vardef in
   let var_type v = var_type v env in
   let rename_check = rename_check pos in
   let instantiate_check = instantiate_check pos in
-  let check_mono = check_mono pos in
   let untypeable str = raise (Untypeable (pos, str)) in
-  let type_lambda env annot v e =
-    if annot = []
-    then untypeable ("Invalid lambda: there must be at least 1 branch.")
-    else
-      let branches =
-          annot |> List.map (fun (group, gen) ->
-            let (doms, codoms) =
-              group |> List.map (fun (s, annot) ->
-                check_mono s ;
-                let env = Env.add v s env in
-                let t = typeof tenv env annot e in
-                (s,t)
-              ) |> List.split
-            in
-            let (dom, codom) = (disj_o doms, disj_o codoms) in
-            mk_arrow (cons dom) (cons codom)
-            |> generalize_check pos env gen
-        ) in
-      branches |> conj_o
-  in
   begin match a, annot_a with
+  | a, InterA branches ->
+    typeof_inter (fun annot_a -> typeof_a vardef tenv env annot_a a) pos branches
   | Alias v, AliasA -> var_type v
   | Const c, ConstA -> typeof_const_atom tenv c
-  | Abstract t, AbstractA gen -> generalize_check pos env gen t
+  | Abstract t, AbstractA -> t
   | Pair (v1, v2), PairA (r1, r2) ->
     let t1 = var_type v1 |> rename_check r1 in
     let t2 = var_type v2 |> rename_check r2 in
@@ -163,7 +140,11 @@ let rec typeof_a vardef tenv env annot_a a =
     if Env.mem v1 env
     then var_type v2
     else untypeable ("Invalid let binding: definition has not been typed.")
-  | Lambda (_, v, e), LambdaA branches -> type_lambda env branches v e
+  | Lambda (_, v, e), LambdaA (s, annot) ->
+    check_mono pos s ;
+    let env = Env.add v s env in
+    let t = typeof tenv env annot e in
+    mk_arrow (cons s) (cons t)
   | _, _ -> untypeable ("Invalid annotations.")
   end
   |> bot_instance |> simplify_typ
@@ -171,29 +152,27 @@ let rec typeof_a vardef tenv env annot_a a =
 and typeof tenv env annot e =
   let open FullAnnot in
   begin match e, annot with
+  | e, Inter branches ->
+    typeof_inter (fun annot -> typeof tenv env annot e) [] branches
   | Var v, BVar r -> var_type v env |> rename_check [] r
-  | Bind (v, a, e), Keep (annot_a, ty, splits) ->
-    let t = (* NOTE: ty different than None bypasses type checking. *)
-      begin match ty with
-      | None -> typeof_a v tenv env annot_a a
-      | Some t -> t
-      end in
+  | Bind (v, _, e), Skip annot ->
+    assert (Env.mem v env |> not) ;
+    typeof tenv env annot e
+  | Bind (v, a, e), Keep (annot_a, splits) ->
+    let t = typeof_a v tenv env annot_a a in
     let pos = Variable.get_locations v in
     let untypeable str = raise (Untypeable (pos, str)) in
     if splits = []
-    then untypeable ("Invalid decomposition: cannot be empty.")
+    then untypeable ("Invalid decomposition: there must be at least 1 branch.")
     else
       if subtype t (splits |> List.map fst |> disj)
       then
         splits |> List.map (fun (s, annot) ->
-          check_novar pos s ;
+          check_mono pos s ;
           let env = Env.add v (cap t s) env in
           typeof tenv env annot e
         ) |> disj_o
       else untypeable ("Invalid decomposition: does not cover the whole domain.")
-  | Bind (v, _, e), Skip annot ->
-    assert (Env.mem v env |> not) ;
-    typeof tenv env annot e
   | _, _ -> raise (Untypeable ([], "Invalid annotations."))
   end
   |> bot_instance |> simplify_typ
@@ -263,8 +242,8 @@ let refine_a tenv env a t =
         let ti = Subst.apply clean_subst ti in
         let argt = Subst.apply clean_subst argt in
         let clean_subst =  clean_type_subst ~pos:any ~neg:empty ti in
-        let ti = Subst.apply clean_subst ti |> ground_inf in
-        let argt = Subst.apply clean_subst argt |> ground_inf in
+        let ti = Subst.apply clean_subst ti |> inf in
+        let argt = Subst.apply clean_subst argt |> inf in
         if singl then Env.singleton v2 argt (* Optimisation *)
         else Env.construct_dup [ (v1, ti) ; (v2, argt) ]
       )
@@ -279,6 +258,8 @@ let refine_a tenv env a t =
 (* ====================================== *)
 (* =============== INFER I ============== *)
 (* ====================================== *)
+
+(* TODO *)
 
 let tallying_nonempty constr =
   match tallying constr with

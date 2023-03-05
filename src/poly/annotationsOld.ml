@@ -41,10 +41,10 @@ module PartialAnnot = struct
     | Infer -> Infer
     | Partial -> Partial
     | Keep (a, b) ->
-      Keep (apply_subst_a s a, apply_subst_branches s b)
+      Keep (apply_subst_a s a, apply_subst_splits s b)
     | Skip t -> Skip (apply_subst s t)
     | KeepSkip (a, b, t) ->
-      KeepSkip (apply_subst_a s a, apply_subst_branches s b, apply_subst s t)
+      KeepSkip (apply_subst_a s a, apply_subst_splits s b, apply_subst s t)
 end
 
 module FullAnnot = struct

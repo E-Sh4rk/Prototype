@@ -21,7 +21,7 @@ module PartialAnnot : sig
     val pp : Format.formatter -> t -> unit
 
     val apply_subst_branches : Subst.t -> branches -> branches
-    val apply_subst_splits : Subst.t -> splits -> branches
+    val apply_subst_splits : Subst.t -> splits -> splits
     val apply_subst_a : Subst.t -> a -> a
     val apply_subst : Subst.t -> t -> t
 end

@@ -310,6 +310,14 @@ let ground_sup t =
   (* TODO: Fix max_type function in Cduce... *)
   if vars t |> TVarSet.is_empty then t else Base.any
 
+let inf t =
+  (* TODO: Fix min_type function in Cduce... *)
+  if vars_poly t |> TVarSet.is_empty then t else Base.empty
+
+let sup t =
+  (* TODO: Fix max_type function in Cduce... *)
+  if vars_poly t |> TVarSet.is_empty then t else Base.any
+
 let tallying constr =
   let mono = constr |>
     List.map (fun (a,b) -> [vars_mono a ; vars_mono b]) |>

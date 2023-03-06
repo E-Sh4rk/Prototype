@@ -259,8 +259,6 @@ let refine_a tenv env a t =
 (* =============== INFER I ============== *)
 (* ====================================== *)
 
-(* TODO *)
-
 let tallying_nonempty constr =
   match tallying constr with
   | [] -> assert false
@@ -393,22 +391,26 @@ let approximate_app infer t1 t2 resvar =
   then (match approximate_app infer t1 t2 resvar with [] -> assert false | sols -> sols)
   else res
 
+let infer_inst_inter infer_inst_branch (b1, b2) =
+  assert (b2 = [] && b1 <> []) ;
+  b1 |> List.map (fun (annot,_,_) -> infer_inst_branch annot)
+
 let rec infer_inst_a vardef tenv env pannot_a a =
   let open PartialAnnot in
   let open FullAnnot in
   let vartype v = Env.find v env in
   match a, pannot_a with
-  | Alias _, PartialA -> AliasA
-  | Const _, PartialA -> ConstA
-  | Let _, PartialA -> LetA
-  | Abstract t, PartialA ->
-    let gvars = TVarSet.diff (vars_mono t) (Env.tvars env) in
-    AbstractA (generalize gvars)
-  | Pair (v1, v2), PartialA ->
+  | a, PartialAnnot.InterA i ->
+    InterA (infer_inst_inter (fun pannot_a -> infer_inst_a vardef tenv env pannot_a a) i)
+  | Alias _, TypA -> AliasA
+  | Const _, TypA -> ConstA
+  | Let _, TypA -> LetA
+  | Abstract _, TypA -> AbstractA
+  | Pair (v1, v2), TypA ->
     let r1 = refresh_all (vartype v1 |> vars_poly) in
     let r2 = refresh_all (vartype v2 |> vars_poly) in
     PairA (r1, r2)
-  | Projection (p, v), PartialA ->
+  | Projection (p, v), TypA ->
     let t = vartype v in
     let alpha = TVar.mk_poly None in
     let s =
@@ -426,19 +428,19 @@ let rec infer_inst_a vardef tenv env pannot_a a =
     let res = tallying_nonempty [(t, s)] in
     let res = simplify_tallying (TVar.typ alpha) res in
     ProjA res
-  | RecordUpdate (v, _, None), PartialA ->
+  | RecordUpdate (v, _, None), TypA ->
     let res = tallying_nonempty [(vartype v, record_any)] in
     let res = simplify_tallying record_any res in
     RecordUpdateA (res, None)
-  | RecordUpdate (v, _, Some v2), PartialA ->
+  | RecordUpdate (v, _, Some v2), TypA ->
     let res = tallying_nonempty [(vartype v, record_any)] in
     let res = simplify_tallying record_any res in
     let r = refresh_all (vartype v2 |> vars_poly) in
     RecordUpdateA (res, Some r)
-  | TypeConstr (v, s), PartialA ->
+  | TypeConstr (v, s), TypA ->
     let res = tallying_nonempty [(vartype v, s)] in
     ConstrA res
-  | App (v1, v2), PartialA ->
+  | App (v1, v2), TypA ->
     let t1 = vartype v1 in
     let t2 = vartype v2 in
     let r1 = refresh_all (vars_poly t1) in
@@ -455,28 +457,17 @@ let rec infer_inst_a vardef tenv env pannot_a a =
       (Subst.compose_restr s r1, Subst.compose_restr s r2)
     ) |> List.split in
     AppA (s1, s2)
-  | Ite (v, s, _, _), PartialA ->
+  | Ite (v, s, _, _), TypA ->
     let t = vartype v in
     let res = tallying [(t, empty)] in
     if res <> [] then EmptyA res
     else if subtype t s then ThenA
     else if subtype t (neg s) then ElseA
     else assert false
-  | Lambda (_, v, e), PartialAnnot.LambdaA (b1, b2) ->
-    assert (b2 = []) ;
-    let branches = b1 |> List.map (fun group ->
-      let group =
-        group |> List.map (fun (s, pannot) ->
-          let env = Env.add v s env in
-          let annot = infer_inst tenv env pannot e in
-          (s, annot)
-        )
-      in
-      let gvars = group |> List.map fst |> List.map vars_mono |> TVarSet.union_many in
-      let gvars = TVarSet.diff gvars (Env.tvars env) in
-      (group, generalize gvars)
-    ) in
-    FullAnnot.LambdaA branches
+  | Lambda (_, v, e), PartialAnnot.LambdaA (s, pannot) ->
+    let env = Env.add v s env in
+    let annot = infer_inst tenv env pannot e in
+    LambdaA (s, annot)
   | _, _ ->  assert false
 
 and infer_inst tenv env pannot e =
@@ -484,13 +475,16 @@ and infer_inst tenv env pannot e =
   let open FullAnnot in
   let vartype v = Env.find v env in
   match e, pannot with
-  | Var v, Partial ->
+  | e, PartialAnnot.Inter i ->
+    Inter (infer_inst_inter (fun pannot -> infer_inst tenv env pannot e) i)
+  | Var v, Typ ->
     let r = refresh_all (vartype v |> vars_poly) in
     BVar r
   | Bind (_, _, e), PartialAnnot.Skip pannot ->
     let annot = infer_inst tenv env pannot e in
     FullAnnot.Skip annot
   | Bind (v, a, e), PartialAnnot.Keep (pannot_a, branches) ->
+    assert (branches <> []) ;
     let annot_a = infer_inst_a v tenv env pannot_a a in
     let t = typeof_a_nofail v tenv env annot_a a in
     let branches = branches |> List.map (fun (si, pannot) ->
@@ -498,12 +492,14 @@ and infer_inst tenv env pannot e =
       let env = Env.add v t env in
       (si, infer_inst tenv env pannot e)
     ) in
-    FullAnnot.Keep (annot_a, None, branches)
+    FullAnnot.Keep (annot_a, branches)
   | _, _ ->  assert false
 
 (* ====================================== *)
 (* =============== INFER B ============== *)
 (* ====================================== *)
+
+(* TODO *)
 
 type 'a res =
   | Ok of 'a

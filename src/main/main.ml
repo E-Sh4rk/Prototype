@@ -12,6 +12,9 @@ type typecheck_result =
 | TSuccess of typ * Env.t * (float * float)
 | TFailure of (Position.t list) * string * (float * float)
 
+let generalize_all t =
+  Subst.apply (generalize (vars t)) t
+
 exception IncompatibleType of typ
 let type_check_def tenv env (var,expr,typ_annot) =
   let time0 = Unix.gettimeofday () in
@@ -25,21 +28,19 @@ let type_check_def tenv env (var,expr,typ_annot) =
   in
   try
     Utils.log "%a@." Msc.pp_e nf_expr ;
-    let typ = Poly.CheckerOld.typeof_simple tenv env nf_expr in
+    let typ = Poly.Checker.typeof_simple tenv env nf_expr |> generalize_all in
     let typ =
       match typ_annot with
       | None -> typ
       | Some typ' ->
         if subtype_poly typ typ'
-        then
-          let g = generalize (vars typ') in
-          Subst.apply g typ'
+        then typ' |> generalize_all
         else raise (IncompatibleType typ)
     in
     let env = Env.add var typ env in
     TSuccess (typ, env, retrieve_times ())
   with
-  | Poly.CheckerOld.Untypeable (pos, str) ->
+  | Poly.Checker.Untypeable (pos, str) ->
     TFailure (pos, str, retrieve_times ())
   | IncompatibleType _ ->
     TFailure (Variable.get_locations var,

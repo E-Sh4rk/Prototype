@@ -709,10 +709,14 @@ let infer_branches_inter tvars infer_branch infer_inst
   else begin
     log ~level:2 "Typing intersection with %n unexplored branches.@." (List.length b2) ;
     let rec aux explored pending =
-      let explored_t = List.map Utils.trd3 explored |> disj in
       (* Remove branches with a domain that has already been explored *)
-      let pending = pending |> List.filter
-        (fun (_,_,estimated) -> subtype_gen explored_t estimated |> not) in
+      let pending =
+        if explored = [] then pending
+        else
+          let explored_t = List.map Utils.trd3 explored |> disj in
+          pending |> List.filter
+            (fun (_,_,estimated) -> subtype_gen explored_t estimated |> not)
+      in
       match pending with
       | [] -> Ok (explored, [])
       | pending ->

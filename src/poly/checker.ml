@@ -858,48 +858,42 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       |> map_res (fun x -> LambdaA (s, x))
   | _, _ -> assert false
 
-(* TODO *)
 and infer_branches_splits tenv env v a e t splits =
   if is_empty t
   then
     let (_, pannot) = List.hd splits in
     let env = Env.add v empty env in
     infer_branches_iterated tenv env pannot e
-    |> map_res (fun pannot -> [(empty, pannot)])
+    |> map_res (fun x -> [(empty, x)])
   else
-    let propagate =
-      splits |> Utils.find_map_among_others (fun (s,_) others ->
+    match splits with
+    | [] -> Ok []
+    | (s, pannot)::splits ->
+      let propagate =
         if subtype t s then None
         else
           refine_a tenv env a (neg s)
-          |> List.find_opt (is_compatible env) |> Option.map (fun x -> (x, others))
-      )
-    in
-    begin match propagate with
-    | Some (env', splits') ->
-      log ~level:1 "Var %a is ok but a split must be propagated.@." Variable.pp v ;
-      let env' = Env.filter (fun v t -> subtype (Env.find v env) t |> not) env' in
-      Split (env', splits', splits)
-    | None ->
-      log ~level:2 "Typing binding for %a with splits %a.@."
-        Variable.pp v (pp_list pp_typ) (List.map fst splits) ;
-      begin match splits with
-      | [] -> Ok []
-      | (s, pannot)::splits ->
+          |> List.find_opt (is_compatible env)
+      in
+      begin match propagate with
+      | Some env' ->
+        log ~level:1 "Var %a is ok but a split must be propagated.@." Variable.pp v ;
+        let env' = Env.filter (fun v t -> subtype (Env.find v env) t |> not) env' in
+        Split (env', splits, (s, pannot)::splits)
+      | None ->
         log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
         let env' = Env.add v (cap_o t s) env in
         begin match infer_branches_iterated tenv env' pannot e with
         | Ok pannot ->
           infer_branches_splits_iterated tenv env v a e t splits
-          |> map_res (fun splits -> (s, pannot)::splits)
+          |> map_res (fun x -> (s, pannot)::x)
         | Split (env', pannot1, pannot2) when Env.mem v env' ->
           let s' = Env.find v env' in
           let splits1 = [ (cap_o s s', pannot1) ; (diff_o s s', pannot2) ]@splits in
           let splits2 = [ (s,pannot2) ]@splits in
           Split (Env.rm v env', splits1, splits2)
-        | res -> res |> map_res (fun pannot -> (s, pannot)::splits)
-        end  
-      end
+        | res -> res |> map_res (fun x -> (s, x)::splits)
+      end  
     end
 
 and infer_branches tenv env pannot e =
@@ -943,6 +937,8 @@ and infer_branches tenv env pannot e =
       let annot_a = infer_inst_a v tenv env pannot_a a in
       let t = typeof_a_nofail v tenv env annot_a a in
       log ~level:1 "Var %a typed with type %a.@." Variable.pp v pp_typ t ;
+      log ~level:2 "Typing body for %a with splits %a.@."
+        Variable.pp v (pp_list pp_typ) (List.map fst splits) ;
       infer_branches_splits_iterated tenv env v a e t splits
       |> map_res (fun x -> Keep (pannot_a, x))
     | res -> res |> map_res (fun x -> Keep (x, splits))

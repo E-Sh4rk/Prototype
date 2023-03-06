@@ -499,13 +499,13 @@ and infer_inst tenv env pannot e =
 (* =============== INFER B ============== *)
 (* ====================================== *)
 
-(* TODO *)
+(* TODO: Stop trying to use the same type variables in the tallying instances *)
 
 type 'a res =
   | Ok of 'a
   | Split of Env.t * 'a * 'a
   | Subst of (Subst.t * 'a) list
-  | NeedVar of (VarSet.t * 'a * 'a option)
+  | NeedVar of VarSet.t * 'a * 'a
 
 let map_res f res =
   match res with
@@ -514,13 +514,12 @@ let map_res f res =
     Split (env, f a1, f a2)
   | Subst lst ->
     Subst (lst |> List.map (fun (s, a) -> (s, f a)))
-  | NeedVar (vs, a, ao) ->
-    NeedVar (vs, f a, Option.map f ao)
+  | NeedVar (vs, a1, a2) -> NeedVar (vs, f a1, f a2)
 
-let needvar env vs a =
+let needvar env vs a1 a2 =
   let vs = VarSet.of_list vs in
   let vs = VarSet.diff vs (Env.domain env |> VarSet.of_list) in
-  NeedVar (vs, a, None)
+  NeedVar (vs, a1, a2)
 
 let is_compatible env gamma =
   VarSet.subset
@@ -666,46 +665,63 @@ let simplify_tallying_infer env res sols =
     res
   ) *)
 
-let insert_new_branch tenv env x e groups branch =
-  let type_branch (s, pannot) =
-    let env = Env.add x s env in
-    let annot = infer_inst tenv env pannot e in
-    let t = typeof_nofail tenv env annot e in
-    (s, t, (s, pannot))
-  in
-  let groups = groups |> List.map (fun branches ->
-      let (ds, rs, branches) =
-        branches |> List.map type_branch |> Utils.split3
-      in
-      let (d, r) = (disj ds, disj rs) in
-      let t = mk_arrow (cons d) (cons r) in
-      (t, d, r, branches)
-    )
-  in
-  let (d, r, branch) = type_branch branch in
-  let t = mk_arrow (cons d) (cons r) in
-  let subtype_gen a b =
-    let gen = TVarSet.diff (vars a) (Env.tvars env) |> generalize in
-    let a = Subst.apply gen a in
-    subtype_poly a b
-  in
-  let last4 (_,_,_,e) = e in
-  if groups |> List.exists (fun (t',_,_,_) -> subtype_gen t' t)
-  then
-    (* Don't insert the branch if it does not strictly strengthen the groups *)
-    List.map last4 groups
-  else
-    (* Insert the branch, but inside a group if possible *)
-    let can_be_merged_in (t',d',r',_) _ =
-      let dom = cup d d' in
-      let codom = cup r r' in
-      let nt = mk_arrow (cons dom) (cons codom) in
-      subtype_gen nt t && subtype_gen nt t'
+let infer_branches_inter infer_branch infer_inst branches =
+(* log ~level:2 "Typing lambda for %a with unexplored branches %a.@."
+  Variable.pp v (pp_list pp_typ) (List.map fst b2) ;
+let rec aux explored b =
+  let explored_domain = explored |> disj in
+  (* Remove branches with a domain that has already been explored *)
+  let b = b |> List.filter
+    (fun (s,_) -> subtype s explored_domain |> not) in
+  match b with
+  | [] -> Ok ([], [])
+  | b ->
+    let f (s, _) others = others |> List.for_all
+      (fun (s', _) -> (subtype s' s |> not) || subtype s s')
     in
-    match Utils.find_among_others can_be_merged_in groups with
-    | None -> [branch]::(List.map last4 groups)
-    | Some ((_,_,_,group),groups) ->
-      (branch::group)::(List.map last4 groups)
+    let ((s, pannot), b) = find_among_others f b |> Option.get in
+    log ~level:1 "Exploring lambda branch %a for %a.@." pp_typ s Variable.pp v ;
+    let env' = Env.add v s env in
+    begin match infer_branches_iterated tenv env' pannot e with
+    | Ok pannot ->
+      aux (s::explored) b
+      |> map_res (fun (b1, b2) -> ((s, pannot)::b1, b2))
+    | Subst lst ->
+      let x = Env.tvars env in
+      let sigma = lst |>
+        List.map (fun (subst,_) -> Subst.restrict subst x) in
+      let sigma = (Subst.identity)::sigma in
+      let sigma = remove_duplicates Subst.equiv sigma in
+      let res = sigma |> List.map (fun subst ->
+        let b' =
+          lst |> List.filter_map (fun (subst', pannot') ->
+            let subst_cur = Subst.remove subst' x in
+            let subst' = Subst.restrict subst' x in
+            if Subst.equiv subst' subst
+            then
+              let s = apply_subst_simplify subst_cur s in
+              let pannot' = apply_subst subst_cur pannot' in
+              (* If it is equivalent to an existing branch modulo renaming, don't add it. *)
+              let ts = (List.map fst b)@explored in
+              if ts |> List.exists (fun t -> types_equiv_modulo_renaming x s t <> None)
+              then None else Some (s, pannot')
+            else None
+          )
+        in
+        (subst, ([], b'@b))
+      ) in
+      Subst res
+    | NeedVar (vs, pannot, None) ->
+      NeedVar (vs, ([], (s, pannot)::b), Some ([], b))
+    | res -> map_res (fun pannot -> ([], (s, pannot)::b)) res
+    end
+in
+aux (b1 |> List.flatten |> List.map fst) b2 |>
+  map_res (fun (b1', b2') ->
+    let b1' = List.fold_left (insert_new_branch tenv env v e) b1 b1' in
+    LambdaA (b1', b2')
+  ) *)
+  failwith "TODO"
 
 let rec infer_branches_a vardef tenv env pannot_a a =
   let memvar v = Env.mem v env in
@@ -713,70 +729,24 @@ let rec infer_branches_a vardef tenv env pannot_a a =
   let needvar = needvar env in
   let packannot a = List.map (fun s -> (s, a)) in
   let open PartialAnnot in
-  let lambda v (b1, b2) e =
-    log ~level:2 "Typing lambda for %a with unexplored branches %a.@."
-      Variable.pp v (pp_list pp_typ) (List.map fst b2) ;
-    let rec aux explored b =
-      let explored_domain = explored |> disj in
-      (* Remove branches with a domain that has already been explored *)
-      let b = b |> List.filter
-        (fun (s,_) -> subtype s explored_domain |> not) in
-      match b with
-      | [] -> Ok ([], [])
-      | b ->
-        let f (s, _) others = others |> List.for_all
-          (fun (s', _) -> (subtype s' s |> not) || subtype s s')
-        in
-        let ((s, pannot), b) = find_among_others f b |> Option.get in
-        log ~level:1 "Exploring lambda branch %a for %a.@." pp_typ s Variable.pp v ;
-        let env' = Env.add v s env in
-        begin match infer_branches_iterated tenv env' pannot e with
-        | Ok pannot ->
-          aux (s::explored) b
-          |> map_res (fun (b1, b2) -> ((s, pannot)::b1, b2))
-        | Subst lst ->
-          let x = Env.tvars env in
-          let sigma = lst |>
-            List.map (fun (subst,_) -> Subst.restrict subst x) in
-          let sigma = (Subst.identity)::sigma in
-          let sigma = remove_duplicates Subst.equiv sigma in
-          let res = sigma |> List.map (fun subst ->
-            let b' =
-              lst |> List.filter_map (fun (subst', pannot') ->
-                let subst_cur = Subst.remove subst' x in
-                let subst' = Subst.restrict subst' x in
-                if Subst.equiv subst' subst
-                then
-                  let s = apply_subst_simplify subst_cur s in
-                  let pannot' = apply_subst subst_cur pannot' in
-                  (* If it is equivalent to an existing branch modulo renaming, don't add it. *)
-                  let ts = (List.map fst b)@explored in
-                  if ts |> List.exists (fun t -> types_equiv_modulo_renaming x s t <> None)
-                  then None else Some (s, pannot')
-                else None
-              )
-            in
-            (subst, ([], b'@b))
-          ) in
-          Subst res
-        | NeedVar (vs, pannot, None) ->
-          NeedVar (vs, ([], (s, pannot)::b), Some ([], b))
-        | res -> map_res (fun pannot -> ([], (s, pannot)::b)) res
-        end
-    in
-    aux (b1 |> List.flatten |> List.map fst) b2 |>
-      map_res (fun (b1', b2') ->
-        let b1' = List.fold_left (insert_new_branch tenv env v e) b1 b1' in
-        LambdaA (b1', b2')
-      )
+  let initial_lambda_branch s =
+    let estimated = mk_arrow (cons s) any_node in
+    (LambdaA (s, Infer), Subst.identity, estimated)
   in
   match a, pannot_a with
-  | _, PartialA -> Ok (PartialA)
-  | Alias v, InferA IMain when memvar v -> Ok (PartialA)
+  | a, InterA i ->
+    infer_branches_inter
+      (fun pannot_a -> infer_branches_a vardef tenv env pannot_a a)
+      (fun pannot_a -> infer_inst_a vardef tenv env pannot_a a)
+      i
+    |> map_res (fun x -> InterA x)
+  | _, TypA -> Ok (TypA)
+  | _, UntypA -> Subst []
+  | Alias v, InferA IMain when memvar v -> Ok (TypA)
   | Alias _, InferA IMain -> Subst []
-  | Abstract _, InferA IMain | Const _, InferA IMain -> Ok (PartialA)
+  | Abstract _, InferA IMain | Const _, InferA IMain -> Ok (TypA)
   | Pair (v1, v2), InferA IMain | Let (v1, v2), InferA IMain ->
-    needvar [v1; v2] PartialA
+    needvar [v1; v2] TypA UntypA
   | Projection (p, v), InferA IMain ->
     if memvar v then
       let t = vartype v in
@@ -801,30 +771,30 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       res |> List.iter (fun s ->
         log ~level:3 "Solution (simplified): %a@." Subst.pp s
       ) ;
-      Subst (packannot PartialA res)
+      Subst (packannot TypA res)
     else
-      needvar [v] (InferA IMain)
+      needvar [v] (InferA IMain) UntypA
   | RecordUpdate (v, _, None), InferA IMain ->
     if memvar v then
       let res = tallying_infer [(vartype v, record_any)] in
       let res = simplify_tallying_infer env empty res in
-      Subst (packannot PartialA res)
+      Subst (packannot TypA res)
     else
-      needvar [v] (InferA IMain)
+      needvar [v] (InferA IMain) UntypA
   | RecordUpdate (v, _, Some v'), InferA IMain ->
     if memvar v && memvar v' then
       let res = tallying_infer [(vartype v, record_any)] in
       let res = simplify_tallying_infer env empty res in
-      Subst (packannot PartialA res)
+      Subst (packannot TypA res)
     else
-      needvar [v ; v'] (InferA IMain)
+      needvar [v ; v'] (InferA IMain) UntypA
   | TypeConstr (v, s), InferA IMain ->
     if memvar v then
       let res = tallying_infer [(vartype v, s)] in
       let res = simplify_tallying_infer env empty res in
-      Subst (packannot PartialA res)
+      Subst (packannot TypA res)
     else
-      needvar [v] (InferA IMain)
+      needvar [v] (InferA IMain) UntypA
   | App (v1, v2), InferA IMain ->
     if memvar v1 && memvar v2 then
       let t1 = vartype v1 in
@@ -841,9 +811,9 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       res |> List.iter (fun s ->
         log ~level:3 "Solution (simplified): %a@." Subst.pp s
       ) ;
-      Subst (packannot PartialA res)
+      Subst (packannot TypA res)
     else
-      needvar [v1;v2] (InferA IMain)
+      needvar [v1;v2] (InferA IMain) UntypA
   | Ite (v, tau, _, _), InferA IMain ->
     if memvar v then
       let t = vartype v in
@@ -861,29 +831,34 @@ let rec infer_branches_a vardef tenv env pannot_a a =
           log ~level:3 "Solution (simplified): %a@." Subst.pp s
         ) ;
         if List.exists Subst.is_identity res then
-          Ok (PartialA)
+          Ok TypA
         else if not_else then
-          Subst ((packannot PartialA res)@[(Subst.identity, InferA IThen)])
+          Subst ((packannot TypA res)@[(Subst.identity, InferA IThen)])
         else
-          Subst ((packannot PartialA res)@[(Subst.identity, InferA IElse)])
+          Subst ((packannot TypA res)@[(Subst.identity, InferA IElse)])
       end else
         Split (Env.singleton v tau, InferA IMain, InferA IMain)
     else
-      needvar [v] (InferA IMain)
-  | Ite (_, _, v1, _), InferA IThen -> needvar [v1] PartialA
-  | Ite (_, _, _, v2), InferA IElse -> needvar [v2] PartialA
+      needvar [v] (InferA IMain) UntypA
+  | Ite (_, _, v1, _), InferA IThen -> needvar [v1] TypA UntypA
+  | Ite (_, _, _, v2), InferA IElse -> needvar [v2] TypA UntypA
   | Lambda (Unnanoted, _, _), InferA IMain ->
-    let alpha = Variable.to_typevar vardef in
-    let pannot_a = LambdaA ([], [(TVar.typ alpha, Infer)]) in
+    let alpha = Variable.to_typevar vardef |> TVar.typ in
+    let pannot_a = InterA ([], [initial_lambda_branch alpha]) in
     infer_branches_a vardef tenv env pannot_a a
   | Lambda (ADomain ts, _, _), InferA IMain ->
-    let pannot_a = LambdaA ([], packannot Infer ts) in
+    let pannot_a = InterA ([], List.map initial_lambda_branch ts) in
     infer_branches_a vardef tenv env pannot_a a
-  | Lambda (_, v, e), LambdaA (b1, b2) ->
-    if (List.flatten b1)@b2 |> List.map fst |> disj |> is_empty
-    then Subst [] else lambda v (b1,b2) e
+  | Lambda (_, v, e), LambdaA (s, pannot) ->
+    log ~level:2 "Entering lambda for %a with domain %a.@." Variable.pp v pp_typ s ;
+    if is_empty s then Subst []
+    else
+      let env = Env.add v s env in
+      infer_branches_iterated tenv env pannot e
+      |> map_res (fun x -> LambdaA (s, x))
   | _, _ -> assert false
 
+(* TODO *)
 and infer_branches_splits tenv env v a e t splits =
   if is_empty t
   then

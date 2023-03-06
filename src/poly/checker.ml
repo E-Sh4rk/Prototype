@@ -906,24 +906,23 @@ and infer_branches tenv env pannot e =
   let needvar = needvar env in
   let open PartialAnnot in
   match e, pannot with
-  | Var _, Partial -> Ok Partial
-  | Var v, Infer -> needvar [v] Partial
-  | Bind _, Infer -> infer_branches tenv env (Skip Infer) e
+  | Var _, Typ -> Ok Typ
+  | Var _, Untyp -> Subst []
+  | Var v, Infer -> needvar [v] Typ Untyp
+  | Bind _, Infer ->
+    let pannot = Inter ([], [Skip Infer, Subst.identity, any]) in
+    infer_branches tenv env pannot e
   | Bind (v, _, e), Skip pannot ->
     begin match infer_branches_iterated tenv env pannot e with
-    | NeedVar (vs, pannot1, Some pannot2) when VarSet.mem v vs ->
-      log ~level:0 "Var %a needed (optional).@." Variable.pp v ;
+    | NeedVar (vs, pannot1, pannot2) when VarSet.mem v vs ->
+      log ~level:0 "Var %a needed.@." Variable.pp v ;
       let pannot1 = KeepSkip (InferA IMain, [(any, pannot1)], pannot2) in
       let pannot2 = Skip pannot2 in
-      NeedVar (VarSet.remove v vs, pannot1, Some pannot2)
-    | NeedVar (vs, pannot, None) when VarSet.mem v vs ->
-      log ~level:0 "Var %a needed.@." Variable.pp v ;
-      let pannot = Keep (InferA IMain, [(any, pannot)]) in
-      NeedVar (VarSet.remove v vs, pannot, None)
-    | res -> map_res (fun pannot -> Skip pannot) res
+      NeedVar (VarSet.remove v vs, pannot1, pannot2)
+    | res -> map_res (fun x -> Skip x) res
     end
   | Bind (v, a, _), KeepSkip (pannot_a, splits, pannot) ->
-    log ~level:1 "Typing var %a (optional).@." Variable.pp v ;
+    log ~level:1 "Trying to type var %a.@." Variable.pp v ;
     begin match infer_branches_a_iterated v tenv env pannot_a a with
     | Ok pannot_a -> infer_branches tenv env (Keep (pannot_a, splits)) e
     | Subst lst when
@@ -932,21 +931,21 @@ and infer_branches tenv env pannot e =
         (s, KeepSkip (pannot_a, splits, pannot))
       ) in
       Subst (lst@[(Subst.identity, Skip pannot)])
-    | NeedVar (vs, pannot_a, None) ->
-      NeedVar (vs, KeepSkip (pannot_a, splits, pannot), Some (Skip pannot))
-    | res -> map_res (fun pannot_a -> KeepSkip (pannot_a, splits, pannot)) res
+    | res -> map_res (fun x -> KeepSkip (x, splits, pannot)) res
     end
   | Bind (v, a, e), Keep (pannot_a, splits) ->
     log ~level:1 "Inferring var %a.@." Variable.pp v ;
     assert (splits <> []) ;
+    (* NOTE: The call to infer_branches_a_iterated should return Ok most of time,
+       it could probably be optimized away. *)
     begin match infer_branches_a_iterated v tenv env pannot_a a with
     | Ok pannot_a ->
       let annot_a = infer_inst_a v tenv env pannot_a a in
       let t = typeof_a_nofail v tenv env annot_a a in
       log ~level:1 "Var %a typed with type %a.@." Variable.pp v pp_typ t ;
       infer_branches_splits_iterated tenv env v a e t splits
-      |> map_res (fun splits -> Keep (pannot_a, splits))
-    | res -> res |> map_res (fun pannot_a -> Keep (pannot_a, splits))
+      |> map_res (fun x -> Keep (pannot_a, x))
+    | res -> res |> map_res (fun x -> Keep (x, splits))
     end
   | _, _ -> assert false
 

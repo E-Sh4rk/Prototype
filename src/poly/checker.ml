@@ -665,6 +665,54 @@ let simplify_tallying_infer env res sols =
     res
   ) *)
 
+let estimate_inter (lst1, lst2) =
+  let lst = lst1@lst2 in
+  if lst = [] then None
+  else Some (lst |> List.map (fun (_, _, t) -> t) |> conj_o)
+
+let rec estimate_branch_a env pannot_a a =
+  let open PartialAnnot in
+  match a, pannot_a with
+  | _, UntypA -> None
+  | _, TypA -> Some any
+  | _, InferA _ -> Some any
+  | _, InterA i -> estimate_inter i
+  | Lambda (_, v, e), LambdaA (s, pannot) ->
+    let env = Env.add v s env in
+    estimate_branch env pannot e |> Option.map (fun t ->
+      mk_arrow (cons s) (cons t)
+    )
+  | _, _ -> assert false
+
+and estimate_branch env pannot e =
+  let estimate_splits v t e splits =
+    let splits =
+      splits |> List.map (fun (s, pannot) ->
+        let env = Env.add v (cap_o t s) env in
+        estimate_branch env pannot e
+      ) in
+    if List.mem None splits then None
+    else Some (List.map Option.get splits |> disj_o)
+  in
+  let open PartialAnnot in
+  match e, pannot with
+  | _, Untyp -> None
+  | _, Inter i -> estimate_inter i
+  | Var v, _ when Env.mem v env -> Some (Env.find v env)
+  | Var _, _ -> None
+  | Bind (v, _, e), Skip pannot ->
+    let env = Env.add v any env in
+    estimate_branch env pannot e
+  | Bind (v, a, e), Keep (pannot_a, splits) ->
+    let t = estimate_branch_a env pannot_a a |> Option.get in
+    estimate_splits v t e splits
+  | Bind (v, a, e), KeepSkip (pannot_a, splits, pannot) ->
+    begin match estimate_branch_a env pannot_a a with
+    | None -> estimate_branch env pannot e
+    | Some t -> estimate_splits v t e splits
+    end
+  | _, _ -> assert false
+
 let infer_branches_inter infer_branch infer_inst branches =
 (* log ~level:2 "Typing lambda for %a with unexplored branches %a.@."
   Variable.pp v (pp_list pp_typ) (List.map fst b2) ;

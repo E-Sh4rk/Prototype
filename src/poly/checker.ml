@@ -264,21 +264,6 @@ let tallying_nonempty constr =
   | [] -> assert false
   | sols -> sols
 
-let types_equiv_modulo_renaming mono t1 t2 =
-  let (v1s, v2s) = (TVarSet.diff (vars t1) mono, TVarSet.diff (vars t2) mono) in
-  let (v1s, v2s) = (TVarSet.diff v1s v2s, TVarSet.diff v2s v1s) in
-  let (v1s, v2s) = (TVarSet.destruct v1s, TVarSet.destruct v2s) in
-  if List.length v1s <> List.length v2s
-  then None
-  else
-    perm v2s |> List.find_map (fun v2s ->
-      let subst = List.map2 (fun v1 v2 ->
-        (v1, TVar.typ v2)
-        ) v1s v2s |> Subst.construct in
-        let t1 = Subst.apply subst t1 in
-        if equiv t1 t2 then Some subst else None 
-    )
-
 let replace_vars t vs v =
   vars_with_polarity t |> List.filter_map (fun (v', k) ->
     if TVarSet.mem vs v' then
@@ -538,9 +523,9 @@ let should_iterate res =
   | NeedVar (vs, pannot, _) when VarSet.is_empty vs -> Some pannot
   | _ -> None
 
-let subst_more_general s1 s2 =
+let subst_more_general tvars s1 s2 =
   let s2m = Subst.codom s2 |> monomorphize in
-  let s1g = Subst.codom s1 |> generalize in
+  let s1g = TVarSet.diff (Subst.codom s1) tvars |> generalize in
   Subst.destruct s1 |> List.map (fun (v,t1) ->
     let t2 = Subst.find' s2 v in
     let t2 = Subst.apply s2m t2 in
@@ -565,7 +550,7 @@ let simplify_tallying_infer env res sols =
   in
   let better_sol sol1 sol2 =
     nb_new_vars sol1 <= nb_new_vars sol2 &&
-    subst_more_general sol1 sol2
+    subst_more_general TVarSet.empty sol1 sol2
   in
   let try_simplify sol v t =
     let pvs = TVarSet.diff (vars t) tvars in
@@ -713,63 +698,64 @@ and estimate_branch env pannot e =
     end
   | _, _ -> assert false
 
-let infer_branches_inter infer_branch infer_inst branches =
-(* log ~level:2 "Typing lambda for %a with unexplored branches %a.@."
-  Variable.pp v (pp_list pp_typ) (List.map fst b2) ;
-let rec aux explored b =
-  let explored_domain = explored |> disj in
-  (* Remove branches with a domain that has already been explored *)
-  let b = b |> List.filter
-    (fun (s,_) -> subtype s explored_domain |> not) in
-  match b with
-  | [] -> Ok ([], [])
-  | b ->
-    let f (s, _) others = others |> List.for_all
-      (fun (s', _) -> (subtype s' s |> not) || subtype s s')
-    in
-    let ((s, pannot), b) = find_among_others f b |> Option.get in
-    log ~level:1 "Exploring lambda branch %a for %a.@." pp_typ s Variable.pp v ;
-    let env' = Env.add v s env in
-    begin match infer_branches_iterated tenv env' pannot e with
-    | Ok pannot ->
-      aux (s::explored) b
-      |> map_res (fun (b1, b2) -> ((s, pannot)::b1, b2))
-    | Subst lst ->
-      let x = Env.tvars env in
-      let sigma = lst |>
-        List.map (fun (subst,_) -> Subst.restrict subst x) in
-      let sigma = (Subst.identity)::sigma in
-      let sigma = remove_duplicates Subst.equiv sigma in
-      let res = sigma |> List.map (fun subst ->
-        let b' =
-          lst |> List.filter_map (fun (subst', pannot') ->
-            let subst_cur = Subst.remove subst' x in
-            let subst' = Subst.restrict subst' x in
-            if Subst.equiv subst' subst
-            then
-              let s = apply_subst_simplify subst_cur s in
-              let pannot' = apply_subst subst_cur pannot' in
-              (* If it is equivalent to an existing branch modulo renaming, don't add it. *)
-              let ts = (List.map fst b)@explored in
-              if ts |> List.exists (fun t -> types_equiv_modulo_renaming x s t <> None)
-              then None else Some (s, pannot')
-            else None
-          )
+let infer_branches_inter tvars infer_branch infer_inst
+  typeof estimate_branch apply_subst_branch (b1, b2) =
+  let subtype_gen a b =
+    let gen = TVarSet.diff (vars a) tvars |> generalize in
+    let a = Subst.apply gen a in
+    subtype_poly a b
+  in
+  if b1 = [] && b2 = [] then Subst []
+  else begin
+    log ~level:2 "Typing intersection with %n unexplored branches.@." (List.length b2) ;
+    let rec aux explored pending =
+      let explored_t = List.map Utils.trd3 explored |> disj in
+      (* Remove branches with a domain that has already been explored *)
+      let pending = pending |> List.filter
+        (fun (_,_,estimated) -> subtype_gen explored_t estimated |> not) in
+      match pending with
+      | [] -> Ok (explored, [])
+      | pending ->
+        (* Select more specific branches first *)
+        let smg = subst_more_general tvars in
+        let f (_, s, _) others = others |> List.for_all
+          (fun (_, s', _) -> (smg s s' |> not) || smg s' s)
         in
-        (subst, ([], b'@b))
-      ) in
-      Subst res
-    | NeedVar (vs, pannot, None) ->
-      NeedVar (vs, ([], (s, pannot)::b), Some ([], b))
-    | res -> map_res (fun pannot -> ([], (s, pannot)::b)) res
-    end
-in
-aux (b1 |> List.flatten |> List.map fst) b2 |>
-  map_res (fun (b1', b2') ->
-    let b1' = List.fold_left (insert_new_branch tenv env v e) b1 b1' in
-    LambdaA (b1', b2')
-  ) *)
-  failwith "TODO"
+        let ((pannot, s, est), pending) = find_among_others f pending |> Option.get in
+        begin match infer_branch pannot with
+        | Ok pannot ->
+          let annot = infer_inst pannot in
+          let est = typeof annot in
+          aux ((pannot, s, est)::explored) pending
+        | Subst lst ->
+          let sigma = lst |>
+            List.map (fun (subst,_) -> Subst.restrict subst tvars) in
+          let sigma = (Subst.identity)::sigma in
+          let sigma = remove_duplicates Subst.equiv sigma in
+          let res = sigma |> List.map (fun subst ->
+            let bs =
+              lst |> List.filter_map (fun (subst', pannot') ->
+                let subst_cur = Subst.remove subst' tvars in
+                let subst' = Subst.restrict subst' tvars in
+                if Subst.equiv subst' subst
+                then
+                  let pannot' = apply_subst_branch subst_cur pannot' in
+                  let s = Subst.compose subst_cur s in
+                  estimate_branch pannot' |> Option.map
+                    (fun est -> (pannot', s, est))
+                else None
+              )
+            in
+            (subst, (explored, bs@pending))
+          ) in
+          Subst res      
+        | res -> map_res (fun x -> (explored, (x,s,est)::pending)) res
+        end
+    in
+    (* NOTE: branches already typed are not typed again
+       (this is an approximation and optimisation). *)
+    aux b1 b2
+  end
 
 let rec infer_branches_a vardef tenv env pannot_a a =
   let memvar v = Env.mem v env in
@@ -784,8 +770,12 @@ let rec infer_branches_a vardef tenv env pannot_a a =
   match a, pannot_a with
   | a, InterA i ->
     infer_branches_inter
-      (fun pannot_a -> infer_branches_a vardef tenv env pannot_a a)
+      (Env.tvars env)
+      (fun pannot_a -> infer_branches_a_iterated vardef tenv env pannot_a a)
       (fun pannot_a -> infer_inst_a vardef tenv env pannot_a a)
+      (fun annot_a -> typeof_a vardef tenv env annot_a a)
+      (fun pannot_a -> estimate_branch_a env pannot_a a)
+      apply_subst_a
       i
     |> map_res (fun x -> InterA x)
   | _, TypA -> Ok (TypA)
@@ -948,6 +938,16 @@ and infer_branches tenv env pannot e =
   let needvar = needvar env in
   let open PartialAnnot in
   match e, pannot with
+  | e, Inter i ->
+    infer_branches_inter
+      (Env.tvars env)
+      (fun pannot -> infer_branches_iterated tenv env pannot e)
+      (fun pannot -> infer_inst tenv env pannot e)
+      (fun annot -> typeof tenv env annot e)
+      (fun pannot -> estimate_branch env pannot e)
+      apply_subst
+      i
+    |> map_res (fun x -> Inter x)
   | Var _, Typ -> Ok Typ
   | Var _, Untyp -> Subst []
   | Var v, Infer -> needvar [v] Typ Untyp

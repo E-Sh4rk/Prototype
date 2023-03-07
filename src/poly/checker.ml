@@ -194,6 +194,11 @@ let rec is_undesirable s =
   dnf s |> List.for_all
     (List.exists (fun (a, b) -> non_empty a && is_undesirable b))
 
+(* let var_r = TVar.mk_mono ~infer:false None
+let poly_to_var v' t =
+  vars_poly t |> TVarSet.destruct |> List.map (fun v ->
+    (v, v' |> TVar.typ)
+  ) |> Subst.construct *)
 let refine_a tenv env a t =
   log ~level:5 "refine_a@." ;
   match a with
@@ -228,26 +233,27 @@ let refine_a tenv env a t =
       )
   | TypeConstr (v, _) -> [Env.singleton v t]
   | App (v1, v2) ->
-    let dnf = Env.find v1 env |> dnf |> simplify_dnf in
-    let singl = List.length dnf <= 1 in
-    dnf |> List.map (fun lst ->
-      let ti = branch_type lst in
-      let alpha = TVar.mk_poly None in
-      let constr = [ (ti, mk_arrow (TVar.typ alpha |> cons) (cons t)) ] in
-      let res = tallying constr in
-      res |> List.map (fun sol ->
-        let ti = apply_subst_simplify sol ti in
-        let argt = Subst.find' sol alpha in
-        let clean_subst =  clean_type_subst ~pos:any ~neg:empty argt in
-        let ti = Subst.apply clean_subst ti in
-        let argt = Subst.apply clean_subst argt in
-        let clean_subst =  clean_type_subst ~pos:any ~neg:empty ti in
-        let ti = Subst.apply clean_subst ti |> inf in
-        let argt = Subst.apply clean_subst argt |> inf in
-        if singl then Env.singleton v2 argt (* Optimisation *)
-        else Env.construct_dup [ (v1, ti) ; (v2, argt) ]
-      )
-    ) |> List.flatten
+    let t1 = Env.find v1 env in
+    let alpha = TVar.mk_poly None in
+    let constr = [ (t1, mk_arrow (TVar.typ alpha |> cons) (cons t)) ] in
+    let res = tallying constr in
+    res |> List.map (fun sol ->
+      let t1 = apply_subst_simplify sol t1 in
+      let t2 = Subst.find' sol alpha in
+      let clean_subst = clean_type_subst ~pos:any ~neg:empty t2 in
+      let t1 = Subst.apply clean_subst t1 in
+      let t2 = Subst.apply clean_subst t2 in
+      let clean_subst = clean_type_subst ~pos:any ~neg:empty t1 in
+      let t1 = Subst.apply clean_subst t1 in
+      let t2 = Subst.apply clean_subst t2 in
+      (* let clean_subst = poly_to_var var_r t2 in
+      let t1 = Subst.apply clean_subst t1 in
+      let t2 = Subst.apply clean_subst t2 in
+      let clean_subst = poly_to_var var_r t1 in
+      let t1 = Subst.apply clean_subst t1 in
+      let t2 = Subst.apply clean_subst t2 in *)
+      Env.construct_dup [ (v1, t1 |> inf) ; (v2, t2 |> inf) ]
+    )
     (* |> List.filter (fun env -> env |> Env.tvars |> TVarSet.is_empty) *)
     |> List.filter (fun env -> Env.bindings env |>
         List.for_all (fun (_,t) -> not (is_undesirable t)))
@@ -766,6 +772,9 @@ let infer_branches_inter tvars infer_branch infer_inst
     aux b1 b2
   end
 
+let filter_refinement env env' =
+  Env.filter (fun v t -> subtype (Env.find v env) t |> not) env'
+
 let rec infer_branches_a vardef tenv env pannot_a a =
   let memvar v = Env.mem v env in
   let vartype v = Env.find v env in
@@ -925,7 +934,7 @@ and infer_branches_splits tenv env v a e t splits =
       begin match propagate with
       | Some env' ->
         log ~level:1 "Var %a is ok but a split must be propagated.@." Variable.pp v ;
-        let env' = Env.filter (fun v t -> subtype (Env.find v env) t |> not) env' in
+        let env' = filter_refinement env env' in
         Split (env', splits, (s, pannot)::splits)
       | None ->
         log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
@@ -994,10 +1003,32 @@ and infer_branches tenv env pannot e =
       let annot_a = infer_inst_a v tenv env pannot_a a in
       let t = typeof_a_nofail v tenv env annot_a a in
       log ~level:1 "Var %a typed with type %a.@." Variable.pp v pp_typ t ;
-      log ~level:2 "Typing body for %a with splits %a.@."
-        Variable.pp v (pp_list pp_typ) (List.map fst splits) ;
-      infer_branches_splits_iterated tenv env v a e t splits
-      |> map_res (fun x -> Keep (pannot_a, x))
+      (* If the definition is a function whose DNF has many disjuncts,
+         we try to split them. *)
+      let propagate =
+        let dnf = dnf t |> simplify_dnf in
+        if List.length dnf >= 2 then
+          dnf |> simplify_dnf |> Utils.map_among_others' (fun _ others ->
+            let s = others |> List.map branch_type |> List.map bot_instance
+              |> disj |> inf in
+            refine_a tenv env a s
+          )
+          |> List.flatten
+          |> List.find_opt (is_compatible env)
+        else None
+      in
+      begin match propagate with
+      | Some env' ->
+        log ~level:1 "Var %a is ok but its DNF needs a split.@." Variable.pp v ;
+        let env' = filter_refinement env env' in
+        Split (env', Keep (pannot_a, splits), Keep (pannot_a, splits))
+      | None ->
+        (* Now, we perform the splits from the annotations *)
+        log ~level:2 "Typing body for %a with splits %a.@."
+          Variable.pp v (pp_list pp_typ) (List.map fst splits) ;
+        infer_branches_splits_iterated tenv env v a e t splits
+        |> map_res (fun x -> Keep (pannot_a, x))
+      end
     | res -> res |> map_res (fun x -> Keep (x, splits))
     end
   | _, _ -> assert false

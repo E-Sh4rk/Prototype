@@ -135,6 +135,14 @@ let filter_among_others pred =
 let map_among_others f =
   fold_acc_rem (fun c acc rem -> (f c (acc@rem))::acc)
 
+let map_among_others' f lst =
+  let rec aux acc left right =
+    match left with
+    | [] -> acc
+    | c::left -> aux ((f c (left@right))::acc) left (c::right)
+  in
+  aux [] (List.rev lst) []
+
 let merge_when_possible merge_opt lst =
   let merge_opt a b others =
     Option.map (fun a -> (a, others)) (merge_opt a b)

@@ -25,7 +25,7 @@ module PartialAnnot = struct
   [@@deriving show]
 
   let apply_subst_branch f s (a, s', t) =
-    (f s a, Subst.compose s s', apply_subst_simplify s t)
+    (f s a, Subst.compose_restr s s', apply_subst_simplify s t)
   let rec apply_subst_splits s lst =
     let aux (ty, t) = (apply_subst_simplify s ty, apply_subst s t) in
     List.map aux lst

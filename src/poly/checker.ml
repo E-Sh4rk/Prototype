@@ -656,6 +656,9 @@ let estimate_inter (lst1, lst2) =
   else Some (lst |> List.map (fun (_, _, t) -> t) |> conj_o)
 
 let rec estimate_branch_a env pannot_a a =
+  (* TODO: refine this function so the branch taken by a typecase matters ?
+     (we could associate a symbolic typevar to each binding and type them with
+     this typevar instead of Any) *)
   let open PartialAnnot in
   match a, pannot_a with
   | _, UntypA -> None
@@ -707,13 +710,14 @@ let infer_branches_inter tvars infer_branch infer_inst
   in
   if b1 = [] && b2 = [] then Subst []
   else begin
-    log ~level:2 "Typing intersection with %n unexplored branches.@." (List.length b2) ;
+    log ~level:2 "Typing intersection with %n unexplored branches (and %n explored).@."
+      (List.length b2) (List.length b1) ;
     let rec aux explored pending =
       (* Remove branches with a domain that has already been explored *)
       let pending =
         if explored = [] then pending
         else
-          let explored_t = List.map Utils.trd3 explored |> disj in
+          let explored_t = List.map Utils.trd3 explored |> conj in
           pending |> List.filter
             (fun (_,_,estimated) -> subtype_gen explored_t estimated |> not)
       in
@@ -726,6 +730,7 @@ let infer_branches_inter tvars infer_branch infer_inst
           (fun (_, s', _) -> (smg s s' |> not) || smg s' s)
         in
         let ((pannot, s, est), pending) = find_among_others f pending |> Option.get in
+        log ~level:3 "Exploring intersection issued from %a@." Subst.pp s;
         begin match infer_branch pannot with
         | Ok pannot ->
           let annot = infer_inst pannot in

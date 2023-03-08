@@ -9,6 +9,7 @@ module PartialAnnot = struct
   [@@deriving show]
   and 'a inter = ('a annotated_branch) list (* Explored *)
                * ('a annotated_branch) list (* Pending *)
+               * bool (* Typing finished? *)
   [@@deriving show]
   and a =
     | InferA of infer_state | TypA | UntypA
@@ -30,12 +31,14 @@ module PartialAnnot = struct
   let rec apply_subst_splits s lst =
     let aux (ty, t) = (apply_subst_simplify s ty, apply_subst s t) in
     List.map aux lst
-  and apply_subst_inter_a s (a, b) =
+  and apply_subst_inter_a s (a, b, tf) =
     (List.map (apply_subst_branch apply_subst_a s) a,
-    List.map (apply_subst_branch apply_subst_a s) b)
-  and apply_subst_inter s (a, b) =
+    List.map (apply_subst_branch apply_subst_a s) b,
+    tf)
+  and apply_subst_inter s (a, b, tf) =
     (List.map (apply_subst_branch apply_subst s) a,
-    List.map (apply_subst_branch apply_subst s) b)
+    List.map (apply_subst_branch apply_subst s) b,
+    tf)
   and apply_subst_a s a = match a with
   | InferA st -> InferA st
   | TypA -> TypA

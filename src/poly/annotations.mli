@@ -6,6 +6,7 @@ module PartialAnnot : sig
     and 'a annotated_branch = 'a * Subst.t * typ
     and 'a inter = ('a annotated_branch) list (* Explored *)
                  * ('a annotated_branch) list (* Pending *)
+                 * bool (* Typing finished? *)
     and a =
         | InferA of infer_state | TypA | UntypA
         | LambdaA of typ * t

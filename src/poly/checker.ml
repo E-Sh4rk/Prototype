@@ -7,6 +7,8 @@ open Msc
 open Annotations
 open Utils
 
+(* TODO: solve issues with examples in test.ml: and2_, curried14, etc. *)
+
 (* ====================================== *)
 (* =============== TYPEOF =============== *)
 (* ====================================== *)
@@ -953,6 +955,8 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       |> map_res (fun x -> LambdaA (s, x))
   | _, _ -> assert false
 
+(* TODO: improve result by avoiding useless splits and/or avoid
+   unioning with the type of branches that are polymorphically smaller. *)
 and infer_branches_splits tenv env v a e t splits =
   if is_empty t
   then
@@ -984,7 +988,8 @@ and infer_branches_splits tenv env v a e t splits =
           |> map_res (fun x -> (s, pannot)::x)
         | Split (env', pannot1, pannot2) when Env.mem v env' ->
           let s' = Env.find v env' in
-          let splits1 = [ (cap_o s s', pannot1) ; (diff_o s s', pannot2) ]@splits in
+          let splits1 = [ (cap_o s s' |> simplify_typ, pannot1) ;
+                          (diff_o s s' |> simplify_typ, pannot2) ]@splits in
           let splits2 = [ (s,pannot2) ]@splits in
           Split (Env.rm v env', splits1, splits2)
         | res -> res |> map_res (fun x -> (s, x)::splits)

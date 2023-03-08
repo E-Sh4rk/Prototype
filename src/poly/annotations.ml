@@ -7,7 +7,8 @@ module PartialAnnot = struct
   [@@deriving show]
   and 'a annotated_branch = 'a * Subst.t * typ
   [@@deriving show]
-  and 'a inter = ('a annotated_branch) list (* Explored *) * ('a annotated_branch) list (* Pending *)
+  and 'a inter = ('a annotated_branch) list (* Explored *)
+               * ('a annotated_branch) list (* Pending *)
   [@@deriving show]
   and a =
     | InferA of infer_state | TypA | UntypA

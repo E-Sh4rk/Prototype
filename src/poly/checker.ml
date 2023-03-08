@@ -295,6 +295,7 @@ let simplify_tallying res sols =
     let sol =
       List.fold_left (fun sol v ->
         let t = Subst.find' sol v in
+        (* let v = TVar.mk_fresh v in *)
         let s = replace_vars t (top_vars t |> TVarSet.filter TVar.is_poly) v in
         Subst.compose s sol
       ) sol (Subst.dom sol |> TVarSet.destruct)
@@ -616,6 +617,7 @@ let simplify_tallying_infer env res sols =
     let new_dom = TVarSet.inter (Subst.dom sol) tvars in
     List.fold_left (fun sol v ->
       let t = Subst.find' sol v in
+      (* let v = TVar.mk_fresh v in *)
       let s = replace_vars t (TVarSet.diff (top_vars t) tvars) v in
       Subst.compose s sol
     ) sol (new_dom |> TVarSet.destruct)
@@ -719,16 +721,33 @@ let infer_branches_inter tvars infer_branch infer_inst
     log ~level:2 "Typing intersection with %n unexplored branches (and %n explored).@."
       (List.length b2) (List.length b1) ;
     let rec aux explored pending =
+      let already_typed = pending = [] in
       (* Remove branches with a domain that has already been explored *)
+      let explored_t =
+        if explored = [] then None
+        else Some (List.map Utils.trd3 explored |> conj)
+      in
       let pending =
-        if explored = [] then pending
-        else
-          let explored_t = List.map Utils.trd3 explored |> conj in
-          pending |> List.filter
-            (fun (_,_,estimated) -> subtype_gen explored_t estimated |> not)
+        match explored_t with
+        | None -> pending
+        | Some t -> pending |> List.filter
+            (fun (_,_,estimated) -> subtype_gen t estimated |> not)
       in
       match pending with
-      | [] -> Ok (explored, [])
+      | [] ->
+        let explored =
+          if already_typed then explored
+          else
+            (* When we just finish typing the intersection, we rename the type vars
+               of the branches so that they are independant *)
+            explored |> List.map (fun (pannot, s, est) ->
+              let new_vars = TVarSet.diff (vars_mono est) tvars in
+              let subst = refresh_all new_vars in
+              (apply_subst_branch subst pannot, Subst.compose_restr subst s,
+              Subst.apply subst est)
+            )
+        in
+        Ok (explored, [])
       | pending ->
         (* Select more specific branches first *)
         let smg = subst_more_general tvars in
@@ -741,7 +760,14 @@ let infer_branches_inter tvars infer_branch infer_inst
         | Ok pannot ->
           let annot = infer_inst pannot in
           let est = typeof annot in
-          aux ((pannot, s, est)::explored) pending
+          (* If the type of this new branch does not add anything, remove it *)
+          let explored =
+            match explored_t with
+            | None -> (pannot, s, est)::explored
+            | Some t when subtype_gen t est -> explored
+            | Some _ -> (pannot, s, est)::explored
+          in
+          aux explored pending
         | Subst lst ->
           let sigma = lst |>
             List.map (fun (subst,_) -> Subst.restrict subst tvars) in
@@ -806,7 +832,9 @@ let rec infer_branches_a vardef tenv env pannot_a a =
   | Projection (p, v), InferA IMain ->
     if memvar v then
       let t = vartype v in
-      let alpha = Variable.to_typevar vardef in
+      let alpha = Variable.to_typevar vardef
+        (* TVar.mk_mono (Some (Variable.show vardef)) *)
+      in
       let s =
         begin match p with
         | Parsing.Ast.Field label ->
@@ -855,7 +883,9 @@ let rec infer_branches_a vardef tenv env pannot_a a =
     if memvar v1 && memvar v2 then
       let t1 = vartype v1 in
       let t2 = vartype v2 in
-      let alpha = Variable.to_typevar vardef in
+      let alpha = Variable.to_typevar vardef
+        (* TVar.mk_mono (Some (Variable.show vardef)) *)
+      in
       let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
       log ~level:3 "@.Approximate tallying (inference) for %a: %a <= %a@."
         Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
@@ -899,7 +929,9 @@ let rec infer_branches_a vardef tenv env pannot_a a =
   | Ite (_, _, v1, _), InferA IThen -> needvar [v1] TypA UntypA
   | Ite (_, _, _, v2), InferA IElse -> needvar [v2] TypA UntypA
   | Lambda (Unnanoted, _, _), InferA IMain ->
-    let alpha = Variable.to_typevar vardef |> TVar.typ in
+    let alpha = Variable.to_typevar vardef |> TVar.typ
+      (* TVar.mk_mono (Some (Variable.show vardef)) |> TVar.typ *)
+    in
     let pannot_a = InterA ([], [initial_lambda_branch alpha]) in
     infer_branches_a vardef tenv env pannot_a a
   | Lambda (ADomain ts, _, _), InferA IMain ->

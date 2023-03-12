@@ -977,44 +977,45 @@ let rec infer_branches_a vardef tenv env pannot_a a =
 
 (* TODO: improve result by avoiding useless splits and/or avoid
    unioning with the type of branches that are polymorphically smaller. *)
-and infer_branches_splits tenv env v a e t splits =
-  if is_empty t
+and infer_branches_union tenv env v a e t splits =
+  let open PartialAnnot in
+  if List.for_all (function SUnr _ -> true | _ -> false) splits
   then
-    let (_, pannot) = List.hd splits in
-    let env = Env.add v empty env in
-    infer_branches_iterated tenv env pannot e
-    |> map_res (fun x -> [(empty, x)])
+    infer_branches_union tenv env v a e t ((SExpl (empty, Infer))::splits)
   else
-    match splits with
-    | [] -> Ok []
-    | (s, pannot)::splits ->
-      let propagate =
-        if subtype t s then None
-        else
-          refine_a tenv env a (neg s)
-          |> List.find_opt (is_compatible env)
-      in
-      begin match propagate with
-      | Some env' ->
-        log ~level:1 "Var %a is ok but a split must be propagated.@." Variable.pp v ;
-        let env' = filter_refinement env env' in
-        Split (env', splits, (s, pannot)::splits)
-      | None ->
-        log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
-        let env' = Env.add v (cap_o t s) env in
-        begin match infer_branches_iterated tenv env' pannot e with
-        | Ok pannot ->
-          infer_branches_splits_iterated tenv env v a e t splits
-          |> map_res (fun x -> (s, pannot)::x)
-        | Split (env', pannot1, pannot2) when Env.mem v env' ->
-          let s' = Env.find v env' in
-          let splits1 = [ (cap_o s s' |> simplify_typ, pannot1) ;
-                          (diff_o s s' |> simplify_typ, pannot2) ]@splits in
-          let splits2 = [ (s,pannot2) ]@splits in
-          Split (Env.rm v env', splits1, splits2)
-        | res -> res |> map_res (fun x -> (s, x)::splits)
-      end  
-    end
+    let rec aux splits =
+      match splits with
+      | [] -> Ok []
+      | (s, pannot)::splits ->
+        let propagate =
+          if subtype t s then None
+          else
+            refine_a tenv env a (neg s)
+            |> List.find_opt (is_compatible env)
+        in
+        begin match propagate with
+        | Some env' ->
+          log ~level:1 "Var %a is ok but a split must be propagated.@." Variable.pp v ;
+          let env' = filter_refinement env env' in
+          Split (env', splits, (s, pannot)::splits)
+        | None ->
+          log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
+          let env' = Env.add v (cap_o t s) env in
+          begin match infer_branches_iterated tenv env' pannot e with
+          | Ok pannot ->
+            aux splits
+            |> map_res (fun x -> (s, pannot)::x)
+          | Split (env', pannot1, pannot2) when Env.mem v env' ->
+            let s' = Env.find v env' in
+            let splits1 = [ (cap_o s s' |> simplify_typ, pannot1) ;
+                            (diff_o s s' |> simplify_typ, pannot2) ]@splits in
+            let splits2 = [ (s,pannot2) ]@splits in
+            Split (Env.rm v env', splits1, splits2)
+          | res -> res |> map_res (fun x -> (s, x)::splits)
+        end  
+      end
+    in
+    aux splits
 
 and infer_branches tenv env pannot e =
   let needvar = needvar env in
@@ -1104,12 +1105,12 @@ and infer_branches_a_iterated vardef tenv env pannot_a a =
   | None -> res
   | Some pannot_a -> infer_branches_a_iterated vardef tenv env pannot_a a
 
-and infer_branches_splits_iterated tenv env v a e t splits =
+and infer_branches_union_iterated tenv env v a e t splits =
   log ~level:5 "infer_branches_splits_iterated@." ;
-  let res = infer_branches_splits tenv env v a e t splits in
+  let res = infer_branches_union tenv env v a e t splits in
   match should_iterate res with
   | None -> res
-  | Some splits -> infer_branches_splits tenv env v a e t splits
+  | Some splits -> infer_branches_union_iterated tenv env v a e t splits
 
 and infer_branches_iterated tenv env pannot e =
   log ~level:5 "infer_branches_iterated@." ;

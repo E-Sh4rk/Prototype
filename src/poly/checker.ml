@@ -124,8 +124,8 @@ let rec typeof_a vardef tenv env annot_a a =
     (* let t1 = var_type v1 |> instantiate_check ss1 in
     let t2 = var_type v2 |> instantiate_check ss2 in
     apply t1 t2 *)
-  | Ite (v, _, _, _), EmptyA ss ->
-    let t = var_type v |> instantiate_check ss in
+  | Ite (v, _, _, _), EmptyA ->
+    let t = var_type v in
     if is_empty t then empty
     else untypeable ("Invalid typecase: tested expression is not empty.")
   | Ite (v, s, v1, _), ThenA ->
@@ -160,14 +160,15 @@ and typeof tenv env annot e =
   | Bind (v, _, e), Skip annot ->
     assert (Env.mem v env |> not) ;
     typeof tenv env annot e
-  | Bind (v, a, e), Keep (annot_a, splits) ->
+  | Bind (v, a, e), Keep (annot_a, (splits, inst)) ->
     let t = typeof_a v tenv env annot_a a in
     let pos = Variable.get_locations v in
     let untypeable str = raise (Untypeable (pos, str)) in
     if splits = []
     then untypeable ("Invalid decomposition: there must be at least 1 branch.")
     else
-      if subtype t (splits |> List.map fst |> disj)
+      if subtype (instantiate_check pos inst t)
+        (splits |> List.map fst |> disj)
       then
         splits |> List.map (fun (s, annot) ->
           check_mono pos s ;

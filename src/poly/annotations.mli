@@ -2,22 +2,26 @@ open Types.Base
 open Types.Tvar
 
 module PartialAnnot : sig
-    type splits = (typ*t) list
+    type split =
+        | SInfer of typ * t
+        | SProp of typ * t
+        | SExpl of typ * t
+        | SUnr of typ
+    and union = split list
     and 'a annotated_branch = 'a * Subst.t * typ
     and 'a inter = ('a annotated_branch) list (* Explored *)
                  * ('a annotated_branch) list (* Pending *)
                  * bool (* Typing finished? *)
     and a =
-        | InferA of infer_state | TypA | UntypA
+        | InferA | TypA | UntypA
         | LambdaA of typ * t
         | InterA of a inter
     and t =
         | Infer | Typ | Untyp
-        | Keep of (a * splits)
+        | Keep of (a * union)
         | Skip of t
-        | KeepSkip of (a * splits * t)
+        | TryKeep of (a * t * t)
         | Inter of t inter
-    and infer_state = IMain | IThen | IElse
 
     val pp_a : Format.formatter -> a -> unit
     val pp : Format.formatter -> t -> unit
@@ -30,19 +34,20 @@ module FullAnnot : sig
     type 'a inter = 'a list
     type inst = Subst.t list
     type renaming = Subst.t
-    type a =
+    type union = (typ * t) list * inst
+    and a =
         | ConstA | AliasA | LetA | AbstractA
         | LambdaA of typ * t
         | PairA of renaming * renaming
         | AppA of inst * inst
         | ProjA of inst
-        | EmptyA of inst | ThenA | ElseA
+        | EmptyA | ThenA | ElseA
         | RecordUpdateA of inst * (renaming option)
         | ConstrA of inst
         | InterA of a inter
     and t =
         | BVar of renaming
-        | Keep of a * (typ * t) list
+        | Keep of a * union
         | Skip of t
         | Inter of t inter
 

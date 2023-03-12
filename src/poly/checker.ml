@@ -698,16 +698,20 @@ let rec estimate_branch_a env pannot_a a =
   | _, _ -> assert false
 
 and estimate_branch env pannot e =
+  let open PartialAnnot in
   let estimate_splits v t e splits =
     let splits =
-      splits |> List.map (fun (s, pannot) ->
-        let env = Env.add v (cap_o t s) env in
-        estimate_branch env pannot e
+      splits |> List.map (function
+          SExpl (s, pannot)
+        | SProp (s, pannot)
+        | SInfer (s, pannot) ->
+          let env = Env.add v (cap_o t s) env in
+          estimate_branch env pannot e
+        | SUnr _ -> Some empty
       ) in
     if List.mem None splits then None
     else Some (List.map Option.get splits |> disj_o)
   in
-  let open PartialAnnot in
   match e, pannot with
   | _, Untyp -> None
   | _, Inter i -> estimate_inter i
@@ -719,10 +723,12 @@ and estimate_branch env pannot e =
   | Bind (v, a, e), Keep (pannot_a, splits) ->
     let t = estimate_branch_a env pannot_a a |> Option.get in
     estimate_splits v t e splits
-  | Bind (v, a, e), KeepSkip (pannot_a, splits, pannot) ->
+  | Bind (v, a, e), TryKeep (pannot_a, pannot1, pannot2) ->
     begin match estimate_branch_a env pannot_a a with
-    | None -> estimate_branch env pannot e
-    | Some t -> estimate_splits v t e splits
+    | None -> estimate_branch env pannot2 e
+    | Some t ->
+      let env = Env.add v t env in
+      estimate_branch env pannot1 e
     end
   | _, _ -> assert false
 

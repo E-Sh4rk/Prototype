@@ -273,6 +273,11 @@ let tallying_nonempty constr =
   | [] -> assert false
   | sols -> sols
 
+let tallying_one constr =
+  match tallying constr with
+  | [] -> assert false
+  | sol::_ -> sol
+
 let replace_vars t vs v =
   vars_with_polarity t |> List.filter_map (fun (v', k) ->
     if TVarSet.mem vs v' then
@@ -454,8 +459,7 @@ let rec infer_inst_a vardef tenv env pannot_a a =
     AppA (s1, s2)
   | Ite (v, s, _, _), TypA ->
     let t = vartype v in
-    let res = tallying [(t, empty)] in
-    if res <> [] then EmptyA res
+    if subtype t empty then EmptyA
     else if subtype t s then ThenA
     else if subtype t (neg s) then ElseA
     else assert false
@@ -482,12 +486,21 @@ and infer_inst tenv env pannot e =
     assert (branches <> []) ;
     let annot_a = infer_inst_a v tenv env pannot_a a in
     let t = typeof_a_nofail v tenv env annot_a a in
-    let branches = branches |> List.map (fun (si, pannot) ->
-      let t = cap_o t si in
-      let env = Env.add v t env in
-      (si, infer_inst tenv env pannot e)
-    ) in
-    FullAnnot.Keep (annot_a, branches)
+    let (branches, inst) = List.fold_left
+      (fun (branches, inst) br ->
+      match br with
+      | SExpl (si, pannot) ->
+        let t = cap_o t si in
+        let env = Env.add v t env in
+        ((si, infer_inst tenv env pannot e)::branches, inst)
+      | SUnr si ->
+        let t = cap_o t si in
+        let sol = tallying_one [(t, empty)] in
+        (branches, sol::inst)
+      | _ -> assert false
+    ) ([], []) branches in
+    FullAnnot.Keep (annot_a,
+      (branches, Utils.remove_duplicates Subst.equiv inst))
   | _, _ ->  assert false
 
 (* ====================================== *)

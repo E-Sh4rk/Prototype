@@ -1071,7 +1071,9 @@ and infer_branches tenv env pannot e =
         if subtype t arrow_any && List.length dnf >= 2 then
           dnf |> simplify_dnf |> Utils.map_among_others' (fun _ others ->
             let s = others |> List.map branch_type |> List.map bot_instance
-              |> disj |> specific_inst in
+              |> disj in
+            let mono = monomorphize (vars_poly s) in
+            let s = Subst.apply mono s in
             refine_a tenv env a s
           )
           |> List.flatten

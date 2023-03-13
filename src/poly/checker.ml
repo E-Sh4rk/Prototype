@@ -727,6 +727,8 @@ and estimate_branch env pannot e =
     end
   | _, _ -> assert false
 
+(* TODO: add a "lastly explored" group in intersections, and only consider it
+   (+ fully exlored branches) in estimations *)
 (* TODO: try to prune branches that initially were more general, but then
    become equivalent (at least, for their domain) to a previous branch *)
 let infer_branches_inter env infer_branch infer_inst

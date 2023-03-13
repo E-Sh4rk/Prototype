@@ -688,7 +688,7 @@ let rec estimate_branch_a env pannot_a a =
   match a, pannot_a with
   | _, UntypA -> None
   | _, TypA -> Some any
-  | _, InferA _ -> Some any
+  | _, InferA -> Some any
   | _, InterA i -> estimate_inter i
   | Lambda (_, v, e), LambdaA (s, pannot) ->
     let env = Env.add v s env in

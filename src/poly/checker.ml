@@ -853,12 +853,12 @@ let rec infer_branches_a vardef tenv env pannot_a a =
     |> map_res (fun x -> InterA x)
   | _, TypA -> Ok (TypA)
   | _, UntypA -> Subst []
-  | Alias v, InferA IMain when memvar v -> Ok (TypA)
-  | Alias _, InferA IMain -> Subst []
-  | Abstract _, InferA IMain | Const _, InferA IMain -> Ok (TypA)
-  | Pair (v1, v2), InferA IMain | Let (v1, v2), InferA IMain ->
+  | Alias v, InferA when memvar v -> Ok (TypA)
+  | Alias _, InferA -> Subst []
+  | Abstract _, InferA | Const _, InferA -> Ok (TypA)
+  | Pair (v1, v2), InferA | Let (v1, v2), InferA ->
     needvar [v1; v2] TypA UntypA
-  | Projection (p, v), InferA IMain ->
+  | Projection (p, v), InferA ->
     if memvar v then
       let t = vartype v in
       let alpha = Variable.to_typevar vardef
@@ -886,29 +886,29 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       ) ;
       Subst (packannot TypA res)
     else
-      needvar [v] (InferA IMain) UntypA
-  | RecordUpdate (v, _, None), InferA IMain ->
+      needvar [v] InferA UntypA
+  | RecordUpdate (v, _, None), InferA ->
     if memvar v then
       let res = tallying_infer [(vartype v, record_any)] in
       let res = simplify_tallying_infer env empty res in
       Subst (packannot TypA res)
     else
-      needvar [v] (InferA IMain) UntypA
-  | RecordUpdate (v, _, Some v'), InferA IMain ->
+      needvar [v] InferA UntypA
+  | RecordUpdate (v, _, Some v'), InferA ->
     if memvar v && memvar v' then
       let res = tallying_infer [(vartype v, record_any)] in
       let res = simplify_tallying_infer env empty res in
       Subst (packannot TypA res)
     else
-      needvar [v ; v'] (InferA IMain) UntypA
-  | TypeConstr (v, s), InferA IMain ->
+      needvar [v ; v'] InferA UntypA
+  | TypeConstr (v, s), InferA ->
     if memvar v then
       let res = tallying_infer [(vartype v, s)] in
       let res = simplify_tallying_infer env empty res in
       Subst (packannot TypA res)
     else
-      needvar [v] (InferA IMain) UntypA
-  | App (v1, v2), InferA IMain ->
+      needvar [v] InferA UntypA
+  | App (v1, v2), InferA ->
     if memvar v1 && memvar v2 then
       let t1 = vartype v1 in
       let t2 = vartype v2 in
@@ -928,42 +928,24 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       ) ;
       Subst (packannot TypA res)
     else
-      needvar [v1;v2] (InferA IMain) UntypA
-  | Ite (v, tau, _, _), InferA IMain ->
+      needvar [v1;v2] InferA UntypA
+  | Ite (v, tau, v1, v2), InferA ->
     if memvar v then
       let t = vartype v in
       let not_else = subtype t tau in
       let not_then = subtype t (neg tau) in
-      if not_then || not_else then begin
-        log ~level:3 "@.Tallying (inference) for %a: %a <= %a@."
-          Variable.pp vardef pp_typ t pp_typ empty ;
-        let res = tallying_infer [(t, empty)] in
-        res |> List.iter (fun s ->
-          log ~level:3 "Solution: %a@." Subst.pp s
-        ) ;
-        let res = simplify_tallying_infer env empty res in
-        res |> List.iter (fun s ->
-          log ~level:3 "Solution (simplified): %a@." Subst.pp s
-        ) ;
-        if List.exists Subst.is_identity res then
-          Ok TypA
-        else if not_else then
-          Subst ((packannot TypA res)@[(Subst.identity, InferA IThen)])
-        else
-          Subst ((packannot TypA res)@[(Subst.identity, InferA IElse)])
-      end else
-        Split (Env.singleton v tau, InferA IMain, InferA IMain)
-    else
-      needvar [v] (InferA IMain) UntypA
-  | Ite (_, _, v1, _), InferA IThen -> needvar [v1] TypA UntypA
-  | Ite (_, _, _, v2), InferA IElse -> needvar [v2] TypA UntypA
-  | Lambda (Unnanoted, _, _), InferA IMain ->
+      if not_then && not_else then Ok TypA        
+      else if not_then then needvar [v2] TypA UntypA
+      else if not_else then needvar [v1] TypA UntypA
+      else Split (Env.singleton v tau, InferA, InferA)
+    else needvar [v] InferA UntypA
+  | Lambda (Unnanoted, _, _), InferA ->
     let alpha = Variable.to_typevar vardef |> TVar.typ
       (* TVar.mk_mono (Some (Variable.show vardef)) |> TVar.typ *)
     in
     let pannot_a = InterA ([], [initial_lambda_branch alpha], false) in
     infer_branches_a vardef tenv env pannot_a a
-  | Lambda (ADomain ts, _, _), InferA IMain ->
+  | Lambda (ADomain ts, _, _), InferA ->
     let pannot_a = InterA ([], List.map initial_lambda_branch ts, false) in
     infer_branches_a vardef tenv env pannot_a a
   | Lambda (_, v, e), LambdaA (s, pannot) ->

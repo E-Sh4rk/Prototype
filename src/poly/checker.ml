@@ -197,11 +197,11 @@ let rec is_undesirable s =
   dnf s |> List.for_all
     (List.exists (fun (a, b) -> non_empty a && is_undesirable b))
 
-(* let var_r = TVar.mk_mono ~infer:false None
-let poly_to_var v' t =
-  vars_poly t |> TVarSet.destruct |> List.map (fun v ->
-    (v, v' |> TVar.typ)
-  ) |> Subst.construct *)
+let specific_inst t =
+  let s = vars_poly t |> TVarSet.destruct
+    |> List.map (fun v -> (v, empty)) |> Subst.construct in
+  Subst.apply s t
+
 let refine_a tenv env a t =
   log ~level:5 "refine_a@." ;
   match a with
@@ -246,18 +246,10 @@ let refine_a tenv env a t =
       let clean_subst = clean_type_subst ~pos:any ~neg:empty t2 in
       let t1 = Subst.apply clean_subst t1 in
       let t2 = Subst.apply clean_subst t2 in
-      let clean_subst = clean_type_subst ~pos:any ~neg:empty t1 in
-      let t1 = Subst.apply clean_subst t1 in
-      let t2 = Subst.apply clean_subst t2 in
-      (* let clean_subst = poly_to_var var_r t2 in
-      let t1 = Subst.apply clean_subst t1 in
-      let t2 = Subst.apply clean_subst t2 in
-      let clean_subst = poly_to_var var_r t1 in
-      let t1 = Subst.apply clean_subst t1 in
-      let t2 = Subst.apply clean_subst t2 in *)
-      Env.construct_dup [ (v1, t1 |> inf) ; (v2, t2 |> inf) ]
+      Env.construct_dup [ (v1, t1 |> specific_inst) ; (v2, t2) ]
     )
-    (* |> List.filter (fun env -> env |> Env.tvars |> TVarSet.is_empty) *)
+    |> List.filter (fun env -> env |> Env.tvars
+        |> TVarSet.filter TVar.is_poly |> TVarSet.is_empty)
     |> List.filter (fun env -> Env.bindings env |>
         List.for_all (fun (_,t) -> not (is_undesirable t)))
   | Ite (v, s, v1, v2) ->
@@ -1079,7 +1071,7 @@ and infer_branches tenv env pannot e =
         if subtype t arrow_any && List.length dnf >= 2 then
           dnf |> simplify_dnf |> Utils.map_among_others' (fun _ others ->
             let s = others |> List.map branch_type |> List.map bot_instance
-              |> disj |> inf in
+              |> disj |> specific_inst in
             refine_a tenv env a s
           )
           |> List.flatten

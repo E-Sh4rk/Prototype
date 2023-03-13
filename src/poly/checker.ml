@@ -960,6 +960,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
 (* TODO: improve result by avoiding useless splits and/or avoid
    unioning with the type of branches that are polymorphically smaller. *)
 and infer_branches_union tenv env v a e t splits =
+  let packannot a = List.map (fun s -> (s, a)) in
   let open PartialAnnot in
   if List.for_all (function SUnr _ -> true | _ -> false) splits
   then
@@ -968,7 +969,23 @@ and infer_branches_union tenv env v a e t splits =
     let rec aux splits =
       match splits with
       | [] -> Ok []
-      | (SInfer _)::splits -> failwith "TODO"
+      | (SInfer (s, pannot))::splits ->
+        let t = cap_o t s in
+        log ~level:3 "@.Tallying (inference) for %a: %a <= %a@."
+          Variable.pp v pp_typ t pp_typ empty ;
+        let res = tallying_infer [(t, empty)] in
+        res |> List.iter (fun s ->
+          log ~level:3 "Solution: %a@." Subst.pp s
+        ) ;
+        let res = simplify_tallying_infer env empty res in
+        res |> List.iter (fun s ->
+          log ~level:3 "Solution (simplified): %a@." Subst.pp s
+        ) ;
+        if List.exists Subst.is_identity res
+        then aux ((SUnr s)::splits)
+        else
+          Subst ((packannot ((SUnr s)::splits) res)@
+            [(Subst.identity, (SProp (s, pannot))::splits)])
       | (SProp (s, pannot))::splits ->
         let propagate =
           refine_a tenv env a (neg s)

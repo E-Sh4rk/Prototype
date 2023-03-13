@@ -28,6 +28,8 @@ module PartialAnnot : sig
 
     val apply_subst_a : Subst.t -> a -> a
     val apply_subst : Subst.t -> t -> t
+
+    val effective_splits : union -> typ list
 end
 
 module FullAnnot : sig

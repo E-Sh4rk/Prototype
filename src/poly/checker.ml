@@ -1041,22 +1041,23 @@ and infer_branches tenv env pannot e =
     begin match infer_branches_iterated tenv env pannot e with
     | NeedVar (vs, pannot1, pannot2) when VarSet.mem v vs ->
       log ~level:0 "Var %a needed.@." Variable.pp v ;
-      let pannot1 = KeepSkip (InferA IMain, [(any, pannot1)], pannot2) in
+      let pannot1 = TryKeep (InferA, pannot1, pannot2) in
       let pannot2 = Skip pannot2 in
       NeedVar (VarSet.remove v vs, pannot1, pannot2)
     | res -> map_res (fun x -> Skip x) res
     end
-  | Bind (v, a, _), KeepSkip (pannot_a, splits, pannot) ->
+  | Bind (v, a, _), TryKeep (pannot_a, pannot1, pannot2) ->
     log ~level:1 "Trying to type var %a.@." Variable.pp v ;
     begin match infer_branches_a_iterated v tenv env pannot_a a with
-    | Ok pannot_a -> infer_branches tenv env (Keep (pannot_a, splits)) e
+    | Ok pannot_a ->
+      infer_branches tenv env (Keep (pannot_a, [SExpl (any, pannot1)])) e
     | Subst lst when
       List.for_all (fun (s,_) -> Subst.is_identity s |> not) lst ->
       let lst = lst |> List.map (fun (s, pannot_a) ->
-        (s, KeepSkip (pannot_a, splits, pannot))
+        (s, TryKeep (pannot_a, pannot1, pannot2))
       ) in
-      Subst (lst@[(Subst.identity, Skip pannot)])
-    | res -> map_res (fun x -> KeepSkip (x, splits, pannot)) res
+      Subst (lst@[(Subst.identity, Skip pannot2)])
+    | res -> map_res (fun x -> TryKeep (x, pannot1, pannot2)) res
     end
   | Bind (v, a, e), Keep (pannot_a, splits) ->
     log ~level:1 "Inferring var %a.@." Variable.pp v ;
@@ -1090,8 +1091,8 @@ and infer_branches tenv env pannot e =
       | None ->
         (* Now, we perform the splits from the annotations *)
         log ~level:2 "Typing body for %a with splits %a.@."
-          Variable.pp v (pp_list pp_typ) (List.map fst splits) ;
-        infer_branches_splits_iterated tenv env v a e t splits
+          Variable.pp v (pp_list pp_typ) (effective_splits splits) ;
+        infer_branches_union_iterated tenv env v a e t splits
         |> map_res (fun x -> Keep (pannot_a, x))
       end
     | res -> res |> map_res (fun x -> Keep (x, splits))

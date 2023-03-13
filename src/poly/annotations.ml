@@ -65,6 +65,12 @@ module PartialAnnot = struct
     | TryKeep (a, t1, t2) ->
       TryKeep (apply_subst_a s a, apply_subst s t1, apply_subst s t2)
     | Inter i -> Inter (apply_subst_inter s i)
+
+  let effective_splits union =
+    union |> List.filter_map (function
+    | SUnr _ -> None
+    | SExpl (s,_) | SProp (s, _) | SInfer (s, _) -> Some s
+    )
 end
 
 module FullAnnot = struct

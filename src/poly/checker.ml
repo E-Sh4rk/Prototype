@@ -968,34 +968,35 @@ and infer_branches_union tenv env v a e t splits =
     let rec aux splits =
       match splits with
       | [] -> Ok []
-      | (s, pannot)::splits ->
+      | (SInfer _)::splits -> failwith "TODO"
+      | (SProp (s, pannot))::splits ->
         let propagate =
-          if subtype t s then None
-          else
-            refine_a tenv env a (neg s)
-            |> List.find_opt (is_compatible env)
+          refine_a tenv env a (neg s)
+          |> List.find_opt (is_compatible env)
         in
         begin match propagate with
         | Some env' ->
           log ~level:1 "Var %a is ok but a split must be propagated.@." Variable.pp v ;
           let env' = filter_refinement env env' in
-          Split (env', splits, (s, pannot)::splits)
-        | None ->
-          log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
-          let env' = Env.add v (cap_o t s) env in
-          begin match infer_branches_iterated tenv env' pannot e with
-          | Ok pannot ->
-            aux splits
-            |> map_res (fun x -> (s, pannot)::x)
-          | Split (env', pannot1, pannot2) when Env.mem v env' ->
-            let s' = Env.find v env' in
-            let splits1 = [ (cap_o s s' |> simplify_typ, pannot1) ;
-                            (diff_o s s' |> simplify_typ, pannot2) ]@splits in
-            let splits2 = [ (s,pannot2) ]@splits in
-            Split (Env.rm v env', splits1, splits2)
-          | res -> res |> map_res (fun x -> (s, x)::splits)
-        end  
-      end
+          Split (env', (SUnr s)::splits, (SProp (s, pannot))::splits)
+        | None -> aux ((SExpl (s, pannot))::splits)
+        end
+      | (SUnr s)::splits ->
+        aux splits |> map_res (fun x -> (SUnr s)::x)
+      | (SExpl (s, pannot))::splits ->
+        log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
+        let env' = Env.add v (cap_o t s) env in
+        begin match infer_branches_iterated tenv env' pannot e with
+        | Ok pannot ->
+          aux splits |> map_res (fun x -> (SExpl (s, pannot))::x)
+        | Split (env', pannot1, pannot2) when Env.mem v env' ->
+          let s' = Env.find v env' in
+          let splits1 = [ SInfer (cap_o s s' |> simplify_typ, pannot1) ;
+                          SInfer (diff_o s s' |> simplify_typ, pannot2) ]@splits in
+          let splits2 = [ SExpl (s,pannot2) ]@splits in
+          Split (Env.rm v env', splits1, splits2)
+        | res -> res |> map_res (fun x -> (SExpl (s, x))::splits)
+        end
     in
     aux splits
 

@@ -1073,7 +1073,7 @@ and infer_branches tenv env pannot e =
          we try to split them. *)
       let propagate =
         let dnf = dnf t |> simplify_dnf in
-        if List.length dnf >= 2 then
+        if subtype t arrow_any && List.length dnf >= 2 then
           dnf |> simplify_dnf |> Utils.map_among_others' (fun _ others ->
             let s = others |> List.map branch_type |> List.map bot_instance
               |> disj |> inf in

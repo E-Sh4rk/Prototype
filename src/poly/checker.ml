@@ -383,8 +383,8 @@ let approximate_app infer t1 t2 resvar =
   then (match approximate_app infer t1 t2 resvar with [] -> assert false | sols -> sols)
   else res
 
-let infer_inst_inter infer_inst_branch (b1, b2, b3, tf) =
-  assert (b3 = [] && b2 = [] && b1 <> [] && tf) ;
+let infer_inst_inter infer_inst_branch (b1, b2, tf) =
+  assert (b2 = [] && b1 <> [] && tf) ;
   b1 |> List.map (fun (annot,_,_) -> infer_inst_branch annot)
 
 let rec infer_inst_a vardef tenv env pannot_a a =
@@ -670,12 +670,13 @@ let simplify_tallying_infer env res sols =
     res
   ) *)
 
-let estimate_inter (lst1, lst2, _, _) =
+(* TODO: do not use estimations in intersections... *)
+let estimate_inter (lst1, lst2, _) =
   let lst = lst1@lst2 in
   if lst = [] then None
   else Some (lst |> List.map (fun (_, _, t) -> t) |> conj_o)
 
-let rec estimate_branch_a env pannot_a a =
+let rec estimate_branch_a env a pannot_a =
   (* TODO: refine this function so the branch taken by a typecase matters ?
      (we could associate a symbolic typevar to each binding and type them with
      this typevar instead of Any) *)
@@ -687,7 +688,7 @@ let rec estimate_branch_a env pannot_a a =
   | _, InterA i -> estimate_inter i
   | Lambda (_, v, e), LambdaA (s, pannot) ->
     let env = Env.add v s env in
-    estimate_branch env pannot e |> Option.map (fun t ->
+    estimate_branch env e pannot |> Option.map (fun t ->
       mk_arrow (cons s) (cons t)
       (* NOTE: the estimation below reduces the number of branches a lot,
          though in some cases it could prune important branches. *)
@@ -695,7 +696,7 @@ let rec estimate_branch_a env pannot_a a =
     )
   | _, _ -> assert false
 
-and estimate_branch env pannot e =
+and estimate_branch env e pannot =
   let open PartialAnnot in
   let estimate_splits v t e splits =
     let splits =
@@ -704,7 +705,7 @@ and estimate_branch env pannot e =
         | SProp (s, pannot)
         | SInfer (s, pannot) ->
           let env = Env.add v (cap_o t s) env in
-          estimate_branch env pannot e
+          estimate_branch env e pannot
         | SUnr _ -> Some empty
       ) in
     if List.mem None splits then None
@@ -717,23 +718,26 @@ and estimate_branch env pannot e =
   | Var _, _ -> None
   | Bind (v, _, e), Skip pannot ->
     let env = Env.add v any env in
-    estimate_branch env pannot e
+    estimate_branch env e pannot
   | Bind (v, a, e), Keep (pannot_a, splits) ->
-    let t = estimate_branch_a env pannot_a a |> Option.get in
+    let t = estimate_branch_a env a pannot_a |> Option.get in
     estimate_splits v t e splits
   | Bind (v, a, e), TryKeep (pannot_a, pannot1, pannot2) ->
-    begin match estimate_branch_a env pannot_a a with
-    | None -> estimate_branch env pannot2 e
+    begin match estimate_branch_a env a pannot_a with
+    | None -> estimate_branch env e pannot2
     | Some t ->
       let env = Env.add v t env in
-      estimate_branch env pannot1 e
+      estimate_branch env e pannot1
     end
   | _, _ -> assert false
 
-(* TODO: more branches pruning... maybe we should remember the previous estimations
-   of a branch in order to always compare estimations made "at the same point" *)
+(* TODO: adapt branch pruning to new system...
+   i) estimations should not be updated even after the branch has been typed
+   ii) intersections of size 1 should be removed
+   iii) estimations of explored branches should be passed as arg when
+   typing another branch, so that it can be considered when removing branches *)
 let infer_branches_inter env infer_branch infer_inst
-  typeof estimate_branch apply_subst_branch (b1, b2, b3, tf) =
+  typeof apply_subst_branch (b1, b2, tf) =
   let tvars = Env.tvars env in
   let tvars = TVarSet.filter TVar.is_mono tvars in
   let subtype_gen a b =
@@ -741,9 +745,9 @@ let infer_branches_inter env infer_branch infer_inst
     let a = Subst.apply gen a in
     subtype_poly a b
   in
-  if b1 = [] && b2 = [] && b3 = [] then Subst []
+  if b1 = [] && b2 = [] then Subst []
   else begin
-    let uNb = List.length b2 + List.length b3 and eNb = List.length b1 in
+    let uNb = List.length b2 and eNb = List.length b1 in
     let nontrivial = uNb + eNb > 1 in
     if nontrivial then begin
       log ~level:0 "Typing intersection with %n unexplored branches (and %n explored).@."
@@ -786,7 +790,7 @@ let infer_branches_inter env infer_branch infer_inst
               subtype_gen est' est |> not
             )
         in
-        Ok (explored, [], [], true)
+        Ok (explored, [], true)
       | pending ->
         let f br others = others |> List.for_all (leq br) in
         (* Select more specific branches first *)
@@ -817,37 +821,41 @@ let infer_branches_inter env infer_branch infer_inst
               else (pannot, s, est')::explored
           in
           aux explored pending
-        | Subst lst ->
-          let sigma = lst |>
-            List.map (fun (subst,_) -> Subst.restrict subst tvars) in
-          let sigma = (Subst.identity)::sigma in
-          let sigma = remove_duplicates Subst.equiv sigma in
-          let res = sigma |> List.map (fun subst ->
-            let bs =
-              lst |> List.filter_map (fun (subst', pannot') ->
-                let subst_cur = Subst.remove subst' tvars in
-                let subst' = Subst.restrict subst' tvars in
-                if Subst.equiv subst' subst
-                then
-                  let pannot' = apply_subst_branch subst_cur pannot' in
-                  let s = Subst.compose subst_cur s in
-                  estimate_branch pannot' |> Option.map
-                    (fun est -> (pannot', s, est))
-                else None
-              )
-            in
-            (subst, (explored, bs, pending, tf))
-          ) in
-          Subst res      
-        | res -> map_res (fun x -> (explored, [(x,s,est)], pending, tf)) res
+        | res -> map_res (fun x -> (explored, (x,s,est)::pending, tf)) res
         end
     in
     (* NOTE: branches already typed are not typed again. *)
-    aux b1 (b2@b3)
+    aux b1 b2
   end
 
 let filter_refinement env env' =
   Env.filter (fun v t -> subtype (Env.find v env) t |> not) env'
+
+let normalize_subst env apply_subst_branch estimate_branch mk_inter res =
+  let tvars = Env.tvars env in
+  match res with
+  | Subst lst ->
+    let sigma = lst |>
+      List.map (fun (subst,_) -> Subst.restrict subst tvars) in
+    let sigma = (Subst.identity)::sigma in
+    let sigma = remove_duplicates Subst.equiv sigma in
+    let res = sigma |> List.map (fun subst ->
+      let bs =
+        lst |> List.filter_map (fun (subst', pannot) ->
+          let subst_cur = Subst.remove subst' tvars in
+          let subst' = Subst.restrict subst' tvars in
+          if Subst.equiv subst' subst
+          then
+            let pannot = apply_subst_branch subst_cur pannot in
+            estimate_branch pannot |> Option.map
+              (fun est -> (pannot, subst_cur, est))
+          else None
+        )
+      in
+      (subst, mk_inter [] bs false)
+    ) in
+    Subst res
+  | res -> res
 
 let rec infer_branches_a vardef tenv env pannot_a a =
   let memvar v = Env.mem v env in
@@ -855,10 +863,6 @@ let rec infer_branches_a vardef tenv env pannot_a a =
   let needvar = needvar env in
   let packannot a = List.map (fun s -> (s, a)) in
   let open PartialAnnot in
-  let initial_lambda_branch s =
-    let estimated = mk_arrow (cons s) any_node in
-    (LambdaA (s, Infer), Subst.identity, estimated)
-  in
   match a, pannot_a with
   | a, InterA i ->
     infer_branches_inter
@@ -866,7 +870,6 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       (fun pannot_a -> infer_branches_a_iterated vardef tenv env pannot_a a)
       (fun pannot_a -> infer_inst_a vardef tenv env pannot_a a)
       (fun annot_a -> typeof_a vardef tenv env annot_a a)
-      (fun pannot_a -> estimate_branch_a env pannot_a a)
       apply_subst_a
       i
     |> map_res (fun x -> InterA x)
@@ -962,11 +965,17 @@ let rec infer_branches_a vardef tenv env pannot_a a =
     let alpha = Variable.to_typevar vardef |> TVar.typ
       (* TVar.mk_mono (Some (Variable.show vardef)) |> TVar.typ *)
     in
-    let pannot_a = InterA ([], [], [initial_lambda_branch alpha], false) in
+    let pannot_a = LambdaA (alpha, Infer) in
     infer_branches_a vardef tenv env pannot_a a
   | Lambda (ADomain ts, _, _), InferA ->
-    let pannot_a = InterA ([], [], List.map initial_lambda_branch ts, false) in
-    infer_branches_a vardef tenv env pannot_a a
+    let alpha = Variable.to_typevar vardef
+      (* TVar.mk_mono (Some (Variable.show vardef)) *)
+    in
+    let pannot_a = LambdaA (TVar.typ alpha, Infer) in
+    let lst = ts |> List.map (fun t ->
+      ([(alpha,t)] |> Subst.construct, pannot_a)
+    ) in
+    Subst lst
   | Lambda (_, v, e), LambdaA (s, pannot) ->
     log ~level:2 "Entering lambda for %a with domain %a.@." Variable.pp v pp_typ s ;
     if is_empty s then Subst []
@@ -1044,16 +1053,13 @@ and infer_branches tenv env pannot e =
       (fun pannot -> infer_branches_iterated tenv env pannot e)
       (fun pannot -> infer_inst tenv env pannot e)
       (fun annot -> typeof tenv env annot e)
-      (fun pannot -> estimate_branch env pannot e)
       apply_subst
       i
     |> map_res (fun x -> Inter x)
   | Var _, Typ -> Ok Typ
   | Var _, Untyp -> Subst []
   | Var v, Infer -> needvar [v] Typ Untyp
-  | Bind _, Infer ->
-    let pannot = Inter ([], [], [Skip Infer, Subst.identity, any], false) in
-    infer_branches tenv env pannot e
+  | Bind _, Infer -> infer_branches tenv env (Skip Infer) e
   | Bind (v, _, e), Skip pannot ->
     begin match infer_branches_iterated tenv env pannot e with
     | NeedVar (vs, pannot1, pannot2) when VarSet.mem v vs ->
@@ -1111,7 +1117,7 @@ and infer_branches tenv env pannot e =
         (* Now, we perform the splits from the annotations *)
         log ~level:2 "Typing body for %a with splits %a.@."
           Variable.pp v (pp_list pp_typ) (effective_splits splits) ;
-        infer_branches_union_iterated tenv env v a e t splits
+        infer_branches_union tenv env v a e t splits
         |> map_res (fun x -> Keep (pannot_a, x))
       end
     | res -> res |> map_res (fun x -> Keep (x, splits))
@@ -1122,21 +1128,18 @@ and infer_branches_a_iterated vardef tenv env pannot_a a =
   log ~level:5 "infer_branches_a_iterated@." ;
   let res = infer_branches_a vardef tenv env pannot_a a in
   match should_iterate res with
-  | None -> res
+  | None -> normalize_subst env
+      PartialAnnot.apply_subst_a (estimate_branch_a env a)
+      (fun a b c -> PartialAnnot.InterA (a,b,c)) res
   | Some pannot_a -> infer_branches_a_iterated vardef tenv env pannot_a a
-
-and infer_branches_union_iterated tenv env v a e t splits =
-  log ~level:5 "infer_branches_splits_iterated@." ;
-  let res = infer_branches_union tenv env v a e t splits in
-  match should_iterate res with
-  | None -> res
-  | Some splits -> infer_branches_union_iterated tenv env v a e t splits
 
 and infer_branches_iterated tenv env pannot e =
   log ~level:5 "infer_branches_iterated@." ;
   let res = infer_branches tenv env pannot e in
   match should_iterate res with
-  | None -> res
+  | None -> normalize_subst env
+      PartialAnnot.apply_subst (estimate_branch env e)
+      (fun a b c -> PartialAnnot.Inter (a,b,c)) res
   | Some pannot -> infer_branches_iterated tenv env pannot e
 
 (* ====================================== *)

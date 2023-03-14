@@ -714,9 +714,10 @@ and estimate_branch env e pannot =
   in
   match e, pannot with
   | _, Untyp -> None
+  | _, Infer -> Some any
   | _, Inter i -> estimate_inter (estimate_branch env e) i
-  | Var v, _ when Env.mem v env -> Some (Env.find v env)
-  | Var _, _ -> None
+  | Var v, Typ when Env.mem v env -> Some (Env.find v env)
+  | Var _, Typ -> None
   | Bind (v, _, e), Skip pannot ->
     let env = Env.add v any env in
     estimate_branch env e pannot
@@ -757,17 +758,14 @@ let infer_branches_inter env infer_branch apply_subst_branch (b1, b2, tf) =
       let smg = subst_more_general tvars in
       let leq s s' = (smg s s' |> not) || smg s' s in
       let leq (_,s,_) (_,s',_) = leq s s' in
-      let more_specific s s' = smg s' s && not (smg s s') in
-      let rm_useless explored pending lst =
-        lst |> Utils.filter_among_others (fun (_,s,est) others ->
-          let leqs = others@pending |> List.filter (fun (_,s',_) -> more_specific s' s) in
-          let leqs = leqs@explored in
-          let t_est = leqs |> List.map Utils.trd3 |> conj in
-          leqs = [] || (subtype_gen t_est est |> not)
+      (* Remove branches that are estimated not to add anything *)
+      let rm_useless lst =
+        lst |> List.filter (fun (_,_,est) ->
+          let t_est = explored |> List.map Utils.trd3 |> conj in
+          explored = [] || (subtype_gen t_est est |> not)
         )
       in
-      (* Remove branches that are estimated not to add anything *)
-      let pending = rm_useless explored [] pending in
+      let pending = rm_useless pending in
       match pending with
       | [] ->
         let explored =

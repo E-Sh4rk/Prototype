@@ -733,12 +733,9 @@ and estimate_branch env e pannot =
   | _, _ -> assert false
 
 (* TODO: adapt branch pruning to new system...
-   i) estimations should not be updated even after the branch has been typed
-   ii) intersections of size 1 should be removed
-   iii) estimations of explored branches should be passed as arg when
+   estimations of explored branches should be passed as arg when
    typing another branch, so that it can be considered when removing branches *)
-let infer_branches_inter env infer_branch infer_inst
-  typeof apply_subst_branch (b1, b2, tf) =
+let infer_branches_inter env infer_branch apply_subst_branch (b1, b2, tf) =
   let tvars = Env.tvars env in
   let tvars = TVarSet.filter TVar.is_mono tvars in
   let subtype_gen a b =
@@ -800,14 +797,11 @@ let infer_branches_inter env infer_branch infer_inst
           log ~level:3 "Exploring intersection issued from %a@." Subst.pp s;
         begin match infer_branch pannot with
         | Ok pannot ->
-          let annot = infer_inst pannot in
-          let est' = typeof annot in
           (* if nontrivial
             && env |> Env.domain |> List.exists (Variable.is_lambda_var) |> not
           then begin
             Format.printf "======================@." ;
-            Format.printf "Branch typed: %a@." pp_typ est' ;
-            Format.printf "Former est: %a@." pp_typ est ;
+            Format.printf "Branch est: %a@." pp_typ est ;
             Format.printf "From subst: %a@." Subst.pp s ;
             Format.printf "Env domain: %a@." (Utils.pp_list Variable.pp) (Env.domain env) ;
             Format.printf "Env: %a@." Env.pp (Env.filter (fun v _ ->
@@ -815,11 +809,11 @@ let infer_branches_inter env infer_branch infer_inst
           end ; *)
           (* If the type of this new branch does not add anything, remove it *)
           let explored =
-            if explored = [] then (pannot, s, est')::explored
+            if explored = [] then (pannot, s, est)::explored
             else
               let t = List.map Utils.trd3 explored |> conj in
-              if subtype_gen t est' then explored
-              else (pannot, s, est')::explored
+              if subtype_gen t est then explored
+              else (pannot, s, est)::explored
           in
           aux explored pending
         | res -> map_res (fun x -> (explored, (x,s,est)::pending, tf)) res
@@ -853,7 +847,9 @@ let normalize_subst env apply_subst_branch estimate_branch mk_inter res =
           else None
         )
       in
-      (subst, mk_inter [] bs false)
+      match bs with
+      | [(pannot,_,_)] -> (subst, pannot)
+      | bs -> (subst, mk_inter [] bs false)
     ) in
     Subst res
   | res -> res
@@ -869,8 +865,6 @@ let rec infer_branches_a vardef tenv env pannot_a a =
     infer_branches_inter
       env
       (fun pannot_a -> infer_branches_a_iterated vardef tenv env pannot_a a)
-      (fun pannot_a -> infer_inst_a vardef tenv env pannot_a a)
-      (fun annot_a -> typeof_a vardef tenv env annot_a a)
       apply_subst_a
       i
     |> map_res (fun x -> InterA x)
@@ -1052,8 +1046,6 @@ and infer_branches tenv env pannot e =
     infer_branches_inter
       env
       (fun pannot -> infer_branches_iterated tenv env pannot e)
-      (fun pannot -> infer_inst tenv env pannot e)
-      (fun annot -> typeof tenv env annot e)
       apply_subst
       i
     |> map_res (fun x -> Inter x)

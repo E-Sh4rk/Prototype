@@ -689,6 +689,9 @@ let rec estimate_branch_a env pannot_a a =
     let env = Env.add v s env in
     estimate_branch env pannot e |> Option.map (fun t ->
       mk_arrow (cons s) (cons t)
+      (* NOTE: the estimation below reduces the number of branches a lot,
+         though in some cases it could prune important branches. *)
+      (* mk_arrow (cons s) any_node *)
     )
   | _, _ -> assert false
 
@@ -727,8 +730,8 @@ and estimate_branch env pannot e =
     end
   | _, _ -> assert false
 
-(* TODO: more branches pruning... maybe we should only consider the domain
-   of estimated types (and not the full estimation with the 2nd arg, 3rd arg, etc) *)
+(* TODO: more branches pruning... maybe we should remember the previous estimations
+   of a branch in order to always compare estimations made "at the same point" *)
 let infer_branches_inter env infer_branch infer_inst
   typeof estimate_branch apply_subst_branch (b1, b2, b3, tf) =
   let tvars = Env.tvars env in
@@ -749,17 +752,20 @@ let infer_branches_inter env infer_branch infer_inst
         b2@b3 |> List.iter (fun (_,_,est) -> Format.printf "Est: %a@." pp_typ est) *)
     end ;
     let rec aux explored pending =
-      (* Remove branches with a domain that has already been explored *)
-      let explored_t =
-        if explored = [] then None
-        else Some (List.map Utils.trd3 explored |> conj)
+      let smg = subst_more_general tvars in
+      let leq s s' = (smg s s' |> not) || smg s' s in
+      let leq (_,s,_) (_,s',_) = leq s s' in
+      let more_specific s s' = smg s' s && not (smg s s') in
+      let rm_useless explored pending lst =
+        lst |> Utils.filter_among_others (fun (_,s,est) others ->
+          let leqs = others@pending |> List.filter (fun (_,s',_) -> more_specific s' s) in
+          let leqs = leqs@explored in
+          let t_est = leqs |> List.map Utils.trd3 |> conj in
+          leqs = [] || (subtype_gen t_est est |> not)
+        )
       in
-      let pending =
-        match explored_t with
-        | None -> pending
-        | Some t -> pending |> List.filter
-            (fun (_,_,estimated) -> subtype_gen t estimated |> not)
-      in
+      (* Remove branches that are estimated not to add anything *)
+      let pending = rm_useless explored [] pending in
       match pending with
       | [] ->
         let explored =
@@ -782,11 +788,8 @@ let infer_branches_inter env infer_branch infer_inst
         in
         Ok (explored, [], [], true)
       | pending ->
+        let f br others = others |> List.for_all (leq br) in
         (* Select more specific branches first *)
-        let smg = subst_more_general tvars in
-        let f (_, s, _) others = others |> List.for_all
-          (fun (_, s', _) -> (smg s s' |> not) || smg s' s)
-        in
         let ((pannot, s, est), pending) = find_among_others f pending |> Option.get in
         if nontrivial then
           log ~level:3 "Exploring intersection issued from %a@." Subst.pp s;
@@ -807,10 +810,11 @@ let infer_branches_inter env infer_branch infer_inst
           end ; *)
           (* If the type of this new branch does not add anything, remove it *)
           let explored =
-            match explored_t with
-            | None -> (pannot, s, est')::explored
-            | Some t when subtype_gen t est' -> explored
-            | Some _ -> (pannot, s, est')::explored
+            if explored = [] then (pannot, s, est')::explored
+            else
+              let t = List.map Utils.trd3 explored |> conj in
+              if subtype_gen t est' then explored
+              else (pannot, s, est')::explored
           in
           aux explored pending
         | Subst lst ->

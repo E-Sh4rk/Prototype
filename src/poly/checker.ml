@@ -727,6 +727,8 @@ and estimate_branch env pannot e =
     end
   | _, _ -> assert false
 
+(* TODO: more branches pruning... maybe we should only consider the domain
+   of estimated types (and not the full estimation with the 2nd arg, 3rd arg, etc) *)
 let infer_branches_inter env infer_branch infer_inst
   typeof estimate_branch apply_subst_branch (b1, b2, b3, tf) =
   let tvars = Env.tvars env in
@@ -740,9 +742,12 @@ let infer_branches_inter env infer_branch infer_inst
   else begin
     let uNb = List.length b2 + List.length b3 and eNb = List.length b1 in
     let nontrivial = uNb + eNb > 1 in
-    if nontrivial then
-      log ~level:2 "Typing intersection with %n unexplored branches (and %n explored).@."
+    if nontrivial then begin
+      log ~level:0 "Typing intersection with %n unexplored branches (and %n explored).@."
         uNb eNb ;
+      (* if uNb >= 5 then
+        b2@b3 |> List.iter (fun (_,_,est) -> Format.printf "Est: %a@." pp_typ est) *)
+    end ;
     let rec aux explored pending =
       (* Remove branches with a domain that has already been explored *)
       let explored_t =
@@ -788,12 +793,13 @@ let infer_branches_inter env infer_branch infer_inst
         begin match infer_branch pannot with
         | Ok pannot ->
           let annot = infer_inst pannot in
-          let est = typeof annot in
+          let est' = typeof annot in
           (* if nontrivial
             && env |> Env.domain |> List.exists (Variable.is_lambda_var) |> not
           then begin
             Format.printf "======================@." ;
-            Format.printf "Branch typed: %a@." pp_typ est ;
+            Format.printf "Branch typed: %a@." pp_typ est' ;
+            Format.printf "Former est: %a@." pp_typ est ;
             Format.printf "From subst: %a@." Subst.pp s ;
             Format.printf "Env domain: %a@." (Utils.pp_list Variable.pp) (Env.domain env) ;
             Format.printf "Env: %a@." Env.pp (Env.filter (fun v _ ->
@@ -802,9 +808,9 @@ let infer_branches_inter env infer_branch infer_inst
           (* If the type of this new branch does not add anything, remove it *)
           let explored =
             match explored_t with
-            | None -> (pannot, s, est)::explored
-            | Some t when subtype_gen t est -> explored
-            | Some _ -> (pannot, s, est)::explored
+            | None -> (pannot, s, est')::explored
+            | Some t when subtype_gen t est' -> explored
+            | Some _ -> (pannot, s, est')::explored
           in
           aux explored pending
         | Subst lst ->
@@ -1000,7 +1006,7 @@ and infer_branches_union tenv env v a e t splits =
         in
         begin match propagate with
         | Some env' ->
-          log ~level:1 "Var %a is ok but a split must be propagated.@." Variable.pp v ;
+          log ~level:0 "Var %a is ok but a split must be propagated.@." Variable.pp v ;
           let env' = filter_refinement env env' in
           Split (env', (SUnr s)::splits, (SProp (s, pannot))::splits)
         | None -> aux ((SExpl (s, pannot))::splits)

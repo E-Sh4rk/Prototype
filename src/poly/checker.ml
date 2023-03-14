@@ -824,6 +824,7 @@ let infer_branches_inter env infer_branch apply_subst_branch (b1, b2, tf) =
 let filter_refinement env env' =
   Env.filter (fun v t -> subtype (Env.find v env) t |> not) env'
 
+(* TODO: Don't add id subst here. Handle it in inter rules. (fix in paper too) *)
 let normalize_subst env apply_subst_branch estimate_branch mk_inter res =
   let tvars = Env.tvars env in
   match res with

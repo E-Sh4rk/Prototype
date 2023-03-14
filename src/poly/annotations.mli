@@ -10,6 +10,7 @@ module PartialAnnot : sig
     and union = split list
     and 'a annotated_branch = 'a * Subst.t * typ
     and 'a inter = ('a annotated_branch) list (* Explored *)
+                 * ('a annotated_branch) list (* Exploring *)
                  * ('a annotated_branch) list (* Pending *)
                  * bool (* Typing finished? *)
     and a =

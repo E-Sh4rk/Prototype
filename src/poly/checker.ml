@@ -383,8 +383,8 @@ let approximate_app infer t1 t2 resvar =
   then (match approximate_app infer t1 t2 resvar with [] -> assert false | sols -> sols)
   else res
 
-let infer_inst_inter infer_inst_branch (b1, b2, tf) =
-  assert (b2 = [] && b1 <> [] && tf) ;
+let infer_inst_inter infer_inst_branch (b1, b2, b3, tf) =
+  assert (b3 = [] && b2 = [] && b1 <> [] && tf) ;
   b1 |> List.map (fun (annot,_,_) -> infer_inst_branch annot)
 
 let rec infer_inst_a vardef tenv env pannot_a a =
@@ -670,7 +670,7 @@ let simplify_tallying_infer env res sols =
     res
   ) *)
 
-let estimate_inter (lst1, lst2, _) =
+let estimate_inter (lst1, lst2, _, _) =
   let lst = lst1@lst2 in
   if lst = [] then None
   else Some (lst |> List.map (fun (_, _, t) -> t) |> conj_o)
@@ -727,12 +727,8 @@ and estimate_branch env pannot e =
     end
   | _, _ -> assert false
 
-(* TODO: add a "lastly explored" group in intersections, and only consider it
-   (+ fully exlored branches) in estimations *)
-(* TODO: try to prune branches that initially were more general, but then
-   become equivalent (at least, for their domain) to a previous branch *)
 let infer_branches_inter env infer_branch infer_inst
-  typeof estimate_branch apply_subst_branch (b1, b2, tf) =
+  typeof estimate_branch apply_subst_branch (b1, b2, b3, tf) =
   let tvars = Env.tvars env in
   let tvars = TVarSet.filter TVar.is_mono tvars in
   let subtype_gen a b =
@@ -740,9 +736,9 @@ let infer_branches_inter env infer_branch infer_inst
     let a = Subst.apply gen a in
     subtype_poly a b
   in
-  if b1 = [] && b2 = [] then Subst []
+  if b1 = [] && b2 = [] && b3 = [] then Subst []
   else begin
-    let uNb = List.length b2 and eNb = List.length b1 in
+    let uNb = List.length b2 + List.length b3 and eNb = List.length b1 in
     let nontrivial = uNb + eNb > 1 in
     if nontrivial then
       log ~level:2 "Typing intersection with %n unexplored branches (and %n explored).@."
@@ -779,7 +775,7 @@ let infer_branches_inter env infer_branch infer_inst
               subtype_gen est' est |> not
             )
         in
-        Ok (explored, [], true)
+        Ok (explored, [], [], true)
       | pending ->
         (* Select more specific branches first *)
         let smg = subst_more_general tvars in
@@ -830,14 +826,14 @@ let infer_branches_inter env infer_branch infer_inst
                 else None
               )
             in
-            (subst, (explored, bs@pending, tf))
+            (subst, (explored, bs, pending, tf))
           ) in
           Subst res      
-        | res -> map_res (fun x -> (explored, (x,s,est)::pending, tf)) res
+        | res -> map_res (fun x -> (explored, [(x,s,est)], pending, tf)) res
         end
     in
     (* NOTE: branches already typed are not typed again. *)
-    aux b1 b2
+    aux b1 (b2@b3)
   end
 
 let filter_refinement env env' =
@@ -956,10 +952,10 @@ let rec infer_branches_a vardef tenv env pannot_a a =
     let alpha = Variable.to_typevar vardef |> TVar.typ
       (* TVar.mk_mono (Some (Variable.show vardef)) |> TVar.typ *)
     in
-    let pannot_a = InterA ([], [initial_lambda_branch alpha], false) in
+    let pannot_a = InterA ([], [], [initial_lambda_branch alpha], false) in
     infer_branches_a vardef tenv env pannot_a a
   | Lambda (ADomain ts, _, _), InferA ->
-    let pannot_a = InterA ([], List.map initial_lambda_branch ts, false) in
+    let pannot_a = InterA ([], [], List.map initial_lambda_branch ts, false) in
     infer_branches_a vardef tenv env pannot_a a
   | Lambda (_, v, e), LambdaA (s, pannot) ->
     log ~level:2 "Entering lambda for %a with domain %a.@." Variable.pp v pp_typ s ;
@@ -1046,7 +1042,7 @@ and infer_branches tenv env pannot e =
   | Var _, Untyp -> Subst []
   | Var v, Infer -> needvar [v] Typ Untyp
   | Bind _, Infer ->
-    let pannot = Inter ([], [Skip Infer, Subst.identity, any], false) in
+    let pannot = Inter ([], [], [Skip Infer, Subst.identity, any], false) in
     infer_branches tenv env pannot e
   | Bind (v, _, e), Skip pannot ->
     begin match infer_branches_iterated tenv env pannot e with

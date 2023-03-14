@@ -670,11 +670,12 @@ let simplify_tallying_infer env res sols =
     res
   ) *)
 
-(* TODO: do not use estimations in intersections... *)
-let estimate_inter (lst1, lst2, _) =
-  let lst = lst1@lst2 in
+let estimate_inter estimate_branch (lst1, lst2, _) =
+  let lst = lst1@lst2 |> List.filter_map (fun (pannot, _, _) ->
+    estimate_branch pannot
+  ) in
   if lst = [] then None
-  else Some (lst |> List.map (fun (_, _, t) -> t) |> conj_o)
+  else Some (conj_o lst)
 
 let rec estimate_branch_a env a pannot_a =
   (* TODO: refine this function so the branch taken by a typecase matters ?
@@ -685,7 +686,7 @@ let rec estimate_branch_a env a pannot_a =
   | _, UntypA -> None
   | _, TypA -> Some any
   | _, InferA -> Some any
-  | _, InterA i -> estimate_inter i
+  | _, InterA i -> estimate_inter (estimate_branch_a env a) i
   | Lambda (_, v, e), LambdaA (s, pannot) ->
     let env = Env.add v s env in
     estimate_branch env e pannot |> Option.map (fun t ->
@@ -713,7 +714,7 @@ and estimate_branch env e pannot =
   in
   match e, pannot with
   | _, Untyp -> None
-  | _, Inter i -> estimate_inter i
+  | _, Inter i -> estimate_inter (estimate_branch env e) i
   | Var v, _ when Env.mem v env -> Some (Env.find v env)
   | Var _, _ -> None
   | Bind (v, _, e), Skip pannot ->

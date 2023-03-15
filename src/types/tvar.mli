@@ -1,4 +1,4 @@
-
+(* TODO: remove var lookup functions (not needed anymore) *)
 module TVar : sig
     type t = Cduce_types.Var.t
 

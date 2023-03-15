@@ -739,6 +739,8 @@ let add_explored key t =
 let get_explored key =
   let all = Hashtbl.find_all explored_table key in
   if all = [] then None else Some (conj_o all)
+(* TODO: reset this cache when taking another (upper) branch,
+   or make the key dependent on the branch *)
 
 let infer_branches_inter key env infer_branch apply_subst_branch (b1, b2, tf) =
   let tvars = Env.tvars env in

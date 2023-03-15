@@ -381,7 +381,7 @@ let approximate_app infer t1 t2 resvar =
   then (match approximate_app infer t1 t2 resvar with [] -> assert false | sols -> sols)
   else res
 
-let infer_inst_inter infer_inst_branch (b1, b2, tf) =
+let infer_inst_inter infer_inst_branch (b1, b2, (tf,_)) =
   assert (b2 = [] && b1 <> [] && tf) ;
   b1 |> List.map (fun (annot,_,_) -> infer_inst_branch annot)
 
@@ -759,7 +759,7 @@ let reset_explored key =
     Hashtbl.remove explored_table key
   done
 
-let infer_branches_inter key env infer_branch typeof (b1, b2, tf) =
+let infer_branches_inter key env infer_branch typeof (b1, b2, (tf,ud)) =
   let explored_t = ref (get_explored key) in
   b1 |> List.iter (fun (_,_,t) -> explored_t := t::(!explored_t)) ;
   let tvars = Env.tvars env in
@@ -783,9 +783,9 @@ let infer_branches_inter key env infer_branch typeof (b1, b2, tf) =
     let leq (_,s,_) (_,s',_) = leq s s' in
     (* Remove branches that are estimated not to add anything *)
     let pending =
-      match !explored_t with
-      | [] -> pending
-      | explored_t ->
+      match !explored_t, ud with
+      | [], _ | _, true -> pending
+      | explored_t, false ->
         let est' = explored_t |> conj_o in
         pending |> List.filter (fun (_,_,est) ->
           subtype_gen est' est |> not
@@ -809,7 +809,7 @@ let infer_branches_inter key env infer_branch typeof (b1, b2, tf) =
           )
           |> List.map fst
       in
-      Ok (explored, [], true)
+      Ok (explored, [], (true, ud))
     | pending ->
       let f br others = others |> List.for_all (leq br) in
       (* Select more specific branches first *)
@@ -834,13 +834,13 @@ let infer_branches_inter key env infer_branch typeof (b1, b2, tf) =
         end ; *)
         explored_t := est::(!explored_t) ;
         aux ((pannot, s, est)::explored) pending
-      | Subst lst when
+      | Subst lst when not ud &&
         List.for_all (fun (s,_) -> Subst.is_identity s |> not) lst ->
         let lst = lst |> List.map (fun (subst, pannot) ->
-          (subst, (explored, (pannot,s,est)::pending, tf))
+          (subst, (explored, (pannot,s,est)::pending, (tf,ud)))
         ) in
-        Subst (lst@[(Subst.identity, (explored, pending, tf))])
-      | res -> map_res (fun x -> (explored, (x,s,est)::pending, tf)) res
+        Subst (lst@[(Subst.identity, (explored, pending, (tf,ud)))])
+      | res -> map_res (fun x -> (explored, (x,s,est)::pending, (tf,ud))) res
       end
   in
   (* NOTE: branches already typed are not typed again. *)
@@ -871,7 +871,7 @@ let normalize_subst env apply_subst_branch estimate_branch mk_inter res =
       in
       match bs with
       | [(pannot,_,_)] -> (subst, pannot)
-      | bs -> (subst, mk_inter [] bs false)
+      | bs -> (subst, mk_inter [] bs (false,false))
     ) in
     Subst res
   | res -> res
@@ -983,11 +983,14 @@ let rec infer_branches_a vardef tenv env pannot_a a =
     infer_branches_a vardef tenv env pannot_a a
   | Lambda (ADomain ts, _, _), InferA ->
     let alpha = TVar.mk_mono (Some (Variable.show vardef)) in
-    let pannot_a = LambdaA (TVar.typ alpha, Infer) in
-    let lst = ts |> List.map (fun t ->
-      ([(alpha,t)] |> Subst.construct, pannot_a)
+    let branches = ts |> List.map (fun t ->
+      let subst = [(alpha,t)] |> Subst.construct in
+      let est = mk_arrow (cons t) any_node in
+      let pannot_a = LambdaA (t, Infer) in
+      (pannot_a, subst, est)
     ) in
-    Subst lst
+    let pannot_a = InterA ([], branches, (false, true)) in
+    infer_branches_a vardef tenv env pannot_a a
   | Lambda (_, v, e), LambdaA (s, pannot) ->
     log ~level:2 "Entering lambda for %a with domain %a.@." Variable.pp v pp_typ s ;
     if is_empty s then Subst []

@@ -15,7 +15,8 @@ module PartialAnnot = struct
   [@@deriving show]
   and 'a inter = ('a annotated_branch) list (* Explored *)
                * ('a annotated_branch) list (* Pending *)
-               * bool (* Typing finished? *)
+               * (  bool (* Typing finished? *)
+                  * bool (* User defined *))
   [@@deriving show]
   and a =
     | InferA | TypA | UntypA
@@ -40,14 +41,14 @@ module PartialAnnot = struct
       | SUnr ty -> SUnr (apply_subst_simplify s ty)
     in
     List.map aux lst
-  and apply_subst_inter_a s (a, b, tf) =
+  and apply_subst_inter_a s (a, b, flags) =
     (List.map (apply_subst_branch apply_subst_a s) a,
     List.map (apply_subst_branch apply_subst_a s) b,
-    tf)
-  and apply_subst_inter s (a, b, tf) =
+    flags)
+  and apply_subst_inter s (a, b, flags) =
     (List.map (apply_subst_branch apply_subst s) a,
     List.map (apply_subst_branch apply_subst s) b,
-    tf)
+    flags)
   and apply_subst_a s a = match a with
   | InferA -> InferA
   | TypA -> TypA

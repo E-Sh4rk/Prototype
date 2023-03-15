@@ -676,14 +676,9 @@ let estimate_inter estimate_branch (lst1, lst2, _) =
   else Some (conj_o lst)
 
 let rec estimate_branch_a env a pannot_a =
-  (* TODO: refine this function so the branch taken by a typecase matters ?
-     (we could associate a symbolic typevar to each binding and type them with
-     this typevar instead of Any) *)
   let open PartialAnnot in
   match a, pannot_a with
   | _, UntypA -> None
-  | _, TypA -> Some any
-  | _, InferA -> Some any
   | _, InterA i -> estimate_inter (estimate_branch_a env a) i
   | Lambda (_, v, e), LambdaA (s, pannot) ->
     let env = Env.add v s env in
@@ -693,6 +688,26 @@ let rec estimate_branch_a env a pannot_a =
          though in some cases it could prune important branches. *)
       (* mk_arrow (cons s) any_node *)
     )
+  | Lambda _, InferA -> Some any
+  | Pair (v1,v2), _ when Env.mem v1 env && Env.mem v2 env ->
+    Some (mk_times (Env.find v1 env |> cons) (Env.find v2 env |> cons))
+  | Pair _, _ -> None
+  | TypeConstr (v, _), _ when Env.mem v env -> Some (Env.find v env)
+  | TypeConstr _, _ -> None
+  | Let (v1, v2), _ when Env.mem v1 env && Env.mem v2 env ->
+    Some (Env.find v2 env)
+  | Let _, _ -> None
+  | Alias v, _ -> Some (Env.find v env)
+  | Abstract _, _ -> Some any
+  | Const _, _ -> Some any
+  | Ite (v, _, _, _), _ when Env.mem v env ->
+    Some any
+    (* TODO: refine so that the branch taken by a typecase matters
+     (we could associate a symbolic typevar to each binding and type them with
+     this typevar instead of Any) *)
+  | App _, _ -> Some any
+  | Projection _, _ -> Some any
+  | RecordUpdate _, _ -> Some any
   | _, _ -> assert false
 
 and estimate_branch env e pannot =
@@ -712,10 +727,9 @@ and estimate_branch env e pannot =
   in
   match e, pannot with
   | _, Untyp -> None
-  | _, Infer -> Some any
   | _, Inter i -> estimate_inter (estimate_branch env e) i
-  | Var v, Typ when Env.mem v env -> Some (Env.find v env)
-  | Var _, Typ -> None
+  | Var v, _ when Env.mem v env -> Some (Env.find v env)
+  | Var _, _ -> None
   | Bind (v, _, e), Skip pannot ->
     let env = Env.add v any env in
     estimate_branch env e pannot
@@ -729,6 +743,7 @@ and estimate_branch env e pannot =
       let env = Env.add v t env in
       estimate_branch env e pannot1
     end
+  | Bind _, Infer -> Some any
   | _, _ -> assert false
 
 (* TODO: refactor this... every branch should be identified and

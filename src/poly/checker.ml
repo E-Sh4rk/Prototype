@@ -565,7 +565,8 @@ let simplify_tallying_infer env res sols =
   in
   let try_remove_var sol v =
     let t = Subst.find' sol v in
-    let pvs = TVarSet.diff (vars t) tvars in
+    let mono = mono_vars (Subst.rm v sol) in
+    let pvs = TVarSet.diff (vars t) mono in
     let g = generalize pvs in let m = Subst.inverse_renaming g in
     let t = Subst.apply g t in
     let res = tallying [(TVar.typ v, t) ; (t, TVar.typ v)]
@@ -623,9 +624,10 @@ let simplify_tallying_infer env res sols =
     List.fold_left (fun sol v ->
       let t = Subst.find' sol v in
       let v = TVar.mk_fresh v in
-      (* NOTE: we allow to rename mono vars even if already in the env...
+      (* NOTE: we allow to rename mono vars even if it corresponds to a
+         mono var already in the env (tvars)...
          this might create an uneeded correlation but it simplifies a lot. *)
-      let vs = (*TVarSet.diff (top_vars t) tvars*) top_vars t in
+      let vs = top_vars t in
       let s = replace_vars t vs v in
       Subst.compose s sol
     ) sol (new_dom |> TVarSet.destruct)

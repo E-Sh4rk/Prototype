@@ -793,16 +793,16 @@ let infer_branches_inter key env infer_branch apply_subst_branch typeof (b1, b2,
             (apply_subst_branch subst pannot, Subst.compose_restr subst s,
             Subst.apply subst est)
           )
-          (* We update all estimations (it will not be used anymore)
-             and remove useless branches *)
-          |> List.map (fun (pannot, s, _) ->
-            (pannot, s, typeof pannot)
+          (* We type each branch and remove useless ones *)
+          |> List.map (fun (pannot, s, est) ->
+            ((pannot, s, est), typeof pannot)
           )
           |> Utils.filter_among_others
-          (fun (_,_,est) others ->
-            let est' = others |> List.map Utils.trd3 |> conj in
-            subtype_gen est' est |> not
+          (fun (_,ty) others ->
+            let ty' = others |> List.map snd |> conj in
+            subtype_gen ty' ty |> not
           )
+          |> List.map fst
       in
       Ok (explored, [], true)
     | pending ->

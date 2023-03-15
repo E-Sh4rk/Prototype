@@ -1,5 +1,5 @@
 (library
- (name poly)
+ (name system)
  (libraries types parsing common utils)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.ord ppx_deriving.eq))

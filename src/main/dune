@@ -2,7 +2,7 @@
  (name main)
  (wrapped false)
  (inline_tests)
- (libraries types parsing common utils poly)
+ (libraries types parsing common utils system)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.ord ppx_deriving.eq ppx_expect ppx_inline_test))
  (modules (:standard)))

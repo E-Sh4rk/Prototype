@@ -733,10 +733,14 @@ and estimate_branch env e pannot =
     end
   | _, _ -> assert false
 
-(* TODO: adapt branch pruning to new system...
-   estimations of explored branches should be passed as arg when
-   typing another branch, so that it can be considered when removing branches *)
-let infer_branches_inter env infer_branch apply_subst_branch (b1, b2, tf) =
+let explored_table = Hashtbl.create 10
+let add_explored key t =
+  Hashtbl.add explored_table key t
+let get_explored key =
+  let all = Hashtbl.find_all explored_table key in
+  if all = [] then None else Some (conj_o all)
+
+let infer_branches_inter key env infer_branch apply_subst_branch (b1, b2, tf) =
   let tvars = Env.tvars env in
   let tvars = TVarSet.filter TVar.is_mono tvars in
   let subtype_gen a b =
@@ -744,88 +748,82 @@ let infer_branches_inter env infer_branch apply_subst_branch (b1, b2, tf) =
     let a = Subst.apply gen a in
     subtype_poly a b
   in
-  if b1 = [] && b2 = [] then Subst []
-  else begin
-    let uNb = List.length b2 and eNb = List.length b1 in
-    let nontrivial = uNb + eNb > 1 in
-    if nontrivial then begin
-      log ~level:0 "Typing intersection with %n unexplored branches (and %n explored).@."
-        uNb eNb ;
-      (* if uNb >= 5 then
-        b2@b3 |> List.iter (fun (_,_,est) -> Format.printf "Est: %a@." pp_typ est) *)
-    end ;
-    let rec aux explored pending =
-      let smg = subst_more_general tvars in
-      let leq s s' = (smg s s' |> not) || smg s' s in
-      let leq (_,s,_) (_,s',_) = leq s s' in
-      (* Remove branches that are estimated not to add anything *)
-      let rm_useless lst =
+  let uNb = List.length b2 and eNb = List.length b1 in
+  let nontrivial = uNb + eNb > 1 in
+  if nontrivial then begin
+    log ~level:0 "Typing intersection with %n unexplored branches (and %n explored).@."
+      uNb eNb ;
+    (* if uNb >= 5 then
+      b2@b3 |> List.iter (fun (_,_,est) -> Format.printf "Est: %a@." pp_typ est) *)
+  end ;
+  let rec aux explored pending =
+    let smg = subst_more_general tvars in
+    let leq s s' = (smg s s' |> not) || smg s' s in
+    let leq (_,s,_) (_,s',_) = leq s s' in
+    (* Remove branches that are estimated not to add anything *)
+    let rm_useless lst =
+      match get_explored key with
+      | None -> lst
+      | Some t_est ->
         lst |> List.filter (fun (_,_,est) ->
-          let t_est = explored |> List.map Utils.trd3 |> conj in
-          explored = [] || (subtype_gen t_est est |> not)
+          subtype_gen t_est est |> not
         )
-      in
-      let pending = rm_useless pending in
-      match pending with
-      | [] ->
-        let explored =
-          if tf || List.length explored <= 1 then explored
-          else
-            (* When we just finished typing the intersection, we rename the type vars
-               of the branches so that they are independant, and we remove redundant branches *)
-            explored
-            |> List.map (fun (pannot, s, est) ->
-              let new_vars = TVarSet.diff (vars_mono est) tvars in
-              let subst = refresh_all new_vars in
-              (apply_subst_branch subst pannot, Subst.compose_restr subst s,
-              Subst.apply subst est)
-            )
-            |> Utils.filter_among_others
-            (fun (_,_,est) others ->
-              let est' = others |> List.map Utils.trd3 |> conj in
-              subtype_gen est' est |> not
-            )
-        in
-        Ok (explored, [], true)
-      | pending ->
-        let f br others = others |> List.for_all (leq br) in
-        (* Select more specific branches first *)
-        let ((pannot, s, est), pending) = find_among_others f pending |> Option.get in
-        if nontrivial then
-          log ~level:3 "Exploring intersection issued from %a@." Subst.pp s;
-        begin match infer_branch pannot with
-        | Ok pannot ->
-          (* if nontrivial
-            && env |> Env.domain |> List.exists (Variable.is_lambda_var) |> not
-          then begin
-            Format.printf "======================@." ;
-            Format.printf "Branch est: %a@." pp_typ est ;
-            Format.printf "From subst: %a@." Subst.pp s ;
-            Format.printf "Env domain: %a@." (Utils.pp_list Variable.pp) (Env.domain env) ;
-            Format.printf "Env: %a@." Env.pp (Env.filter (fun v _ ->
-              Variable.is_lambda_var v) env)
-          end ; *)
-          (* If the type of this new branch does not add anything, remove it *)
-          let explored =
-            if explored = [] then (pannot, s, est)::explored
-            else
-              let t = List.map Utils.trd3 explored |> conj in
-              if subtype_gen t est then explored
-              else (pannot, s, est)::explored
-          in
-          aux explored pending
-        | Subst lst when
-          List.for_all (fun (s,_) -> Subst.is_identity s |> not) lst ->
-          let lst = lst |> List.map (fun (subst, pannot) ->
-            (subst, (explored, (pannot,s,est)::pending, tf))
-          ) in
-          Subst (lst@[(Subst.identity, (explored, pending, tf))])
-        | res -> map_res (fun x -> (explored, (x,s,est)::pending, tf)) res
-        end
     in
-    (* NOTE: branches already typed are not typed again. *)
-    aux b1 b2
-  end
+    let pending = rm_useless pending in
+    match pending with
+    | [] when explored = [] -> Subst []
+    | [] ->
+      let explored =
+        if tf || List.length explored <= 1 then explored
+        else
+          (* When we just finished typing the intersection, we rename the type vars
+              of the branches so that they are independant, and we remove redundant branches *)
+          explored
+          |> List.map (fun (pannot, s, est) ->
+            let new_vars = TVarSet.diff (vars_mono est) tvars in
+            let subst = refresh_all new_vars in
+            (apply_subst_branch subst pannot, Subst.compose_restr subst s,
+            Subst.apply subst est)
+          )
+          (* TODO: with real type instead of estimations *)
+          (* |> Utils.filter_among_others
+          (fun (_,_,est) others ->
+            let est' = others |> List.map Utils.trd3 |> conj in
+            subtype_gen est' est |> not
+          ) *)
+      in
+      Ok (explored, [], true)
+    | pending ->
+      let f br others = others |> List.for_all (leq br) in
+      (* Select more specific branches first *)
+      let ((pannot, s, est), pending) = find_among_others f pending |> Option.get in
+      if nontrivial then
+        log ~level:3 "Exploring intersection issued from %a@." Subst.pp s;
+      begin match infer_branch pannot with
+      | Ok pannot ->
+        (* if nontrivial
+          && env |> Env.domain |> List.exists (Variable.is_lambda_var) |> not
+        then begin
+          Format.printf "======================@." ;
+          Format.printf "Branch est: %a@." pp_typ est ;
+          Format.printf "From subst: %a@." Subst.pp s ;
+          Format.printf "Env domain: %a@." (Utils.pp_list Variable.pp) (Env.domain env) ;
+          Format.printf "Env: %a@." Env.pp (Env.filter (fun v _ ->
+            Variable.is_lambda_var v) env)
+        end ; *)
+        add_explored key est ;
+        aux ((pannot, s, est)::explored) pending
+      | Subst lst when
+        List.for_all (fun (s,_) -> Subst.is_identity s |> not) lst ->
+        let lst = lst |> List.map (fun (subst, pannot) ->
+          (subst, (explored, (pannot,s,est)::pending, tf))
+        ) in
+        Subst (lst@[(Subst.identity, (explored, pending, tf))])
+      | res -> map_res (fun x -> (explored, (x,s,est)::pending, tf)) res
+      end
+  in
+  (* NOTE: branches already typed are not typed again. *)
+  aux b1 b2
 
 let filter_refinement env env' =
   Env.filter (fun v t -> subtype (Env.find v env) t |> not) env'
@@ -866,6 +864,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
   match a, pannot_a with
   | a, InterA i ->
     infer_branches_inter
+      (true, vardef)
       env
       (fun pannot_a -> infer_branches_a_iterated vardef tenv env pannot_a a)
       apply_subst_a
@@ -1045,8 +1044,9 @@ and infer_branches tenv env pannot e =
   let needvar = needvar env in
   let open PartialAnnot in
   match e, pannot with
-  | e, Inter i ->
+  | Bind (v,_,_), Inter i ->
     infer_branches_inter
+      (false, v)
       env
       (fun pannot -> infer_branches_iterated tenv env pannot e)
       apply_subst

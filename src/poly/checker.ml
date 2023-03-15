@@ -1120,23 +1120,26 @@ and infer_branches tenv env pannot e =
     end
   | _, _ -> assert false
 
-(* TODO: fix (should iterate after normalize_subst) *)
 and infer_branches_a_iterated vardef tenv env pannot_a a =
   log ~level:5 "infer_branches_a_iterated@." ;
-  let res = infer_branches_a vardef tenv env pannot_a a in
-  match should_iterate res with
-  | None -> normalize_subst env
+  let res = infer_branches_a vardef tenv env pannot_a a |>
+    normalize_subst env
       PartialAnnot.apply_subst_a (estimate_branch_a env a)
-      (fun a b c -> PartialAnnot.InterA (a,b,c)) res
+      (fun a b c -> PartialAnnot.InterA (a,b,c))
+  in
+  match should_iterate res with
+  | None -> res
   | Some pannot_a -> infer_branches_a_iterated vardef tenv env pannot_a a
 
 and infer_branches_iterated tenv env pannot e =
   log ~level:5 "infer_branches_iterated@." ;
-  let res = infer_branches tenv env pannot e in
-  match should_iterate res with
-  | None -> normalize_subst env
+  let res = infer_branches tenv env pannot e |>
+    normalize_subst env
       PartialAnnot.apply_subst (estimate_branch env e)
-      (fun a b c -> PartialAnnot.Inter (a,b,c)) res
+      (fun a b c -> PartialAnnot.Inter (a,b,c))
+  in
+  match should_iterate res with
+  | None -> res
   | Some pannot -> infer_branches_iterated tenv env pannot e
 
 (* ====================================== *)

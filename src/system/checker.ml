@@ -667,21 +667,21 @@ let simplify_tallying_infer env res sols =
     res
   ) *)
 
-let estimate_inter estimate_branch (lst1, lst2, _) =
+let estimate_inter estimate (lst1, lst2, _) =
   let lst = lst1@lst2 |> List.filter_map (fun (pannot, _, _) ->
-    estimate_branch pannot
+    estimate pannot
   ) in
   if lst = [] then None
   else Some (conj_o lst)
 
-let rec estimate_branch_a env a pannot_a =
+let rec estimate_a env a pannot_a =
   let open PartialAnnot in
   match a, pannot_a with
   | _, UntypA -> None
-  | _, InterA i -> estimate_inter (estimate_branch_a env a) i
+  | _, InterA i -> estimate_inter (estimate_a env a) i
   | Lambda (_, v, e), LambdaA (s, pannot) ->
     let env = Env.add v s env in
-    estimate_branch env e pannot |> Option.map (fun t ->
+    estimate env e pannot |> Option.map (fun t ->
       mk_arrow (cons s) (cons t)
       (* NOTE: the estimation below reduces the number of branches a lot,
          though in some cases it could prune important branches. *)
@@ -709,7 +709,7 @@ let rec estimate_branch_a env a pannot_a =
   | RecordUpdate _, _ -> Some any
   | _, _ -> assert false
 
-and estimate_branch env e pannot =
+and estimate env e pannot =
   let open PartialAnnot in
   let estimate_splits v t e splits =
     let splits =
@@ -718,7 +718,7 @@ and estimate_branch env e pannot =
         | SProp (s, pannot)
         | SInfer (s, pannot) ->
           let env = Env.add v (cap_o t s) env in
-          estimate_branch env e pannot
+          estimate env e pannot
         | SUnr _ -> Some empty
       ) in
     if List.mem None splits then None
@@ -726,21 +726,21 @@ and estimate_branch env e pannot =
   in
   match e, pannot with
   | _, Untyp -> None
-  | _, Inter i -> estimate_inter (estimate_branch env e) i
+  | _, Inter i -> estimate_inter (estimate env e) i
   | Var v, _ when Env.mem v env -> Some (Env.find v env)
   | Var _, _ -> None
   | Bind (v, _, e), Skip pannot ->
     let env = Env.add v any env in
-    estimate_branch env e pannot
+    estimate env e pannot
   | Bind (v, a, e), Keep (pannot_a, splits) ->
-    let t = estimate_branch_a env a pannot_a |> Option.get in
+    let t = estimate_a env a pannot_a |> Option.get in
     estimate_splits v t e splits
   | Bind (v, a, e), TryKeep (pannot_a, pannot1, pannot2) ->
-    begin match estimate_branch_a env a pannot_a with
-    | None -> estimate_branch env e pannot2
+    begin match estimate_a env a pannot_a with
+    | None -> estimate env e pannot2
     | Some t ->
       let env = Env.add v t env in
-      estimate_branch env e pannot1
+      estimate env e pannot1
     end
   | Bind _, Infer -> Some any
   | _, _ -> assert false
@@ -849,7 +849,7 @@ let infer_mono_inter key env infer_branch typeof (b1, b2, (tf,ud)) =
 let filter_refinement env env' =
   Env.filter (fun v t -> subtype (Env.find v env) t |> not) env'
 
-let normalize_subst env apply_subst_branch estimate_branch mk_inter res =
+let normalize_subst env apply_subst_branch estimate mk_inter res =
   let tvars = Env.tvars env in
   match res with
   | Subst lst ->
@@ -864,7 +864,7 @@ let normalize_subst env apply_subst_branch estimate_branch mk_inter res =
           if Subst.equiv subst' subst
           then
             let pannot = apply_subst_branch subst_cur pannot in
-            estimate_branch pannot |> Option.map
+            estimate pannot |> Option.map
               (fun est -> (pannot, subst_cur, est))
           else None
         )
@@ -1144,7 +1144,7 @@ and infer_mono_a_iterated vardef tenv env pannot_a a =
   log ~level:5 "infer_mono_a_iterated@." ;
   let res = infer_mono_a vardef tenv env pannot_a a |>
     normalize_subst env
-      PartialAnnot.apply_subst_a (estimate_branch_a env a)
+      PartialAnnot.apply_subst_a (estimate_a env a)
       (fun a b c -> PartialAnnot.InterA (a,b,c))
   in
   match should_iterate res with
@@ -1155,7 +1155,7 @@ and infer_mono_iterated tenv env pannot e =
   log ~level:5 "infer_mono_iterated@." ;
   let res = infer_mono tenv env pannot e |>
     normalize_subst env
-      PartialAnnot.apply_subst (estimate_branch env e)
+      PartialAnnot.apply_subst (estimate env e)
       (fun a b c -> PartialAnnot.Inter (a,b,c))
   in
   match should_iterate res with

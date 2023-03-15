@@ -814,6 +814,12 @@ let infer_branches_inter env infer_branch apply_subst_branch (b1, b2, tf) =
               else (pannot, s, est)::explored
           in
           aux explored pending
+        | Subst lst when
+          List.for_all (fun (s,_) -> Subst.is_identity s |> not) lst ->
+          let lst = lst |> List.map (fun (subst, pannot) ->
+            (subst, (explored, (pannot,s,est)::pending, tf))
+          ) in
+          Subst (lst@[(Subst.identity, (explored, pending, tf))])
         | res -> map_res (fun x -> (explored, (x,s,est)::pending, tf)) res
         end
     in
@@ -824,15 +830,13 @@ let infer_branches_inter env infer_branch apply_subst_branch (b1, b2, tf) =
 let filter_refinement env env' =
   Env.filter (fun v t -> subtype (Env.find v env) t |> not) env'
 
-(* TODO: Don't add id subst here. Handle it in inter rules. (fix in paper too) *)
 let normalize_subst env apply_subst_branch estimate_branch mk_inter res =
   let tvars = Env.tvars env in
   match res with
   | Subst lst ->
     let sigma = lst |>
-      List.map (fun (subst,_) -> Subst.restrict subst tvars) in
-    let sigma = (Subst.identity)::sigma in
-    let sigma = remove_duplicates Subst.equiv sigma in
+      List.map (fun (subst,_) -> Subst.restrict subst tvars)
+      |> remove_duplicates Subst.equiv in
     let res = sigma |> List.map (fun subst ->
       let bs =
         lst |> List.filter_map (fun (subst', pannot) ->
@@ -1116,6 +1120,7 @@ and infer_branches tenv env pannot e =
     end
   | _, _ -> assert false
 
+(* TODO: fix (should iterate after normalize_subst) *)
 and infer_branches_a_iterated vardef tenv env pannot_a a =
   log ~level:5 "infer_branches_a_iterated@." ;
   let res = infer_branches_a vardef tenv env pannot_a a in

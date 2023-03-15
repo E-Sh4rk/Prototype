@@ -255,7 +255,7 @@ let refine_a tenv env a t =
   | Let (_, v2) -> [Env.singleton v2 t]
 
 (* ====================================== *)
-(* =============== INFER I ============== *)
+(* =============== INFER P ============== *)
 (* ====================================== *)
 
 let tallying_nonempty constr =
@@ -381,17 +381,17 @@ let approximate_app infer t1 t2 resvar =
   then (match approximate_app infer t1 t2 resvar with [] -> assert false | sols -> sols)
   else res
 
-let infer_inst_inter infer_inst_branch (b1, b2, (tf,_)) =
+let infer_poly_inter infer_poly_branch (b1, b2, (tf,_)) =
   assert (b2 = [] && b1 <> [] && tf) ;
-  b1 |> List.map (fun (annot,_,_) -> infer_inst_branch annot)
+  b1 |> List.map (fun (annot,_,_) -> infer_poly_branch annot)
 
-let rec infer_inst_a vardef tenv env pannot_a a =
+let rec infer_poly_a vardef tenv env pannot_a a =
   let open PartialAnnot in
   let open FullAnnot in
   let vartype v = Env.find v env in
   match a, pannot_a with
   | a, PartialAnnot.InterA i ->
-    InterA (infer_inst_inter (fun pannot_a -> infer_inst_a vardef tenv env pannot_a a) i)
+    InterA (infer_poly_inter (fun pannot_a -> infer_poly_a vardef tenv env pannot_a a) i)
   | Alias _, TypA -> AliasA
   | Const _, TypA -> ConstA
   | Let _, TypA -> LetA
@@ -455,26 +455,26 @@ let rec infer_inst_a vardef tenv env pannot_a a =
     else assert false
   | Lambda (_, v, e), PartialAnnot.LambdaA (s, pannot) ->
     let env = Env.add v s env in
-    let annot = infer_inst tenv env pannot e in
+    let annot = infer_poly tenv env pannot e in
     LambdaA (s, annot)
   | _, _ ->  assert false
 
-and infer_inst tenv env pannot e =
+and infer_poly tenv env pannot e =
   let open PartialAnnot in
   let open FullAnnot in
   let vartype v = Env.find v env in
   match e, pannot with
   | e, PartialAnnot.Inter i ->
-    Inter (infer_inst_inter (fun pannot -> infer_inst tenv env pannot e) i)
+    Inter (infer_poly_inter (fun pannot -> infer_poly tenv env pannot e) i)
   | Var v, Typ ->
     let r = refresh_all (vartype v |> vars_poly) in
     BVar r
   | Bind (_, _, e), PartialAnnot.Skip pannot ->
-    let annot = infer_inst tenv env pannot e in
+    let annot = infer_poly tenv env pannot e in
     FullAnnot.Skip annot
   | Bind (v, a, e), PartialAnnot.Keep (pannot_a, branches) ->
     assert (branches <> []) ;
-    let annot_a = infer_inst_a v tenv env pannot_a a in
+    let annot_a = infer_poly_a v tenv env pannot_a a in
     let t = typeof_a_nofail v tenv env annot_a a in
     let (branches, inst) = List.fold_left
       (fun (branches, inst) br ->
@@ -482,7 +482,7 @@ and infer_inst tenv env pannot e =
       | SExpl (si, pannot) ->
         let t = cap_o t si in
         let env = Env.add v t env in
-        ((si, infer_inst tenv env pannot e)::branches, inst)
+        ((si, infer_poly tenv env pannot e)::branches, inst)
       | SUnr si ->
         let t = cap_o t si in
         let sol = tallying_one [(t, empty)] in
@@ -494,7 +494,7 @@ and infer_inst tenv env pannot e =
   | _, _ ->  assert false
 
 (* ====================================== *)
-(* =============== INFER B ============== *)
+(* =============== INFER M ============== *)
 (* ====================================== *)
 
 type 'a res =
@@ -759,7 +759,7 @@ let reset_explored key =
     Hashtbl.remove explored_table key
   done
 
-let infer_branches_inter key env infer_branch typeof (b1, b2, (tf,ud)) =
+let infer_mono_inter key env infer_branch typeof (b1, b2, (tf,ud)) =
   let explored_t = ref (get_explored key) in
   b1 |> List.iter (fun (_,_,t) -> explored_t := t::(!explored_t)) ;
   let tvars = Env.tvars env in
@@ -876,7 +876,7 @@ let normalize_subst env apply_subst_branch estimate_branch mk_inter res =
     Subst res
   | res -> res
 
-let rec infer_branches_a vardef tenv env pannot_a a =
+let rec infer_mono_a vardef tenv env pannot_a a =
   let memvar v = Env.mem v env in
   let vartype v = Env.find v env in
   let needvar = needvar env in
@@ -884,12 +884,12 @@ let rec infer_branches_a vardef tenv env pannot_a a =
   let open PartialAnnot in
   match a, pannot_a with
   | a, InterA i ->
-    infer_branches_inter
+    infer_mono_inter
       (true, vardef)
       env
-      (fun pannot_a -> infer_branches_a_iterated vardef tenv env pannot_a a)
+      (fun pannot_a -> infer_mono_a_iterated vardef tenv env pannot_a a)
       (fun pannot_a ->
-        let annot_a = infer_inst_a vardef tenv env pannot_a a in
+        let annot_a = infer_poly_a vardef tenv env pannot_a a in
         typeof_a vardef tenv env annot_a a)
       i
     |> map_res (fun x -> InterA x)
@@ -980,7 +980,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
   | Lambda (Unnanoted, _, _), InferA ->
     let alpha = TVar.mk_mono (Some (Variable.show vardef)) |> TVar.typ in
     let pannot_a = LambdaA (alpha, Infer) in
-    infer_branches_a vardef tenv env pannot_a a
+    infer_mono_a vardef tenv env pannot_a a
   | Lambda (ADomain ts, _, _), InferA ->
     let alpha = TVar.mk_mono (Some (Variable.show vardef)) in
     let branches = ts |> List.map (fun t ->
@@ -990,22 +990,22 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       (pannot_a, subst, est)
     ) in
     let pannot_a = InterA ([], branches, (false, true)) in
-    infer_branches_a vardef tenv env pannot_a a
+    infer_mono_a vardef tenv env pannot_a a
   | Lambda (_, v, e), LambdaA (s, pannot) ->
     log ~level:2 "Entering lambda for %a with domain %a.@." Variable.pp v pp_typ s ;
     if is_empty s then Subst []
     else
       let env = Env.add v s env in
-      infer_branches_iterated tenv env pannot e
+      infer_mono_iterated tenv env pannot e
       |> map_res (fun x -> LambdaA (s, x))
   | _, _ -> assert false
 
-and infer_branches_union tenv env v a e t splits =
+and infer_mono_union tenv env v a e t splits =
   let packannot a = List.map (fun s -> (s, a)) in
   let open PartialAnnot in
   if List.for_all (function SUnr _ -> true | _ -> false) splits
   then
-    infer_branches_union tenv env v a e t ((SExpl (empty, Infer))::splits)
+    infer_mono_union tenv env v a e t ((SExpl (empty, Infer))::splits)
   else
     let rec aux splits =
       match splits with
@@ -1044,7 +1044,7 @@ and infer_branches_union tenv env v a e t splits =
       | (SExpl (s, pannot))::splits ->
         log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
         let env' = Env.add v (cap_o t s) env in
-        begin match infer_branches_iterated tenv env' pannot e with
+        begin match infer_mono_iterated tenv env' pannot e with
         | Ok pannot ->
           aux splits |> map_res (fun x -> (SExpl (s, pannot))::x)
         | Split (env', pannot1, pannot2) when Env.mem v env' ->
@@ -1058,26 +1058,26 @@ and infer_branches_union tenv env v a e t splits =
     in
     aux splits
 
-and infer_branches tenv env pannot e =
+and infer_mono tenv env pannot e =
   let needvar = needvar env in
   let open PartialAnnot in
   match e, pannot with
   | Bind (v,_,_), Inter i ->
-    infer_branches_inter
+    infer_mono_inter
       (false, v)
       env
-      (fun pannot -> infer_branches_iterated tenv env pannot e)
+      (fun pannot -> infer_mono_iterated tenv env pannot e)
       (fun pannot ->
-        let annot = infer_inst tenv env pannot e in
+        let annot = infer_poly tenv env pannot e in
         typeof tenv env annot e)
       i
     |> map_res (fun x -> Inter x)
   | Var _, Typ -> Ok Typ
   | Var _, Untyp -> Subst []
   | Var v, Infer -> needvar [v] Typ Untyp
-  | Bind _, Infer -> infer_branches tenv env (Skip Infer) e
+  | Bind _, Infer -> infer_mono tenv env (Skip Infer) e
   | Bind (v, _, e), Skip pannot ->
-    begin match infer_branches_iterated tenv env pannot e with
+    begin match infer_mono_iterated tenv env pannot e with
     | NeedVar (vs, pannot1, pannot2) when VarSet.mem v vs ->
       log ~level:0 "Var %a needed.@." Variable.pp v ;
       let pannot1 = TryKeep (InferA, pannot1, pannot2) in
@@ -1087,9 +1087,9 @@ and infer_branches tenv env pannot e =
     end
   | Bind (v, a, _), TryKeep (pannot_a, pannot1, pannot2) ->
     log ~level:1 "Trying to type var %a.@." Variable.pp v ;
-    begin match infer_branches_a_iterated v tenv env pannot_a a with
+    begin match infer_mono_a_iterated v tenv env pannot_a a with
     | Ok pannot_a ->
-      infer_branches tenv env (Keep (pannot_a, [SExpl (any, pannot1)])) e
+      infer_mono tenv env (Keep (pannot_a, [SExpl (any, pannot1)])) e
     | Subst lst when
       List.for_all (fun (s,_) -> Subst.is_identity s |> not) lst ->
       let lst = lst |> List.map (fun (s, pannot_a) ->
@@ -1101,11 +1101,11 @@ and infer_branches tenv env pannot e =
   | Bind (v, a, e), Keep (pannot_a, splits) ->
     log ~level:1 "Inferring var %a.@." Variable.pp v ;
     assert (splits <> []) ;
-    (* NOTE: The call to infer_branches_a_iterated should return Ok most of time,
+    (* NOTE: The call to infer_mono_a_iterated should return Ok most of time,
        it could probably be optimized away. *)
-    begin match infer_branches_a_iterated v tenv env pannot_a a with
+    begin match infer_mono_a_iterated v tenv env pannot_a a with
     | Ok pannot_a ->
-      let annot_a = infer_inst_a v tenv env pannot_a a in
+      let annot_a = infer_poly_a v tenv env pannot_a a in
       let t = typeof_a_nofail v tenv env annot_a a in
       log ~level:1 "Var %a typed with type %a.@." Variable.pp v pp_typ t ;
       (* If the definition is a function whose DNF has many disjuncts,
@@ -1133,34 +1133,34 @@ and infer_branches tenv env pannot e =
         (* Now, we perform the splits from the annotations *)
         log ~level:2 "Typing body for %a with splits %a.@."
           Variable.pp v (pp_list pp_typ) (effective_splits splits) ;
-        infer_branches_union tenv env v a e t splits
+        infer_mono_union tenv env v a e t splits
         |> map_res (fun x -> Keep (pannot_a, x))
       end
     | res -> res |> map_res (fun x -> Keep (x, splits))
     end
   | _, _ -> assert false
 
-and infer_branches_a_iterated vardef tenv env pannot_a a =
-  log ~level:5 "infer_branches_a_iterated@." ;
-  let res = infer_branches_a vardef tenv env pannot_a a |>
+and infer_mono_a_iterated vardef tenv env pannot_a a =
+  log ~level:5 "infer_mono_a_iterated@." ;
+  let res = infer_mono_a vardef tenv env pannot_a a |>
     normalize_subst env
       PartialAnnot.apply_subst_a (estimate_branch_a env a)
       (fun a b c -> PartialAnnot.InterA (a,b,c))
   in
   match should_iterate res with
   | None -> res
-  | Some pannot_a -> infer_branches_a_iterated vardef tenv env pannot_a a
+  | Some pannot_a -> infer_mono_a_iterated vardef tenv env pannot_a a
 
-and infer_branches_iterated tenv env pannot e =
-  log ~level:5 "infer_branches_iterated@." ;
-  let res = infer_branches tenv env pannot e |>
+and infer_mono_iterated tenv env pannot e =
+  log ~level:5 "infer_mono_iterated@." ;
+  let res = infer_mono tenv env pannot e |>
     normalize_subst env
       PartialAnnot.apply_subst (estimate_branch env e)
       (fun a b c -> PartialAnnot.Inter (a,b,c))
   in
   match should_iterate res with
   | None -> res
-  | Some pannot -> infer_branches_iterated tenv env pannot e
+  | Some pannot -> infer_mono_iterated tenv env pannot e
 
 (* ====================================== *)
 (* ================ INFER =============== *)
@@ -1168,9 +1168,9 @@ and infer_branches_iterated tenv env pannot e =
 
 let infer tenv env e =
   let open PartialAnnot in
-  match infer_branches_iterated tenv env Infer e with
+  match infer_mono_iterated tenv env Infer e with
   | Subst [] -> raise (Untypeable ([], "Annotations inference failed."))
-  | Ok annot -> infer_inst tenv env annot e
+  | Ok annot -> infer_poly tenv env annot e
   | NeedVar (vs, _, _) ->
     Format.printf "NeedVar %a@." (pp_list Variable.pp) (VarSet.to_seq vs |> List.of_seq) ;
     assert false

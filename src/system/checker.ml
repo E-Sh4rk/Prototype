@@ -799,6 +799,7 @@ let infer_mono_inter key env infer_branch typeof (b1, b2, (tf,ud)) =
         else
           explored
           (* We type each branch and remove useless ones *)
+          (* TODO: not if user defined? (see test_annots) *)
           |> List.map (fun (pannot, s, est) ->
             ((pannot, s, est), typeof pannot)
           )

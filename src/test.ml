@@ -606,3 +606,9 @@ let rec concat lst1 lst2 =
   | :[] -> lst2
   | (e,lst1) & :List -> (e, concat lst1 lst2)
   end
+
+let test_annots =
+  let pack (x:'a;'b) (y:'a;'b) = (x,y) in
+  pack
+  
+  

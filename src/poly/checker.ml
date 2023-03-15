@@ -736,11 +736,15 @@ and estimate_branch env e pannot =
 let explored_table = Hashtbl.create 10
 let add_explored key t =
   Hashtbl.add explored_table key t
+let add_seq_explored key ts =
+  ts |> List.iter (add_explored key)
 let get_explored key =
   let all = Hashtbl.find_all explored_table key in
   if all = [] then None else Some (conj_o all)
-(* TODO: reset this cache when taking another (upper) branch,
-   or make the key dependent on the branch *)
+let reset_explored key =
+  while Hashtbl.mem explored_table key do
+    Hashtbl.remove explored_table key
+  done
 
 let infer_branches_inter key env infer_branch apply_subst_branch (b1, b2, tf) =
   let tvars = Env.tvars env in
@@ -825,7 +829,9 @@ let infer_branches_inter key env infer_branch apply_subst_branch (b1, b2, tf) =
       end
   in
   (* NOTE: branches already typed are not typed again. *)
-  aux b1 b2
+  add_seq_explored key (b1 |> List.map Utils.trd3) ;
+  let res = aux b1 b2 in
+  reset_explored key ; res
 
 let filter_refinement env env' =
   Env.filter (fun v t -> subtype (Env.find v env) t |> not) env'

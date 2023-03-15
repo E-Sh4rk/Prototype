@@ -191,7 +191,10 @@ let rec def_of_var_pat pat v e =
   | PatAssign _ -> assert false
   | PatType _ -> assert false
 
+(* TODO: refactor: fixpoints should only occur at toplevel
+   and should not be part of the AST like that *)
 let remove_patterns_and_fixpoints e =
+  let aux_defs = ref [] in
   let aux (annot,e) =
     let e =
       match e with
@@ -221,13 +224,17 @@ let remove_patterns_and_fixpoints e =
         in
         Ast.Let (x, e, e')
       | Ast.Fixpoint e ->
+        let v = Variable.create_other (Some "fixpoint_aux") in
+        aux_defs := (v,e)::(!aux_defs) ;
         let lhs = (annot, Ast.Var fixpoint_var) in
-        Ast.App (lhs, e)
+        let rhs = (annot, Ast.Var v) in
+        Ast.App (lhs, rhs)
       | e -> e
     in
     (annot, e)
   in
-  Ast.map_ast aux e
+  let res = Ast.map_ast aux e in
+  (res, !aux_defs)
   
 let convert_to_msc ast =
   let aux expr_var_map ast =
@@ -314,4 +321,4 @@ let convert_to_msc ast =
     let (defs, _, x) = to_defs_and_x expr_var_map ast in
     defs_and_x_to_e defs x
 
-  in aux ExprMap.empty (remove_patterns_and_fixpoints ast)
+  in aux ExprMap.empty ast

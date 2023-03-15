@@ -18,7 +18,9 @@ let generalize_all t =
 exception IncompatibleType of typ
 let type_check_def tenv env (var,expr,typ_annot) =
   let time0 = Unix.gettimeofday () in
+  let (expr, addition) = Msc.remove_patterns_and_fixpoints expr in
   let nf_expr = Msc.convert_to_msc expr in
+  let nf_addition = addition |> List.map (fun (v,e) -> v, Msc.convert_to_msc e) in
   let time1 = Unix.gettimeofday () in
   let retrieve_times () =
     let time2 = Unix.gettimeofday () in
@@ -26,8 +28,13 @@ let type_check_def tenv env (var,expr,typ_annot) =
     let typ_time = (time2 -. time1) *. 1000. in
     (msc_time, typ_time)
   in
+  let type_additionnal env (v, nf) =
+    let typ = Poly.Checker.typeof_simple tenv env nf |> generalize_all in
+    Env.add v typ env
+  in
   try
     Utils.log "%a@." Msc.pp_e nf_expr ;
+    let env = List.fold_left type_additionnal env nf_addition in
     let typ = Poly.Checker.typeof_simple tenv env nf_expr |> generalize_all in
     let typ =
       match typ_annot with

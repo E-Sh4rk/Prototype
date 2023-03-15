@@ -21,6 +21,9 @@ and e =
 
 val initial_env : Env.t
 
+val remove_patterns_and_fixpoints :
+  Ast.annot_expr -> Ast.annot_expr * (Variable.t * Ast.annot_expr) list
+(* convert_to_msc assumes that there is no fixpoint nor pattern matching *)
 val convert_to_msc : Ast.annot_expr -> e
 val map_e : (e -> e) -> (a -> a) -> e -> e
 val map_a : (e -> e) -> (a -> a) -> a -> a

@@ -7,8 +7,6 @@ open Msc
 open Annotations
 open Utils
 
-(* TODO: solve issues with examples in test.ml: and2_, curried14, etc. *)
-
 (* ====================================== *)
 (* =============== TYPEOF =============== *)
 (* ====================================== *)

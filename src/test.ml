@@ -389,11 +389,11 @@ let filter_aux_pure filter (f: ('a->True) & ('b -> ~True)) (l:[('a|'b)*]) =
 
 let filter = fixpoint filter_aux_pure
 
-(* let filter_aux_pure_noannot filter f l =
+let filter_aux_pure_noannot filter f l =
   if l is Nil then nil else
   if l is [Any+] then
       if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
-  else 42(3) *)
+  else 42(3)
 
 (*
    A new variation that does not require the

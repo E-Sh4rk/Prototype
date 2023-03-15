@@ -731,20 +731,23 @@ and estimate_branch env e pannot =
     end
   | _, _ -> assert false
 
+(* TODO: refactor this... every branch should be identified and
+   part of the key, so that there is no need to reset *)
 let explored_table = Hashtbl.create 10
 let add_explored key t =
   Hashtbl.add explored_table key t
 let add_seq_explored key ts =
   ts |> List.iter (add_explored key)
 let get_explored key =
-  let all = Hashtbl.find_all explored_table key in
-  if all = [] then None else Some (conj_o all)
+  Hashtbl.find_all explored_table key
 let reset_explored key =
   while Hashtbl.mem explored_table key do
     Hashtbl.remove explored_table key
   done
 
 let infer_branches_inter key env infer_branch apply_subst_branch typeof (b1, b2, tf) =
+  let explored_t = ref (get_explored key) in
+  b1 |> List.iter (fun (_,_,t) -> explored_t := t::(!explored_t)) ;
   let tvars = Env.tvars env in
   let tvars = TVarSet.filter TVar.is_mono tvars in
   let subtype_gen a b =
@@ -766,11 +769,12 @@ let infer_branches_inter key env infer_branch apply_subst_branch typeof (b1, b2,
     let leq (_,s,_) (_,s',_) = leq s s' in
     (* Remove branches that are estimated not to add anything *)
     let rm_useless lst =
-      match get_explored key with
-      | None -> lst
-      | Some t_est ->
+      match !explored_t with
+      | [] -> lst
+      | explored_t ->
+        let est' = explored_t |> conj_o in
         lst |> List.filter (fun (_,_,est) ->
-          subtype_gen t_est est |> not
+          subtype_gen est' est |> not
         )
     in
     let pending = rm_useless pending in
@@ -807,6 +811,8 @@ let infer_branches_inter key env infer_branch apply_subst_branch typeof (b1, b2,
       let ((pannot, s, est), pending) = find_among_others f pending |> Option.get in
       if nontrivial then
         log ~level:3 "Exploring intersection issued from %a@." Subst.pp s;
+      reset_explored key;
+      add_seq_explored key (!explored_t) ;
       begin match infer_branch pannot with
       | Ok pannot ->
         (* if nontrivial
@@ -819,7 +825,7 @@ let infer_branches_inter key env infer_branch apply_subst_branch typeof (b1, b2,
           Format.printf "Env: %a@." Env.pp (Env.filter (fun v _ ->
             Variable.is_lambda_var v) env)
         end ; *)
-        add_explored key est ;
+        explored_t := est::(!explored_t) ;
         aux ((pannot, s, est)::explored) pending
       | Subst lst when
         List.for_all (fun (s,_) -> Subst.is_identity s |> not) lst ->
@@ -831,9 +837,7 @@ let infer_branches_inter key env infer_branch apply_subst_branch typeof (b1, b2,
       end
   in
   (* NOTE: branches already typed are not typed again. *)
-  add_seq_explored key (b1 |> List.map Utils.trd3) ;
-  let res = aux b1 b2 in
-  reset_explored key ; res
+  aux b1 b2
 
 let filter_refinement env env' =
   Env.filter (fun v t -> subtype (Env.find v env) t |> not) env'

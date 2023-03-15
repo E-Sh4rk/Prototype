@@ -13,9 +13,6 @@ module TVar = struct
   module VH = Hashtbl.Make(CD.Var)
   let data = VH.create 100
 
-  module SM = Map.Make(String)
-  let lookup = ref SM.empty
-
   let is_unregistered t =
     VH.mem data t |> not
 
@@ -49,7 +46,6 @@ module TVar = struct
     let name = match name with None -> norm_name | Some str -> str in
     let var = CD.Var.mk norm_name in
     VH.add data var {poly=false; infer; dname=name} ;
-    lookup := SM.add norm_name var (!lookup) ;
     var
   let mk_poly name =
     let id = unique_poly_id () in
@@ -57,7 +53,6 @@ module TVar = struct
     let name = match name with None -> norm_name | Some str -> str in
     let var = CD.Var.mk norm_name in
     VH.add data var {poly=true; infer=true; dname=name} ;
-    lookup := SM.add norm_name var (!lookup) ;
     var
   let mk_fresh t =
     let dname = display_name t in
@@ -66,9 +61,6 @@ module TVar = struct
     let id = unique_unregistered_id () in
     let norm_name = (string_of_int id)^"U" in
     CD.Var.mk norm_name
-
-  let lookup str =
-    SM.find_opt str (!lookup)
 
   let typ = CD.Types.var
 
@@ -203,28 +195,6 @@ let monomorphize vars =
       (v, TVar.mk_mono None |> TVar.typ)
     ) |> Subst.construct
 
-let lookup_or_fresh c v =
-  let str = TVar.name v in
-  match TVar.lookup str with
-  | Some v' -> Some v'
-  | None ->
-    let str = (List.hd (String.split_on_char c str))^(String.make 1 c) in
-    begin match TVar.lookup str with
-    | Some v' -> Some v'
-    | None -> None
-    end
-let lookup_or_fresh v =
-  match lookup_or_fresh 'M' v with
-  | Some v' -> Some v'
-  | None -> lookup_or_fresh 'P' v
-let lookup_unregistered vars =
-  vars |>
-    TVarSet.filter TVar.is_unregistered |>
-    TVarSet.destruct |> List.filter_map (fun v ->
-      match lookup_or_fresh v with None -> None
-      | Some v' -> Some (v, TVar.typ v')
-    ) |> Subst.construct
-
 let register_unregistered ~mono vars =
   let f =
     if mono
@@ -326,7 +296,6 @@ let tallying constr =
 
 let tallying_infer constr =
   (* TODO: set var_order for the tallying instance *)
-  (* TODO: make newly introduced mono vars more deterministic? *)
   let infer = constr |>
     List.map (fun (a,b) -> [vars_infer a ; vars_infer b]) |>
     List.flatten in

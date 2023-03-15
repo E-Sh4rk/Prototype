@@ -1,5 +1,3 @@
-open Types.Tvar
-
 module Variable : sig
   type t
   val pp : Format.formatter -> t -> unit
@@ -15,8 +13,6 @@ module Variable : sig
   val is_binding_var : t -> bool
   val is_lambda_var : t -> bool
   val get_name : t -> string option
-  val to_typevar : t -> TVar.t
-  val get_typevar : t -> int -> TVar.t
 end
 
 module VarMap : Map.S with type key=Variable.t

@@ -318,10 +318,10 @@ let tallying constr =
   let res = Raw.tallying ~var_order:[] mono constr in
   let codom = List.map Subst.codom res in
   let codom = TVarSet.union_many codom in
-  let lkp_subst = lookup_unregistered codom in
+  (* let lkp_subst = lookup_unregistered codom in *)
   let reg_subst = register_unregistered ~mono:false codom in
   res
-    |> List.map (Subst.compose_restr lkp_subst)
+    (* |> List.map (Subst.compose_restr lkp_subst) *)
     |> List.map (Subst.compose_restr reg_subst)
 
 let tallying_infer constr =
@@ -332,7 +332,7 @@ let tallying_infer constr =
     List.flatten in
   let infer = TVarSet.union_many infer in
   let gen = generalize infer in
-  let mon = Subst.inverse_renaming gen in
+  (* let mon = Subst.inverse_renaming gen in *)
   let constr = constr |>
     List.map (fun (a,b) ->
       let r1 = refresh_all (vars_poly a) in
@@ -343,7 +343,7 @@ let tallying_infer constr =
   in
   tallying constr |> List.map (fun s ->
     let s = Subst.compose_restr s gen in
-    let s = Subst.compose_restr mon s in
+    (* let s = Subst.compose_restr mon s in *)
     let mono_subst = monomorphize (Subst.codom s) in
     Subst.compose_restr mono_subst s
   )

@@ -293,7 +293,7 @@ let simplify_tallying res sols =
     let sol =
       List.fold_left (fun sol v ->
         let t = Subst.find' sol v in
-        (* let v = TVar.mk_fresh v in *)
+        let v = TVar.mk_fresh v in
         let s = replace_vars t (top_vars t |> TVarSet.filter TVar.is_poly) v in
         Subst.compose s sol
       ) sol (Subst.dom sol |> TVarSet.destruct)
@@ -497,9 +497,6 @@ and infer_inst tenv env pannot e =
 (* =============== INFER B ============== *)
 (* ====================================== *)
 
-(* TODO: Stop trying to use the same type variables in the tallying instances
-   (this would avoid having to rename monomorphic variables when exiting a lambda) *)
-
 type 'a res =
   | Ok of 'a
   | Split of Env.t * 'a * 'a
@@ -566,7 +563,8 @@ let simplify_tallying_infer env res sols =
     nb_new_vars sol1 <= nb_new_vars sol2 &&
     subst_more_general TVarSet.empty sol1 sol2
   in
-  let try_simplify sol v t =
+  let try_remove_var sol v =
+    let t = Subst.find' sol v in
     let pvs = TVarSet.diff (vars t) tvars in
     let g = generalize pvs in let m = Subst.inverse_renaming g in
     let t = Subst.apply g t in
@@ -619,12 +617,12 @@ let simplify_tallying_infer env res sols =
       is_undesirable t || not (is_undesirable (Subst.apply sol t))
     )
   )
-  (* Simplify (light) *)
+  (* Simplify *)
   |> List.map (fun sol ->
     let new_dom = TVarSet.inter (Subst.dom sol) tvars in
     List.fold_left (fun sol v ->
       let t = Subst.find' sol v in
-      (* let v = TVar.mk_fresh v in *)
+      let v = TVar.mk_fresh v in
       (* NOTE: we allow to rename mono vars even if already in the env...
          this might create an uneeded correlation but it simplifies a lot. *)
       let vs = (*TVarSet.diff (top_vars t) tvars*) top_vars t in
@@ -645,12 +643,11 @@ let simplify_tallying_infer env res sols =
     let respart = merge_on_domain conj [res_var] to_merge in
     Subst.combine common respart
   )
-  (* Simplify (heavy) *)
+  (* Try remove var substitutions *)
   |> List.map (fun sol ->
     let new_dom = TVarSet.inter (Subst.dom sol) tvars in
     List.fold_left (fun sol v ->
-      let t = Subst.find' sol v in
-      match try_simplify sol v t with
+      match try_remove_var sol v with
       | None -> sol
       | Some s -> Subst.compose s sol
     ) sol (new_dom |> TVarSet.destruct)
@@ -760,7 +757,7 @@ let reset_explored key =
     Hashtbl.remove explored_table key
   done
 
-let infer_branches_inter key env infer_branch apply_subst_branch typeof (b1, b2, tf) =
+let infer_branches_inter key env infer_branch typeof (b1, b2, tf) =
   let explored_t = ref (get_explored key) in
   b1 |> List.iter (fun (_,_,t) -> explored_t := t::(!explored_t)) ;
   let tvars = Env.tvars env in
@@ -799,15 +796,7 @@ let infer_branches_inter key env infer_branch apply_subst_branch typeof (b1, b2,
       let explored =
         if tf || List.length explored <= 1 then explored
         else
-          (* When we just finished typing the intersection, we rename the type vars
-              of the branches so that they are independant, and we remove redundant branches *)
           explored
-          |> List.map (fun (pannot, s, est) ->
-            let new_vars = TVarSet.diff (vars_mono est) tvars in
-            let subst = refresh_all new_vars in
-            (apply_subst_branch subst pannot, Subst.compose_restr subst s,
-            Subst.apply subst est)
-          )
           (* We type each branch and remove useless ones *)
           |> List.map (fun (pannot, s, est) ->
             ((pannot, s, est), typeof pannot)
@@ -896,7 +885,6 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       (true, vardef)
       env
       (fun pannot_a -> infer_branches_a_iterated vardef tenv env pannot_a a)
-      apply_subst_a
       (fun pannot_a ->
         let annot_a = infer_inst_a vardef tenv env pannot_a a in
         typeof_a vardef tenv env annot_a a)
@@ -912,9 +900,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
   | Projection (p, v), InferA ->
     if memvar v then
       let t = vartype v in
-      let alpha = Variable.to_typevar vardef
-        (* TVar.mk_mono (Some (Variable.show vardef)) *)
-      in
+      let alpha = TVar.mk_mono (Some (Variable.show vardef)) in
       let s =
         begin match p with
         | Parsing.Ast.Field label ->
@@ -963,9 +949,7 @@ let rec infer_branches_a vardef tenv env pannot_a a =
     if memvar v1 && memvar v2 then
       let t1 = vartype v1 in
       let t2 = vartype v2 in
-      let alpha = Variable.to_typevar vardef
-        (* TVar.mk_mono (Some (Variable.show vardef)) *)
-      in
+      let alpha = TVar.mk_mono (Some (Variable.show vardef)) in
       let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
       log ~level:3 "@.Approximate tallying (inference) for %a: %a <= %a@."
         Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
@@ -991,15 +975,11 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       else Split (Env.singleton v tau, InferA, InferA)
     else needvar [v] InferA UntypA
   | Lambda (Unnanoted, _, _), InferA ->
-    let alpha = Variable.to_typevar vardef |> TVar.typ
-      (* TVar.mk_mono (Some (Variable.show vardef)) |> TVar.typ *)
-    in
+    let alpha = TVar.mk_mono (Some (Variable.show vardef)) |> TVar.typ in
     let pannot_a = LambdaA (alpha, Infer) in
     infer_branches_a vardef tenv env pannot_a a
   | Lambda (ADomain ts, _, _), InferA ->
-    let alpha = Variable.to_typevar vardef
-      (* TVar.mk_mono (Some (Variable.show vardef)) *)
-    in
+    let alpha = TVar.mk_mono (Some (Variable.show vardef)) in
     let pannot_a = LambdaA (TVar.typ alpha, Infer) in
     let lst = ts |> List.map (fun t ->
       ([(alpha,t)] |> Subst.construct, pannot_a)
@@ -1081,7 +1061,6 @@ and infer_branches tenv env pannot e =
       (false, v)
       env
       (fun pannot -> infer_branches_iterated tenv env pannot e)
-      apply_subst
       (fun pannot ->
         let annot = infer_inst tenv env pannot e in
         typeof tenv env annot e)

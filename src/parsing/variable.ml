@@ -1,5 +1,3 @@
-open Types.Tvar
-
 module Variable = struct
 
   let data = Hashtbl.create 100
@@ -57,26 +55,6 @@ module Variable = struct
     match get_name t with
     | None -> string_of_int t
     | Some str -> str
-
-  let typevars = Hashtbl.create 100
-
-  let to_typevar v =
-    if Hashtbl.mem typevars v
-    then Hashtbl.find typevars v
-    else
-      let tv = TVar.mk_mono (Some (show v)) in
-      Hashtbl.add typevars v tv ;
-      tv
-
-  let typevars_ext = Hashtbl.create 100
-
-  let get_typevar v i =
-    if Hashtbl.mem typevars_ext (v,i)
-    then Hashtbl.find typevars_ext (v,i)
-    else
-      let tv = TVar.mk_mono (Some ((show v)^"_"^(string_of_int i))) in
-      Hashtbl.add typevars_ext (v,i) tv ;
-      tv
 end
 
 module VarMap = Map.Make(Variable)

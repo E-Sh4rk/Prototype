@@ -816,7 +816,9 @@ let infer_branches_inter key env infer_branch typeof (b1, b2, tf) =
         log ~level:3 "Exploring intersection issued from %a@." Subst.pp s;
       reset_explored key;
       add_seq_explored key (!explored_t) ;
-      begin match infer_branch pannot with
+      let res = infer_branch pannot in
+      reset_explored key ;
+      begin match res with
       | Ok pannot ->
         (* if nontrivial
           && env |> Env.domain |> List.exists (Variable.is_lambda_var) |> not

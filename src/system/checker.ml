@@ -627,7 +627,7 @@ let simplify_tallying_infer env res sols =
       (* NOTE: we allow to rename mono vars even if it corresponds to a
          mono var already in the env (tvars)...
          this might create an uneeded correlation but it simplifies a lot. *)
-      let vs = top_vars t in
+      let vs = top_vars t |> TVarSet.filter TVar.can_infer in
       let s = replace_vars t vs v in
       Subst.compose s sol
     ) sol (new_dom |> TVarSet.destruct)

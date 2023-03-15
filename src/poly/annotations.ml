@@ -32,7 +32,7 @@ module PartialAnnot = struct
   [@@deriving show]
 
   let apply_subst_branch f s (a, s', t) =
-    (f s a, Subst.compose_restr s s', apply_subst_simplify s t)
+    (f s a, s', apply_subst_simplify s t)
   let rec apply_subst_union s lst =
     let aux split = match split with
       | SInfer (ty, t) -> SInfer (apply_subst_simplify s ty, apply_subst s t)

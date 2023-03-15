@@ -534,13 +534,11 @@ let should_iterate res =
   | NeedVar (vs, pannot, _) when VarSet.is_empty vs -> Some pannot
   | _ -> None
 
-let subst_more_general tvars s1 s2 =
+let subst_more_general s1 s2 =
   let s2m = Subst.codom s2 |> monomorphize in
-  let s1g = TVarSet.diff (Subst.codom s1) tvars |> generalize in
   Subst.destruct s1 |> List.map (fun (v,t1) ->
     let t2 = Subst.find' s2 v in
     let t2 = Subst.apply s2m t2 in
-    let t1 = Subst.apply s1g t1 in
     [(t1, t2) ; (t2, t1)]
   ) |> List.flatten |> tallying <> []
 
@@ -560,8 +558,10 @@ let simplify_tallying_infer env res sols =
     nv |> TVarSet.destruct |> List.length
   in
   let better_sol sol1 sol2 =
+    let s1g = Subst.codom sol1 |> generalize in
+    let sol1' = Subst.compose_restr s1g sol1 in
     nb_new_vars sol1 <= nb_new_vars sol2 &&
-    subst_more_general TVarSet.empty sol1 sol2
+    subst_more_general sol1' sol2
   in
   let try_remove_var sol v =
     let t = Subst.find' sol v in
@@ -764,11 +764,6 @@ let infer_mono_inter key env infer_branch typeof (b1, b2, (tf,ud)) =
   b1 |> List.iter (fun (_,_,t) -> explored_t := t::(!explored_t)) ;
   let tvars = Env.tvars env in
   let tvars = TVarSet.filter TVar.is_mono tvars in
-  let subtype_gen a b =
-    let gen = TVarSet.diff (vars a) tvars |> generalize in
-    let a = Subst.apply gen a in
-    subtype_poly a b
-  in
   let uNb = List.length b2 and eNb = List.length b1 in
   let nontrivial = uNb + eNb > 1 in
   if nontrivial then begin
@@ -778,7 +773,7 @@ let infer_mono_inter key env infer_branch typeof (b1, b2, (tf,ud)) =
       b2 |> List.iter (fun (_,_,est) -> Format.printf "Est: %a@." pp_typ est) *)
   end ;
   let rec aux explored pending =
-    let smg = subst_more_general tvars in
+    let smg = subst_more_general in
     let leq s s' = (smg s s' |> not) || smg s' s in
     let leq (_,s,_) (_,s',_) = leq s s' in
     (* Remove branches that are estimated not to add anything *)
@@ -788,12 +783,17 @@ let infer_mono_inter key env infer_branch typeof (b1, b2, (tf,ud)) =
       | explored_t, false ->
         let est' = explored_t |> conj_o in
         pending |> List.filter (fun (_,_,est) ->
-          subtype_gen est' est |> not
+          subtype_poly est' est |> not
         )
     in
     match pending with
     | [] when explored = [] -> Subst []
     | [] ->
+      let subtype_gen a b =
+        let gen = TVarSet.diff (vars a) tvars |> generalize in
+        let a = Subst.apply gen a in
+        subtype_poly a b
+      in
       let explored =
         if tf || List.length explored <= 1 then explored
         else
@@ -865,7 +865,14 @@ let normalize_subst env apply_subst_branch estimate mk_inter res =
           then
             let pannot = apply_subst_branch subst_cur pannot in
             estimate pannot |> Option.map
-              (fun est -> (pannot, subst_cur, est))
+              (fun est ->
+                let gen = TVarSet.diff (vars est) tvars |> generalize in
+                let est = Subst.apply gen est in
+                let gen = TVarSet.diff (Subst.codom subst_cur) tvars
+                  |> generalize in
+                let subst_cur = Subst.compose_restr gen subst_cur in
+                (pannot, subst_cur, est)
+              )
           else None
         )
       in
@@ -982,12 +989,9 @@ let rec infer_mono_a vardef tenv env pannot_a a =
     let pannot_a = LambdaA (alpha, Infer) in
     infer_mono_a vardef tenv env pannot_a a
   | Lambda (ADomain ts, _, _), InferA ->
-    let alpha = TVar.mk_mono (Some (Variable.show vardef)) in
     let branches = ts |> List.map (fun t ->
-      let subst = [(alpha,t)] |> Subst.construct in
-      let est = mk_arrow (cons t) any_node in
       let pannot_a = LambdaA (t, Infer) in
-      (pannot_a, subst, est)
+      (pannot_a, Subst.identity, any)
     ) in
     let pannot_a = InterA ([], branches, (false, true)) in
     infer_mono_a vardef tenv env pannot_a a

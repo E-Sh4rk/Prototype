@@ -746,7 +746,7 @@ let reset_explored key =
     Hashtbl.remove explored_table key
   done
 
-let infer_branches_inter key env infer_branch apply_subst_branch (b1, b2, tf) =
+let infer_branches_inter key env infer_branch apply_subst_branch typeof (b1, b2, tf) =
   let tvars = Env.tvars env in
   let tvars = TVarSet.filter TVar.is_mono tvars in
   let subtype_gen a b =
@@ -791,12 +791,16 @@ let infer_branches_inter key env infer_branch apply_subst_branch (b1, b2, tf) =
             (apply_subst_branch subst pannot, Subst.compose_restr subst s,
             Subst.apply subst est)
           )
-          (* TODO: with real type instead of estimations *)
-          (* |> Utils.filter_among_others
+          (* We update all estimations (it will not be used anymore)
+             and remove useless branches *)
+          |> List.map (fun (pannot, s, _) ->
+            (pannot, s, typeof pannot)
+          )
+          |> Utils.filter_among_others
           (fun (_,_,est) others ->
             let est' = others |> List.map Utils.trd3 |> conj in
             subtype_gen est' est |> not
-          ) *)
+          )
       in
       Ok (explored, [], true)
     | pending ->
@@ -876,6 +880,9 @@ let rec infer_branches_a vardef tenv env pannot_a a =
       env
       (fun pannot_a -> infer_branches_a_iterated vardef tenv env pannot_a a)
       apply_subst_a
+      (fun pannot_a ->
+        let annot_a = infer_inst_a vardef tenv env pannot_a a in
+        typeof_a vardef tenv env annot_a a)
       i
     |> map_res (fun x -> InterA x)
   | _, TypA -> Ok (TypA)
@@ -1058,6 +1065,9 @@ and infer_branches tenv env pannot e =
       env
       (fun pannot -> infer_branches_iterated tenv env pannot e)
       apply_subst
+      (fun pannot ->
+        let annot = infer_inst tenv env pannot e in
+        typeof tenv env annot e)
       i
     |> map_res (fun x -> Inter x)
   | Var _, Typ -> Ok Typ

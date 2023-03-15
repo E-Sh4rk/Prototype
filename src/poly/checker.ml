@@ -773,23 +773,22 @@ let infer_branches_inter key env infer_branch typeof (b1, b2, tf) =
     log ~level:0 "Typing intersection with %n unexplored branches (and %n explored).@."
       uNb eNb ;
     (* if uNb >= 5 then
-      b2@b3 |> List.iter (fun (_,_,est) -> Format.printf "Est: %a@." pp_typ est) *)
+      b2 |> List.iter (fun (_,_,est) -> Format.printf "Est: %a@." pp_typ est) *)
   end ;
   let rec aux explored pending =
     let smg = subst_more_general tvars in
     let leq s s' = (smg s s' |> not) || smg s' s in
     let leq (_,s,_) (_,s',_) = leq s s' in
     (* Remove branches that are estimated not to add anything *)
-    let rm_useless lst =
+    let pending =
       match !explored_t with
-      | [] -> lst
+      | [] -> pending
       | explored_t ->
         let est' = explored_t |> conj_o in
-        lst |> List.filter (fun (_,_,est) ->
+        pending |> List.filter (fun (_,_,est) ->
           subtype_gen est' est |> not
         )
     in
-    let pending = rm_useless pending in
     match pending with
     | [] when explored = [] -> Subst []
     | [] ->

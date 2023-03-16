@@ -1105,42 +1105,36 @@ and infer_mono tenv env pannot e =
   | Bind (v, a, e), Keep (pannot_a, splits) ->
     log ~level:1 "Inferring var %a.@." Variable.pp v ;
     assert (splits <> []) ;
-    (* NOTE: The call to infer_mono_a_iterated should return Ok most of time,
-       it could probably be optimized away. *)
-    begin match infer_mono_a_iterated v tenv env pannot_a a with
-    | Ok pannot_a ->
-      let annot_a = infer_poly_a v tenv env pannot_a a in
-      let t = typeof_a_nofail v tenv env annot_a a in
-      log ~level:1 "Var %a typed with type %a.@." Variable.pp v pp_typ t ;
-      (* If the definition is a function whose DNF has many disjuncts,
-         we try to split them. *)
-      let propagate =
-        let dnf = dnf t |> simplify_dnf in
-        if subtype t arrow_any && List.length dnf >= 2 then
-          dnf |> simplify_dnf |> Utils.map_among_others' (fun _ others ->
-            let s = others |> List.map branch_type |> List.map bot_instance
-              |> disj in
-            let mono = monomorphize (vars_poly s) in
-            let s = Subst.apply mono s in
-            refine_a tenv env a s
-          )
-          |> List.flatten
-          |> List.find_opt (is_compatible env)
-        else None
-      in
-      begin match propagate with
-      | Some env' ->
-        log ~level:1 "Var %a is ok but its DNF needs a split.@." Variable.pp v ;
-        let env' = filter_refinement env env' in
-        Split (env', Keep (pannot_a, splits), Keep (pannot_a, splits))
-      | None ->
-        (* Now, we perform the splits from the annotations *)
-        log ~level:2 "Typing body for %a with splits %a.@."
-          Variable.pp v (pp_list pp_typ) (effective_splits splits) ;
-        infer_mono_union tenv env v a e t splits
-        |> map_res (fun x -> Keep (pannot_a, x))
-      end
-    | res -> res |> map_res (fun x -> Keep (x, splits))
+    let annot_a = infer_poly_a v tenv env pannot_a a in
+    let t = typeof_a_nofail v tenv env annot_a a in
+    log ~level:1 "Var %a typed with type %a.@." Variable.pp v pp_typ t ;
+    (* If the definition is a function whose DNF has many disjuncts,
+        we try to split them. *)
+    let propagate =
+      let dnf = dnf t |> simplify_dnf in
+      if subtype t arrow_any && List.length dnf >= 2 then
+        dnf |> simplify_dnf |> Utils.map_among_others' (fun _ others ->
+          let s = others |> List.map branch_type |> List.map bot_instance
+            |> disj in
+          let mono = monomorphize (vars_poly s) in
+          let s = Subst.apply mono s in
+          refine_a tenv env a s
+        )
+        |> List.flatten
+        |> List.find_opt (is_compatible env)
+      else None
+    in
+    begin match propagate with
+    | Some env' ->
+      log ~level:1 "Var %a is ok but its DNF needs a split.@." Variable.pp v ;
+      let env' = filter_refinement env env' in
+      Split (env', Keep (pannot_a, splits), Keep (pannot_a, splits))
+    | None ->
+      (* Now, we perform the splits from the annotations *)
+      log ~level:2 "Typing body for %a with splits %a.@."
+        Variable.pp v (pp_list pp_typ) (effective_splits splits) ;
+      infer_mono_union tenv env v a e t splits
+      |> map_res (fun x -> Keep (pannot_a, x))
     end
   | _, _ -> assert false
 

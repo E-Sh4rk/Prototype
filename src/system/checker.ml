@@ -761,6 +761,7 @@ let reset_explored key =
 
 let infer_mono_inter key env infer_branch typeof (b1, b2, (tf,ud)) =
   let explored_t = ref (get_explored key) in
+  reset_explored key;
   b1 |> List.iter (fun (_,_,t) -> explored_t := t::(!explored_t)) ;
   let tvars = Env.tvars env in
   let tvars = TVarSet.filter TVar.is_mono tvars in
@@ -816,7 +817,6 @@ let infer_mono_inter key env infer_branch typeof (b1, b2, (tf,ud)) =
       let ((pannot, s, est), pending) = find_among_others f pending |> Option.get in
       if nontrivial then
         log ~level:3 "Exploring intersection issued from %a@." Subst.pp s;
-      reset_explored key;
       add_seq_explored key (!explored_t) ;
       let res = infer_branch pannot in
       reset_explored key ;

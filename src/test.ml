@@ -607,8 +607,7 @@ let rec concat lst1 lst2 =
   | (e,lst1) & :List -> (e, concat lst1 lst2)
   end
 
-let test_annots =
+let test_patterns_annots (x:'a) (y:'b) =
   let pack (x:'a;'b) (y:'a;'b) = (x,y) in
-  pack
-  
-  
+  let (y,x) = pack x y in
+  pack x y

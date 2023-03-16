@@ -795,11 +795,10 @@ let infer_mono_inter key env infer_branch typeof (b1, b2, (tf,ud)) =
         subtype_poly a b
       in
       let explored =
-        if tf || List.length explored <= 1 then explored
+        if tf || ud || List.length explored <= 1 then explored
         else
           explored
           (* We type each branch and remove useless ones *)
-          (* TODO: not if user defined? (see test_annots) *)
           |> List.map (fun (pannot, s, est) ->
             ((pannot, s, est), typeof pannot)
           )

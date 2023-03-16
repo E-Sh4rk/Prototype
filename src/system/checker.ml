@@ -1050,6 +1050,11 @@ and infer_mono_union tenv env v a e t splits =
         let env' = Env.add v (cap_o t s) env in
         begin match infer_mono_iterated tenv env' pannot e with
         | Ok pannot ->
+          (* TODO: if possible, find a substitution (over type variables not in the env)
+             that would make the new split smaller than the union of the previous ones,
+             and apply this substitution to pannot. It might be needed to do
+             something equivalent in the polymorphic inference, as a branch
+             must be rigourously smaller in order to be assimilated. *)
           aux splits |> map_res (fun x -> (SExpl (s, pannot))::x)
         | Split (env', pannot1, pannot2) when Env.mem v env' ->
           let s' = Env.find v env' in
@@ -1059,6 +1064,8 @@ and infer_mono_union tenv env v a e t splits =
           Split (Env.rm v env', splits1, splits2)
         | res -> res |> map_res (fun x -> (SExpl (s, x))::splits)
         end
+      (* TODO: add an "explored" case to avoid exploring again a branch (optimisation)?
+         (add it in the paper as a note) *)
     in
     aux splits
 

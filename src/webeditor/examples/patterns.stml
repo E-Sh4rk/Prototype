@@ -51,7 +51,7 @@ let rec map f (lst:['a*]) =
   | (e,lst) -> ((f e), map f lst)
   end
 
-let rec filter (f: ('a->True) & ('b -> ~True)) (l:[('a|'b)*]) =
+let rec filter (f: ('a->Any) & ('b -> ~True)) (l:[('a|'b)*]) =
   match l with
   | :Nil -> nil
   | _ ->

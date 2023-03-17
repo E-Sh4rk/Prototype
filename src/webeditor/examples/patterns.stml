@@ -1,7 +1,6 @@
 
 let succ = <Int->Int>
 
-
 let test_patterns (a,_) = a
 
 let test2_patterns x =
@@ -50,4 +49,13 @@ let rec map f (lst:['a*]) =
   match lst with
   | :[] -> []
   | (e,lst) -> ((f e), map f lst)
+  end
+
+let rec filter (f: ('a->True) & ('b -> ~True)) (l:[('a|'b)*]) =
+  match l with
+  | :Nil -> nil
+  | _ ->
+    if f(fst(l)) is True
+    then (fst(l),filter f (snd(l)))
+    else filter f (snd(l))
   end

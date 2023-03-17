@@ -479,7 +479,7 @@ and infer_poly tenv env pannot e =
     let (branches, inst) = List.fold_left
       (fun (branches, inst) br ->
       match br with
-      | SExpl (si, pannot) ->
+      | SDone (si, pannot) ->
         let t = cap_o t si in
         let env = Env.add v t env in
         ((si, infer_poly tenv env pannot e)::branches, inst)
@@ -487,7 +487,7 @@ and infer_poly tenv env pannot e =
         let t = cap_o t si in
         let sol = tallying_one [(t, empty)] in
         (branches, sol::inst)
-      | _ -> assert false
+      | SInfer _ | SProp _ | SExpl _ -> assert false
     ) ([], []) branches in
     FullAnnot.Keep (annot_a,
       (branches, Utils.remove_duplicates Subst.equiv inst))
@@ -714,7 +714,8 @@ and estimate env e pannot =
   let estimate_splits v t e splits =
     let splits =
       splits |> List.map (function
-          SExpl (s, pannot)
+          SDone (s, pannot)
+        | SExpl (s, pannot)
         | SProp (s, pannot)
         | SInfer (s, pannot) ->
           let env = Env.add v (cap_o t s) env in
@@ -1055,7 +1056,7 @@ and infer_mono_union tenv env v a e t splits =
              and apply this substitution to pannot. It might be needed to do
              something equivalent in the polymorphic inference, as a branch
              must be rigourously smaller in order to be assimilated. *)
-          aux splits |> map_res (fun x -> (SExpl (s, pannot))::x)
+          aux splits |> map_res (fun x -> (SDone (s, pannot))::x)
         | Split (env', pannot1, pannot2) when Env.mem v env' ->
           let s' = Env.find v env' in
           let splits1 = [ SInfer (cap_o s s' |> simplify_typ, pannot1) ;
@@ -1064,8 +1065,8 @@ and infer_mono_union tenv env v a e t splits =
           Split (Env.rm v env', splits1, splits2)
         | res -> res |> map_res (fun x -> (SExpl (s, x))::splits)
         end
-      (* TODO: add an "explored" case to avoid exploring again a branch (optimisation)?
-         (add it in the paper as a note) *)
+      | (SDone (s, pannot))::splits ->
+        aux splits |> map_res (fun x -> (SDone (s, pannot))::x)
     in
     aux splits
 

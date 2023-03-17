@@ -6,6 +6,7 @@ module PartialAnnot : sig
         | SInfer of typ * t
         | SProp of typ * t
         | SExpl of typ * t
+        | SDone of typ * t
         | SUnr of typ
     and union = split list
     and 'a annotated_branch = 'a * Subst.t * typ

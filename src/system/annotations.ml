@@ -7,6 +7,7 @@ module PartialAnnot = struct
   | SInfer of typ * t
     | SProp of typ * t
     | SExpl of typ * t
+    | SDone of typ * t
     | SUnr of typ
   [@@deriving show]
   and union = split list
@@ -38,6 +39,7 @@ module PartialAnnot = struct
       | SInfer (ty, t) -> SInfer (apply_subst_simplify s ty, apply_subst s t)
       | SProp (ty, t) -> SProp (apply_subst_simplify s ty, apply_subst s t)
       | SExpl (ty, t) -> SExpl (apply_subst_simplify s ty, apply_subst s t)
+      | SDone (ty, t) -> SDone (apply_subst_simplify s ty, apply_subst s t)
       | SUnr ty -> SUnr (apply_subst_simplify s ty)
     in
     List.map aux lst
@@ -70,7 +72,7 @@ module PartialAnnot = struct
   let effective_splits union =
     union |> List.filter_map (function
     | SUnr _ -> None
-    | SExpl (s,_) | SProp (s, _) | SInfer (s, _) -> Some s
+    | SDone (s, _) | SExpl (s, _) | SProp (s, _) | SInfer (s, _) -> Some s
     )
 end
 

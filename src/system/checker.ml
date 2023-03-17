@@ -44,7 +44,6 @@ let rename_check pos r t =
   then Subst.apply r t
   else raise (Untypeable (pos, "Invalid renaming."))
 
-(* TODO: test examples in flatten.ml, and merge them with test.ml *)
 let typeof_inter typeof_branch pos branches =
   let untypeable str = raise (Untypeable (pos, str)) in
   if branches = []

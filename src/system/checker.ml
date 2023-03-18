@@ -681,6 +681,7 @@ let rec estimate_a env a pannot_a =
   | Lambda (_, v, e), LambdaA (s, pannot) ->
     let env = Env.add v s env in
     estimate env e pannot |> Option.map (fun t ->
+      (* mk_arrow (cons s) (cons (cap t s)) *)
       mk_arrow (cons s) (cons t)
       (* NOTE: the estimation below reduces the number of branches a lot,
          though in some cases it could prune important branches. *)
@@ -763,7 +764,7 @@ let infer_mono_inter key env infer_branch typeof (b1, b2, (tf,ud)) =
   let explored_t = ref (get_explored key) in
   reset_explored key;
   b1 |> List.iter (fun (_,_,t) -> explored_t := t::(!explored_t)) ;
-  let tvars = Env.tvars env in
+  let tvars = env |> Env.filter (fun x _ -> Variable.is_lambda_var x) |> Env.tvars in
   let tvars = TVarSet.filter TVar.is_mono tvars in
   let uNb = List.length b2 and eNb = List.length b1 in
   let nontrivial = uNb + eNb > 1 in
@@ -773,6 +774,11 @@ let infer_mono_inter key env infer_branch typeof (b1, b2, (tf,ud)) =
     (* if uNb >= 5 then
       b2 |> List.iter (fun (_,_,est) -> Format.printf "Est: %a@." pp_typ est) *)
   end ;
+  let subtype_gen a b =
+    let gen = TVarSet.diff (vars a) tvars |> generalize in
+    let a = Subst.apply gen a in
+    subtype_poly a b
+  in
   let rec aux explored pending =
     let smg = subst_more_general in
     let leq s s' = (smg s s' |> not) || smg s' s in
@@ -784,17 +790,14 @@ let infer_mono_inter key env infer_branch typeof (b1, b2, (tf,ud)) =
       | explored_t, false ->
         let est' = explored_t |> conj_o in
         pending |> List.filter (fun (_,_,est) ->
-          subtype_poly est' est |> not
+          let r = subtype_gen est' est |> not in
+          (* if not r then Format.printf "REMOVED: %a@.VS:%a@." pp_typ est pp_typ est' ; *)
+          r
         )
     in
     match pending with
     | [] when explored = [] -> Subst []
     | [] ->
-      let subtype_gen a b =
-        let gen = TVarSet.diff (vars a) tvars |> generalize in
-        let a = Subst.apply gen a in
-        subtype_poly a b
-      in
       let explored =
         if tf || ud || List.length explored <= 1 then explored
         else
@@ -850,7 +853,7 @@ let filter_refinement env env' =
   Env.filter (fun v t -> subtype (Env.find v env) t |> not) env'
 
 let normalize_subst env apply_subst_branch estimate mk_inter res =
-  let tvars = Env.tvars env in
+  let tvars = Env.tvars env |> TVarSet.filter TVar.is_mono in
   match res with
   | Subst lst ->
     let sigma = lst |>
@@ -866,10 +869,7 @@ let normalize_subst env apply_subst_branch estimate mk_inter res =
             let pannot = apply_subst_branch subst_cur pannot in
             estimate pannot |> Option.map
               (fun est ->
-                let gen = TVarSet.diff (vars est) tvars |> generalize in
-                let est = Subst.apply gen est in
-                let gen = TVarSet.diff (Subst.codom subst_cur) tvars
-                  |> generalize in
+                let gen = Subst.codom subst_cur |> generalize in
                 let subst_cur = Subst.compose_restr gen subst_cur in
                 (pannot, subst_cur, est)
               )

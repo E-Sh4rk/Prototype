@@ -705,6 +705,9 @@ and estimations_a a pannot_a =
   | _, UntypA -> None
   | Lambda (_, _, e), LambdaA (s, pannot) ->
     estimations e pannot |> Option.map (fun est ->
+      (* let v = TVar.mk_mono None |> TVar.typ in *)
+      (*(cup (cap v est) (neg v) |> cons)*)
+      (* Should be the above... but determining subtyping takes too long *)
       mk_arrow (cons s) (cons est)
     )
   | a, InterA (p1,p2,_) ->
@@ -745,6 +748,20 @@ let infer_mono_inter key env infer_branch typeof (b1, b2, (tf,ud)) =
     let a = Subst.apply gen a in
     subtype_poly a b
   in
+  (* NOTE: subtype_gen' is used when pruning branch. This is an heuristic
+     to avoid pruning some important branches (we could do it in a
+     more general way by modifying the estimation function, but then
+     the tallying instance takes too long) *)
+  let subtype_gen' a b =
+    let gen = TVarSet.diff (vars a) tvars |> generalize in
+    let a = Subst.apply gen a in
+    let b = Subst.apply (monomorphize (vars b)) b in
+    tallying [(bot_instance a,b)] |> List.filter (fun sol ->
+      sol |> Subst.destruct |> List.for_all (fun (_,t) -> non_empty t)
+      (* TODO: make a more general check: refuse solutions
+         that makes the codomain of an arrow empty in a *)
+    ) <> []
+  in
   let rec aux explored pending =
     let smg = subst_more_general in
     let leq s s' = (smg s s' |> not) || smg s' s in
@@ -758,7 +775,7 @@ let infer_mono_inter key env infer_branch typeof (b1, b2, (tf,ud)) =
       | explored_t, false ->
         let est' = explored_t |> conj_o in
         pending |> List.filter (fun (_,_,est) ->
-          let r = subtype_gen est' est |> not in
+          let r = subtype_gen' est' est |> not in
           (* if not r then Format.printf "REMOVED: %a@.VS:%a@." pp_typ est pp_typ est'
           else Format.printf "KEPT: %a@.VS:%a@." pp_typ est pp_typ est' ; *)
           r

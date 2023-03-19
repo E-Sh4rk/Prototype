@@ -666,43 +666,32 @@ let simplify_tallying_infer env res sols =
     res
   ) *)
 
-let defvar = Hashtbl.create 10
-let rdefvar = Hashtbl.create 10
-let get_defvar v =
-  if Hashtbl.mem defvar v
-  then Hashtbl.find defvar v
-  else
-    let tv = TVar.mk_mono ~infer:false (Some (Variable.show v)) in
-    Hashtbl.replace defvar v tv ; Hashtbl.replace rdefvar tv v ; tv
-let is_defvar tv =
-  Hashtbl.mem rdefvar tv
-let est_type_for_vardef v t =
-  let tv = get_defvar v |> TVar.typ in
-  cup (cap tv t) (neg tv)
-
 let rec estimations e pannot =
   let open PartialAnnot in
   match e, pannot with
-  | _, Typ -> Some any
-  | _, Infer -> Some any
-  | _, Untyp -> None
-  | Bind (_,_,e), Skip p -> estimations e p
-  | Bind (v,a,e), TryKeep (pannot_a, pannot1, pannot2) ->
-    begin match estimations_a a pannot_a |> Option.map (est_type_for_vardef v) with
+  | Var _, Typ -> Some any
+  | Var _, Untyp -> None
+  | Var _, Infer -> Some any
+  | Bind (_,_,e), Infer -> estimations e Infer |>
+    Option.map (fun t -> mk_times any_node (cons t))
+  | Bind (_,_,e), Skip p -> estimations e p |>
+    Option.map (fun t -> mk_times any_node (cons t))
+  | Bind (_,a,e), TryKeep (pannot_a, pannot1, pannot2) ->
+    begin match estimations_a a pannot_a with
     | None -> estimations e pannot2
     | Some est_a ->
       let est_e = estimations e pannot1 in
       est_e |> Option.map (fun est_e ->
-        cap est_a est_e
+        mk_times (cons est_a) (cons est_e)
       )
     end
-  | Bind (v,a,e), Keep (pannot_a, u) ->
-    let est_a = estimations_a a pannot_a |> Option.get |> est_type_for_vardef v in
+  | Bind (_,a,e), Keep (pannot_a, u) ->
+    let est_a = estimations_a a pannot_a |> Option.get in
     let est_e = u |> effective_splits_annots |> List.map (estimations e) in
     if List.mem None est_e then None
     else
       let est_e = est_e |> List.map Option.get |> disj_o in
-      Some (cap est_a est_e)
+      Some (mk_times (cons est_a) (cons est_e))
   | e, Inter (p1,p2,_) ->
     let res = p1@p2 |> List.map Utils.fst3 |> List.filter_map (estimations e) in
     if res = [] then None else Some (conj_o res)
@@ -752,9 +741,7 @@ let infer_mono_inter key env infer_branch typeof (b1, b2, (tf,ud)) =
       b2 |> List.iter (fun (_,_,est) -> Format.printf "Est: %a@." pp_typ est) *)
   end ;
   let subtype_gen a b =
-    let gen = TVarSet.diff (vars a) tvars
-    |> TVarSet.filter (fun tv -> is_defvar tv |> not)
-    |> generalize in
+    let gen = TVarSet.diff (vars a) tvars |> generalize in
     let a = Subst.apply gen a in
     subtype_poly a b
   in

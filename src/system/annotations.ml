@@ -74,6 +74,11 @@ module PartialAnnot = struct
     | SUnr _ -> None
     | SDone (s, _) | SExpl (s, _) | SProp (s, _) | SInfer (s, _) -> Some s
     )
+  let effective_splits_annots union =
+    union |> List.filter_map (function
+    | SUnr _ -> None
+    | SDone (_, pannot) | SExpl (_, pannot) | SProp (_, pannot) | SInfer (_, pannot) -> Some pannot
+    )
 end
 
 module FullAnnot = struct

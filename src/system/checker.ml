@@ -716,7 +716,8 @@ and estimations_a a pannot_a =
   | _, _ -> assert false
 
 (* TODO: refactor this... every branch should be identified and
-   part of the key, so that there is no need to reset *)
+   part of the key, so that there is no need to reset.
+   Or don't use hashtbl at all and pass the data as a new parameter. *)
 let explored_table = Hashtbl.create 10
 let add_explored key t =
   Hashtbl.add explored_table key t
@@ -728,6 +729,14 @@ let reset_explored key =
   while Hashtbl.mem explored_table key do
     Hashtbl.remove explored_table key
   done
+
+let rec is_undesirable_pruning_sol subst t =
+  let t' = Subst.apply subst t in
+  (non_empty t && is_empty t') ||
+  (subtype t arrow_any &&
+    dnf t |> List.for_all
+      (List.exists (fun (a, _) -> is_undesirable_pruning_sol subst a))
+  )
 
 let infer_mono_inter key env infer_branch typeof (b1, b2, (tf,ud)) =
   let explored_t = ref (get_explored key) in
@@ -754,12 +763,10 @@ let infer_mono_inter key env infer_branch typeof (b1, b2, (tf,ud)) =
      the tallying instance takes too long) *)
   let subtype_gen' a b =
     let gen = TVarSet.diff (vars a) tvars |> generalize in
-    let a = Subst.apply gen a in
+    let a = Subst.apply gen a |> bot_instance in
     let b = Subst.apply (monomorphize (vars b)) b in
-    tallying [(bot_instance a,b)] |> List.filter (fun sol ->
-      sol |> Subst.destruct |> List.for_all (fun (_,t) -> non_empty t)
-      (* TODO: make a more general check: refuse solutions
-         that makes the codomain of an arrow empty in a *)
+    tallying [(a,b)] |> List.filter (fun sol ->
+      is_undesirable_pruning_sol sol a |> not
     ) <> []
   in
   let rec aux explored pending =

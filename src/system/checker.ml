@@ -997,73 +997,9 @@ let rec infer_mono_a vardef tenv env pannot_a a =
       |> map_res (fun x -> LambdaA (s, x))
   | _, _ -> assert false
 
-and infer_mono_union tenv env v a e t splits =
-  let needsubst a = List.map (fun s -> (s, a)) in
-  let open PartialAnnot in
-  if List.for_all (function SUnr _ -> true | _ -> false) splits
-  then
-    infer_mono_union tenv env v a e t ((SExpl (empty, Infer))::splits)
-  else
-    let rec aux splits =
-      match splits with
-      | [] -> Ok []
-      | (SInfer (s, pannot))::splits ->
-        let t = cap_o t s in
-        log ~level:3 "@.Tallying (inference) for %a: %a <= %a@."
-          Variable.pp v pp_typ t pp_typ empty ;
-        let res = tallying_infer [(t, empty)] in
-        res |> List.iter (fun s ->
-          log ~level:3 "Solution: %a@." Subst.pp s
-        ) ;
-        let res = simplify_tallying_infer env empty res in
-        res |> List.iter (fun s ->
-          log ~level:3 "Solution (simplified): %a@." Subst.pp s
-        ) ;
-        if List.exists Subst.is_identity res
-        then aux ((SUnr s)::splits)
-        else
-          Subst ((needsubst ((SUnr s)::splits) res)@
-            [(Subst.identity, (SProp (s, pannot))::splits)])
-      | (SProp (s, pannot))::splits ->
-        let propagate =
-          refine_a tenv env a (neg s)
-          |> List.find_opt (is_compatible env)
-        in
-        begin match propagate with
-        | Some env' ->
-          log ~level:0 "Var %a is ok but a split must be propagated.@." Variable.pp v ;
-          let env' = filter_refinement env env' in
-          Split (env', (SUnr s)::splits, (SProp (s, pannot))::splits)
-        | None -> aux ((SExpl (s, pannot))::splits)
-        end
-      | (SUnr s)::splits ->
-        aux splits |> map_res (fun x -> (SUnr s)::x)
-      | (SExpl (s, pannot))::splits ->
-        log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
-        let env' = Env.add v (cap_o t s) env in
-        begin match infer_mono_iterated tenv env' pannot e with
-        | Ok pannot ->
-          (* TODO: if possible, find a substitution (over type variables not in the env)
-             that would make the new split smaller than the union of the previous ones,
-             and apply this substitution to pannot. It might be needed to do
-             something equivalent in the polymorphic inference, as a branch
-             must be rigourously smaller in order to be assimilated. *)
-          aux splits |> map_res (fun x -> (SDone (s, pannot))::x)
-        | Split (env', pannot1, pannot2) when Env.mem v env' ->
-          let s' = Env.find v env' in
-          let splits1 = [ SInfer (cap_o s s' |> simplify_typ, pannot1) ;
-                          SInfer (diff_o s s' |> simplify_typ, pannot2) ]@splits in
-          let splits2 = [ SExpl (s,pannot2) ]@splits in
-          Split (Env.rm v env', splits1, splits2)
-        | res -> res |> map_res (fun x -> (SExpl (s, x))::splits)
-        end
-      | (SDone (s, pannot))::splits ->
-        aux splits |> map_res (fun x -> (SDone (s, pannot))::x)
-    in
-    aux splits
-
 and infer_mono tenv env pannot e =
   let needvar = needvar env in
+  let needsubst a = List.map (fun s -> (s, a)) in
   let open PartialAnnot in
   match e, pannot with
   | Bind (v,_,_), Inter i ->
@@ -1103,39 +1039,99 @@ and infer_mono tenv env pannot e =
     | res -> map_res (fun x -> TryKeep (x, pannot1, pannot2)) res
     end
   | Bind (v, a, e), Keep (pannot_a, splits) ->
-    log ~level:1 "Inferring var %a.@." Variable.pp v ;
-    assert (splits <> []) ;
-    let annot_a = infer_poly_a v tenv env pannot_a a in
-    let t = typeof_a_nofail v tenv env annot_a a in
-    log ~level:1 "Var %a typed with type %a.@." Variable.pp v pp_typ t ;
-    (* If the definition is a function whose DNF has many disjuncts,
-        we try to split them. *)
-    let propagate =
-      let dnf = dnf t |> simplify_dnf in
-      if subtype t arrow_any && List.length dnf >= 2 then
-        dnf |> simplify_dnf |> Utils.map_among_others' (fun _ others ->
-          let s = others |> List.map branch_type |> List.map bot_instance
-            |> disj in
-          let mono = monomorphize (vars_poly s) in
-          let s = Subst.apply mono s in
-          refine_a tenv env a s
-        )
-        |> List.flatten
-        |> List.find_opt (is_compatible env)
-      else None
+    let rec aux splits =
+      if List.for_all (function SUnr _ -> true | _ -> false) splits
+      then aux ((SExpl (empty, Infer))::splits)
+      else if List.for_all (function SUnr _ | SDone _ -> true | _ -> false) splits
+      then Ok splits
+      else begin
+        log ~level:1 "Inferring var %a.@." Variable.pp v ;
+        assert (splits <> []) ;
+        let annot_a = infer_poly_a v tenv env pannot_a a in
+        let t = typeof_a_nofail v tenv env annot_a a in
+        log ~level:1 "Var %a typed with type %a.@." Variable.pp v pp_typ t ;
+        (* If the definition is a function whose DNF has many disjuncts,
+            we try to split them. *)
+        let propagate =
+          let dnf = dnf t |> simplify_dnf in
+          if subtype t arrow_any && List.length dnf >= 2 then
+            dnf |> simplify_dnf |> Utils.map_among_others' (fun _ others ->
+              let s = others |> List.map branch_type |> List.map bot_instance
+                |> disj in
+              let mono = monomorphize (vars_poly s) in
+              let s = Subst.apply mono s in
+              refine_a tenv env a s
+            )
+            |> List.flatten
+            |> List.find_opt (is_compatible env)
+          else None
+        in
+        begin match propagate with
+        | Some env' ->
+          log ~level:1 "Var %a is ok but its DNF needs a split.@." Variable.pp v ;
+          let env' = filter_refinement env env' in
+          Split (env', splits, splits)
+        | None ->
+          (* Now, we perform the splits from the annotations *)
+          log ~level:2 "Typing body for %a with splits %a.@."
+            Variable.pp v (pp_list pp_typ) (effective_splits splits) ;
+          begin match splits with
+          | [] -> assert false
+          | (SUnr s)::splits -> aux (splits@[SUnr s])
+          | (SDone (s, pannot))::splits -> aux (splits@[SDone (s, pannot)])
+          | (SInfer (s, pannot))::splits ->
+            let t = cap_o t s in
+            log ~level:3 "@.Tallying (inference) for %a: %a <= %a@."
+              Variable.pp v pp_typ t pp_typ empty ;
+            let res = tallying_infer [(t, empty)] in
+            res |> List.iter (fun s ->
+              log ~level:3 "Solution: %a@." Subst.pp s
+            ) ;
+            let res = simplify_tallying_infer env empty res in
+            res |> List.iter (fun s ->
+              log ~level:3 "Solution (simplified): %a@." Subst.pp s
+            ) ;
+            if List.exists Subst.is_identity res
+            then aux ((SUnr s)::splits)
+            else
+              Subst ((needsubst ((SUnr s)::splits) res)@
+                [(Subst.identity, (SProp (s, pannot))::splits)])
+          | (SProp (s, pannot))::splits ->
+            let propagate =
+              refine_a tenv env a (neg s)
+              |> List.find_opt (is_compatible env)
+            in
+            begin match propagate with
+            | Some env' ->
+              log ~level:0 "Var %a is ok but a split must be propagated.@." Variable.pp v ;
+              let env' = filter_refinement env env' in
+              Split (env', (SUnr s)::splits, (SProp (s, pannot))::splits)
+            | None -> aux ((SExpl (s, pannot))::splits)
+            end
+          | (SExpl (s, pannot))::splits ->
+            log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
+            let env' = Env.add v (cap_o t s) env in
+            begin match infer_mono_iterated tenv env' pannot e with
+            | Ok pannot ->
+              (* TODO: if possible, find a substitution (over type variables not in the env)
+                  that would make the new split smaller than the union of the previous ones,
+                  and apply this substitution to pannot. It might be needed to do
+                  something equivalent in the polymorphic inference, as a branch
+                  must be rigourously smaller in order to be assimilated. *)
+              aux ((SDone (s, pannot))::splits)
+            | Split (env', pannot1, pannot2) when Env.mem v env' ->
+              let s' = Env.find v env' in
+              let splits1 = [ SInfer (cap_o s s' |> simplify_typ, pannot1) ;
+                              SInfer (diff_o s s' |> simplify_typ, pannot2) ]@splits in
+              let splits2 = [ SExpl (s,pannot2) ]@splits in
+              Split (Env.rm v env', splits1, splits2)
+            | res -> res |> map_res (fun x -> (SExpl (s, x))::splits)
+            end
+          end
+        end  
+      end
     in
-    begin match propagate with
-    | Some env' ->
-      log ~level:1 "Var %a is ok but its DNF needs a split.@." Variable.pp v ;
-      let env' = filter_refinement env env' in
-      Split (env', Keep (pannot_a, splits), Keep (pannot_a, splits))
-    | None ->
-      (* Now, we perform the splits from the annotations *)
-      log ~level:2 "Typing body for %a with splits %a.@."
-        Variable.pp v (pp_list pp_typ) (effective_splits splits) ;
-      infer_mono_union tenv env v a e t splits
-      |> map_res (fun x -> Keep (pannot_a, x))
-    end
+    aux splits |> map_res (fun splits -> Keep (pannot_a, splits))
   | _, _ -> assert false
 
 and infer_mono_a_iterated vardef tenv env pannot_a a =

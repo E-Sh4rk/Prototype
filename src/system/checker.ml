@@ -194,10 +194,10 @@ let rec is_undesirable s =
   dnf s |> List.for_all
     (List.exists (fun (a, b) -> non_empty a && is_undesirable b))
 
-let specific_inst t =
+(* let specific_inst t =
   let s = vars_poly t |> TVarSet.destruct
     |> List.map (fun v -> (v, empty)) |> Subst.construct in
-  Subst.apply s t
+  Subst.apply s t *)
 
 let refine_a tenv env a t =
   log ~level:5 "refine_a@." ;
@@ -238,12 +238,13 @@ let refine_a tenv env a t =
     let constr = [ (t1, mk_arrow (TVar.typ alpha |> cons) (cons t)) ] in
     let res = tallying constr in
     res |> List.map (fun sol ->
-      let t1 = apply_subst_simplify sol t1 in
+      (* let t1 = apply_subst_simplify sol t1 in
       let t2 = Subst.find' sol alpha in
       let clean_subst = clean_type_subst ~pos:any ~neg:empty t2 in
       let t1 = Subst.apply clean_subst t1 in
       let t2 = Subst.apply clean_subst t2 in
-      Env.construct_dup [ (v1, t1 |> specific_inst) ; (v2, t2) ]
+      Env.construct_dup [ (v1, t1 |> specific_inst) ; (v2, t2) ] *)
+      Env.singleton v2 (Subst.find' sol alpha |> top_instance)
     )
     |> List.filter (fun env -> env |> Env.tvars
         |> TVarSet.filter TVar.is_poly |> TVarSet.is_empty)
@@ -861,7 +862,6 @@ let normalize_subst env apply_subst_branch estimate mk_inter res =
           then
             let pannot = apply_subst_branch subst_cur pannot in
             estimate pannot |> Option.map (fun est ->
-              (* let est = apply_subst_simplify subst_cur est in *)
               let gen = Subst.codom subst_cur |> generalize in
               let subst_cur = Subst.compose_restr gen subst_cur in
               (pannot, subst_cur, est)
@@ -1183,7 +1183,6 @@ let infer tenv env e =
     Format.printf "Split %a@." Env.pp gamma ;
     assert false
   | Subst lst ->
-    (* Format.printf "Subst %a@." (pp_long_list Subst.pp) (List.map fst lst) ; *)
     Format.printf "Subst %a@."
       (pp_long_list TVarSet.pp) (List.map fst lst |> List.map Subst.dom) ;
     assert false

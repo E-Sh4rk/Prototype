@@ -27,7 +27,7 @@ module PartialAnnot = struct
   and t =
     | Infer | Typ | Untyp
     | Keep of (a * union)
-    | Skip of t
+    | Skip of t * bool (* Already typed *)
     | TryKeep of (a * t * t)
     | Inter of t inter
   [@@deriving show]
@@ -64,7 +64,7 @@ module PartialAnnot = struct
     | Typ -> Typ
     | Untyp -> Untyp
     | Keep (a, b) -> Keep (apply_subst_a s a, apply_subst_union s b)
-    | Skip t -> Skip (apply_subst s t)
+    | Skip (t, b) -> Skip (apply_subst s t, b)
     | TryKeep (a, t1, t2) ->
       TryKeep (apply_subst_a s a, apply_subst s t1, apply_subst s t2)
     | Inter i -> Inter (apply_subst_inter s i)

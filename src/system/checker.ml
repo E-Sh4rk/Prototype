@@ -469,7 +469,7 @@ and infer_poly tenv env pannot e =
   | Var v, Typ ->
     let r = refresh_all (vartype v |> vars_poly) in
     BVar r
-  | Bind (_, _, e), PartialAnnot.Skip pannot ->
+  | Bind (_, _, e), PartialAnnot.Skip (pannot, _) ->
     let annot = infer_poly tenv env pannot e in
     FullAnnot.Skip annot
   | Bind (v, a, e), PartialAnnot.Keep (pannot_a, branches) ->
@@ -675,7 +675,7 @@ let rec estimations e pannot =
   | Var _, Infer -> Some any
   | Bind (_,_,e), Infer -> estimations e Infer |>
     Option.map (fun t -> mk_times any_node (cons t))
-  | Bind (_,_,e), Skip p -> estimations e p |>
+  | Bind (_,_,e), Skip (p,_) -> estimations e p |>
     Option.map (fun t -> mk_times any_node (cons t))
   | Bind (_,a,e), TryKeep (pannot_a, pannot1, pannot2) ->
     begin match estimations_a a pannot_a with
@@ -1015,15 +1015,16 @@ and infer_mono tenv env pannot e =
   | Var _, Typ -> Ok Typ
   | Var _, Untyp -> Subst []
   | Var v, Infer -> needvar [v] Typ Untyp
-  | Bind _, Infer -> infer_mono tenv env (Skip Infer) e
-  | Bind (v, _, e), Skip pannot ->
+  | Bind _, Infer -> infer_mono tenv env (Skip (Infer, false)) e
+  | Bind (v, _, e) as ee, Skip (pannot, b) ->
     begin match infer_mono_iterated tenv env pannot e with
     | NeedVar (vs, pannot1, pannot2) when VarSet.mem v vs ->
       log ~level:0 "Var %a needed.@." Variable.pp v ;
       let pannot1 = TryKeep (InferA, pannot1, pannot2) in
-      let pannot2 = Skip pannot2 in
-      NeedVar (VarSet.remove v vs, pannot1, pannot2)
-    | res -> map_res (fun x -> Skip x) res
+      let pannot2 = Skip (pannot2, b) in
+      if b then infer_mono tenv env pannot2 ee
+      else NeedVar (VarSet.remove v vs, pannot1, pannot2)
+    | res -> map_res (fun x -> Skip (x,b)) res
     end
   | Bind (v, a, _), TryKeep (pannot_a, pannot1, pannot2) ->
     log ~level:1 "Trying to type var %a.@." Variable.pp v ;
@@ -1064,7 +1065,7 @@ and infer_mono tenv env pannot e =
       let lst = lst |> List.map (fun (s, pannot_a) ->
         (s, TryKeep (pannot_a, pannot1, pannot2))
       ) in
-      Subst (lst@[(Subst.identity, Skip pannot2)])
+      Subst (lst@[(Subst.identity, Skip (pannot2, true))])
     | res -> map_res (fun x -> TryKeep (x, pannot1, pannot2)) res
     end
   | Bind (v, a, e), Keep (pannot_a, splits) ->

@@ -21,7 +21,7 @@ module PartialAnnot : sig
     and t =
         | Infer | Typ | Untyp
         | Keep of (a * union)
-        | Skip of t
+        | Skip of t * bool (* Already typed *)
         | TryKeep of (a * t * t)
         | Inter of t inter
 

@@ -761,7 +761,7 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
     let pending =
       match ud with
       | true -> pending
-      | false when subtype any expl -> pending
+      (* | false when subtype any expl -> pending *)
       | false ->
         pending |> List.filter (fun (_,_,est) ->
           let r = subtype_gen' expl est |> not in

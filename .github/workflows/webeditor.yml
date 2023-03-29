@@ -46,7 +46,7 @@ jobs:
         run: |
           cd src
           opam exec -- dune build --profile release lib_js.bc.js
-          cp _build/default/lib_js.bc.js webeditor/typechecker.js
+          cp _build/default/lib_js.bc.js ../webeditor/typechecker.js
 
       # Node dependencies
       - name: Use Node.js
@@ -55,7 +55,7 @@ jobs:
           node-version: 16
       - name: Install Node.js dependencies
         run: |
-          cd src/webeditor
+          cd webeditor
           npm ci
 
       # Upload artifact
@@ -64,7 +64,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
-          path: src/webeditor/
+          path: webeditor/
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v1

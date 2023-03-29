@@ -759,10 +759,7 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
     let leq (_,s,_) (_,s',_) = leq s s' in
     (* Remove branches that are estimated not to add anything *)
     let pending =
-      match ud with
-      | true -> pending
-      (* | false when subtype any expl -> pending *)
-      | false ->
+      if ud then pending else
         pending |> List.filter (fun (_,_,est) ->
           let r = subtype_gen' expl est |> not in
           (* if not r then Format.printf "REMOVED: %a@.VS:%a@." pp_typ est pp_typ expl

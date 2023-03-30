@@ -94,6 +94,7 @@ module Raw : sig
     in term of the variables that are greater. Thus, greater variables (in particular variables not in var_order)
     are less likely to be constrained. *)
     val tallying : var_order:(TVar.t list) -> TVarSet.t -> (Base.typ * Base.typ) list -> Subst.t list
+    val test_tallying : var_order:(TVar.t list) -> TVarSet.t -> (Base.typ * Base.typ) list -> bool
 end
 
 val clean_type : pos:Base.typ -> neg:Base.typ -> Base.typ -> Base.typ

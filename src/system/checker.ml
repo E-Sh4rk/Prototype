@@ -706,9 +706,9 @@ and estimations_a a pannot_a =
   | _, UntypA -> None
   | Lambda (_, _, e), LambdaA (s, pannot) ->
     estimations e pannot |> Option.map (fun est ->
-      (* let v = TVar.mk_mono None |> TVar.typ in *)
-      (*(cup (cap v est) (neg v) |> cons)*)
-      (* Should be the above... but determining subtyping takes too long *)
+      (* let v = TVar.mk_mono None |> TVar.typ in
+      let est = cup (cap v est) (neg v) in *)
+      (* NOTE: Should be the above... but determining subtyping takes too long *)
       mk_arrow (cons s) (cons est)
     )
   | a, InterA (p1,p2,_) ->

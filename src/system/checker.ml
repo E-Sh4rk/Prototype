@@ -540,7 +540,7 @@ let subst_more_general s1 s2 =
     let t2 = Subst.find' s2 v in
     let t2 = Subst.apply s2m t2 in
     [(t1, t2) ; (t2, t1)]
-  ) |> List.flatten |> tallying <> []
+  ) |> List.flatten |> test_tallying
 
 let res_var = TVar.mk_mono None
 let simplify_tallying_infer env res sols =

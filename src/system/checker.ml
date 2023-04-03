@@ -472,25 +472,22 @@ and infer_poly tenv env pannot e =
   | Bind (_, _, e), PartialAnnot.Skip (pannot, _) ->
     let annot = infer_poly tenv env pannot e in
     FullAnnot.Skip annot
-  | Bind (v, a, e), PartialAnnot.Keep (pannot_a, branches) ->
-    assert (branches <> []) ;
+  | Bind (v, a, e), PartialAnnot.Keep (pannot_a, (i,p,ex,d,u)) ->
+    assert (d <> [] && i = [] && p = [] && ex = []) ;
     let annot_a = infer_poly_a v tenv env pannot_a a in
     let t = typeof_a_nofail v tenv env annot_a a in
-    let (branches, inst) = List.fold_left
-      (fun (branches, inst) br ->
-      match br with
-      | SDone (si, pannot) ->
+    let branches = d |> List.map (fun (si, pannot) ->
         let t = cap_o t si in
         let env = Env.add v t env in
-        ((si, infer_poly tenv env pannot e)::branches, inst)
-      | SUnr si ->
-        let t = cap_o t si in
-        let sol = tallying_one [(t, empty)] in
-        (branches, sol::inst)
-      | SInfer _ | SProp _ | SExpl _ -> assert false
-    ) ([], []) branches in
-    FullAnnot.Keep (annot_a,
-      (branches, Utils.remove_duplicates Subst.equiv inst))
+        (si, infer_poly tenv env pannot e)
+      )
+    in
+    let inst = u |> List.map (fun si ->
+      let t = cap_o t si in
+      tallying_one [(t, empty)]
+    )
+    in
+    FullAnnot.Keep (annot_a, (branches, Utils.remove_duplicates Subst.equiv inst))
   | _, _ ->  assert false
 
 (* ====================================== *)
@@ -1007,7 +1004,7 @@ and infer_mono tenv expl env pannot e =
       (in the paper, the split is set to SInfer instead, which could sometimes allow
       to detect that the type of the definition is empty, but thanks to type simplifications
       we probably don't need it) *)
-      let pannot = Keep (pannot_a, [(* SInfer *)SExpl (any, pannot1)]) in
+      let pannot = Keep (pannot_a, ([], [], [(any, pannot1)], [], [])) in
       (* If the definition is a function whose DNF has many disjuncts,
           we try to split them. *)
       let annot_a = infer_poly_a v tenv env pannot_a a in
@@ -1049,70 +1046,60 @@ and infer_mono tenv expl env pannot e =
       t
     in
     let rec aux splits =
-      if List.for_all (function SUnr _ -> true | _ -> false) splits
-      then aux ((SExpl (empty, Infer))::splits)
-      else if List.for_all (function SUnr _ | SDone _ -> true | _ -> false) splits
-      then Ok splits
-      else begin
-        assert (splits <> []) ;
-        (* Now, we perform the splits from the annotations *)
-        log ~level:2 "Typing body for %a with splits %a.@."
-          Variable.pp v (pp_list pp_typ) (effective_splits splits) ;
-        begin match splits with
-        | [] -> assert false
-        | (SUnr s)::splits -> aux (splits@[SUnr s])
-        | (SDone (s, pannot))::splits -> aux (splits@[SDone (s, pannot)])
-        | (SInfer (s, pannot))::splits ->
-          let t = cap_o (type_def ()) s in
-          log ~level:3 "@.Tallying (inference) for %a: %a <= %a@."
-            Variable.pp v pp_typ t pp_typ empty ;
-          let res = tallying_infer [(t, empty)] in
-          res |> List.iter (fun s ->
-            log ~level:3 "Solution: %a@." Subst.pp s
-          ) ;
-          let res = simplify_tallying_infer env empty res in
-          res |> List.iter (fun s ->
-            log ~level:3 "Solution (simplified): %a@." Subst.pp s
-          ) ;
-          if List.exists Subst.is_identity res
-          then aux ((SUnr s)::splits)
-          else
-            Subst ((needsubst ((SUnr s)::splits) res)@
-              [(Subst.identity, (SProp (s, pannot))::splits)])
-        | (SProp (s, pannot))::splits ->
-          let propagate =
-            refine_a tenv env a (neg s)
-            |> List.find_opt (is_compatible env)
+      match splits with
+      | ([],[],[],[],[]) -> assert false
+      | ([],[],[],[],u) -> aux ([],[],[(empty, Infer)],[],u)
+      | ([],[],[],d,u) -> Ok ([],[],[],d,u)
+      | (i,p,(s,pannot)::ex,d,u) ->
+        let t = cap_o (type_def ()) s in
+        log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
+        let env' = Env.add v t env in
+        begin match infer_mono_iterated tenv (pi2 expl) env' pannot e with
+        | Ok pannot ->
+          (* TODO: if possible, find a substitution (over type variables not in the env)
+              that would make the new split smaller than the union of the previous ones,
+              and apply this substitution to pannot. It might be needed to do
+              something equivalent in the polymorphic inference, as a branch
+              must be rigourously smaller in order to be assimilated. *)
+          aux (i,p,ex,(s, pannot)::d,u)
+        | Split (env', pannot1, pannot2) when Env.mem v env' ->
+          let s' = Env.find v env' in
+          let splits1 = 
+            ((cap_o s s' |> simplify_typ, pannot1)::
+             (diff_o s s' |> simplify_typ, pannot2)::i,p,ex,d,u)
           in
-          begin match propagate with
-          | Some env' ->
-            log ~level:0 "Var %a is ok but a split must be propagated.@." Variable.pp v ;
-            let env' = filter_refinement env env' in
-            Split (env', (SUnr s)::splits, (SProp (s, pannot))::splits)
-          | None -> aux ((SExpl (s, pannot))::splits)
-          end
-        | (SExpl (s, pannot))::splits ->
-          let t = cap_o (type_def ()) s in
-          log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
-          let env' = Env.add v t env in
-          begin match infer_mono_iterated tenv (pi2 expl) env' pannot e with
-          | Ok pannot ->
-            (* TODO: if possible, find a substitution (over type variables not in the env)
-                that would make the new split smaller than the union of the previous ones,
-                and apply this substitution to pannot. It might be needed to do
-                something equivalent in the polymorphic inference, as a branch
-                must be rigourously smaller in order to be assimilated. *)
-            aux ((SDone (s, pannot))::splits)
-          | Split (env', pannot1, pannot2) when Env.mem v env' ->
-            let s' = Env.find v env' in
-            let splits1 = [ SInfer (cap_o s s' |> simplify_typ, pannot1) ;
-                            SInfer (diff_o s s' |> simplify_typ, pannot2) ]@splits in
-            let splits2 = [ SExpl (s,pannot2) ]@splits in
-            Split (Env.rm v env', splits1, splits2)
-          | res -> res |> map_res (fun x -> (SExpl (s, x))::splits)
-          end
+          let splits2 = (i,p,(s,pannot2)::ex,d,u) in
+          Split (Env.rm v env', splits1, splits2)
+        | res -> res |> map_res (fun x -> (i,p,(s, x)::ex,d,u))
         end
-      end
+      | (i,(gammas,s,pannot)::p,ex,d,u) ->
+        let propagate = gammas |>
+          Utils.find_among_others (fun env' _ -> is_compatible env env') in
+        begin match propagate with
+        | Some (env',gammas) ->
+          log ~level:0 "Var %a is ok but a split must be propagated.@." Variable.pp v ;
+          let env' = filter_refinement env env' in
+          Split (env', (i,p,ex,d,s::u), (i,(gammas,s,pannot)::p,ex,d,u))
+        | None -> aux (i,p,(s, pannot)::ex,d,u)
+        end
+      | ((s, pannot)::i,p,ex,d,u) ->
+        let t = cap_o (type_def ()) s in
+        log ~level:3 "@.Tallying (inference) for %a: %a <= %a@."
+          Variable.pp v pp_typ t pp_typ empty ;
+        let res = tallying_infer [(t, empty)] in
+        res |> List.iter (fun s ->
+          log ~level:3 "Solution: %a@." Subst.pp s
+        ) ;
+        let res = simplify_tallying_infer env empty res in
+        res |> List.iter (fun s ->
+          log ~level:3 "Solution (simplified): %a@." Subst.pp s
+        ) ;
+        if List.exists Subst.is_identity res
+        then aux (i,p,ex,d,s::u)
+        else
+          let gammas = refine_a tenv env a (neg s) in
+          Subst ((needsubst (i,p,ex,d,s::u) res)@
+            [(Subst.identity, (i,(gammas,s,pannot)::p,ex,d,u))])
     in
     aux splits |> map_res (fun splits -> Keep (pannot_a, splits))
   | _, _ -> assert false

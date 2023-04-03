@@ -1,14 +1,14 @@
 open Types.Base
 open Types.Tvar
+open Common
 
 module PartialAnnot : sig
-    type split =
-        | SInfer of typ * t
-        | SProp of typ * t
-        | SExpl of typ * t
-        | SDone of typ * t
-        | SUnr of typ
-    and union = split list
+    type union_infer = (typ * t) list
+    and union_prop = (Env.t list * typ * t) list
+    and union_expl = (typ * t) list
+    and union_done = (typ * t) list
+    and union_unr = typ list
+    and union = union_infer * union_prop * union_expl * union_done * union_unr
     and 'a annotated_branch = 'a * Subst.t * typ
     and 'a inter = ('a annotated_branch) list (* Explored *)
                  * ('a annotated_branch) list (* Pending *)
@@ -20,9 +20,9 @@ module PartialAnnot : sig
         | InterA of a inter
     and t =
         | Infer | Typ | Untyp
-        | Keep of (a * union)
+        | Keep of a * union
         | Skip of t * bool (* Already typed *)
-        | TryKeep of (a * t * t)
+        | TryKeep of a * t * t
         | Inter of t inter
 
     val pp_a : Format.formatter -> a -> unit

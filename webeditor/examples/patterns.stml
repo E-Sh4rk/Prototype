@@ -54,8 +54,8 @@ let rec map f (lst:['a*]) =
 let rec filter (f: ('a->Any) & ('b -> ~True)) (l:[('a|'b)*]) =
   match l with
   | :Nil -> nil
-  | _ ->
-    if f(fst(l)) is True
-    then (fst(l),filter f (snd(l)))
-    else filter f (snd(l))
+  | (e,l) ->
+    if f e is True
+    then (e, filter f l)
+    else filter f l
   end

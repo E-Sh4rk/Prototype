@@ -16,6 +16,7 @@ module PartialAnnot : sig
                     * bool (* User defined *))
     and a =
         | InferA | TypA | UntypA
+        | EmptyA | ThenA | ElseA (* NOTE: not in the paper, small optimisation *)
         | LambdaA of typ * t
         | InterA of a inter
     and t =
@@ -46,7 +47,7 @@ module FullAnnot : sig
         | PairA of renaming * renaming
         | AppA of inst * inst
         | ProjA of inst
-        | EmptyA | ThenA | ElseA
+        | EmptyA of inst | ThenA of inst | ElseA of inst
         | RecordUpdateA of inst * (renaming option)
         | ConstrA of inst
         | InterA of a inter

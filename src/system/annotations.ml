@@ -25,6 +25,7 @@ module PartialAnnot = struct
   [@@deriving show]
   and a =
     | InferA | TypA | UntypA
+    | EmptyA | ThenA | ElseA
     | LambdaA of typ * t
     | InterA of a inter
   [@@deriving show]
@@ -60,6 +61,7 @@ module PartialAnnot = struct
   | InferA -> InferA
   | TypA -> TypA
   | UntypA -> UntypA
+  | EmptyA -> EmptyA | ThenA -> ThenA | ElseA -> ElseA
   | LambdaA (ty, t) -> LambdaA (apply_subst_simplify s ty, apply_subst s t)
   | InterA i -> InterA (apply_subst_inter_a s i)
   and apply_subst s t =
@@ -95,7 +97,7 @@ module FullAnnot = struct
       | PairA of renaming * renaming
       | AppA of inst * inst
       | ProjA of inst
-      | EmptyA | ThenA | ElseA
+      | EmptyA of inst | ThenA of inst | ElseA of inst
       | RecordUpdateA of inst * (renaming option)
       | ConstrA of inst
       | InterA of a inter

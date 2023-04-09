@@ -121,17 +121,17 @@ let rec typeof_a vardef tenv env annot_a a =
     (* let t1 = var_type v1 |> instantiate_check ss1 in
     let t2 = var_type v2 |> instantiate_check ss2 in
     apply t1 t2 *)
-  | Ite (v, _, _, _), EmptyA ->
-    let t = var_type v in
+  | Ite (v, _, _, _), EmptyA ss ->
+    let t = var_type v |> instantiate_check ss in
     if is_empty t then empty
     else untypeable ("Invalid typecase: tested expression is not empty.")
-  | Ite (v, s, v1, _), ThenA ->
-    let t = var_type v in
+  | Ite (v, s, v1, _), ThenA ss ->
+    let t = var_type v |> instantiate_check ss in
     if subtype t s
     then var_type v1
     else untypeable ("Invalid typecase: tested expression hasn't the required type.")
-  | Ite (v, s, _, v2), ElseA ->
-    let t = var_type v in
+  | Ite (v, s, _, v2), ElseA ss ->
+    let t = var_type v |> instantiate_check ss in
     if subtype t (neg s)
     then var_type v2
     else untypeable ("Invalid typecase: tested expression hasn't the required type.")
@@ -447,12 +447,12 @@ let rec infer_poly_a vardef tenv env pannot_a a =
       (Subst.compose_restr s r1, Subst.compose_restr s r2)
     ) |> List.split in
     AppA (s1, s2)
-  | Ite (v, s, _, _), TypA ->
-    let t = vartype v in
-    if subtype t empty then EmptyA
-    else if subtype t s then ThenA
-    else if subtype t (neg s) then ElseA
-    else assert false
+  | Ite (v, _, _, _), EmptyA ->
+    EmptyA [tallying_one [(vartype v, empty)]]
+  | Ite (v, s, _, _), ThenA ->
+    ThenA [tallying_one [(vartype v, s)]]
+  | Ite (v, s, _, _), ElseA ->
+    ElseA [tallying_one [(vartype v, neg s)]]
   | Lambda (_, v, e), PartialAnnot.LambdaA (s, pannot) ->
     let env = Env.add v s env in
     let annot = infer_poly tenv env pannot e in
@@ -701,6 +701,9 @@ and estimations_a a pannot_a =
   | _, TypA -> Some any
   | _, InferA -> Some any
   | _, UntypA -> None
+  | _, EmptyA -> Some any
+  | _, ThenA -> Some any
+  | _, ElseA -> Some any
   | Lambda (_, _, e), LambdaA (s, pannot) ->
     estimations e pannot |> Option.map (fun est ->
       (* let v = TVar.mk_mono None |> TVar.typ in
@@ -865,6 +868,9 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
       i
     |> map_res (fun x -> InterA x)
   | _, TypA -> Ok (TypA)
+  | _, EmptyA -> Ok (EmptyA)
+  | _, ThenA -> Ok (ThenA)
+  | _, ElseA -> Ok (ElseA)
   | _, UntypA -> Subst []
   | Alias v, InferA when memvar v -> Ok (TypA)
   | Alias _, InferA -> Subst []
@@ -943,9 +949,9 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
       let t = vartype v in
       let not_else = subtype t tau in
       let not_then = subtype t (neg tau) in
-      if not_then && not_else then Ok TypA        
-      else if not_then then needvar [v2] TypA UntypA
-      else if not_else then needvar [v1] TypA UntypA
+      if not_then && not_else then Ok EmptyA        
+      else if not_then then needvar [v2] ElseA UntypA
+      else if not_else then needvar [v1] ThenA UntypA
       else Split (Env.singleton v tau, InferA, InferA)
     else needvar [v] InferA UntypA
   | Lambda (Unnanoted, _, _), InferA ->
@@ -1064,7 +1070,7 @@ and infer_mono tenv expl env pannot e =
           aux (i,p,ex,(s, pannot)::d,u)
         | Split (env', pannot1, pannot2) when Env.mem v env' ->
           let s' = Env.find v env' in
-          let splits1 = 
+          let splits1 =
             ((cap_o s s' |> simplify_typ, pannot1)::
              (diff_o s s' |> simplify_typ, pannot2)::i,p,ex,d,u)
           in

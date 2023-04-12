@@ -475,6 +475,7 @@ and infer_poly tenv env pannot e =
   | Bind (v, a, e), PartialAnnot.Keep (pannot_a, (i,p,ex,d,u)) ->
     assert (d <> [] && i = [] && p = [] && ex = []) ;
     let annot_a = infer_poly_a v tenv env pannot_a a in
+    assert (subtype any ([List.map fst d ; u] |> List.concat |> disj)) ;
     let t = typeof_a_nofail v tenv env annot_a a in
     let branches = d |> List.map (fun (si, pannot) ->
         let t = cap_o t si in

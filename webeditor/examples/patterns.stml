@@ -7,7 +7,7 @@ let test2_patterns x =
   match x with (a,_)&(_,b) -> (a,b) end
 
 let test3_patterns x y =
-  let pack x y = (x,y) in
+  let pack (x:'a;'b) (y:'a;'b) = (x,y) in
   let (y,x) = pack x y in
   pack x y
 

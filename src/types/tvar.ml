@@ -173,37 +173,31 @@ let vars_with_polarity t = CD.Types.Subst.var_polarities t |> CD.Var.Map.get
 let is_mono_typ t = vars_poly t |> TVarSet.is_empty
 let is_novar_typ t = vars t |> TVarSet.is_empty
 
-let refresh ~mono vars =
-  let test = if mono then TVar.is_mono else TVar.is_poly in
-  let f = (fun v -> (v, TVar.mk_fresh v |> TVar.typ)) in
-  vars |> TVarSet.filter test |>
-    TVarSet.destruct |> List.map f |> Subst.construct
-let refresh_all vars =
-  let f = (fun v -> (v, TVar.mk_fresh v |> TVar.typ)) in
+let refresh vars =
+  let f v = (v, TVar.mk_fresh v |> TVar.typ) in
   vars |> TVarSet.destruct |> List.map f |> Subst.construct
+
 let generalize vars =
+  let f v = (v, TVar.mk_poly None |> TVar.typ) in
   vars |>
     TVarSet.filter TVar.is_mono |>
-    TVarSet.destruct |> List.map (fun v ->
-      (v, TVar.mk_poly None |> TVar.typ)
-    ) |> Subst.construct
-
+    TVarSet.destruct |> List.map f |> Subst.construct
 let monomorphize vars =
+  let f v = (v, TVar.mk_mono None |> TVar.typ) in
   vars |>
     TVarSet.filter TVar.is_poly |>
-    TVarSet.destruct |> List.map (fun v ->
-      (v, TVar.mk_mono None |> TVar.typ)
-    ) |> Subst.construct
+    TVarSet.destruct |> List.map f |> Subst.construct
 
-let register_unregistered ~mono vars =
-  let f =
-    if mono
-    then (fun v -> (v, TVar.mk_mono None |> TVar.typ))
-    else (fun v -> (v, TVar.mk_poly None |> TVar.typ))
-  in
+let generalize_unregistered vars =
+  let f v = (v, TVar.mk_poly None |> TVar.typ) in
   vars |>
     TVarSet.filter TVar.is_unregistered |>
     TVarSet.destruct |> List.map f |> Subst.construct
+(* let monomorphize_unregistered vars =
+  let f v = (v, TVar.mk_mono None |> TVar.typ) in
+  vars |>
+    TVarSet.filter TVar.is_unregistered |>
+    TVarSet.destruct |> List.map f |> Subst.construct *)
 
 let pp_typ_short fmt t =
   let t = Subst.apply (Subst.short_names (vars t)) t in
@@ -294,38 +288,34 @@ let test_tallying constr =
   Raw.test_tallying ~var_order:[] mono constr
 
 let tallying constr =
-  let mono = constr |>
-    List.map (fun (a,b) -> [vars_mono a ; vars_mono b]) |>
-    List.flatten in
-  let mono = TVarSet.union_many mono in
-  let res = Raw.tallying ~var_order:[] mono constr in
-  let codom = List.map Subst.codom res in
-  let codom = TVarSet.union_many codom in
-  (* let lkp_subst = lookup_unregistered codom in *)
-  let reg_subst = register_unregistered ~mono:false codom in
-  res
-    (* |> List.map (Subst.compose_restr lkp_subst) *)
-    |> List.map (Subst.compose_restr reg_subst)
+  let vars = constr |>
+    List.map (fun (a,b) -> [vars a ; vars b]) |>
+    List.flatten |> TVarSet.union_many in
+  let mono = vars |> TVarSet.filter TVar.is_mono in
+  let poly = vars |> TVarSet.filter TVar.is_poly in
+  Raw.tallying ~var_order:[] mono constr
+  |> List.map (fun s ->
+    let reg_subst = generalize_unregistered (Subst.codom s) in
+    let ref_subst = refresh poly in
+    Subst.compose ref_subst (Subst.compose_restr reg_subst s)
+  )
 
 let tallying_infer constr =
   (* TODO: set var_order for the tallying instance *)
   let infer = constr |>
     List.map (fun (a,b) -> [vars_infer a ; vars_infer b]) |>
-    List.flatten in
-  let infer = TVarSet.union_many infer in
+    List.flatten |> TVarSet.union_many in
   let gen = generalize infer in
-  (* let mon = Subst.inverse_renaming gen in *)
   let constr = constr |>
     List.map (fun (a,b) ->
-      let r1 = refresh_all (vars_poly a) in
-      let r2 = refresh_all (vars_poly b) in
+      let r1 = refresh (vars_poly a) in
+      let r2 = refresh (vars_poly b) in
       let a = Subst.apply r1 a in
       let b = Subst.apply r2 b in
       (Subst.apply gen a, Subst.apply gen b))
   in
   tallying constr |> List.map (fun s ->
     let s = Subst.compose_restr s gen in
-    (* let s = Subst.compose_restr mon s in *)
     let mono_subst = monomorphize (Subst.codom s) in
     Subst.compose_restr mono_subst s
   )

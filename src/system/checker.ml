@@ -298,14 +298,8 @@ let simplify_tallying res sols =
         Subst.compose s sol
       ) sol (Subst.dom sol |> TVarSet.destruct)
     in
-    (* Decorrelate solutions *)
-    (* NOTE: Disabled because it can cause two branches
-       with a common domain to separate *)
-    (* let t = Subst.apply sol res in
-    let s = refresh_all (vars_poly t) in
-    Subst.compose s sol *)
     sol
-    ) in
+  ) in
   (* Remove weaker solutions *)
   let sols = keep_only_minimal is_better_sol sols in
   sols
@@ -397,8 +391,8 @@ let rec infer_poly_a vardef tenv env pannot_a a =
   | Let _, TypA -> LetA
   | Abstract _, TypA -> AbstractA
   | Pair (v1, v2), TypA ->
-    let r1 = refresh_all (vartype v1 |> vars_poly) in
-    let r2 = refresh_all (vartype v2 |> vars_poly) in
+    let r1 = refresh (vartype v1 |> vars_poly) in
+    let r2 = refresh (vartype v2 |> vars_poly) in
     PairA (r1, r2)
   | Projection (p, v), TypA ->
     let t = vartype v in
@@ -425,7 +419,7 @@ let rec infer_poly_a vardef tenv env pannot_a a =
   | RecordUpdate (v, _, Some v2), TypA ->
     let res = tallying_nonempty [(vartype v, record_any)] in
     let res = simplify_tallying record_any res in
-    let r = refresh_all (vartype v2 |> vars_poly) in
+    let r = refresh (vartype v2 |> vars_poly) in
     RecordUpdateA (res, Some r)
   | TypeConstr (v, s), TypA ->
     let res = tallying_nonempty [(vartype v, s)] in
@@ -433,8 +427,8 @@ let rec infer_poly_a vardef tenv env pannot_a a =
   | App (v1, v2), TypA ->
     let t1 = vartype v1 in
     let t2 = vartype v2 in
-    let r1 = refresh_all (vars_poly t1) in
-    let r2 = refresh_all (vars_poly t2) in
+    let r1 = refresh (vars_poly t1) in
+    let r2 = refresh (vars_poly t2) in
     let t1 = Subst.apply r1 t1 in
     let t2 = Subst.apply r2 t2 in
     let alpha = TVar.mk_poly None in
@@ -467,7 +461,7 @@ and infer_poly tenv env pannot e =
   | e, PartialAnnot.Inter i ->
     Inter (infer_poly_inter (fun pannot -> infer_poly tenv env pannot e) i)
   | Var v, Typ ->
-    let r = refresh_all (vartype v |> vars_poly) in
+    let r = refresh (vartype v |> vars_poly) in
     BVar r
   | Bind (_, _, e), PartialAnnot.Skip (pannot, _) ->
     let annot = infer_poly tenv env pannot e in

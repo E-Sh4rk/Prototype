@@ -77,11 +77,9 @@ val check_var : Base.typ -> [ `Not_var | `Pos of TVar.t | `Neg of TVar.t ]
 val is_mono_typ : Base.typ -> bool
 val is_novar_typ : Base.typ -> bool
 
-val refresh : mono:bool -> TVarSet.t -> Subst.t
-val refresh_all : TVarSet.t -> Subst.t
+val refresh : TVarSet.t -> Subst.t
 val generalize : TVarSet.t -> Subst.t
 val monomorphize : TVarSet.t -> Subst.t
-val register_unregistered : mono:bool -> TVarSet.t -> Subst.t
 val pp_typ_short : Format.formatter -> Base.typ -> unit
 val string_of_type_short : Base.typ -> string
 

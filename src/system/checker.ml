@@ -289,11 +289,13 @@ let simplify_tallying res sols =
     let t = Subst.apply sol res in
     let clean = clean_type_subst ~pos:empty ~neg:any t in
     let sol = Subst.compose clean sol in
-    (* Simplify (light) *)
+    (* Simplify *)
     let sol =
       List.fold_left (fun sol v ->
         let t = Subst.find' sol v in
-        let v = TVar.mk_fresh v in
+        (* let v = TVar.mk_fresh v in *)
+        (* NOTE: we use the same poly vars for the different solutions,
+           which is different of the paper. But it is an easy way to factorize some types. *)
         let s = replace_vars t (top_vars t |> TVarSet.filter TVar.is_poly) v in
         Subst.compose s sol
       ) sol (Subst.dom sol |> TVarSet.destruct)
@@ -580,12 +582,6 @@ let simplify_tallying_infer env res sols =
     | [] -> None
     | sol::_ -> Some sol
   in
-  let merge_on_domain merge dom lst =
-    dom |> List.map (fun v ->
-      let t = lst |> List.map (fun s -> Subst.find' s v) |> merge in
-      (v, t)
-    ) |> Subst.construct
-  in
   sols
   (* Restrict to tvars and store result *)
   |> List.map (fun sol ->
@@ -623,19 +619,6 @@ let simplify_tallying_infer env res sols =
       let s = replace_vars t vs v in
       Subst.compose s sol
     ) sol (new_dom |> TVarSet.destruct)
-  )
-  (* Merge substitutions when possible *)
-  |> regroup_equiv (fun s1 s2 ->
-    let s1 = Subst.restrict s1 tvars in
-    let s2 = Subst.restrict s2 tvars in
-    Subst.equiv s1 s2
-    )
-  |> List.map (fun to_merge ->
-    let common = Subst.restrict (List.hd to_merge) tvars in
-    (* conj instead of conj_o, because in some cases it can be very complex types
-       without being used later (e.g. when there is no tvar to infer) *)
-    let respart = merge_on_domain conj [res_var] to_merge in
-    Subst.combine common respart
   )
   (* Try remove var substitutions *)
   |> List.map (fun sol ->

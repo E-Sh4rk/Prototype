@@ -33,7 +33,7 @@ module PartialAnnot : sig
     val apply_subst : Subst.t -> t -> t
 
     val effective_splits : union -> typ list
-    val effective_splits_annots : union -> t list
+    val effective_splits_annots : union -> (typ * t) list
 end
 
 module FullAnnot : sig

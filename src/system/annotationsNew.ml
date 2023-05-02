@@ -79,7 +79,7 @@ module PartialAnnot = struct
   let effective_splits (e,p,i,d,_) =
     (p |> List.map (fun (t,_,_) -> t)) @ (i@e@d |> List.map (fun (t, _) -> t))
   let effective_splits_annots (e,p,i,d,_) =
-    (p |> List.map (fun (_,_,pa) -> pa)) @ (i@e@d |> List.map (fun (_, pa) -> pa))
+    (p |> List.map (fun (t,_,pa) -> (t,pa))) @ (i@e@d |> List.map (fun (t, pa) -> (t,pa)))
 end
 
 module FullAnnot = struct

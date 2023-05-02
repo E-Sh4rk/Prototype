@@ -996,7 +996,7 @@ and infer_mono tenv expl env pannot e =
       let propagate =
         let dnf = dnf t |> simplify_dnf in
         if subtype t arrow_any && List.length dnf >= 2 then
-          dnf |> simplify_dnf |> Utils.map_among_others' (fun _ others ->
+          dnf |> Utils.map_among_others' (fun _ others ->
             let s = others |> List.map branch_type |> List.map bot_instance
               |> disj in
             let mono = monomorphize (vars_poly s) in

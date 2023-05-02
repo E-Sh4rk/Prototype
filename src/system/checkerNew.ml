@@ -817,8 +817,6 @@ let normalize env apply_subst_branch estimate mk_inter res =
     Split (env', pannot1, pannot2)
   | Ok pannot -> Ok pannot | Fail -> Fail
 
-(* TODO: normalize_subst should also normalize NeedVar (in paper too) *)
-
 let rec infer_mono_a vardef tenv expl env pannot_a a =
   let memvar v = Env.mem v env in
   let vartype v = Env.find v env in
@@ -1078,15 +1076,11 @@ and infer_mono tenv expl env pannot e =
     aux splits
   | _, _ -> assert false
 
-(* TODO *)
-
 and infer_mono_a_iterated vardef tenv expl env pannot_a a =
   log ~level:5 "infer_mono_a_iterated@." ;
   let res = infer_mono_a vardef tenv expl env pannot_a a |>
-    normalize_subst env
-      PartialAnnot.apply_subst_a
-      (estimations_a a)
-      (fun a b c -> PartialAnnot.InterA (a,b,c))
+    normalize env PartialAnnot.apply_subst_a
+      (estimations_a a) (fun a b c -> PartialAnnot.InterA (a,b,c))
   in
   match should_iterate res with
   | None -> res
@@ -1095,10 +1089,8 @@ and infer_mono_a_iterated vardef tenv expl env pannot_a a =
 and infer_mono_iterated tenv expl env pannot e =
   log ~level:5 "infer_mono_iterated@." ;
   let res = infer_mono tenv expl env pannot e |>
-    normalize_subst env
-      PartialAnnot.apply_subst
-      (estimations e)
-      (fun a b c -> PartialAnnot.Inter (a,b,c))
+    normalize env PartialAnnot.apply_subst
+      (estimations e) (fun a b c -> PartialAnnot.Inter (a,b,c))
   in
   match should_iterate res with
   | None -> res
@@ -1111,7 +1103,7 @@ and infer_mono_iterated tenv expl env pannot e =
 let infer tenv env e =
   let open PartialAnnot in
   match infer_mono_iterated tenv any env Infer e with
-  | Subst [] -> raise (Untypeable ([], "Annotations inference failed."))
+  | Fail -> raise (Untypeable ([], "Annotations inference failed."))
   | Ok annot -> infer_poly tenv env annot e
   | NeedVar (vs, _, _) ->
     Format.printf "NeedVar %a@." (pp_list Variable.pp) (VarSet.to_seq vs |> List.of_seq) ;
@@ -1119,7 +1111,7 @@ let infer tenv env e =
   | Split (gamma, _, _) ->
     Format.printf "Split %a@." Env.pp gamma ;
     assert false
-  | Subst lst ->
+  | Subst (lst, _) ->
     Format.printf "Subst %a@."
       (pp_long_list TVarSet.pp) (List.map fst lst |> List.map Subst.dom) ;
     assert false

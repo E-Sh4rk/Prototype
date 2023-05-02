@@ -18,7 +18,7 @@ let switch2 s f a b =
 
 (* ======================================= *)
 
-let typeof x =
+debug let typeof x =
   if x is Unit|Nil then "Nil"
   else if x is String then "String"
   else if x is Char then "Char"

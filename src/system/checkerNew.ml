@@ -508,11 +508,6 @@ let map_res f res =
     Subst (lst |> List.map (fun (s, a) -> (s, f a)), f a)
   | NeedVar (vs, a1, a2) -> NeedVar (vs, f a1, f a2)
 
-let needvar env vs a1 a2 =
-  let vs = VarSet.of_list vs in
-  let vs = VarSet.diff vs (Env.domain env |> VarSet.of_list) in
-  NeedVar (vs, a1, a2)
-
 let is_compatible env gamma =
   VarSet.subset
     (Env.domain gamma |> VarSet.of_list)
@@ -795,13 +790,10 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
   in
   aux b1 expl b2
 
-let filter_refinement env env' =
-  Env.filter (fun v t -> subtype (Env.find v env) t |> not) env'
-
-let normalize_subst env apply_subst_branch estimate mk_inter res =
-  let tvars = Env.tvars env |> TVarSet.filter TVar.is_mono in
+let normalize env apply_subst_branch estimate mk_inter res =
   match res with
   | Subst (lst, default) ->
+    let tvars = Env.tvars env |> TVarSet.filter TVar.is_mono in
     let (lst1, lst2) = lst |> List.partition (fun (s,_) ->
       TVarSet.inter (Subst.dom s) tvars |> TVarSet.is_empty) in
     let lst1 = (Subst.identity, default)::lst1 |> List.filter_map (fun (s,pannot) ->
@@ -817,18 +809,21 @@ let normalize_subst env apply_subst_branch estimate mk_inter res =
     | [(default,_,_)] -> Subst (lst2, default)
     | lst1 -> Subst (lst2, mk_inter [] lst1 (false,false))
     end
-  | res -> res
+  | NeedVar (vs, pannot1, pannot2) ->
+    let vars = Env.domain env |> VarSet.of_list in
+    NeedVar (VarSet.diff vs vars, pannot1, pannot2)
+  | Split (env', pannot1, pannot2) ->
+    let env' = Env.filter (fun v t -> subtype (Env.find v env) t |> not) env' in
+    Split (env', pannot1, pannot2)
+  | Ok pannot -> Ok pannot | Fail -> Fail
 
 (* TODO: normalize_subst should also normalize NeedVar (in paper too) *)
 
 let rec infer_mono_a vardef tenv expl env pannot_a a =
   let memvar v = Env.mem v env in
   let vartype v = Env.find v env in
-  let needvar = needvar env in
-  let norm_subst =
-    normalize_subst env PartialAnnot.apply_subst_a (estimations_a a)
-    (fun a b c -> InterA (a,b,c)) in
-  let needsubst a d ss = Subst (List.map (fun s -> (s, a)) ss, d) |> norm_subst in
+  let needsubst a d ss = Subst (List.map (fun s -> (s, a)) ss, d) in
+  let needvar vs a1 a2 = NeedVar (VarSet.of_list vs, a1, a2) in
   let open PartialAnnot in
   match a, pannot_a with
   | a, InterA i ->
@@ -942,7 +937,7 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
     else
       let env = Env.add v s env in
       infer_mono_iterated tenv (apply expl s) env pannot e
-      |> map_res (fun x -> LambdaA (s, x)) |> norm_subst
+      |> map_res (fun x -> LambdaA (s, x))
   | _, _ -> assert false
 
 (* TODO *)

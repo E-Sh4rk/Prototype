@@ -656,7 +656,7 @@ let rec estimations e pannot =
         mk_times (cons est_a) (cons est_e)
       )
     end
-  | Bind (_,a,e), Keep (pannot_a, u) ->
+  | Bind (_,a,e), Keep (pannot_a, u) -> (* TODO: Restore behaviour of old checker for this case  *)
     let est_a = estimations_a a pannot_a |> Option.get in
     let est_e = u |> effective_splits_annots |> List.map (fun (t, a) ->
       (t, estimations e a)) in
@@ -938,6 +938,7 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
       |> map_res (fun x -> LambdaA (s, x))
   | _, _ -> assert false
 
+(* TODO: Reformalize behaviour of old checker for bindings inference, and update this function *)
 and infer_mono tenv expl env pannot e =
   let needvar vs a1 a2 = NeedVar (VarSet.of_list vs, a1, a2) in
   let needsubst a d ss = Subst (List.map (fun s -> (s, a)) ss, d) in

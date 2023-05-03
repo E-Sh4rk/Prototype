@@ -8,7 +8,7 @@ module PartialAnnot : sig
     and union_infer = union_expl
     and union_done = (typ * t) list
     and union_unr = typ list
-    and union = union_expl * union_prop * union_infer * union_done * union_unr
+    and union = union_infer * union_prop * union_expl * union_done * union_unr
     and 'a annotated_branch = 'a * Subst.t * typ
     and 'a inter = ('a annotated_branch) list (* Explored *)
                  * ('a annotated_branch) list (* Pending *)

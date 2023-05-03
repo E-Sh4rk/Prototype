@@ -14,7 +14,7 @@ module PartialAnnot = struct
   [@@deriving show]
   and union_unr = typ list
   [@@deriving show]
-  and union = union_expl * union_prop * union_infer * union_done * union_unr
+  and union = union_infer * union_prop * union_expl * union_done * union_unr
   [@@deriving show]
   and 'a annotated_branch = 'a * Subst.t * typ
   [@@deriving show]
@@ -39,7 +39,7 @@ module PartialAnnot = struct
 
   let apply_subst_branch f s (a, s', t) =
     (f s a, s' (* The subst never change *), apply_subst_simplify s t)
-  let rec apply_subst_union s (e,p,i,d,u) =
+  let rec apply_subst_union s (i,p,e,d,u) =
     let apply = apply_subst_simplify s in
     let aux1 ty = apply ty in
     let aux2 (ty, t) = (apply ty, apply_subst s t) in
@@ -48,7 +48,7 @@ module PartialAnnot = struct
       |> Env.construct
     in
     let aux3 (ty, env, t) = (apply ty, List.map aux_env env, apply_subst s t) in
-    (List.map aux2 e, List.map aux3 p, List.map aux2 i, List.map aux2 d, List.map aux1 u)
+    (List.map aux2 i, List.map aux3 p, List.map aux2 e, List.map aux2 d, List.map aux1 u)
   and apply_subst_inter_a s (a, b, flags) =
     (List.map (apply_subst_branch apply_subst_a s) a,
     List.map (apply_subst_branch apply_subst_a s) b,
@@ -76,10 +76,10 @@ module PartialAnnot = struct
       TryKeep (apply_subst_a s a, apply_subst s t1, apply_subst s t2)
     | Inter i -> Inter (apply_subst_inter s i)
 
-  let effective_splits (e,p,i,d,_) =
+  let effective_splits (i,p,e,d,_) =
     (p |> List.map (fun (t,_,_) -> t)) @ (i@e@d |> List.map (fun (t, _) -> t))
-  let effective_splits_annots (e,p,i,d,_) =
-    (p |> List.map (fun (t,_,pa) -> (t,pa))) @ (i@e@d |> List.map (fun (t, pa) -> (t,pa)))
+  let effective_splits_annots (i,p,e,d,_) =
+    (p |> List.map (fun (t,_,pa) -> (t,pa))) @ (i@e@d)
 end
 
 module FullAnnot = struct

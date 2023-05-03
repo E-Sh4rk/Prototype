@@ -662,7 +662,7 @@ let rec estimations e pannot =
   | Bind (_,a,e), Keep (pannot_a, u) ->
     let est_a = estimations_a a pannot_a |> Option.get in
     let est_e = u |> effective_splits_annots |> List.map snd |> List.map (estimations e) in
-    if List.mem None est_e then None
+    if List.mem None est_e || est_e = [] then None
     else
       let est_e = est_e |> List.map Option.get |> disj_o in
       Some (mk_times (cons est_a) (cons est_e))
@@ -804,6 +804,11 @@ let normalize env apply_subst_branch estimate mk_inter res =
         )
       )
     in
+    (* let lst2 = lst2 |> List.map (fun (s,pannot) ->
+      let s' = Subst.restrict s tvars in
+      let cur = Subst.remove s tvars in
+      (s', apply_subst_branch cur pannot)
+    ) in *)
     begin match lst1 with
     | [(default,_,_)] -> Subst (lst2, default)
     | lst1 -> Subst (lst2, mk_inter [] lst1 (false,false))

@@ -143,13 +143,13 @@ module Subst = struct
       match check_var t with
       | `Pos _ -> true
       | _ -> false)
-  let inverse_renaming t =
+  (* let inverse_renaming t =
     destruct t |>
     List.map (fun (v,t) ->
       match check_var t with
       | `Pos v' -> (v', TVar.typ v)
       | _ -> assert false) |>
-    construct
+    construct *)
 
   let short_names vs =
     let r = CD.Var.full_renaming vs in

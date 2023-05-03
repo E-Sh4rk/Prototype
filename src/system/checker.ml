@@ -784,15 +784,19 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
           Format.printf "Env: %a@." Env.pp (Env.filter (fun v _ ->
             Variable.is_lambda_var v) env)
         end ; *)
+        log ~level:3 "Success of intersection issued from %a@." Subst.pp s;
         aux ((pannot, s, est)::explored) (cap_o expl est) pending
       | Subst lst when not ud &&
         List.for_all (fun (s,_) -> Subst.is_identity s |> not) lst &&
         (explored <> [] || pending <> []) ->
+        log ~level:3 "Failure (need subst) of intersection issued from %a@." Subst.pp s;
         let lst = lst |> List.map (fun (subst, pannot) ->
             (subst, (explored, (pannot,s,est)::pending, (tf,ud)))
         ) in
         Subst (lst@[(Subst.identity, (explored, pending, (tf,ud)))])
-      | res -> map_res (fun x -> (explored, (x,s,est)::pending, (tf,ud))) res
+      | res ->
+        log ~level:3 "Backtracking for intersection issued from %a@." Subst.pp s;
+        map_res (fun x -> (explored, (x,s,est)::pending, (tf,ud))) res
       end
   in
   aux b1 expl b2
@@ -825,7 +829,9 @@ let normalize_subst env apply_subst_branch estimate mk_inter res =
       in
       match bs with
       | [(pannot,_,_)] -> (subst, pannot)
-      | bs -> (subst, mk_inter [] bs (false,false))
+      | bs ->
+        log ~level:2 "@.Creating an intersection with %n branches.@." (List.length bs) ;
+        (subst, mk_inter [] bs (false,false))
     ) in
     Subst res
   | res -> res

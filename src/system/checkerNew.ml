@@ -744,7 +744,7 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
         )
     in
     match pending with
-    | [] when explored = [] -> Fail
+    | [] when explored = [] -> log ~level:3 "Intersection generated a fail (0 branch)@." ; Fail
     | [] ->
       let explored =
         if tf || ud || List.length explored <= 1 then explored
@@ -781,10 +781,14 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
           Format.printf "Env: %a@." Env.pp (Env.filter (fun v _ ->
             Variable.is_lambda_var v) env)
         end ; *)
+        log ~level:3 "Success of intersection issued from %a@." Subst.pp s;
         aux ((pannot, s, est)::explored) (cap_o expl est) pending
       | Fail when not ud && (explored <> [] || pending <> []) ->
+        log ~level:3 "Failure of intersection issued from %a@." Subst.pp s;
         aux explored est pending
-      | res -> map_res (fun x -> (explored, (x,s,est)::pending, (tf,ud))) res
+      | res ->
+        log ~level:3 "Backtracking for intersection issued from %a@." Subst.pp s;
+        map_res (fun x -> (explored, (x,s,est)::pending, (tf,ud))) res
       end
   in
   aux b1 expl b2
@@ -811,7 +815,9 @@ let normalize env apply_subst_branch estimate mk_inter res =
     ) in *)
     begin match lst1 with
     | [(default,_,_)] -> Subst (lst2, default)
-    | lst1 -> Subst (lst2, mk_inter [] lst1 (false,false))
+    | lst1 ->
+      log ~level:2 "@.Creating an intersection with %n branches.@." (List.length lst1) ;
+      Subst (lst2, mk_inter [] lst1 (false,false))
     end
   | NeedVar (vs, pannot1, pannot2) ->
     let vars = Env.domain env |> VarSet.of_list in
@@ -841,9 +847,9 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
   | _, EmptyA -> Ok (EmptyA)
   | _, ThenA -> Ok (ThenA)
   | _, ElseA -> Ok (ElseA)
-  | _, UntypA -> Fail
+  | _, UntypA -> log ~level:3 "Untyp annot generated a fail.@." ; Fail
   | Alias v, InferA when memvar v -> Ok (TypA)
-  | Alias _, InferA -> Fail
+  | Alias v, InferA -> log ~level:3 "Unknown var %s generated a fail.@." (Variable.show v) ; Fail
   | Abstract _, InferA | Const _, InferA -> Ok (TypA)
   | Pair (v1, v2), InferA | Let (v1, v2), InferA ->
     needvar [v1; v2] TypA UntypA
@@ -935,7 +941,7 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
     infer_mono_a vardef tenv expl env pannot_a a
   | Lambda (_, v, e), LambdaA (s, pannot) ->
     log ~level:2 "Entering lambda for %a with domain %a.@." Variable.pp v pp_typ s ;
-    if is_empty s then Fail
+    if is_empty s then (log ~level:3 "Lambda with empty domain generated a fail.@." ; Fail)
     else
       let env = Env.add v s env in
       infer_mono_iterated tenv (apply expl s) env pannot e
@@ -947,7 +953,7 @@ and infer_mono tenv expl env pannot e =
   let needsubst a d ss = Subst (List.map (fun s -> (s, a)) ss, d) in
   let open PartialAnnot in
   match e, pannot with
-  | _, Untyp -> Fail
+  | _, Untyp -> log ~level:3 "Untyp annot generated a fail.@." ; Fail
   | _, Typ -> Ok Typ
   | Var v, Infer -> needvar [v] Typ Untyp
   | Bind _, Inter i ->
@@ -1018,7 +1024,7 @@ and infer_mono tenv expl env pannot e =
     let rec aux splits =
       match splits with
       | ([],[],[],[],[]) -> assert false
-      | ([],[],[],[],_) -> Fail
+      | ([],[],[],[],_) -> log ~level:3 "Empty union generated a fail.@." ; Fail
       | ([],[],[],d,u) -> Ok (Keep (pannot_a, ([],[],[],d,u)))
       | (i,p,(s,pannot)::ex,d,u) ->
         let t = cap_o (type_def ()) s in

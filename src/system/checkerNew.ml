@@ -940,6 +940,8 @@ and infer_mono tenv expl env pannot e =
   let open PartialAnnot in
   match e, pannot with
   | _, Untyp -> Fail
+  | _, Typ -> Ok Typ
+  | Var v, Infer -> needvar [v] Typ Untyp
   | Bind _, Inter i ->
     infer_mono_inter
       expl env
@@ -949,8 +951,6 @@ and infer_mono tenv expl env pannot e =
         typeof tenv env annot e)
       i
     |> map_res (fun x -> Inter x)
-  | Var _, Typ -> Ok Typ
-  | Var v, Infer -> needvar [v] Typ Untyp
   | Bind _, Infer -> infer_mono tenv expl env (Skip (Infer, false)) e
   | Bind (v, _, e), Skip (pannot, b) ->
     begin match infer_mono_iterated tenv (pi2 expl) env pannot e with

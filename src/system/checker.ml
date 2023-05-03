@@ -733,6 +733,8 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
   in
   let rec aux explored expl pending =
     let smg = subst_more_general in
+    (* TODO: Take number of vars / domain into account so that the exact identity is
+       more general than something different but not vice versa. *)
     let leq s s' = (smg s s' |> not) || smg s' s in
     let leq (_,s,_) (_,s',_) = leq s s' in
     (* Remove branches that are estimated not to add anything *)

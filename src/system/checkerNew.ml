@@ -730,6 +730,8 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
   in
   let rec aux explored expl pending =
     let smg = subst_more_general in
+    (* TODO: Take number of vars / domain into account so that the exact identity is
+       more general than something different but not vice versa. *)
     let leq s s' = (smg s s' |> not) || smg s' s in
     let leq (_,s,_) (_,s',_) = leq s s' in
     (* Remove branches that are estimated not to add anything *)
@@ -1006,6 +1008,7 @@ and infer_mono tenv expl env pannot e =
     | res -> map_res (fun x -> TryKeep (x, pannot1, pannot2, None)) res
     end
   | Bind (v,_,_), TryKeep (pannot_a, pannot1, pannot2, Some gammas) ->
+    (* TODO: Make something more intuitive than this optional set of environments *)
     let propagate = gammas |>
       Utils.find_among_others (fun env' _ -> is_compatible env env') in
     begin match propagate with

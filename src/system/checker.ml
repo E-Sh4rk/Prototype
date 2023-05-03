@@ -645,16 +645,17 @@ let simplify_tallying_infer env res sols =
 let rec estimations e pannot =
   let open PartialAnnot in
   match e, pannot with
-  | Var _, Typ -> Some any
-  | Var _, Untyp -> None
-  | Var _, Infer -> Some any
-  | Bind (_,_,e), Infer -> estimations e Infer |>
-    Option.map (fun t -> mk_times any_node (cons t))
+  | _, Infer -> Some any
+  | _, Typ -> Some any
+  | _, Untyp -> None
   | Bind (_,_,e), Skip (p,_) -> estimations e p |>
     Option.map (fun t -> mk_times any_node (cons t))
   | Bind (_,a,e), TryKeep (pannot_a, pannot1, pannot2) ->
     begin match estimations_a a pannot_a with
     | None -> estimations e pannot2
+      |> Option.map (fun est_e ->
+        mk_times any_node (cons est_e)
+      )
     | Some est_a ->
       let est_e = estimations e pannot1 in
       est_e |> Option.map (fun est_e ->
@@ -985,20 +986,19 @@ and infer_mono tenv expl env pannot e =
     begin match infer_mono_a_iterated v tenv (pi1 expl) env pannot_a a with
     | Ok pannot_a ->
       (* NOTE: We directly explore the next split (no infer) for performance.
-      (in the paper, the split is set to SInfer instead, which could sometimes allow
-      to detect that the type of the definition is empty, but thanks to type simplifications
-      we probably don't need it) *)
-      let pannot = Keep (pannot_a, ([], [], [(any, pannot1)], [], [])) in
+        (in the paper, the split is set to SInfer instead, which could sometimes allow
+        to detect that the type of the definition is empty, but thanks to type simplifications
+        we probably don't need it) *)
       (* If the definition is a function whose DNF has many disjuncts,
-          we try to split them. *)
+         we try to split them. *)
+      let pannot = Keep (pannot_a, ([], [], [(any, pannot1)], [], [])) in
       let annot_a = infer_poly_a v tenv env pannot_a a in
       let t = typeof_a_nofail v tenv env annot_a a in
       let propagate =
         let dnf = dnf t |> simplify_dnf in
         if subtype t arrow_any && List.length dnf >= 2 then
           dnf |> Utils.map_among_others' (fun _ others ->
-            let s = others |> List.map branch_type |> List.map bot_instance
-              |> disj in
+            let s = others |> List.map branch_type |> disj |> bot_instance in
             let mono = monomorphize (vars_poly s) in
             let s = Subst.apply mono s in
             refine_a tenv env a s
@@ -1008,7 +1008,7 @@ and infer_mono tenv expl env pannot e =
         else None
       in
       begin match propagate with
-      | Some env' ->
+      | Some env' -> (* TODO: not really complete... should also trigger the other results *)
         log ~level:1 "Var %a is ok but its DNF needs a split.@." Variable.pp v ;
         let env' = filter_refinement env env' in
         Split (env', pannot, pannot)

@@ -33,21 +33,22 @@ module PartialAnnot = struct
     | Infer | Typ | Untyp
     | Keep of a * union
     | Skip of t * bool (* Already typed *)
-    | TryKeep of a * t * t
+    | TryKeep of a * t * t * (Env.t list) option (* Splits to separate union *)
     | Inter of t inter
   [@@deriving show]
 
   let apply_subst_branch f s (a, s', t) =
     (f s a, s' (* The subst never change *), apply_subst_simplify s t)
+  let apply_env s env =
+    let apply = apply_subst_simplify s in
+    Env.bindings env
+    |> List.map (fun (v,ty) -> (v, apply ty))
+    |> Env.construct
   let rec apply_subst_union s (i,p,e,d,u) =
     let apply = apply_subst_simplify s in
     let aux1 ty = apply ty in
     let aux2 (ty, t) = (apply ty, apply_subst s t) in
-    let aux_env env = Env.bindings env
-      |> List.map (fun (v,ty) -> (v, apply ty))
-      |> Env.construct
-    in
-    let aux3 (ty, env, t) = (apply ty, List.map aux_env env, apply_subst s t) in
+    let aux3 (ty, env, t) = (apply ty, List.map (apply_env s) env, apply_subst s t) in
     (List.map aux2 i, List.map aux3 p, List.map aux2 e, List.map aux2 d, List.map aux1 u)
   and apply_subst_inter_a s (a, b, flags) =
     (List.map (apply_subst_branch apply_subst_a s) a,
@@ -72,8 +73,9 @@ module PartialAnnot = struct
     | Untyp -> Untyp
     | Keep (a, b) -> Keep (apply_subst_a s a, apply_subst_union s b)
     | Skip (t, b) -> Skip (apply_subst s t, b)
-    | TryKeep (a, t1, t2) ->
-      TryKeep (apply_subst_a s a, apply_subst s t1, apply_subst s t2)
+    | TryKeep (a, t1, t2, envs) ->
+      TryKeep (apply_subst_a s a, apply_subst s t1, apply_subst s t2,
+      Option.map (List.map (apply_env s)) envs)
     | Inter i -> Inter (apply_subst_inter s i)
 
   let effective_splits (i,p,e,d,_) =

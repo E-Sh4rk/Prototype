@@ -647,9 +647,12 @@ let rec estimations e pannot =
   | Var _, Typ -> Some any
   | Bind (_,_,e), Skip (p,_) -> estimations e p |>
     Option.map (fun t -> mk_times any_node (cons t))
-  | Bind (_,a,e), TryKeep (pannot_a, pannot1, pannot2) ->
+  | Bind (_,a,e), TryKeep (pannot_a, pannot1, pannot2, _) ->
     begin match estimations_a a pannot_a with
     | None -> estimations e pannot2
+      |> Option.map (fun est_e ->
+        mk_times any_node (cons est_e)
+      )
     | Some est_a ->
       let est_e = estimations e pannot1 in
       est_e |> Option.map (fun est_e ->
@@ -956,13 +959,13 @@ and infer_mono tenv expl env pannot e =
     begin match infer_mono_iterated tenv (pi2 expl) env pannot e with
     | NeedVar (vs, pannot1, pannot2) when VarSet.mem v vs ->
       log ~level:0 "Var %a needed.@." Variable.pp v ;
-      let pannot1 = TryKeep (InferA, pannot1, pannot2) in
+      let pannot1 = TryKeep (InferA, pannot1, pannot2, None) in
       let pannot2 = Skip (pannot2, b) in
       (* if b then infer_mono tenv expl env pannot2 ee else *)
       NeedVar (VarSet.remove v vs, pannot1, pannot2)
     | res -> map_res (fun x -> Skip (x,b)) res
     end
-  | Bind (v, a, _), TryKeep (pannot_a, pannot1, pannot2) ->
+  | Bind (v, a, _), TryKeep (pannot_a, pannot1, pannot2, None) ->
     log ~level:1 "Trying to type var %a.@." Variable.pp v ;
     begin match infer_mono_a_iterated v tenv (pi1 expl) env pannot_a a with
     | Ok pannot_a ->
@@ -980,20 +983,24 @@ and infer_mono tenv expl env pannot e =
             refine_a tenv env a s
           )
           |> List.flatten
-          |> List.find_opt (is_compatible env)
-        else None
+        else []
       in
-      begin match propagate with
-      | Some env' ->
-        log ~level:1 "Var %a is ok but its DNF needs a split.@." Variable.pp v ;
-        let pannot = TryKeep (pannot_a, pannot1, pannot2) in
-        Split (env', pannot, pannot)
-      | None ->
-        let pannot = Keep (pannot_a, ([], [], [(any, pannot1)], [], [])) in
-        infer_mono tenv expl env pannot e
-      end
+      let pannot = TryKeep (pannot_a, pannot1, pannot2, Some propagate) in
+      infer_mono tenv expl env pannot e
     | Fail -> infer_mono tenv expl env (Skip (pannot2, true)) e
-    | res -> map_res (fun x -> TryKeep (x, pannot1, pannot2)) res
+    | res -> map_res (fun x -> TryKeep (x, pannot1, pannot2, None)) res
+    end
+  | Bind (v,_,_), TryKeep (pannot_a, pannot1, pannot2, Some gammas) ->
+    let propagate = gammas |>
+      Utils.find_among_others (fun env' _ -> is_compatible env env') in
+    begin match propagate with
+    | Some (env',gammas) ->
+      log ~level:1 "Var %a is ok but its DNF needs a split.@." Variable.pp v ;
+      let pannot = TryKeep (pannot_a, pannot1, pannot2, Some gammas) in
+      Split (env', pannot, pannot)
+    | None ->
+      let pannot = Keep (pannot_a, ([], [], [(any, pannot1)], [], [])) in
+      infer_mono tenv expl env pannot e
     end
   | Bind (v, a, e), Keep (pannot_a, splits) ->
     let type_def () =

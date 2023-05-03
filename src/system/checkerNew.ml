@@ -764,9 +764,12 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
     | pending ->
       let f br others = others |> List.for_all (leq br) in
       (* Select more specific branches first *)
+      (* NOTE: the order also matters (priority to the first) *)
       let ((pannot, s, est), pending) = find_among_others f pending |> Option.get in
-      if nontrivial then
-        log ~level:3 "Exploring intersection issued from %a@." Subst.pp s;
+      if nontrivial then (
+        log ~level:3 "Exploring intersection issued from %a@." Subst.pp s ;
+        (* pending |> List.iter (fun (_,s,_) -> log ~level:3 "VS %a@." Subst.pp s) *)
+      ) ;
       let res = infer_branch expl pannot in
       begin match res with
       | Ok pannot ->
@@ -798,7 +801,8 @@ let normalize env apply_subst_branch estimate mk_inter res =
     let tvars = Env.tvars env |> TVarSet.filter TVar.is_mono in
     let (lst1, lst2) = lst |> List.partition (fun (s,_) ->
       TVarSet.inter (Subst.dom s) tvars |> TVarSet.is_empty) in
-    let lst1 = (Subst.identity, default)::lst1 |> List.filter_map (fun (s,pannot) ->
+    (* NOTE: It is important for the default case is inserted at the end (smaller priority). *)
+    let lst1 = lst1@[(Subst.identity, default)] |> List.filter_map (fun (s,pannot) ->
         let pannot = apply_subst_branch s pannot in
         estimate pannot |> Option.map (fun est ->
           let gen = Subst.codom s |> generalize in
@@ -815,7 +819,8 @@ let normalize env apply_subst_branch estimate mk_inter res =
     begin match lst1 with
     | [(default,_,_)] -> Subst (lst2, default)
     | lst1 ->
-      log ~level:2 "@.Creating an intersection with %n branches.@." (List.length lst1) ;
+      let n = List.length lst1 in
+      if n > 1 then log ~level:2 "@.Creating an intersection with %n branches.@." n ;
       Subst (lst2, mk_inter [] lst1 (false,false))
     end
   | NeedVar (vs, pannot1, pannot2) ->

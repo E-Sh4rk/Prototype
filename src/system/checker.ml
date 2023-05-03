@@ -767,9 +767,12 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
     | pending ->
       let f br others = others |> List.for_all (leq br) in
       (* Select more specific branches first *)
+      (* NOTE: the order also matters (priority to the first) *)
       let ((pannot, s, est), pending) = find_among_others f pending |> Option.get in
-      if nontrivial then
-        log ~level:3 "Exploring intersection issued from %a@." Subst.pp s;
+      if nontrivial then (
+        log ~level:3 "Exploring intersection issued from %a@." Subst.pp s ;
+        (* pending |> List.iter (fun (_,s,_) -> log ~level:3 "VS %a@." Subst.pp s) *)
+      ) ;
       let res = infer_branch expl pannot in
       begin match res with
       | Ok pannot ->
@@ -829,7 +832,8 @@ let normalize_subst env apply_subst_branch estimate mk_inter res =
       match bs with
       | [(pannot,_,_)] -> (subst, pannot)
       | bs ->
-        log ~level:2 "@.Creating an intersection with %n branches.@." (List.length bs) ;
+        let n = List.length bs in
+        if n > 1 then log ~level:2 "@.Creating an intersection with %n branches.@." n ;
         (subst, mk_inter [] bs (false,false))
     ) in
     Subst res

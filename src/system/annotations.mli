@@ -3,9 +3,9 @@ open Types.Tvar
 open Common
 
 module PartialAnnot : sig
-    type union_infer = (typ * t) list
-    and union_prop = (Env.t list * typ * t) list
-    and union_expl = (typ * t) list
+    type union_expl = (typ * t) list
+    and union_prop = (typ * Env.t list * t) list
+    and union_infer = union_expl
     and union_done = (typ * t) list
     and union_unr = typ list
     and union = union_infer * union_prop * union_expl * union_done * union_unr
@@ -24,6 +24,7 @@ module PartialAnnot : sig
         | Keep of a * union
         | Skip of t * bool (* Already typed *)
         | TryKeep of a * t * t
+        | Propagate of a * t * Env.t list
         | Inter of t inter
 
     val pp_a : Format.formatter -> a -> unit
@@ -33,7 +34,7 @@ module PartialAnnot : sig
     val apply_subst : Subst.t -> t -> t
 
     val effective_splits : union -> typ list
-    val effective_splits_annots : union -> t list
+    val effective_splits_annots : union -> (typ * t) list
 end
 
 module FullAnnot : sig

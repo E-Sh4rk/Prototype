@@ -4,11 +4,11 @@ open Types.Additions
 open Common
 
 module PartialAnnot = struct
-  type union_infer = (typ * t) list
+  type union_expl = (typ * t) list
   [@@deriving show]
-  and union_prop = (Env.t list * typ * t) list
+  and union_prop = (typ * Env.t list * t) list
   [@@deriving show]
-  and union_expl = (typ * t) list
+  and union_infer = union_expl
   [@@deriving show]
   and union_done = (typ * t) list
   [@@deriving show]
@@ -34,20 +34,22 @@ module PartialAnnot = struct
     | Keep of a * union
     | Skip of t * bool (* Already typed *)
     | TryKeep of a * t * t
+    | Propagate of a * t * Env.t list
     | Inter of t inter
   [@@deriving show]
 
   let apply_subst_branch f s (a, s', t) =
     (f s a, s' (* The subst never change *), apply_subst_simplify s t)
+  let apply_env s env =
+    let apply = apply_subst_simplify s in
+    Env.bindings env
+    |> List.map (fun (v,ty) -> (v, apply ty))
+    |> Env.construct
   let rec apply_subst_union s (i,p,e,d,u) =
     let apply = apply_subst_simplify s in
     let aux1 ty = apply ty in
     let aux2 (ty, t) = (apply ty, apply_subst s t) in
-    let aux_env env = Env.bindings env
-      |> List.map (fun (v,ty) -> (v, apply ty))
-      |> Env.construct
-    in
-    let aux3 (env, ty, t) = (List.map aux_env env, apply ty, apply_subst s t) in
+    let aux3 (ty, env, t) = (apply ty, List.map (apply_env s) env, apply_subst s t) in
     (List.map aux2 i, List.map aux3 p, List.map aux2 e, List.map aux2 d, List.map aux1 u)
   and apply_subst_inter_a s (a, b, flags) =
     (List.map (apply_subst_branch apply_subst_a s) a,
@@ -74,12 +76,14 @@ module PartialAnnot = struct
     | Skip (t, b) -> Skip (apply_subst s t, b)
     | TryKeep (a, t1, t2) ->
       TryKeep (apply_subst_a s a, apply_subst s t1, apply_subst s t2)
+    | Propagate (a, t, envs) ->
+      Propagate (apply_subst_a s a, apply_subst s t, List.map (apply_env s) envs)
     | Inter i -> Inter (apply_subst_inter s i)
 
   let effective_splits (i,p,e,d,_) =
-    (p |> List.map (fun (_,t,_) -> t)) @ (i@e@d |> List.map (fun (t, _) -> t))
+    (p |> List.map (fun (t,_,_) -> t)) @ (i@e@d |> List.map (fun (t, _) -> t))
   let effective_splits_annots (i,p,e,d,_) =
-    (p |> List.map (fun (_,_,pa) -> pa)) @ (i@e@d |> List.map (fun (_, pa) -> pa))
+    (p |> List.map (fun (t,_,pa) -> (t,pa))) @ (i@e@d)
 end
 
 module FullAnnot = struct

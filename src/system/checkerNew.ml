@@ -532,6 +532,7 @@ let subst_more_general s1 s2 =
     let t2 = Subst.apply s2m t2 in
     [(t1, t2) ; (t2, t1)]
   ) |> List.flatten |> test_tallying
+let subst_nb_vars s = Subst.codom s |> TVarSet.destruct |> List.length
 
 let res_var = TVar.mk_mono None
 let simplify_tallying_infer env res sols =
@@ -544,15 +545,12 @@ let simplify_tallying_infer env res sols =
     let sol = Subst.restrict sol tvars in
     TVarSet.union (Subst.codom sol) tvars
   in
-  let nb_new_vars sol =
-    let nv = TVarSet.diff (mono_vars sol) tvars in
-    nv |> TVarSet.destruct |> List.length
-  in
   let better_sol sol1 sol2 =
+    let nb1 = Subst.restrict sol1 tvars |> subst_nb_vars in
+    let nb2 = Subst.restrict sol2 tvars |> subst_nb_vars in
     let s1g = Subst.codom sol1 |> generalize in
-    let sol1' = Subst.compose_restr s1g sol1 in
-    nb_new_vars sol1 <= nb_new_vars sol2 &&
-    subst_more_general sol1' sol2
+    let sol1 = Subst.compose_restr s1g sol1 in
+    nb1 <= nb2 && subst_more_general sol1 sol2
   in
   let try_remove_var sol v =
     let t = Subst.find' sol v in
@@ -588,13 +586,13 @@ let simplify_tallying_infer env res sols =
   )
   (* Generalize vars in the result when possible *)
   |> List.map (fun sol ->
-    let tvars' = mono_vars sol in
+    let mono = mono_vars sol in
     let res = Subst.find' sol res_var in
-    let g = generalize (TVarSet.diff (vars res) tvars') in
+    let g = generalize (TVarSet.diff (vars res) mono) in
     let res = Subst.apply g res in
     let clean = clean_type_subst ~pos:empty ~neg:any res in
     let g = Subst.compose_restr clean g in
-    Subst.compose g sol
+    Subst.compose_restr g sol
   )
   (* Remove solutions that require "undesirable" lambda branches *)
   |> List.filter (fun sol ->
@@ -734,9 +732,9 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
     ) <> []
   in
   let rec aux explored expl pending =
-    let smg = subst_more_general in
-    (* TODO: Take number of vars / domain into account so that the exact identity is
-       more general than something different but not vice versa. *)
+    let smg s1 s2 =
+      subst_more_general s1 s2 && subst_nb_vars s1 <= subst_nb_vars s2
+    in
     let leq s s' = (smg s s' |> not) || smg s' s in
     let leq (_,s,_) (_,s',_) = leq s s' in
     (* Remove branches that are estimated not to add anything *)

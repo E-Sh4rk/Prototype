@@ -642,8 +642,8 @@ let rec estimations e pannot =
   let open PartialAnnot in
   match e, pannot with
   | _, Untyp -> None
+  | _, Typ -> Some any
   | _, Infer -> Some any
-  | Var _, Typ -> Some any
   | Bind (_,_,e), Skip (p,_) -> estimations e p |>
     Option.map (fun t -> mk_times any_node (cons t))
   | Bind (_,a,e), TryKeep (pannot_a, pannot1, pannot2, _) ->
@@ -661,7 +661,7 @@ let rec estimations e pannot =
   | Bind (_,a,e), Keep (pannot_a, u) ->
     let est_a = estimations_a a pannot_a |> Option.get in
     let est_e = u |> effective_splits_annots |> List.map snd |> List.map (estimations e) in
-    if List.mem None est_e || est_e = [] then None
+    if List.mem None est_e then None
     else
       let est_e = est_e |> List.map Option.get |> disj_o in
       Some (mk_times (cons est_a) (cons est_e))
@@ -1031,7 +1031,8 @@ and infer_mono tenv expl env pannot e =
     let rec aux splits =
       match splits with
       | ([],[],[],[],[]) -> assert false
-      | ([],[],[],[],_) -> log ~level:3 "Empty union generated a fail.@." ; Fail
+      (* | ([],[],[],[],_) -> log ~level:3 "Empty union generated a fail.@." ; Fail *)
+      | ([],[],[],[],u) -> aux ([],[],[(empty, Infer)],[],u)
       | ([],[],[],d,u) -> Ok (Keep (pannot_a, ([],[],[],d,u)))
       | (i,p,(s,pannot)::ex,d,u) ->
         let t = cap_o (type_def ()) s in

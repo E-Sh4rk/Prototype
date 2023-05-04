@@ -557,10 +557,11 @@ let simplify_tallying_infer env res sols =
     nb_new_vars sol1 <= nb_new_vars sol2 &&
     subst_more_general sol1' sol2
   in
-  let try_remove_var sol v = (* TODO: Is it still useful?? *)
+  let try_remove_var sol v =
     let t = Subst.find' sol v in
     let mono = mono_vars (Subst.rm v sol) in
     let pvs = TVarSet.diff (vars t) mono in
+    let v = TVar.mk_fresh v in
     let g = generalize pvs in
     let t = Subst.apply g t in
     let res = tallying [(TVar.typ v, t) ; (t, TVar.typ v)]

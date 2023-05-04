@@ -1067,7 +1067,6 @@ and infer_mono tenv expl env pannot e =
         end
       | ((s, pannot)::i,p,ex,d,u) ->
         let t = cap_o (type_def ()) s in
-        let gammas = refine_a tenv env a (neg s) in
         log ~level:3 "@.Tallying (inference) for %a: %a <= %a@."
           Variable.pp v pp_typ t pp_typ empty ;
         let res = tallying_infer [(t, empty)] in
@@ -1080,7 +1079,9 @@ and infer_mono tenv expl env pannot e =
         ) ;
         if List.exists Subst.is_identity res
         then aux (i,p,ex,d,s::u)
-        else needsubst (i,p,ex,d,s::u) (i,(s,gammas,pannot)::p,ex,d,u) res |> keep
+        else
+          let gammas = refine_a tenv env a (neg s) in
+          needsubst (i,p,ex,d,s::u) (i,(s,gammas,pannot)::p,ex,d,u) res |> keep
     in
     aux splits
   | _, _ -> assert false

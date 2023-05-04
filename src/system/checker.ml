@@ -663,11 +663,13 @@ let rec estimations e pannot =
     )
   | Bind (_,a,e), Keep (pannot_a, u) ->
     let est_a = estimations_a a pannot_a |> Option.get in
-    let est_e = u |> effective_splits_annots |> List.map snd |> List.map (estimations e) in
-    if List.mem None est_e then None
-    else
-      let est_e = est_e |> List.map Option.get |> disj_o in
-      Some (mk_times (cons est_a) (cons est_e))
+    let ts = u |> effective_splits_annots |> List.map (fun ((*t*)_,pannot) ->
+      estimations e pannot |> Option.map (fun est_e ->
+        mk_times ((*cap est_a t*) est_a |> cons) (est_e |> cons)
+      )
+    ) in
+    if List.mem None ts then None
+    else Some (ts |> List.map Option.get |> disj_o)
   | e, Inter (p1,p2,_) ->
     let res = p1@p2 |> List.map Utils.fst3 |> List.filter_map (estimations e) in
     if res = [] then None else Some (conj_o res)

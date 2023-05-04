@@ -663,9 +663,10 @@ let rec estimations e pannot =
     )
   | Bind (_,a,e), Keep (pannot_a, u) ->
     let est_a = estimations_a a pannot_a |> Option.get in
-    let ts = u |> effective_splits_annots |> List.map (fun ((*t*)_,pannot) ->
+    let r = neg (effective_splits u |> disj) in
+    let ts = u |> effective_splits_annots |> List.map (fun (t,pannot) ->
       estimations e pannot |> Option.map (fun est_e ->
-        mk_times ((*cap est_a t*) est_a |> cons) (est_e |> cons)
+        mk_times (cap est_a (cup t r) |> cons) (est_e |> cons)
       )
     ) in
     if List.mem None ts then None

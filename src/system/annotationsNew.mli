@@ -23,7 +23,8 @@ module PartialAnnot : sig
         | Infer | Typ | Untyp
         | Keep of a * union
         | Skip of t * bool (* Already typed *)
-        | TryKeep of a * t * t * (Env.t list) option (* Splits to separate union *)
+        | TryKeep of a * t * t
+        | Propagate of a * t * Env.t list
         | Inter of t inter
 
     val pp_a : Format.formatter -> a -> unit

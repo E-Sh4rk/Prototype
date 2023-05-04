@@ -33,7 +33,8 @@ module PartialAnnot = struct
     | Infer | Typ | Untyp
     | Keep of a * union
     | Skip of t * bool (* Already typed *)
-    | TryKeep of a * t * t * (Env.t list) option (* Splits to separate union *)
+    | TryKeep of a * t * t
+    | Propagate of a * t * Env.t list
     | Inter of t inter
   [@@deriving show]
 
@@ -73,9 +74,10 @@ module PartialAnnot = struct
     | Untyp -> Untyp
     | Keep (a, b) -> Keep (apply_subst_a s a, apply_subst_union s b)
     | Skip (t, b) -> Skip (apply_subst s t, b)
-    | TryKeep (a, t1, t2, envs) ->
-      TryKeep (apply_subst_a s a, apply_subst s t1, apply_subst s t2,
-      Option.map (List.map (apply_env s)) envs)
+    | TryKeep (a, t1, t2) ->
+      TryKeep (apply_subst_a s a, apply_subst s t1, apply_subst s t2)
+    | Propagate (a, t, envs) ->
+      Propagate (apply_subst_a s a, apply_subst s t, List.map (apply_env s) envs)
     | Inter i -> Inter (apply_subst_inter s i)
 
   let effective_splits (i,p,e,d,_) =

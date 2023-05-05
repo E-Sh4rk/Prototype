@@ -495,17 +495,15 @@ type 'a res =
   | Ok of 'a
   | Fail
   | Split of Env.t * 'a * 'a
-  | Subst of (Subst.t * 'a) list * 'a
+  | Subst of Subst.t list * 'a * 'a
   | NeedVar of VarSet.t * 'a * 'a
 
 let map_res f res =
   match res with
   | Ok a -> Ok (f a)
   | Fail -> Fail
-  | Split (env, a1, a2) ->
-    Split (env, f a1, f a2)
-  | Subst (lst, a) ->
-    Subst (lst |> List.map (fun (s, a) -> (s, f a)), f a)
+  | Split (env, a1, a2) -> Split (env, f a1, f a2)
+  | Subst (ss, a1, a2) -> Subst (ss, f a1, f a2)
   | NeedVar (vs, a1, a2) -> NeedVar (vs, f a1, f a2)
 
 let is_compatible env gamma =
@@ -521,7 +519,7 @@ let is_compatible env gamma =
 let should_iterate res =
   match res with
   | Split (gamma, pannot, _) when Env.is_empty gamma -> Some pannot
-  | Subst ([], pannot) -> Some pannot
+  | Subst ([], _, pannot) -> Some pannot
   | NeedVar (vs, pannot, _) when VarSet.is_empty vs -> Some pannot
   | _ -> None
 
@@ -805,13 +803,14 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
 
 let normalize env apply_subst_branch estimate mk_inter res =
   match res with
-  | Subst (lst, default) ->
+  | Subst (lst, pannot, default) ->
     let tvars = Env.tvars env |> TVarSet.filter TVar.is_mono in
-    let (lst1, lst2) = lst |> List.partition (fun (s,_) ->
-      TVarSet.inter (Subst.dom s) tvars |> TVarSet.is_empty) in
+    let (lst1, lst2) = lst |> List.partition
+      (fun s -> TVarSet.inter (Subst.dom s) tvars |> TVarSet.is_empty) in
+    let lst1 = List.map (fun s -> (s, apply_subst_branch s pannot)) lst1 in
     (* NOTE: It is important for the default case is inserted at the end (smaller priority). *)
-    let lst1 = lst1@[(Subst.identity, default)] |> List.filter_map (fun (s,pannot) ->
-        let pannot = apply_subst_branch s pannot in
+    let lst1 = lst1@[(Subst.identity, default)] |> List.filter_map
+      (fun (s,pannot) ->
         estimate pannot |> Option.map (fun est ->
           let gen = Subst.codom s |> generalize in
           let s = Subst.compose_restr gen s in
@@ -819,17 +818,12 @@ let normalize env apply_subst_branch estimate mk_inter res =
         )
       )
     in
-    (* let lst2 = lst2 |> List.map (fun (s,pannot) ->
-      let s' = Subst.restrict s tvars in
-      let cur = Subst.remove s tvars in
-      (s', apply_subst_branch cur pannot)
-    ) in *)
     begin match lst1 with
-    | [(default,_,_)] -> Subst (lst2, default)
+    | [(default,_,_)] -> Subst (lst2, pannot, default)
     | lst1 ->
       let n = List.length lst1 in
       if n > 1 then log ~level:2 "@.Creating an intersection with %n branches.@." n ;
-      Subst (lst2, mk_inter [] lst1 (false,false))
+      Subst (lst2, pannot, mk_inter [] lst1 (false,false))
     end
   | NeedVar (vs, pannot1, pannot2) ->
     let vars = Env.domain env |> VarSet.of_list in
@@ -842,7 +836,6 @@ let normalize env apply_subst_branch estimate mk_inter res =
 let rec infer_mono_a vardef tenv expl env pannot_a a =
   let memvar v = Env.mem v env in
   let vartype v = Env.find v env in
-  let needsubst a d ss = Subst (List.map (fun s -> (s, a)) ss, d) in
   let needvar vs a1 a2 = NeedVar (VarSet.of_list vs, a1, a2) in
   let open PartialAnnot in
   match a, pannot_a with
@@ -889,28 +882,28 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
       res |> List.iter (fun s ->
         log ~level:3 "Solution (simplified): %a@." Subst.pp s
       ) ;
-      needsubst TypA UntypA res
+      Subst (res, TypA, UntypA)
     else
       needvar [v] InferA UntypA
   | RecordUpdate (v, _, None), InferA ->
     if memvar v then
       let res = tallying_infer [(vartype v, record_any)] in
       let res = simplify_tallying_infer env empty res in
-      needsubst TypA UntypA res
+      Subst (res, TypA, UntypA)
     else
       needvar [v] InferA UntypA
   | RecordUpdate (v, _, Some v'), InferA ->
     if memvar v && memvar v' then
       let res = tallying_infer [(vartype v, record_any)] in
       let res = simplify_tallying_infer env empty res in
-      needsubst TypA UntypA res
+      Subst (res, TypA, UntypA)
     else
       needvar [v ; v'] InferA UntypA
   | TypeConstr (v, s), InferA ->
     if memvar v then
       let res = tallying_infer [(vartype v, s)] in
       let res = simplify_tallying_infer env empty res in
-      needsubst TypA UntypA res
+      Subst (res, TypA, UntypA)
     else
       needvar [v] InferA UntypA
   | App (v1, v2), InferA ->
@@ -929,7 +922,7 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
       res |> List.iter (fun s ->
         log ~level:3 "Solution (simplified): %a@." Subst.pp s
       ) ;
-      needsubst TypA UntypA res
+      Subst (res, TypA, UntypA)
     else
       needvar [v1;v2] InferA UntypA
   | Ite (v, tau, v1, v2), InferA ->
@@ -962,7 +955,6 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
 
 and infer_mono tenv expl env pannot e =
   let needvar vs a1 a2 = NeedVar (VarSet.of_list vs, a1, a2) in
-  let needsubst a d ss = Subst (List.map (fun s -> (s, a)) ss, d) in
   let open PartialAnnot in
   match e, pannot with
   | _, Untyp -> log ~level:3 "Untyp annot generated a fail.@." ; Fail
@@ -1086,7 +1078,7 @@ and infer_mono tenv expl env pannot e =
         then aux (i,p,ex,d,s::u)
         else
           let gammas = refine_a tenv env a (neg s) in
-          needsubst (i,p,ex,d,s::u) (i,(s,gammas,pannot)::p,ex,d,u) res |> keep
+          Subst (res, (i,p,ex,d,s::u), (i,(s,gammas,pannot)::p,ex,d,u)) |> keep
     in
     aux splits
   | _, _ -> assert false
@@ -1126,9 +1118,9 @@ let infer tenv env e =
   | Split (gamma, _, _) ->
     Format.printf "Split %a@." Env.pp gamma ;
     assert false
-  | Subst (lst, _) ->
+  | Subst (ss, _, _) ->
     Format.printf "Subst %a@."
-      (pp_long_list TVarSet.pp) (List.map fst lst |> List.map Subst.dom) ;
+      (pp_long_list TVarSet.pp) (List.map Subst.dom ss) ;
     assert false
 
 let typeof_simple tenv env e =

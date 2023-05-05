@@ -1,6 +1,5 @@
 open Types.Base
 open Types.Tvar
-open Common
 
 module PartialAnnot : sig
     type union_expl = (typ * t) list

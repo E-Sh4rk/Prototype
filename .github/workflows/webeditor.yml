@@ -46,8 +46,8 @@ jobs:
       - name: Build
         run: |
           cd src
-          opam exec -- dune build --profile release lib_js.bc.js
-          cp _build/default/lib_js.bc.js ../webeditor/typechecker.js
+          opam exec -- dune build --profile release main/lib_js.bc.js
+          cp _build/default/main/lib_js.bc.js ../webeditor/typechecker.js
 
       # Node dependencies
       - name: Use Node.js

@@ -1,6 +1,6 @@
 (library
  (name system)
- (libraries types parsing common utils)
+ (libraries types parsing utils)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.ord ppx_deriving.eq))
  (modules (:standard)))

@@ -1,7 +1,6 @@
 open Types.Base
 open Types.Tvar
 open Types.Additions
-open Common
 
 module PartialAnnot = struct
   type union_expl = (typ * t) list

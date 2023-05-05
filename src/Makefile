@@ -2,18 +2,18 @@
 all: build run
 
 build:
-	dune build prototype.exe
+	dune build main/prototype.exe
 
 run:
-	dune exec ./prototype.exe
+	dune exec ./main/prototype.exe
 
 clean:
 	dune clean
-	rm -f html/prototype_js.js
+	rm -f ../webeditor/typechecker.js
 
 libjs:
-	dune build --profile release lib_js.bc.js
-	cp _build/default/lib_js.bc.js ../webeditor/typechecker.js
+	dune build --profile release main/lib_js.bc.js
+	cp _build/default/main/lib_js.bc.js ../webeditor/typechecker.js
 	chmod +w ../webeditor/typechecker.js
 
 test:

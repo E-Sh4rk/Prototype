@@ -1,7 +1,6 @@
 open Types.Base
 open Types.Additions
 open Annotations
-open Common
 
 exception Untypeable of Position.t list * string
 

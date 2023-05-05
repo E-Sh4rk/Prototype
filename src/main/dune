@@ -2,7 +2,19 @@
  (name main)
  (wrapped false)
  (inline_tests)
- (libraries types parsing common utils system)
+ (libraries types parsing utils system)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.ord ppx_deriving.eq ppx_expect ppx_inline_test))
- (modules (:standard)))
+ (modules main tests))
+
+(executable
+ (name prototype)
+ (libraries main)
+ (modules prototype))
+
+(executable
+ (name lib_js)
+ (libraries main yojson)
+ (modes js)
+ (preprocess (pps js_of_ocaml-ppx))
+ (modules lib_js))

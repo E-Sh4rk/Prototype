@@ -1,7 +1,6 @@
 open Types.Base
 open Types.Tvar
 open Types.Additions
-open Common
 open Parsing.Variable
 open Msc
 open Annotations

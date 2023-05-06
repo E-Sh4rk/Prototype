@@ -619,3 +619,19 @@ let filter_stub_noannot filter f l =
     if f(fst(l)) is True
     then (fst(l),filter f (snd(l)))
     else filter f (snd(l))
+	
+let rec eval e =
+  match e with
+  | (:"add", (e1, e2)) -> (eval e1) + (eval e2)
+  | (:"uminus", e) -> 0 - (eval e)
+  | (:"const", x) -> x
+  end
+
+type Expr = ("const", Int) | ("add", (Expr, Expr)) | ("uminus", Expr)
+
+let rec eval (e:Expr) =
+  match e with
+  | (:"add", (e1, e2)) -> (eval e1) + (eval e2)
+  | (:"uminus", e) -> 0 - (eval e)
+  | (:"const", x) -> x
+  end

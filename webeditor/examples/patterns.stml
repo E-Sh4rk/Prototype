@@ -66,3 +66,12 @@ let rec eval e =
   | (:"uminus", e) -> 0 - (eval e)
   | (:"const", x) -> x
   end
+
+type Expr = ("const", Int) | ("add", (Expr, Expr)) | ("uminus", Expr)
+
+let rec eval (e:Expr) =
+  match e with
+  | (:"add", (e1, e2)) -> (eval e1) + (eval e2)
+  | (:"uminus", e) -> 0 - (eval e)
+  | (:"const", x) -> x
+  end

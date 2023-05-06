@@ -59,3 +59,10 @@ let rec filter (f: ('a->Any) & ('b -> ~True)) (l:[('a|'b)*]) =
     then (e, filter f l)
     else filter f l
   end
+
+let rec eval e =
+  match e with
+  | (:"add", (e1, e2)) -> (eval e1) + (eval e2)
+  | (:"uminus", e) -> 0 - (eval e)
+  | (:"const", x) -> x
+  end

@@ -1,14 +1,18 @@
 [
     {
-        "name": "Examples from the paper",
-        "path": "paper.stml"
-    },
-    {
         "name": "Fixpoint and recursion",
         "path": "fixpoint.stml"
     },
     {
         "name": "Pattern matching",
         "path": "patterns.stml"
-    }
+    },
+	{
+        "name": "Examples from \"Journées PPS\"",
+        "path": "pps.stml"
+    },
+	{
+        "name": "Examples from the paper (wip)",
+        "path": "paper.stml"
+    },
 ]

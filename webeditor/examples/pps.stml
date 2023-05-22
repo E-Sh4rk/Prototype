@@ -1,0 +1,43 @@
+
+(* Javascript logical operators *)
+
+type Falsy = False | "" | 0
+type Truthy = ~Falsy
+
+let toBoolean x =
+    if x is Truthy then true else false
+
+let lOr (x,y) =
+    if toBoolean x then x else y
+
+let lNeg x =
+    if toBoolean x then false else true
+
+let f x =
+    toBoolean (lOr (x, lNeg x))
+
+(* Fixpoint and recursive functions *)
+
+let fixpoint = fun f ->
+  let delta = fun x ->
+     f ( fun  v -> ( x x v ))
+   in delta delta
+
+let fact_stub fact n =
+  if n is 0 then 1 else (fact (n-1))*n
+
+let fact = fixpoint fact_stub
+
+let map_stub map f lst =
+  match lst with
+  | :[] -> []
+  | (e,lst) -> ((f e), map f lst)
+  end
+
+let map = fixpoint map_stub
+
+let rec map f (lst:['a*]) =
+  match lst with
+  | :[] -> []
+  | (e,lst) -> ((f e), map f lst)
+  end

@@ -553,7 +553,6 @@ let simplify_tallying_infer env res sols =
     let t = Subst.find' sol v in
     let mono = mono_vars (Subst.rm v sol) in
     let pvs = TVarSet.diff (vars t) mono in
-    let v = TVar.mk_fresh v in
     let g = generalize pvs in
     let t = Subst.apply g t in
     let res = tallying [(TVar.typ v, t) ; (t, TVar.typ v)]
@@ -949,6 +948,15 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
     else
       let env = Env.add v s env in
       infer_mono_iterated tenv (apply expl s) env pannot e
+      (* Refresh mono vars in the domain to avoid unrelevant tvar correlations between branches *)
+      |> (function Subst (ss, pannot1, pannot2) ->
+        let ss = ss |> List.map (fun subst ->
+          let r = TVarSet.diff (vars_infer s) (Subst.dom subst) |> refresh in
+          Subst.combine r subst
+        ) in
+        Subst (ss, pannot1, pannot2)
+        | res -> res
+      )
       |> map_res (fun x -> LambdaA (s, x))
   | _, _ -> assert false
 

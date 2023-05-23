@@ -946,12 +946,12 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
     log ~level:2 "Entering lambda for %a with domain %a.@." Variable.pp v pp_typ s ;
     if is_empty s then (log ~level:3 "Lambda with empty domain generated a fail.@." ; Fail)
     else
-      let env = Env.add v s env in
-      infer_mono_iterated tenv (apply expl s) env pannot e
+      infer_mono_iterated tenv (apply expl s) (Env.add v s env) pannot e
       (* Refresh mono vars in the domain to avoid unrelevant tvar correlations between branches *)
       |> (function Subst (ss, pannot1, pannot2) ->
         let ss = ss |> List.map (fun subst ->
-          let r = TVarSet.diff (vars_infer s) (Subst.dom subst) |> refresh in
+          let d = TVarSet.union (Env.tvars env) (Subst.dom subst) in
+          let r = TVarSet.diff (vars_infer s) d |> refresh in
           Subst.combine r subst
         ) in
         Subst (ss, pannot1, pannot2)

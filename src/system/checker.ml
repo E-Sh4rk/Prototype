@@ -111,6 +111,7 @@ let rec typeof_a vardef tenv env annot_a a =
     in
     (* NOTE: Approximation... this is not what the paper suggests,
        but given the inference we gain nothing by doing like in the paper. *)
+    assert (List.length ss1 <> 0 && List.length ss2 <> 0) ;
     let treat_sigma (s1,s2) =
       let t1 = var_type v1 |> instantiate_check [s1] in
       let t2 = var_type v2 |> instantiate_check [s2] in
@@ -322,6 +323,7 @@ let rec approximate_arrow is_poly t =
             vars a |> TVarSet.filter is_poly |> TVarSet.is_empty)
           in *)
           let (keep, split) = ([], arrows) in
+          let split = match split with [] -> [(empty, any)] | lst -> lst in
           split |> List.map (fun arrow -> branch_type (arrow::keep))
         )
       |> List.fold_left (fun acc lst ->
@@ -472,16 +474,16 @@ and infer_poly tenv env pannot e =
     let annot_a = infer_poly_a v tenv env pannot_a a in
     assert (subtype any ([List.map fst d ; u] |> List.concat |> disj)) ;
     let t = typeof_a_nofail v tenv env annot_a a in
+    let inst = u |> List.map (fun si ->
+      let t = cap_o t si in
+      tallying_one [(t, empty)]
+    )
+    in
     let branches = d |> List.map (fun (si, pannot) ->
         let t = cap_o t si in
         let env = Env.add v t env in
         (si, infer_poly tenv env pannot e)
       )
-    in
-    let inst = u |> List.map (fun si ->
-      let t = cap_o t si in
-      tallying_one [(t, empty)]
-    )
     in
     FullAnnot.Keep (annot_a, (branches, Utils.remove_duplicates Subst.equiv inst))
   | _, _ ->  assert false
@@ -620,11 +622,12 @@ let simplify_tallying_infer env res sols =
       | Some s -> Subst.compose s sol
     ) sol (new_dom |> TVarSet.destruct)
   )
+  (* Remove duplicates *)
+  |> List.map (fun sol -> (sol, Subst.restrict sol tvars))
+  |> remove_duplicates (fun (_,r1) (_,r2) -> Subst.equiv r1 r2)
   (* Remove "less general" solutions *)
-  |> keep_only_minimal better_sol
-  (* Restrict and remove duplicates *)
-  |> List.map (fun sol -> Subst.restrict sol tvars)
-  |> remove_duplicates Subst.equiv
+  |> keep_only_minimal (fun (s1,_) (s2,_) -> better_sol s1 s2)
+  |> List.map snd
   (* Printing (debug) *)
   (* |> (fun res ->
     Format.printf "=== Solutions ===@." ;

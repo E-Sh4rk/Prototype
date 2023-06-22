@@ -317,7 +317,9 @@ let rec approximate_arrow is_poly t =
     let tv = top_vars t |> TVarSet.filter is_poly in
     match TVarSet.destruct tv with
     | [] ->
-      dnf t |> simplify_dnf |> List.map (fun arrows ->
+      let dnf = dnf t |> simplify_dnf in
+      let dnf = match dnf with [] -> [[(any, empty)]] | lst -> lst in
+      dnf |> List.map (fun arrows ->
           (* Keep all branches with no var in their domain, split the others *)
           (* let (keep, split) = arrows |> List.partition (fun (a,_) ->
             vars a |> TVarSet.filter is_poly |> TVarSet.is_empty)

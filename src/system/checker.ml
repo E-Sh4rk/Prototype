@@ -577,6 +577,12 @@ let simplify_tallying_infer env res sols =
     | [] -> None
     | sol::_ -> Some sol
   in
+  let merge_on_domain merge dom lst =
+    dom |> List.map (fun v ->
+      let t = lst |> List.map (fun s -> Subst.find' s v) |> merge in
+      (v, t)
+    ) |> Subst.construct
+  in
   sols
   (* Restrict to tvars and store result *)
   |> List.map (fun sol ->
@@ -624,12 +630,23 @@ let simplify_tallying_infer env res sols =
       | Some s -> Subst.compose s sol
     ) sol (new_dom |> TVarSet.destruct)
   )
-  (* Remove duplicates *)
-  |> List.map (fun sol -> (sol, Subst.restrict sol tvars))
-  |> remove_duplicates (fun (_,r1) (_,r2) -> Subst.equiv r1 r2)
+  (* Regroup equivalent solutions *)
+  |> regroup_equiv (fun s1 s2 ->
+    let s1 = Subst.restrict s1 tvars in
+    let s2 = Subst.restrict s2 tvars in
+    Subst.equiv s1 s2
+    )
+  |> List.map (fun to_merge ->
+    let common = Subst.restrict (List.hd to_merge) tvars in
+    (* conj instead of conj_o, because in some cases it can be very complex types
+        without being used later (e.g. when there is no tvar to infer) *)
+    let respart = merge_on_domain conj [res_var] to_merge in
+    Subst.combine common respart
+  )
   (* Remove "less general" solutions *)
-  |> keep_only_minimal (fun (s1,_) (s2,_) -> better_sol s1 s2)
-  |> List.map snd
+  |> keep_only_minimal better_sol
+  (* Restrict solutions to tvars *)
+  |> List.map (fun sol -> Subst.restrict sol tvars)
   (* Printing (debug) *)
   (* |> (fun res ->
     Format.printf "=== Solutions ===@." ;

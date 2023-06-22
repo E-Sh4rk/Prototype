@@ -37,8 +37,38 @@ module PartialAnnot = struct
     | Inter of t inter
   [@@deriving show]
 
+  let tvars_branch f (a, _, t) =
+    TVarSet.union (f a) (vars t)
+  let rec tvars_union (i,p,e,d,u) =
+    let aux1 ty = vars ty in
+    let aux2 (ty, t) = TVarSet.union (vars ty) (tvars t) in
+    let aux3 (ty, env, t) = TVarSet.union_many [vars ty ; List.map Env.tvars env |> TVarSet.union_many ; tvars t] in
+    TVarSet.union_many ((List.map aux2 i)@(List.map aux3 p)@(List.map aux2 e)@(List.map aux2 d)@(List.map aux1 u))
+  and tvars_inter_a (a, b, _) =
+    TVarSet.union
+      (List.map (tvars_branch tvars_a) a |> TVarSet.union_many)
+      (List.map (tvars_branch tvars_a) b |> TVarSet.union_many)
+  and tvars_inter (a, b, _) =
+    TVarSet.union
+      (List.map (tvars_branch tvars) a |> TVarSet.union_many)
+      (List.map (tvars_branch tvars) b |> TVarSet.union_many)
+  and tvars_a a = match a with
+  | InferA | TypA | UntypA | EmptyA | ThenA | ElseA -> TVarSet.empty
+  | LambdaA (ty, t) -> TVarSet.union (vars ty) (tvars t)
+  | InterA i -> tvars_inter_a i
+  and tvars t =
+    match t with
+    | Infer | Typ | Untyp -> TVarSet.empty
+    | Keep (a, b) -> TVarSet.union (tvars_a a) (tvars_union b)
+    | Skip (t, _) -> tvars t
+    | TryKeep (a, t1, t2) ->
+      TVarSet.union_many [tvars_a a ; tvars t1 ; tvars t2]
+    | Propagate (a, t, envs) ->
+      TVarSet.union_many [tvars_a a ; tvars t ; List.map Env.tvars envs |> TVarSet.union_many ]
+    | Inter i -> tvars_inter i
+
   let apply_subst_branch f s (a, s', t) =
-    (f s a, s' (* The subst never change *), apply_subst_simplify s t)
+    (f s a, s' (* The subst never change, and only has polymorphic tvars *), apply_subst_simplify s t)
   let apply_env s env =
     let apply = apply_subst_simplify s in
     Env.bindings env

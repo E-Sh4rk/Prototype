@@ -292,12 +292,13 @@ let tallying constr =
     List.map (fun (a,b) -> [vars a ; vars b]) |>
     List.flatten |> TVarSet.union_many in
   let mono = vars |> TVarSet.filter TVar.is_mono in
-  let poly = vars |> TVarSet.filter TVar.is_poly in
+  (* let poly = vars |> TVarSet.filter TVar.is_poly in *)
   Raw.tallying ~var_order:[] mono constr
   |> List.map (fun s ->
     let reg_subst = generalize_unregistered (Subst.codom s) in
-    let ref_subst = refresh poly in
-    Subst.compose ref_subst (Subst.compose_restr reg_subst s)
+    (* let ref_subst = refresh poly in *)
+    Subst.compose_restr reg_subst s
+    (* |> Subst.compose ref_subst *)
   )
 
 let tallying_infer constr =

@@ -799,13 +799,19 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
   in
   aux b1 expl b2
 
-let normalize env apply_subst_branch estimate mk_inter res =
+let normalize env tvars_branch apply_subst_branch estimate mk_inter res =
   match res with
   | Subst (lst, pannot, default) ->
     let tvars = Env.tvars env |> TVarSet.filter TVar.is_mono in
+    let refresh b =
+      let tvs = TVarSet.diff (tvars_branch b) tvars in
+      apply_subst_branch (refresh tvs) b
+    in
     let (lst1, lst2) = lst |> List.partition
       (fun s -> TVarSet.inter (Subst.dom s) tvars |> TVarSet.is_empty) in
-    let lst1 = List.map (fun s -> (s, apply_subst_branch s pannot)) lst1 in
+    let lst1 = List.map (fun s -> (s, apply_subst_branch s pannot)) lst1
+      |> List.map (fun (s, b) -> (s, refresh b))
+    in
     (* NOTE: It is important for the default case is inserted at the end (smaller priority). *)
     let lst1 = lst1@[(Subst.identity, default)] |> List.filter_map
       (fun (s,pannot) ->
@@ -947,16 +953,6 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
     if is_empty s then (log ~level:3 "Lambda with empty domain generated a fail.@." ; Fail)
     else
       infer_mono_iterated tenv (apply expl s) (Env.add v s env) pannot e
-      (* Refresh mono vars in the domain to avoid unrelevant tvar correlations between branches *)
-      |> (function Subst (ss, pannot1, pannot2) ->
-        let ss = ss |> List.map (fun subst ->
-          let d = TVarSet.union (Env.tvars env) (Subst.dom subst) in
-          let r = TVarSet.diff (vars_infer s) d |> refresh in
-          Subst.combine r subst
-        ) in
-        Subst (ss, pannot1, pannot2)
-        | res -> res
-      )
       |> map_res (fun x -> LambdaA (s, x))
   | _, _ -> assert false
 
@@ -1093,7 +1089,7 @@ and infer_mono tenv expl env pannot e =
 and infer_mono_a_iterated vardef tenv expl env pannot_a a =
   log ~level:5 "infer_mono_a_iterated@." ;
   let res = infer_mono_a vardef tenv expl env pannot_a a |>
-    normalize env PartialAnnot.apply_subst_a
+    normalize env PartialAnnot.tvars_a PartialAnnot.apply_subst_a
       (estimations_a a) (fun a b c -> PartialAnnot.InterA (a,b,c))
   in
   match should_iterate res with
@@ -1103,7 +1099,7 @@ and infer_mono_a_iterated vardef tenv expl env pannot_a a =
 and infer_mono_iterated tenv expl env pannot e =
   log ~level:5 "infer_mono_iterated@." ;
   let res = infer_mono tenv expl env pannot e |>
-    normalize env PartialAnnot.apply_subst
+    normalize env PartialAnnot.tvars PartialAnnot.apply_subst
       (estimations e) (fun a b c -> PartialAnnot.Inter (a,b,c))
   in
   match should_iterate res with

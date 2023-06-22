@@ -809,7 +809,7 @@ let normalize env tvars_branch apply_subst_branch estimate mk_inter res =
   | Subst (lst, pannot, default) ->
     let tvars = Env.tvars env |> TVarSet.filter TVar.is_mono in
     let refresh b =
-      let tvs = TVarSet.diff (tvars_branch b) tvars in
+      let tvs = TVarSet.diff (tvars_branch b) tvars |> TVarSet.filter TVar.can_infer in
       apply_subst_branch (refresh tvs) b
     in
     let (lst1, lst2) = lst |> List.partition

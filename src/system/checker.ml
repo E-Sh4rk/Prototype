@@ -208,7 +208,7 @@ let refine_a tenv env a t =
   | Alias v when subtype (Env.find v env) t -> [Env.empty]
   | Alias _ | Abstract _ | Const _ -> []
   | Pair (v1, v2) ->
-    split_pair t
+    pair_dnf t
     |> List.map (
       fun (t1, t2) -> Env.construct_dup [(v1,t1) ; (v2, t2)]
     )

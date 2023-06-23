@@ -54,11 +54,12 @@ val mk_times : node -> node -> typ
 val pair_any : typ
 val pi1 : typ -> typ
 val pi2 : typ -> typ
-val split_pair : typ -> (typ * typ) list
+val pair_dnf : typ -> (typ * typ) list
 
 val to_label : string -> Ns.Label.t
 val from_label : Ns.Label.t -> string
 val mk_record : bool (* is_open *) -> (string * node) list -> typ
+val record_dnf : typ -> ((string * (bool * typ)) list * bool) list
 val record_any : typ
 val absent : typ
 val has_absent : typ -> bool

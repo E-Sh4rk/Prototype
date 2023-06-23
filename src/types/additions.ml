@@ -520,10 +520,15 @@ let reduce_tvars t =
                     aux ((ArrowRight (i,j))::path) b
                 )
             ) ;
-            split_pair t |> List.iteri (fun i (a,b) ->
+            pair_dnf t |> List.iteri (fun i (a,b) ->
                 aux ((PairLeft i)::path) a ; aux ((PairRight i)::path) b
             ) ;
-            (* TODO: records *)
+            record_dnf t |> List.map fst
+            |> List.iteri (fun i fields ->
+                fields |> List.iter (fun (str,(_,t)) ->
+                    aux ((Record (i,str))::path) t
+                )
+            )
         end
     in
     aux [] t ; !res

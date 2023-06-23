@@ -155,7 +155,7 @@ let pi1 t =
 let pi2 t =
   CD.Types.Product.pi2 (CD.Types.Product.get t)
 
-let split_pair t =
+let pair_dnf t =
   (* CD.Types.Product.normal ~kind:`Normal t *)
   CD.Types.Product.get ~kind:`Normal t
 
@@ -164,6 +164,11 @@ let mk_record is_open fields =
   let fields = LabelMap.from_list_disj fields in
   CD.Types.record_fields (is_open, fields)
 
+let record_dnf t =
+  CD.Types.Record.get t |> List.map (fun (map, o, _) ->
+    let map = LabelMap.get map |> List.map (fun (l, t) -> (from_label l, t)) in
+    (map, o)
+  )
 let record_any = CD.Types.Rec.any
 
 let absent = CD.Types.Absent.any

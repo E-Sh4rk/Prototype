@@ -277,6 +277,9 @@ let replace_vars t vs v =
     | `Both -> None
     else None
     ) |> Subst.construct
+(* let replace_vars _ vs v =
+  TVarSet.destruct vs |> List.map (fun v' -> (v', TVar.typ v))
+  |> Subst.construct *)
 
 let simplify_tallying res sols =
   let is_better_sol s1 s2 =
@@ -380,6 +383,14 @@ let approximate_app infer t1 t2 resvar =
   then (match approximate_app infer t1 t2 resvar with [] -> assert false | sols -> sols)
   else res
 
+let reduce_tvars arg =
+  if is_opened_arrow arg
+  then
+    let rsubst = reduce_tvars arg in
+    let arg = apply_subst_simplify rsubst arg in
+    (rsubst, arg)
+  else (Subst.identity, arg)
+
 let infer_poly_inter infer_poly_branch (b1, b2, (tf,_)) =
   assert (b2 = [] && b1 <> [] && tf) ;
   b1 |> List.map (fun (annot,_,_) -> infer_poly_branch annot)
@@ -436,12 +447,14 @@ let rec infer_poly_a vardef tenv env pannot_a a =
     let r2 = refresh (vars_poly t2) in
     let t1 = Subst.apply r1 t1 in
     let t2 = Subst.apply r2 t2 in
+    let (rsubst, t2) = reduce_tvars t2 in
     let alpha = TVar.mk_poly None in
     let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
     log ~level:4 "@.Approximate tallying for %a: %a <= %a@."
       Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
     let res = approximate_app false t1 t2 alpha in
-    let res = simplify_tallying (TVar.typ alpha) res in
+    let res = simplify_tallying (TVar.typ alpha) res
+      |> List.map (fun s -> Subst.compose s rsubst) in
     let (s1, s2) = res |> List.map (fun s ->
       (Subst.compose_restr s r1, Subst.compose_restr s r2)
     ) |> List.split in
@@ -936,6 +949,7 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
     if memvar v1 && memvar v2 then
       let t1 = vartype v1 in
       let t2 = vartype v2 in
+      let (_, t2) = reduce_tvars t2 in
       let alpha = TVar.mk_mono (Some (Variable.show vardef)) in
       let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
       log ~level:3 "@.Approximate tallying (inference) for %a: %a <= %a@."

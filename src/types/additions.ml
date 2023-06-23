@@ -471,3 +471,59 @@ let top_instance =
 let subtype_poly t1 t2 =
     let t2 = Subst.apply (monomorphize (vars t2)) t2 in
     test_tallying [(bot_instance t1,t2)]
+
+(* reduce_tvars *)
+
+type tpath_elt = ArrowLeft of int * int | ArrowRight  of int * int
+    | PairLeft of int | PairRight of int
+    | Record of int * string
+
+let norm_path p =
+    let rec aux = function
+    | [] -> []
+    | (ArrowLeft (u,_))::tl -> (ArrowLeft (u,0))::tl
+    | (ArrowRight (u,_))::tl -> (ArrowRight (u,0))::(aux tl)
+    | (PairLeft u)::tl -> (PairLeft u)::(aux tl)
+    | (PairRight u)::tl -> (PairRight u)::(aux tl)
+    | (Record (u,str))::tl -> (Record (u,str))::(aux tl)
+    in aux p
+
+let reduce_tvars t =
+    (* TODO: work on raw DNFs (with nodes for caching, negated parts, etc) *)
+    let res = ref (Subst.construct []) in
+    let paths_cache = Hashtbl.create 20 in
+    let treat_var path v =
+        if Subst.mem (!res) v then ()
+        else
+            let path = norm_path (List.rev path) in
+            let v' =
+                if Hashtbl.mem paths_cache path
+                then Hashtbl.find paths_cache path
+                else TVar.mk_poly (Some (TVar.display_name v))
+            in
+            Hashtbl.replace paths_cache path v' ;
+            res := Subst.combine (!res) (Subst.construct [(v, TVar.typ v')])
+    in
+    let treat_vars path tvs =
+        let tvs = TVarSet.destruct tvs |> List.filter TVar.is_poly in
+        match tvs with [tv] -> treat_var path tv | _ -> ()
+    in
+    let visited = ref Compare.TypeMap.empty in
+    let rec aux path t =
+        if Compare.TypeMap.mem t (!visited) then ()
+        else begin
+            visited := Compare.TypeMap.add t () (!visited) ;
+            treat_vars path (top_vars t) ;
+            dnf t |> List.iteri (fun i arrows ->
+                arrows |> List.iteri (fun j (a,b) ->
+                    aux ((ArrowLeft (i,j))::path) a ;
+                    aux ((ArrowRight (i,j))::path) b
+                )
+            ) ;
+            split_pair t |> List.iteri (fun i (a,b) ->
+                aux ((PairLeft i)::path) a ; aux ((PairRight i)::path) b
+            ) ;
+            (* TODO: records *)
+        end
+    in
+    aux [] t ; !res

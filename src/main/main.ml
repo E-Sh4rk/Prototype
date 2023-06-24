@@ -13,7 +13,8 @@ type typecheck_result =
 | TFailure of (Position.t list) * string * (float * float)
 
 let generalize_all t =
-  Subst.apply (generalize (vars t)) t |> bot_instance |> simplify_typ
+  let t = Subst.apply (generalize (vars t)) t |> bot_instance |> simplify_typ in
+  apply_subst_simplify (reduce_tvars t) t
 
 exception IncompatibleType of typ
 let type_check_def tenv env (var,expr,typ_annot) =

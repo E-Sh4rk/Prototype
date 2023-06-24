@@ -298,7 +298,7 @@ let simplify_tallying res sols =
         let t = Subst.find' sol v in
         (* let v = TVar.mk_fresh v in *)
         (* NOTE: we use the same poly vars for the different solutions,
-           which is different of the paper. But it is an easy way to factorize some types. *)
+           which is an easy way to factorize some types. *)
         let s = replace_vars t (top_vars t |> TVarSet.filter TVar.is_poly) v in
         Subst.compose s sol
       ) sol (Subst.dom sol |> TVarSet.destruct)
@@ -557,7 +557,7 @@ let simplify_tallying_infer env res sols =
     List.filter Variable.is_lambda_var |>
     List.map (fun v -> Env.find v env)
   in
-  let mono_vars sol =
+  let mono_vars tvars sol =
     let sol = Subst.restrict sol tvars in
     TVarSet.union (Subst.codom sol) tvars
   in
@@ -570,7 +570,7 @@ let simplify_tallying_infer env res sols =
   in
   let try_remove_var sol v =
     let t = Subst.find' sol v in
-    let mono = mono_vars (Subst.rm v sol) in
+    let mono = mono_vars (TVarSet.rm v tvars) sol in
     let pvs = TVarSet.diff (vars t) mono in
     let g = generalize pvs in
     let t = Subst.apply g t in
@@ -607,7 +607,7 @@ let simplify_tallying_infer env res sols =
   )
   (* Generalize vars in the result when possible *)
   |> List.map (fun sol ->
-    let mono = mono_vars sol in
+    let mono = mono_vars tvars sol in
     let res = Subst.find' sol res_var in
     let g = generalize (TVarSet.diff (vars res) mono) in
     let res = Subst.apply g res in
@@ -627,7 +627,7 @@ let simplify_tallying_infer env res sols =
     let new_dom = TVarSet.inter (Subst.dom sol) tvars in
     List.fold_left (fun sol v ->
       let t = Subst.find' sol v in
-      let v = TVar.mk_fresh v in
+      (* let v = TVar.mk_fresh v in *)
       (* NOTE: we allow to rename mono vars even if it corresponds to a
          mono var already in the env (tvars)...
          this might create an uneeded correlation but it simplifies a lot. *)

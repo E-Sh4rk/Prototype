@@ -23,8 +23,8 @@ let map_stub map f lst =
 let map = fixpoint map_stub
 
 let filter_stub filter (f: ('a->Any) & ('b -> ~True)) (l:[('a|'b)*]) =
-  if l is Nil then nil else
-  if f(fst(l)) is True
+  if l is Nil then nil
+  else if f(fst(l)) is True
   then (fst(l), filter f (snd(l)))
   else filter f (snd(l))
 

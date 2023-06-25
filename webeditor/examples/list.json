@@ -12,7 +12,7 @@
         "path": "pps.stml"
     },
 	{
-        "name": "Examples from the paper (wip)",
+        "name": "Examples from POPL24 submission",
         "path": "paper.stml"
     }
 ]

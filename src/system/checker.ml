@@ -548,7 +548,10 @@ let subst_more_general s1 s2 =
     let t2 = Subst.apply s2m t2 in
     [(t1, t2) ; (t2, t1)]
   ) |> List.flatten |> test_tallying
-let subst_nb_vars s = Subst.codom s |> TVarSet.destruct |> List.length
+let subst_nb_new_vars s =
+  let codom = Subst.codom s |> TVarSet.destruct |> List.length in
+  let dom = Subst.dom s |> TVarSet.destruct |> List.length in
+  codom - dom
 
 let res_var = TVar.mk_mono None
 let res_var_p = TVar.mk_poly None
@@ -563,7 +566,7 @@ let simplify_tallying_infer env res_type sols =
     TVarSet.union (Subst.codom sol) dom
   in
   let better_sol (sol1, res1) (sol2, res2) =
-    let nb1, nb2 = subst_nb_vars sol1, subst_nb_vars sol2 in
+    let nb1, nb2 = subst_nb_new_vars sol1, subst_nb_new_vars sol2 in
     let respart1 = Subst.construct [(res_var, cup res1 (TVar.typ res_var_p))] in
     let respart2 = Subst.construct [(res_var, res2)] in
     let sol1, sol2 = Subst.combine sol1 respart1, Subst.combine sol2 respart2 in
@@ -722,7 +725,7 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
   in
   let rec aux explored expl pending =
     let smg s1 s2 =
-      subst_more_general s1 s2 && subst_nb_vars s1 <= subst_nb_vars s2
+      subst_more_general s1 s2 && subst_nb_new_vars s1 <= subst_nb_new_vars s2
     in
     let leq s s' = (smg s s' |> not) || smg s' s in
     let leq (_,s,_) (_,s',_) = leq s s' in

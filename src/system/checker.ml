@@ -255,7 +255,7 @@ let refine_a tenv env a t =
   | Let (_, v2) -> [Env.singleton v2 t]
 
 (* ====================================== *)
-(* =============== INFER P ============== *)
+(* ============= INFER POLY ============= *)
 (* ====================================== *)
 
 let tallying_nonempty constr =
@@ -506,7 +506,7 @@ and infer_poly tenv env pannot e =
   | _, _ ->  assert false
 
 (* ====================================== *)
-(* =============== INFER M ============== *)
+(* ====== INFER MONO (MAIN SYSTEM) ====== *)
 (* ====================================== *)
 
 type 'a res =
@@ -670,62 +670,60 @@ let simplify_tallying_infer env res sols =
     res
   ) *)
 
-let rec estimations e pannot =
+let rec estimate pannot =
   let open PartialAnnot in
-  match e, pannot with
-  | _, Untyp -> None
-  | _, Typ -> Some any
-  | _, Infer -> Some any
-  | Bind (_,_,e), Skip (p,_) -> estimations e p |>
+  match pannot with
+  | Untyp -> None
+  | Typ -> Some any
+  | Infer -> Some any
+  | Skip (p,_) -> estimate p |>
     Option.map (fun t -> mk_times any_node (cons t))
-  | Bind (_,a,e), TryKeep (pannot_a, pannot1, pannot2) ->
-    begin match estimations_a a pannot_a with
+  | TryKeep (pannot_a, pannot1, pannot2) ->
+    begin match estimate_a pannot_a with
     | None ->
-      estimations e pannot2 |> Option.map (fun est_e ->
+      estimate pannot2 |> Option.map (fun est_e ->
         mk_times any_node (cons est_e)
       )
     | Some est_a ->
-      estimations e pannot1 |> Option.map (fun est_e ->
+      estimate pannot1 |> Option.map (fun est_e ->
         mk_times (cons est_a) (cons est_e)
       )
     end
-  | Bind (_,a,e), Propagate (pannot_a, pannot, _) ->
-    let est_a = estimations_a a pannot_a |> Option.get in
-    estimations e pannot |> Option.map (fun est_e ->
+  | Propagate (pannot_a, pannot, _) ->
+    let est_a = estimate_a pannot_a |> Option.get in
+    estimate pannot |> Option.map (fun est_e ->
       mk_times (cons est_a) (cons est_e)
     )
-  | Bind (_,a,e), Keep (pannot_a, u) ->
-    let est_a = estimations_a a pannot_a |> Option.get in
+  | Keep (pannot_a, u) ->
+    let est_a = estimate_a pannot_a |> Option.get in
     let r = neg (effective_splits u |> disj) in
     let ts = u |> effective_splits_annots |> List.map (fun (t,pannot) ->
-      estimations e pannot |> Option.map (fun est_e ->
+      estimate pannot |> Option.map (fun est_e ->
         mk_times (cap est_a (cup t r) |> cons) (est_e |> cons)
       )
     ) in
     if List.mem None ts then None
     else Some (ts |> List.map Option.get |> disj_o)
-  | e, Inter (p1,p2,_) ->
-    let res = p1@p2 |> List.map Utils.fst3 |> List.filter_map (estimations e) in
+  | Inter (p1,p2,_) ->
+    let res = p1@p2 |> List.map Utils.fst3 |> List.filter_map estimate in
     if res = [] then None else Some (conj_o res)
-  | _, _ -> assert false
 
-and estimations_a a pannot_a =
+and estimate_a pannot_a =
   let open PartialAnnot in
-  match a, pannot_a with
-  | _, TypA -> Some any
-  | _, InferA -> Some any
-  | _, UntypA -> None
-  | _, EmptyA -> Some any
-  | _, ThenA -> Some any
-  | _, ElseA -> Some any
-  | Lambda (_, _, e), LambdaA (s, pannot) ->
-    estimations e pannot |> Option.map (fun est ->
+  match pannot_a with
+  | TypA -> Some any
+  | InferA -> Some any
+  | UntypA -> None
+  | EmptyA -> Some any
+  | ThenA -> Some any
+  | ElseA -> Some any
+  | LambdaA (s, pannot) ->
+    estimate pannot |> Option.map (fun est ->
       mk_arrow (cons s) (cons est)
     )
-  | a, InterA (p1,p2,_) ->
-    let res = p1@p2 |> List.map Utils.fst3 |> List.filter_map (estimations_a a) in
+  | InterA (p1,p2,_) ->
+    let res = p1@p2 |> List.map Utils.fst3 |> List.filter_map estimate_a in
     if res = [] then None else Some (conj_o res)
-  | _, _ -> assert false
 
 let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
   let expl = b1 |> List.fold_left (fun acc (_,_,t) -> cap_o acc t) expl in
@@ -1105,7 +1103,7 @@ and infer_mono_a_iterated vardef tenv expl env pannot_a a =
   log ~level:5 "infer_mono_a_iterated@." ;
   let res = infer_mono_a vardef tenv expl env pannot_a a |>
     normalize env PartialAnnot.tvars_a PartialAnnot.apply_subst_a
-      (estimations_a a) (fun a b c -> PartialAnnot.InterA (a,b,c))
+      estimate_a (fun a b c -> PartialAnnot.InterA (a,b,c))
   in
   match should_iterate res with
   | None -> res
@@ -1115,7 +1113,7 @@ and infer_mono_iterated tenv expl env pannot e =
   log ~level:5 "infer_mono_iterated@." ;
   let res = infer_mono tenv expl env pannot e |>
     normalize env PartialAnnot.tvars PartialAnnot.apply_subst
-      (estimations e) (fun a b c -> PartialAnnot.Inter (a,b,c))
+      estimate (fun a b c -> PartialAnnot.Inter (a,b,c))
   in
   match should_iterate res with
   | None -> res

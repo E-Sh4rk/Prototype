@@ -551,117 +551,96 @@ let subst_more_general s1 s2 =
 let subst_nb_vars s = Subst.codom s |> TVarSet.destruct |> List.length
 
 let res_var = TVar.mk_mono None
-let simplify_tallying_infer env res sols =
+let res_var_p = TVar.mk_poly None
+let simplify_tallying_infer env res_type sols =
   let tvars = Env.tvars env |> TVarSet.filter TVar.is_mono in
   let params_types = Env.domain env |>
     List.filter Variable.is_lambda_var |>
     List.map (fun v -> Env.find v env)
   in
-  let mono_vars tvars sol =
-    let sol = Subst.restrict sol tvars in
-    TVarSet.union (Subst.codom sol) tvars
+  let vars_involved dom sol =
+    let sol = Subst.restrict sol dom in
+    TVarSet.union (Subst.codom sol) dom
   in
-  let better_sol sol1 sol2 =
-    let nb1 = Subst.restrict sol1 tvars |> subst_nb_vars in
-    let nb2 = Subst.restrict sol2 tvars |> subst_nb_vars in
-    let s1g = Subst.codom sol1 |> generalize in
-    let sol1 = Subst.compose_restr s1g sol1 in
+  let better_sol (sol1, res1) (sol2, res2) =
+    let nb1, nb2 = subst_nb_vars sol1, subst_nb_vars sol2 in
+    let respart1 = Subst.construct [(res_var, cup res1 (TVar.typ res_var_p))] in
+    let respart2 = Subst.construct [(res_var, res2)] in
+    let sol1, sol2 = Subst.combine sol1 respart1, Subst.combine sol2 respart2 in
+    let sol1 = Subst.compose_restr (Subst.codom sol1 |> generalize) sol1 in
     nb1 <= nb2 && subst_more_general sol1 sol2
-  in
-  let try_remove_var sol v =
-    let t = Subst.find' sol v in
-    let mono = mono_vars (TVarSet.rm v tvars) sol in
-    let pvs = TVarSet.diff (vars t) mono in
-    let g = generalize pvs in
-    let t = Subst.apply g t in
-    let res = tallying [(TVar.typ v, t) ; (t, TVar.typ v)]
-    |> List.map (fun s ->
-      let s = Subst.compose_restr s g in
-      let mono_subst = monomorphize (Subst.codom s) in
-      Subst.compose_restr mono_subst s
-    )
-    |> List.filter (fun s ->
-      let res = Subst.find' sol res_var in
-      let res' = Subst.apply s res in
-      let g = vars res' |> generalize in
-      let res' = Subst.apply g res' in
-      subtype_poly res' res
-    )
-    in
-    match res with
-    | [] -> None
-    | sol::_ -> Some sol
-  in
-  let merge_on_domain merge dom lst =
-    dom |> List.map (fun v ->
-      let t = lst |> List.map (fun s -> Subst.find' s v) |> merge in
-      (v, t)
-    ) |> Subst.construct
   in
   sols
   (* Restrict to tvars and store result *)
   |> List.map (fun sol ->
-    let res = Subst.apply sol res in
+    let res = Subst.apply sol res_type in
     let sol = Subst.restrict sol tvars in
-    Subst.combine sol (Subst.construct [(res_var, res)])
+    (sol, res)
   )
   (* Generalize vars in the result when possible *)
-  |> List.map (fun sol ->
-    let mono = mono_vars tvars sol in
-    let res = Subst.find' sol res_var in
-    let g = generalize (TVarSet.diff (vars res) mono) in
-    let res = Subst.apply g res in
+  |> List.map (fun (sol, res) ->
+    let mono = vars_involved tvars sol in
+    let gen = generalize (TVarSet.diff (vars res) mono) in
+    let sol, res = Subst.compose_restr gen sol, Subst.apply gen res in
     let clean = clean_type_subst ~pos:empty ~neg:any res in
-    let g = Subst.compose_restr clean g in
-    Subst.compose_restr g sol
+    (Subst.compose_restr clean sol, Subst.apply clean res)
   )
   (* Remove solutions that require "undesirable" lambda branches *)
-  |> List.filter (fun sol ->
+  |> List.filter (fun (sol, _) ->
     params_types |> List.for_all (fun t ->
       TVarSet.inter (vars_mono t) (Subst.dom sol) |> TVarSet.is_empty ||
       is_undesirable t || not (is_undesirable (Subst.apply sol t))
     )
   )
   (* Simplify *)
-  |> List.map (fun sol ->
-    let new_dom = TVarSet.inter (Subst.dom sol) tvars in
-    List.fold_left (fun sol v ->
+  |> List.map (fun (sol, res) ->
+    List.fold_left (fun (sol, res) v ->
       let t = Subst.find' sol v in
       (* let v = TVar.mk_fresh v in *)
       (* NOTE: we allow to rename mono vars even if it corresponds to a
          mono var already in the env (tvars)...
          this might create an uneeded correlation but it simplifies a lot. *)
-      let vs = top_vars t |> TVarSet.filter TVar.can_infer in
-      let s = replace_vars t vs v in
-      Subst.compose s sol
-    ) sol (new_dom |> TVarSet.destruct)
+      let s = replace_vars t (top_vars t |> TVarSet.filter TVar.can_infer) v in
+      (Subst.restrict (Subst.compose s sol) tvars, Subst.apply s res)
+    ) (sol, res) (Subst.dom sol |> TVarSet.destruct)
   )
   (* Try remove var substitutions *)
-  |> List.map (fun sol ->
-    let new_dom = TVarSet.inter (Subst.dom sol) tvars in
-    List.fold_left (fun sol v ->
-      match try_remove_var sol v with
-      | None -> sol
-      | Some s -> Subst.compose s sol
-    ) sol (new_dom |> TVarSet.destruct)
+  |> List.map (fun (sol, res) ->
+    List.fold_left (fun (sol, res) v ->
+      let t = Subst.find' sol v in
+      let mono = vars_involved (TVarSet.rm v tvars) sol in
+      let pvs = TVarSet.diff (vars t) mono in
+      let g = generalize pvs in
+      let t = Subst.apply g t in
+      let tallying_res = tallying [(TVar.typ v, t) ; (t, TVar.typ v)]
+      |> List.map (fun s ->
+        let s = Subst.compose_restr s g in
+        Subst.compose_restr (Subst.codom s |> monomorphize) s
+      )
+      |> List.filter (fun s ->
+        let res' = Subst.apply s res in
+        let res' = Subst.apply (vars res' |> generalize) res' in
+        subtype_poly res' res
+      )
+      in
+      match tallying_res with
+      | [] -> (sol, res)
+      | s::_ -> (Subst.rm v sol, Subst.apply s res)  
+    ) (sol, res) (Subst.dom sol |> TVarSet.destruct)
   )
   (* Regroup equivalent solutions *)
-  |> regroup_equiv (fun s1 s2 ->
-    let s1 = Subst.restrict s1 tvars in
-    let s2 = Subst.restrict s2 tvars in
-    Subst.equiv s1 s2
-    )
+  |> regroup_equiv (fun (s1, _) (s2, _) -> Subst.equiv s1 s2)
   |> List.map (fun to_merge ->
-    let common = Subst.restrict (List.hd to_merge) tvars in
+    let sol = List.hd to_merge |> fst in
     (* conj instead of conj_o, because in some cases it can be very complex types
         without being used later (e.g. when there is no tvar to infer) *)
-    let respart = merge_on_domain conj [res_var] to_merge in
-    Subst.combine common respart
+    let res = List.map snd to_merge |> conj in
+    (sol, res)
   )
   (* Remove "less general" solutions *)
   |> keep_only_minimal better_sol
   (* Restrict solutions to tvars *)
-  |> List.map (fun sol -> Subst.restrict sol tvars)
+  |> List.map fst
   (* Printing (debug) *)
   (* |> (fun res ->
     Format.printf "=== Solutions ===@." ;
@@ -738,8 +717,7 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
       b2 |> List.iter (fun (_,_,est) -> Format.printf "Est: %a@." pp_typ est) *)
   end ;
   let subtype_gen a b =
-    let gen = TVarSet.diff (vars a) tvars |> generalize in
-    let a = Subst.apply gen a in
+    let a = Subst.apply (TVarSet.diff (vars a) tvars |> generalize) a in
     subtype_poly a b
   in
   let rec aux explored expl pending =
@@ -828,8 +806,7 @@ let normalize env tvars_branch apply_subst_branch estimate mk_inter res =
     let lst1 = lst1@[(Subst.identity, default)] |> List.filter_map
       (fun (s,pannot) ->
         estimate pannot |> Option.map (fun est ->
-          let gen = Subst.codom s |> generalize in
-          let s = Subst.compose_restr gen s in
+          let s = Subst.compose_restr (Subst.codom s |> generalize) s in
           (pannot, s, est)
         )
       )
@@ -1009,8 +986,7 @@ and infer_mono tenv expl env pannot e =
         if subtype t arrow_any && List.length dnf >= 2 then
           dnf |> Utils.map_among_others' (fun _ others ->
             let s = others |> List.map branch_type |> disj |> bot_instance in
-            let mono = monomorphize (vars_poly s) in
-            let s = Subst.apply mono s in
+            let s = Subst.apply (vars_poly s |> monomorphize) s in
             refine_a tenv env a s
           )
           |> List.flatten

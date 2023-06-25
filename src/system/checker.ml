@@ -720,23 +720,12 @@ and estimations_a a pannot_a =
   | _, ElseA -> Some any
   | Lambda (_, _, e), LambdaA (s, pannot) ->
     estimations e pannot |> Option.map (fun est ->
-      (* let v = TVar.mk_mono None |> TVar.typ in
-      let est = cup (cap v est) (neg v) in *)
-      (* NOTE: Should be the above... but determining subtyping takes too long *)
       mk_arrow (cons s) (cons est)
     )
   | a, InterA (p1,p2,_) ->
     let res = p1@p2 |> List.map Utils.fst3 |> List.filter_map (estimations_a a) in
     if res = [] then None else Some (conj_o res)
   | _, _ -> assert false
-
-let rec is_undesirable_pruning_sol subst t =
-  let t' = Subst.apply subst t in
-  (non_empty t && is_empty t') ||
-  (subtype t arrow_any &&
-    dnf t |> List.for_all
-      (List.exists (fun (a, _) -> is_undesirable_pruning_sol subst a))
-  )
 
 let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
   let expl = b1 |> List.fold_left (fun acc (_,_,t) -> cap_o acc t) expl in
@@ -755,18 +744,6 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
     let a = Subst.apply gen a in
     subtype_poly a b
   in
-  (* NOTE: subtype_gen' is used when pruning branch. This is an heuristic
-     to avoid pruning some important branches (we could do it in a
-     more general way by modifying the estimation function, but then
-     the tallying instance takes too long) *)
-  let subtype_gen' a b =
-    let gen = TVarSet.diff (vars a) tvars |> generalize in
-    let a = Subst.apply gen a |> bot_instance in
-    let b = Subst.apply (monomorphize (vars b)) b in
-    tallying [(a,b)] |> List.filter (fun sol ->
-      is_undesirable_pruning_sol sol a |> not
-    ) <> []
-  in
   let rec aux explored expl pending =
     let smg s1 s2 =
       subst_more_general s1 s2 && subst_nb_vars s1 <= subst_nb_vars s2
@@ -777,7 +754,7 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
     let pending =
       if ud then pending else
         pending |> List.filter (fun (_,_,est) ->
-          let r = subtype_gen' expl est |> not in
+          let r = subtype_gen expl est |> not in
           (* if not r then Format.printf "REMOVED: %a@.VS:%a@." pp_typ est pp_typ expl
           else Format.printf "KEPT: %a@.VS:%a@." pp_typ est pp_typ expl ; *)
           r

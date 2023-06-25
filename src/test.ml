@@ -620,6 +620,11 @@ let filter_stub_noannot filter f l =
     then (fst(l),filter f (snd(l)))
     else filter f (snd(l))
 	
+(* let filter_noannot = fixpoint filter_stub_noannot *)
+(* checked in 31667.95ms:
+(('a -> `true) -> ([ 'a ] -> [ 'a ]) & ([ 'a+ ] -> [ 'a+ ]) & ([  ] -> [  ])) &
+(('a -> Any \ `true) -> [ 'a* ] -> [  ]) & (Any -> [  ] -> [  ]) *)
+
 let rec eval e =
   match e with
   | (:"add", (e1, e2)) -> (eval e1) + (eval e2)

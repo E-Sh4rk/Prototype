@@ -271,10 +271,10 @@ let tallying_one constr =
 let replace_vars t vs v =
   vars_with_polarity t |> List.filter_map (fun (v', k) ->
     if TVarSet.mem vs v' then
-    match k with
+    match k with (* TODO: only top-level occurences polarity should be considered. *)
     | `Pos -> Some (v', TVar.typ v)
     | `Neg -> Some (v', TVar.typ v |> neg)
-    | `Both -> None
+    | `Both -> (* Cases like Bool & 'a \ 'b  |  Int & 'a & 'b *) None
     else None
     ) |> Subst.construct
 (* let replace_vars _ vs v =

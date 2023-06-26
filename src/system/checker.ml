@@ -678,8 +678,8 @@ let rec estimate pannot =
     )
   | Keep (pannot_a, u) ->
     let est_a = estimate_a pannot_a |> Option.get in
-    let r = neg (effective_splits u |> disj) in
-    let ts = u |> effective_splits_annots |> List.map (fun (t,pannot) ->
+    let r = unreachable_splits u |> disj in
+    let ts = u |> effective_splits |> List.map (fun (t,pannot) ->
       estimate pannot |> Option.map (fun est_e ->
         mk_times (cap est_a (cup t r) |> cons) (est_e |> cons)
       )

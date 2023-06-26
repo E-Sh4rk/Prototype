@@ -109,9 +109,8 @@ module PartialAnnot = struct
       Propagate (apply_subst_a s a, apply_subst s t, List.map (apply_env s) envs)
     | Inter i -> Inter (apply_subst_inter s i)
 
+  let unreachable_splits (_,_,_,_,u) = u
   let effective_splits (i,p,e,d,_) =
-    (p |> List.map (fun (t,_,_) -> t)) @ (i@e@d |> List.map (fun (t, _) -> t))
-  let effective_splits_annots (i,p,e,d,_) =
     (p |> List.map (fun (t,_,pa) -> (t,pa))) @ (i@e@d)
 end
 

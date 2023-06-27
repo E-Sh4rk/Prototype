@@ -652,6 +652,7 @@ let simplify_tallying_infer env res_type sols =
     res
   ) *)
 
+(* TODO: could empty replace None? *)
 let rec estimate pannot =
   let open PartialAnnot in
   match pannot with
@@ -678,17 +679,16 @@ let rec estimate pannot =
     )
   | Keep (pannot_a, u) ->
     let est_a = estimate_a pannot_a |> Option.get in
-    let r = unreachable_splits u |> disj in
-    let ts = u |> effective_splits |> List.map (fun (t,pannot) ->
-      estimate pannot |> Option.map (fun est_e ->
-        mk_times (cap est_a (cup t r) |> cons) (est_e |> cons)
-      )
-    ) in
+    let ts = u |> effective_splits |> List.map
+      (fun (_,pannot) -> estimate pannot)
+    in
     if List.mem None ts then None
-    else Some (ts |> List.map Option.get |> disj_o)
+    else
+      let rhs = ts |> List.map Option.get |> conj_o in
+      Some (mk_times (cons est_a) (cons rhs))
   | Inter (p1,p2,_) ->
     let res = p1@p2 |> List.map Utils.fst3 |> List.filter_map estimate in
-    if res = [] then None else Some (conj_o res)
+    if res = [] then None else Some (disj_o res)
 
 and estimate_a pannot_a =
   let open PartialAnnot in
@@ -701,14 +701,14 @@ and estimate_a pannot_a =
   | ElseA -> Some any
   | LambdaA (s, pannot) ->
     estimate pannot |> Option.map (fun est ->
-      mk_arrow (cons s) (cons est)
+      mk_times (cons s) (cons est)
     )
   | InterA (p1,p2,_) ->
     let res = p1@p2 |> List.map Utils.fst3 |> List.filter_map estimate_a in
-    if res = [] then None else Some (conj_o res)
+    if res = [] then None else Some (disj_o res)
 
 let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
-  let expl = b1 |> List.fold_left (fun acc (_,_,t) -> cap_o acc t) expl in
+  let expl = b1 |> List.fold_left (fun acc (_,_,t) -> cup_o acc t) expl in
   let tvars = env |> Env.filter (fun x _ -> Variable.is_lambda_var x) |> Env.tvars in
   let tvars = TVarSet.filter TVar.is_mono tvars in
   let uNb = List.length b2 and eNb = List.length b1 in
@@ -723,6 +723,10 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
     let a = Subst.apply (TVarSet.diff (vars a) tvars |> generalize) a in
     subtype_poly a b
   in
+  let supertype_gen a b =
+    let a = Subst.apply (TVarSet.diff (vars a) tvars |> generalize) a in
+    supertype_poly a b
+  in
   let rec aux explored expl pending =
     let smg s1 s2 =
       subst_more_general s1 s2 && subst_nb_new_vars s1 <= subst_nb_new_vars s2
@@ -733,7 +737,7 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
     let pending =
       if ud then pending else
         pending |> List.filter (fun (_,_,est) ->
-          let r = subtype_gen expl est |> not in
+          let r = supertype_gen expl est |> not in
           (* if not r then Format.printf "REMOVED: %a@.VS:%a@." pp_typ est pp_typ expl
           else Format.printf "KEPT: %a@.VS:%a@." pp_typ est pp_typ expl ; *)
           r
@@ -781,7 +785,7 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
             Variable.is_lambda_var v) env)
         end ; *)
         log ~level:3 "Success of intersection issued from %a@." Subst.pp s;
-        aux ((pannot, s, est)::explored) (cap_o expl est) pending
+        aux ((pannot, s, est)::explored) (cup_o expl est) pending
       | Fail when not ud && (explored <> [] || pending <> []) ->
         log ~level:3 "Failure of intersection issued from %a@." Subst.pp s;
         aux explored est pending
@@ -945,7 +949,9 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
     log ~level:2 "Entering lambda for %a with domain %a.@." Variable.pp v pp_typ s ;
     if is_empty s then (log ~level:3 "Lambda with empty domain generated a fail.@." ; Fail)
     else
-      infer_mono_iterated tenv (apply expl s) (Env.add v s env) pannot e
+      infer_mono_iterated tenv
+        (apply_or_empty (pair_to_arrow expl) s)
+        (Env.add v s env) pannot e
       |> map_res (fun x -> LambdaA (s, x))
   | _, _ -> assert false
 
@@ -1029,8 +1035,7 @@ and infer_mono tenv expl env pannot e =
       | (i,p,(s,pannot)::ex,d,u) ->
         let t = cap_o (type_def ()) s in
         log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
-        let expl = cap expl (mk_times (cons s) any_node) |> pi2 in
-        begin match infer_mono_iterated tenv expl (Env.add v t env) pannot e with
+        begin match infer_mono_iterated tenv (pi2 expl) (Env.add v t env) pannot e with
         | Ok pannot ->
           (* TODO: if possible, find a substitution (over type variables not in the env)
               that would make the new split smaller than the union of the previous ones,
@@ -1105,7 +1110,7 @@ and infer_mono_iterated tenv expl env pannot e =
 
 let infer tenv env e =
   let open PartialAnnot in
-  match infer_mono_iterated tenv any env Infer e with
+  match infer_mono_iterated tenv empty env Infer e with
   | Fail -> raise (Untypeable ([], "Annotations inference failed."))
   | Ok annot -> infer_poly tenv env annot e
   | NeedVar (vs, _, _) ->

@@ -204,6 +204,14 @@ let disj ts = List.fold_left cup empty ts
 let conj_o ts = List.fold_left cap_o any ts
 let disj_o ts = List.fold_left cup_o empty ts
 
+let pair_to_arrow t =
+    pair_dnf t |> List.map (fun (l,r) ->
+        mk_arrow (cons l) (cons r)
+    ) |> disj_o
+let apply_or_empty t1 t2 =
+    if subtype t1 (arrow_any) && subtype t2 (domain t1)
+    then apply t1 t2 else empty
+
 let is_test_type t =
     let exception NotTestType in
     try
@@ -471,6 +479,9 @@ let top_instance =
 let subtype_poly t1 t2 =
     let t2 = Subst.apply (monomorphize (vars t2)) t2 in
     test_tallying [(bot_instance t1,t2)]
+let supertype_poly t1 t2 =
+    let t2 = Subst.apply (monomorphize (vars t2)) t2 in
+    test_tallying [(t2, top_instance t1)]
 
 (* reduce_tvars *)
 

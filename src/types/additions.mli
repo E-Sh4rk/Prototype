@@ -59,6 +59,9 @@ val disj : typ list -> typ
 val conj_o : typ list -> typ
 val disj_o : typ list -> typ
 
+val pair_to_arrow : typ -> typ
+val apply_or_empty : typ -> typ -> typ
+
 val is_test_type : typ -> bool
 
 val branch_type : (typ*typ) list -> typ
@@ -92,5 +95,6 @@ val instantiate : Subst.t list -> typ -> typ
 val bot_instance : typ -> typ
 val top_instance : typ -> typ
 val subtype_poly : typ -> typ -> bool
+val supertype_poly : typ -> typ -> bool
 
 val reduce_tvars : typ -> Subst.t

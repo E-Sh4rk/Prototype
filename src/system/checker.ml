@@ -652,60 +652,36 @@ let simplify_tallying_infer env res_type sols =
     res
   ) *)
 
-(* TODO: could empty replace None? *)
 let rec estimate pannot =
   let open PartialAnnot in
   match pannot with
-  | Untyp -> None
-  | Typ -> Some any
-  | Infer -> Some any
-  | Skip (p,_) -> estimate p |>
-    Option.map (fun t -> mk_times any_node (cons t))
+  | Untyp -> empty
+  | Typ | Infer -> any
+  | Skip (p,_) -> mk_times any_node (estimate p |> cons)
   | TryKeep (pannot_a, pannot1, pannot2) ->
-    begin match estimate_a pannot_a with
-    | None ->
-      estimate pannot2 |> Option.map (fun est_e ->
-        mk_times any_node (cons est_e)
-      )
-    | Some est_a ->
-      estimate pannot1 |> Option.map (fun est_e ->
-        mk_times (cons est_a) (cons est_e)
-      )
-    end
+    let est_a = estimate_a pannot_a in
+    if is_empty est_a
+    then mk_times any_node (estimate pannot2 |> cons)
+    else mk_times (cons est_a) (estimate pannot1 |> cons)
   | Propagate (pannot_a, pannot, _) ->
-    let est_a = estimate_a pannot_a |> Option.get in
-    estimate pannot |> Option.map (fun est_e ->
-      mk_times (cons est_a) (cons est_e)
-    )
+    mk_times (estimate_a pannot_a |> cons) (estimate pannot |> cons)
   | Keep (pannot_a, u) ->
-    let est_a = estimate_a pannot_a |> Option.get in
-    let ts = u |> effective_splits |> List.map
-      (fun (_,pannot) -> estimate pannot)
+    let est_a = estimate_a pannot_a in
+    let est_e =
+      u |> effective_splits |> List.map snd |> List.map estimate |> conj_o
     in
-    if List.mem None ts then None
-    else
-      let rhs = ts |> List.map Option.get |> conj_o in
-      Some (mk_times (cons est_a) (cons rhs))
+    mk_times (cons est_a) (cons est_e)
   | Inter (p1,p2,_) ->
-    let res = p1@p2 |> List.map Utils.fst3 |> List.filter_map estimate in
-    if res = [] then None else Some (disj_o res)
+    p1@p2 |> List.map Utils.fst3 |> List.map estimate |> disj_o
 
 and estimate_a pannot_a =
   let open PartialAnnot in
   match pannot_a with
-  | TypA -> Some any
-  | InferA -> Some any
-  | UntypA -> None
-  | EmptyA -> Some any
-  | ThenA -> Some any
-  | ElseA -> Some any
-  | LambdaA (s, pannot) ->
-    estimate pannot |> Option.map (fun est ->
-      mk_times (cons s) (cons est)
-    )
+  | UntypA -> empty
+  | TypA | InferA | EmptyA | ThenA | ElseA -> any
+  | LambdaA (s, pannot) -> mk_times (cons s) (estimate pannot |> cons)
   | InterA (p1,p2,_) ->
-    let res = p1@p2 |> List.map Utils.fst3 |> List.filter_map estimate_a in
-    if res = [] then None else Some (disj_o res)
+    p1@p2 |> List.map Utils.fst3 |> List.map estimate_a |> disj_o
 
 let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
   let expl = b1 |> List.fold_left (fun acc (_,_,t) -> cup_o acc t) expl in
@@ -809,13 +785,14 @@ let normalize env tvars_branch apply_subst_branch estimate mk_inter res =
     let lst1 = List.map (fun s -> (s, apply_subst_branch s pannot)) lst1
       |> List.map (fun (s, b) -> (s, refresh b))
     in
-    (* NOTE: It is important for the default case is inserted at the end (smaller priority). *)
+    (* NOTE: It is important for the default case to be inserted at the end (smaller priority). *)
     let lst1 = lst1@[(Subst.identity, default)] |> List.filter_map
       (fun (s,pannot) ->
-        estimate pannot |> Option.map (fun est ->
+        let est = estimate pannot in
+        if is_empty est then None
+        else
           let s = Subst.compose_restr (Subst.codom s |> generalize) s in
-          (pannot, s, est)
-        )
+          Some (pannot, s, est)
       )
     in
     begin match lst1 with

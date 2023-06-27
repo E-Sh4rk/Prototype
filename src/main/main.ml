@@ -30,13 +30,13 @@ let type_check_def tenv env (var,expr,typ_annot) =
     (msc_time, typ_time)
   in
   let type_additionnal env (v, nf) =
-    let typ = Checker.typeof_simple tenv env nf |> generalize_all true in
+    let typ = Reconstruction.typeof_simple tenv env nf |> generalize_all true in
     Env.add v typ env
   in
   try
     Utils.log "%a@." Msc.pp_e nf_expr ;
     let env = List.fold_left type_additionnal env nf_addition in
-    let typ = Checker.typeof_simple tenv env nf_expr |> generalize_all true in
+    let typ = Reconstruction.typeof_simple tenv env nf_expr |> generalize_all true in
     let typ =
       match typ_annot with
       | None -> typ
@@ -48,7 +48,7 @@ let type_check_def tenv env (var,expr,typ_annot) =
     let env = Env.add var typ env in
     TSuccess (typ, env, retrieve_times ())
   with
-  | Checker.Untypeable (pos, str) ->
+  | Algorithmic.Untypeable (pos, str) ->
     TFailure (pos, str, retrieve_times ())
   | IncompatibleType _ ->
     TFailure (Variable.get_locations var,

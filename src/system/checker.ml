@@ -1029,7 +1029,8 @@ and infer_mono tenv expl env pannot e =
       | (i,p,(s,pannot)::ex,d,u) ->
         let t = cap_o (type_def ()) s in
         log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
-        begin match infer_mono_iterated tenv (pi2 expl) (Env.add v t env) pannot e with
+        let expl = cap expl (mk_times (cons s) any_node) |> pi2 in
+        begin match infer_mono_iterated tenv expl (Env.add v t env) pannot e with
         | Ok pannot ->
           (* TODO: if possible, find a substitution (over type variables not in the env)
               that would make the new split smaller than the union of the previous ones,

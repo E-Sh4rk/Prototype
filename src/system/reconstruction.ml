@@ -322,16 +322,6 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
       let res = infer_branch expl pannot in
       begin match res with
       | Ok pannot ->
-        (* if nontrivial
-          && env |> Env.domain |> List.exists (Variable.is_lambda_var) |> not
-        then begin
-          Format.printf "======================@." ;
-          Format.printf "Branch est: %a@." pp_typ est ;
-          Format.printf "From subst: %a@." Subst.pp s ;
-          Format.printf "Env domain: %a@." (Utils.pp_list Variable.pp) (Env.domain env) ;
-          Format.printf "Env: %a@." Env.pp (Env.filter (fun v _ ->
-            Variable.is_lambda_var v) env)
-        end ; *)
         log ~level:3 "Success of intersection issued from %a@." Subst.pp s;
         aux ((pannot, s, est)::explored) (cup_o expl est) pending
       | Fail when not ud && (explored <> [] || pending <> []) ->

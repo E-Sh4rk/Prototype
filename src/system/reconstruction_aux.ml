@@ -129,7 +129,7 @@ let approximate_app ~infer t1 t2 resvar =
     t1s |> List.map (fun t1 -> approximate_app infer t1 t2 resvar) |> List.flatten
   in
   if res = [] && List.length t1s > 1
-  then (match approximate_app infer t1 t2 resvar with [] -> assert false | sols -> sols)
+  then approximate_app infer t1 t2 resvar
   else res
 
 let infer_poly_inter infer_poly_branch (b1, b2, (tf,_)) =

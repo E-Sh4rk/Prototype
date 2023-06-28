@@ -24,6 +24,17 @@
       last := (!last) + 1 ;
       Format.sprintf "%s_internal_self_%i" infer_prefix (!last))
   let multi_param_rec_abstraction startpos endpos name lst oty t =
+    (* We correlate 'self' and args as much as possible
+      (until we have an arg annotated with more than 1 type) *)
+    let rec add_fixed_tvar lst =
+      match lst with
+      | [] -> []
+      | (ADomain [ty], n)::lst -> (ADomain [ty], n)::(add_fixed_tvar lst)
+      | (ADomain tys, n)::lst -> (ADomain tys, n)::lst
+      | (Unnanoted, n)::lst -> (ADomain [TVar (fresh_infer_tvar_id ())], n)::(add_fixed_tvar lst)
+    in
+    let lst = add_fixed_tvar lst in
+    (* We annotate 'self' *)
     let rec aux lst =
       match lst with
       | [] ->

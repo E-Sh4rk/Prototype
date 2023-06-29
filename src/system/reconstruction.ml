@@ -224,12 +224,13 @@ let simplify_tallying_infer env res_type sols =
     res
   ) *)
 
-let rec estimate pannot =
+let rec estimate pannot = (* TODO: update *)
   let open PartialAnnot in
   match pannot with
   | Untyp -> empty
   | Typ | Infer -> any
-  | Skip (p,_) -> mk_times any_node (estimate p |> cons)
+  | Skip p -> mk_times any_node (estimate p |> cons)
+  | TrySkip p -> mk_times any_node (estimate p |> cons)
   | TryKeep (pannot_a, pannot1, pannot2) ->
     let est_a = estimate_a pannot_a in
     if is_empty est_a
@@ -518,15 +519,20 @@ and infer_mono tenv expl env pannot e =
         typeof tenv env annot e)
       i
     |> map_res (fun x -> Inter x)
-  | Bind _, Infer -> infer_mono tenv expl env (Skip (Infer, false)) e
-  | Bind (v, _, e) as ee, Skip (pannot, b) ->
+  | Bind _, Infer -> infer_mono tenv expl env (TrySkip Infer) e
+  | Bind (v, _, e) as ee, TrySkip pannot ->
     begin match infer_mono_iterated tenv (pi2 expl) env pannot e with
     | NeedVar (Some v', pannot1, pannot2) when Variable.equals v v' ->
       log ~level:0 "Var %a needed.@." Variable.pp v ;
-      if b
-      then infer_mono tenv expl env (Skip (pannot2, true)) ee
-      else infer_mono tenv expl env (TryKeep (InferA, pannot1, pannot2)) ee
-    | res -> map_res (fun x -> Skip (x,b)) res
+      infer_mono tenv expl env (TryKeep (InferA, pannot1, pannot2)) ee
+    | Ok pannot -> Ok (Skip pannot)
+    | res -> map_res (fun x -> TrySkip x) res
+    end
+  | Bind (v, _, e) as ee, Skip pannot ->
+    begin match infer_mono_iterated tenv (pi2 expl) env pannot e with
+    | NeedVar (Some v', _, pannot2) when Variable.equals v v' ->
+      infer_mono tenv expl env (Skip pannot2) ee
+    | res -> map_res (fun x -> Skip x) res
     end
   | Bind (v, a, _), TryKeep (pannot_a, pannot1, pannot2) ->
     log ~level:1 "Trying to type var %a.@." Variable.pp v ;
@@ -549,7 +555,7 @@ and infer_mono tenv expl env pannot e =
       in
       let pannot = Propagate (pannot_a, pannot1, propagate) in
       infer_mono tenv expl env pannot e
-    | Fail -> infer_mono tenv expl env (Skip (pannot2, true)) e
+    | Fail -> infer_mono tenv expl env (Skip pannot2) e
     | res -> map_res (fun x -> TryKeep (x, pannot1, pannot2)) res
     end
   | Bind (v,_,_), Propagate (pannot_a, pannot, gammas) ->

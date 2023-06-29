@@ -21,7 +21,8 @@ module PartialAnnot : sig
     and t =
         | Infer | Typ | Untyp
         | Keep of a * union
-        | Skip of t * bool (* Already typed *)
+        | Skip of t
+        | TrySkip of t
         | TryKeep of a * t * t
         | Propagate of a * t * Env.t list
         | Inter of t inter

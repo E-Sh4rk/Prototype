@@ -220,7 +220,7 @@ and infer_poly tenv env pannot e =
   | Var v, Typ ->
     let r = refresh (vartype v |> vars_poly) in
     BVar r
-  | Bind (_, _, e), PartialAnnot.Skip (pannot, _) ->
+  | Bind (_, _, e), PartialAnnot.Skip pannot ->
     let annot = infer_poly tenv env pannot e in
     FullAnnot.Skip annot
   | Bind (v, a, e), PartialAnnot.Keep (pannot_a, (i,p,ex,d,u)) ->

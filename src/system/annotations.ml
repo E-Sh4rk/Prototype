@@ -31,7 +31,8 @@ module PartialAnnot = struct
   and t =
     | Infer | Typ | Untyp
     | Keep of a * union
-    | Skip of t * bool (* Already typed *)
+    | Skip of t
+    | TrySkip of t
     | TryKeep of a * t * t
     | Propagate of a * t * Env.t list
     | Inter of t inter
@@ -60,7 +61,7 @@ module PartialAnnot = struct
     match t with
     | Infer | Typ | Untyp -> TVarSet.empty
     | Keep (a, b) -> TVarSet.union (tvars_a a) (tvars_union b)
-    | Skip (t, _) -> tvars t
+    | Skip t | TrySkip t -> tvars t
     | TryKeep (a, t1, t2) ->
       TVarSet.union_many [tvars_a a ; tvars t1 ; tvars t2]
     | Propagate (a, t, envs) ->
@@ -102,7 +103,8 @@ module PartialAnnot = struct
     | Typ -> Typ
     | Untyp -> Untyp
     | Keep (a, b) -> Keep (apply_subst_a s a, apply_subst_union s b)
-    | Skip (t, b) -> Skip (apply_subst s t, b)
+    | Skip t -> Skip (apply_subst s t)
+    | TrySkip t -> TrySkip (apply_subst s t)
     | TryKeep (a, t1, t2) ->
       TryKeep (apply_subst_a s a, apply_subst s t1, apply_subst s t2)
     | Propagate (a, t, envs) ->

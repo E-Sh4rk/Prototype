@@ -602,6 +602,13 @@ let rec map f (lst:['a*]) =
   | (e,lst) & :List -> ((f e), map f lst)
   end
 
+let rec filter f l =
+  if l is Nil then nil
+  else
+    if f(fst(l)) is True
+    then (fst(l),filter f (snd(l)))
+    else filter f (snd(l))
+
 let rec concat lst1 lst2 =
   match lst1 with
   | :[] -> lst2

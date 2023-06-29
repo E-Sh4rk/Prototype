@@ -86,7 +86,7 @@ type 'a res =
   | Fail
   | Split of Env.t * 'a * 'a
   | Subst of Subst.t list * 'a * 'a
-  | NeedVar of VarSet.t * 'a * 'a
+  | NeedVar of Variable.t option * 'a * 'a
 
 let map_res f res =
   match res with
@@ -94,7 +94,7 @@ let map_res f res =
   | Fail -> Fail
   | Split (env, a1, a2) -> Split (env, f a1, f a2)
   | Subst (ss, a1, a2) -> Subst (ss, f a1, f a2)
-  | NeedVar (vs, a1, a2) -> NeedVar (vs, f a1, f a2)
+  | NeedVar (vo, a1, a2) -> NeedVar (vo, f a1, f a2)
 
 let is_compatible env gamma =
   VarSet.subset
@@ -110,7 +110,7 @@ let should_iterate res =
   match res with
   | Split (gamma, pannot, _) when Env.is_empty gamma -> Some pannot
   | Subst ([], _, pannot) -> Some pannot
-  | NeedVar (vs, pannot, _) when VarSet.is_empty vs -> Some pannot
+  | NeedVar (None, pannot, _) -> Some pannot
   | _ -> None
 
 let subst_more_general s1 s2 =
@@ -364,9 +364,10 @@ let normalize env tvars_branch apply_subst_branch estimate mk_inter res =
       if n > 1 then log ~level:2 "@.Creating an intersection with %n branches.@." n ;
       Subst (lst2, pannot, mk_inter [] lst1 (false,false))
     end
-  | NeedVar (vs, pannot1, pannot2) ->
-    let vars = Env.domain env |> VarSet.of_list in
-    NeedVar (VarSet.diff vs vars, pannot1, pannot2)
+  | NeedVar (Some v, pannot1, pannot2)
+      when Env.domain env |> VarSet.of_list |> VarSet.mem v ->
+    NeedVar (None, pannot1, pannot2)
+  | NeedVar (vo, pannot1, pannot2) -> NeedVar (vo, pannot1, pannot2)
   | Split (env', pannot1, pannot2) ->
     let env' = Env.filter (fun v t -> subtype (Env.find v env) t |> not) env' in
     Split (env', pannot1, pannot2)
@@ -375,7 +376,7 @@ let normalize env tvars_branch apply_subst_branch estimate mk_inter res =
 let rec infer_mono_a vardef tenv expl env pannot_a a =
   let memvar v = Env.mem v env in
   let vartype v = Env.find v env in
-  let needvar vs a1 a2 = NeedVar (VarSet.of_list vs, a1, a2) in
+  let needvar v a1 a2 = NeedVar (Some v, a1, a2) in
   let open PartialAnnot in
   match a, pannot_a with
   | a, InterA i ->
@@ -396,7 +397,11 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
   | Alias v, InferA -> log ~level:3 "Unknown var %s generated a fail.@." (Variable.show v) ; Fail
   | Abstract _, InferA | Const _, InferA -> Ok (TypA)
   | Pair (v1, v2), InferA | Let (v1, v2), InferA ->
-    needvar [v1; v2] TypA UntypA
+    if memvar v1 |> not
+    then needvar v1 InferA UntypA
+    else if memvar v2 |> not
+    then needvar v2 InferA UntypA
+    else Ok TypA
   | Projection (p, v), InferA ->
     if memvar v then
       let t = vartype v in
@@ -423,30 +428,36 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
       ) ;
       Subst (res, TypA, UntypA)
     else
-      needvar [v] InferA UntypA
+      needvar v InferA UntypA
   | RecordUpdate (v, _, None), InferA ->
     if memvar v then
       let res = tallying_infer [(vartype v, record_any)] in
       let res = simplify_tallying_infer env empty res in
       Subst (res, TypA, UntypA)
     else
-      needvar [v] InferA UntypA
+      needvar v InferA UntypA
   | RecordUpdate (v, _, Some v'), InferA ->
-    if memvar v && memvar v' then
+    if memvar v |> not
+    then needvar v InferA UntypA
+    else if memvar v' |> not
+    then needvar v' InferA UntypA
+    else
       let res = tallying_infer [(vartype v, record_any)] in
       let res = simplify_tallying_infer env empty res in
       Subst (res, TypA, UntypA)
-    else
-      needvar [v ; v'] InferA UntypA
   | TypeConstr (v, s), InferA ->
     if memvar v then
       let res = tallying_infer [(vartype v, s)] in
       let res = simplify_tallying_infer env empty res in
       Subst (res, TypA, UntypA)
     else
-      needvar [v] InferA UntypA
+      needvar v InferA UntypA
   | App (v1, v2), InferA ->
-    if memvar v1 && memvar v2 then
+    if memvar v1 |> not
+    then needvar v1 InferA UntypA
+    else if memvar v2 |> not
+    then needvar v2 InferA UntypA
+    else
       let t1 = vartype v1 in
       let t2 = vartype v2 in
       let alpha = TVar.mk_mono (Some (Variable.show vardef)) in
@@ -462,16 +473,14 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
         log ~level:3 "Solution (simplified): %a@." Subst.pp s
       ) ;
       Subst (res, TypA, UntypA)
-    else
-      needvar [v1;v2] InferA UntypA
   | Ite (v, tau, v1, v2), InferA ->
     if memvar v then
       let t = vartype v in
       if subtype_poly t empty then Ok EmptyA
-      else if subtype_poly t tau then needvar [v1] ThenA UntypA
-      else if subtype_poly t (neg tau) then needvar [v2] ElseA UntypA
+      else if subtype_poly t tau then needvar v1 ThenA UntypA
+      else if subtype_poly t (neg tau) then needvar v2 ElseA UntypA
       else Split (Env.singleton v tau, InferA, InferA)
-    else needvar [v] InferA UntypA
+    else needvar v InferA UntypA
   | Lambda (Unnanoted, _, _), InferA ->
     let alpha = TVar.mk_mono (Some (Variable.show vardef)) |> TVar.typ in
     let pannot_a = LambdaA (alpha, Infer) in
@@ -494,12 +503,12 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
   | _, _ -> assert false
 
 and infer_mono tenv expl env pannot e =
-  let needvar vs a1 a2 = NeedVar (VarSet.of_list vs, a1, a2) in
+  let needvar v a1 a2 = NeedVar (Some v, a1, a2) in
   let open PartialAnnot in
   match e, pannot with
   | _, Untyp -> log ~level:3 "Untyp annot generated a fail.@." ; Fail
   | _, Typ -> Ok Typ
-  | Var v, Infer -> needvar [v] Typ Untyp
+  | Var v, Infer -> needvar v Typ Untyp
   | Bind _, Inter i ->
     infer_mono_inter
       expl env
@@ -510,14 +519,13 @@ and infer_mono tenv expl env pannot e =
       i
     |> map_res (fun x -> Inter x)
   | Bind _, Infer -> infer_mono tenv expl env (Skip (Infer, false)) e
-  | Bind (v, _, e), Skip (pannot, b) ->
+  | Bind (v, _, e) as ee, Skip (pannot, b) ->
     begin match infer_mono_iterated tenv (pi2 expl) env pannot e with
-    | NeedVar (vs, pannot1, pannot2) when VarSet.mem v vs ->
+    | NeedVar (Some v', pannot1, pannot2) when Variable.equals v v' ->
       log ~level:0 "Var %a needed.@." Variable.pp v ;
-      let pannot1 = TryKeep (InferA, pannot1, pannot2) in
-      let pannot2 = Skip (pannot2, b) in
-      (* if b then infer_mono tenv expl env pannot2 ee else *)
-      NeedVar (VarSet.remove v vs, pannot1, pannot2)
+      if b
+      then infer_mono tenv expl env (Skip (pannot2, true)) ee
+      else infer_mono tenv expl env (TryKeep (InferA, pannot1, pannot2)) ee
     | res -> map_res (fun x -> Skip (x,b)) res
     end
   | Bind (v, a, _), TryKeep (pannot_a, pannot1, pannot2) ->
@@ -651,9 +659,10 @@ let infer tenv env e =
   match infer_mono_iterated tenv empty env Infer e with
   | Fail -> raise (Untypeable ([], "Annotations inference failed."))
   | Ok annot -> infer_poly tenv env annot e
-  | NeedVar (vs, _, _) ->
-    Format.printf "NeedVar %a@." (pp_list Variable.pp) (VarSet.to_seq vs |> List.of_seq) ;
+  | NeedVar (Some v, _, _) ->
+    Format.printf "NeedVar %a@." Variable.pp v ;
     assert false
+  | NeedVar (None, _, _) -> assert false
   | Split (gamma, _, _) ->
     Format.printf "Split %a@." Env.pp gamma ;
     assert false

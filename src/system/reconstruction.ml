@@ -224,26 +224,25 @@ let simplify_tallying_infer env res_type sols =
     res
   ) *)
 
-let rec estimate pannot = (* TODO: update *)
+let undefined = mk_atom "undefined"
+let rec estimate pannot =
   let open PartialAnnot in
   match pannot with
   | Untyp -> empty
   | Typ | Infer -> any
-  | Skip p -> mk_times any_node (estimate p |> cons)
   | TrySkip p -> mk_times any_node (estimate p |> cons)
+  | Skip p -> mk_times (cons undefined) (estimate p |> cons)
   | TryKeep (pannot_a, pannot1, pannot2) ->
     let est_a = estimate_a pannot_a in
     if is_empty est_a
-    then mk_times any_node (estimate pannot2 |> cons)
-    else mk_times (cons est_a) (estimate pannot1 |> cons)
+    then mk_times (cons undefined) (estimate pannot2 |> cons)
+    else mk_times (cup est_a undefined |> cons) (estimate pannot1 |> cons)
   | Propagate (pannot_a, pannot, _) ->
-    mk_times (estimate_a pannot_a |> cons) (estimate pannot |> cons)
+    mk_times (cup (estimate_a pannot_a) undefined |> cons) (estimate pannot |> cons)
   | Keep (pannot_a, u) ->
-    let est_a = estimate_a pannot_a in
-    let est_e =
-      u |> effective_splits |> List.map snd |> List.map estimate |> conj_o
-    in
-    mk_times (cons est_a) (cons est_e)
+    mk_times
+      (cup (estimate_a pannot_a) undefined |> cons)
+      (u |> effective_splits |> List.map snd |> List.map estimate |> conj_o |> cons)
   | Inter (p1,p2,_) ->
     p1@p2 |> List.map Utils.fst3 |> List.map estimate |> disj_o
 
@@ -252,7 +251,8 @@ and estimate_a pannot_a =
   match pannot_a with
   | UntypA -> empty
   | TypA | InferA | EmptyA | ThenA | ElseA -> any
-  | LambdaA (s, pannot) -> mk_times (cons s) (estimate pannot |> cons)
+  | LambdaA (s, pannot) ->
+    mk_times (cons s) (estimate pannot |> cons)
   | InterA (p1,p2,_) ->
     p1@p2 |> List.map Utils.fst3 |> List.map estimate_a |> disj_o
 

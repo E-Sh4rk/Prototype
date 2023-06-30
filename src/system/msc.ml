@@ -27,9 +27,11 @@ let fixpoint_var = Variable.create_other (Some "__builtin_fixpoint")
 let fixpoint_typ =
   let a = TVar.mk_poly None |> TVar.typ |> cons in
   let b = TVar.mk_poly None |> TVar.typ |> cons in
-  let res = mk_arrow a b |> cons in
-  let arg = mk_arrow res res |> cons in
-  mk_arrow arg res
+  let f = mk_arrow a b in
+  let c = TVar.mk_poly None |> TVar.typ in
+  let fc = cap f c |> cons in
+  let arg = mk_arrow (cons f) fc |> cons in
+  mk_arrow arg fc
 let initial_env = Env.singleton fixpoint_var fixpoint_typ
 
 let map ef af =

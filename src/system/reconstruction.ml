@@ -86,7 +86,7 @@ type 'a res =
   | Fail
   | Split of Env.t * 'a * 'a
   | Subst of Subst.t list * 'a * 'a
-  | NeedVar of Variable.t option * 'a * 'a
+  | NeedVar of Variable.t * 'a * 'a
 
 let map_res f res =
   match res with
@@ -94,7 +94,7 @@ let map_res f res =
   | Fail -> Fail
   | Split (env, a1, a2) -> Split (env, f a1, f a2)
   | Subst (ss, a1, a2) -> Subst (ss, f a1, f a2)
-  | NeedVar (vo, a1, a2) -> NeedVar (vo, f a1, f a2)
+  | NeedVar (v, a1, a2) -> NeedVar (v, f a1, f a2)
 
 let is_compatible env gamma =
   VarSet.subset
@@ -110,7 +110,6 @@ let should_iterate res =
   match res with
   | Split (gamma, pannot, _) when Env.is_empty gamma -> Some pannot
   | Subst ([], _, pannot) -> Some pannot
-  | NeedVar (None, pannot, _) -> Some pannot
   | _ -> None
 
 let subst_more_general s1 s2 =
@@ -365,19 +364,14 @@ let normalize env tvars_branch apply_subst_branch estimate mk_inter res =
       if n > 1 then log ~level:2 "@.Creating an intersection with %n branches.@." n ;
       Subst (lst2, pannot, mk_inter [] lst1 (false,false))
     end
-  | NeedVar (Some v, pannot1, pannot2)
-      when Env.domain env |> VarSet.of_list |> VarSet.mem v ->
-    NeedVar (None, pannot1, pannot2)
-  | NeedVar (vo, pannot1, pannot2) -> NeedVar (vo, pannot1, pannot2)
-  | Split (env', pannot1, pannot2) ->
-    let env' = Env.filter (fun v t -> subtype (Env.find v env) t |> not) env' in
-    Split (env', pannot1, pannot2)
+  | NeedVar (v, pannot1, pannot2) -> NeedVar (v, pannot1, pannot2)
+  | Split (env', pannot1, pannot2) -> Split (env', pannot1, pannot2)
   | Ok pannot -> Ok pannot | Fail -> Fail
 
 let rec infer_mono_a vardef tenv expl env pannot_a a =
   let memvar v = Env.mem v env in
   let vartype v = Env.find v env in
-  let needvar v a1 a2 = NeedVar (Some v, a1, a2) in
+  let needvar v a1 a2 = NeedVar (v, a1, a2) in
   let open PartialAnnot in
   match a, pannot_a with
   | a, InterA i ->
@@ -477,9 +471,12 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
   | Ite (v, tau, v1, v2), InferA ->
     if memvar v then
       let t = vartype v in
-      if subtype_poly t empty then Ok EmptyA
-      else if subtype_poly t tau then needvar v1 ThenA UntypA
-      else if subtype_poly t (neg tau) then needvar v2 ElseA UntypA
+      if subtype_poly t empty
+      then Ok EmptyA
+      else if subtype_poly t tau
+      then (if memvar v1 then Ok ThenA else needvar v1 ThenA UntypA)
+      else if subtype_poly t (neg tau)
+      then (if memvar v2 then Ok ElseA else needvar v2 ElseA UntypA)
       else Split (Env.singleton v tau, InferA, InferA)
     else needvar v InferA UntypA
   | Lambda (Unnanoted, _, _), InferA ->
@@ -504,12 +501,14 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
   | _, _ -> assert false
 
 and infer_mono tenv expl env pannot e =
-  let needvar v a1 a2 = NeedVar (Some v, a1, a2) in
+  let memvar v = Env.mem v env in
+  let needvar v a1 a2 = NeedVar (v, a1, a2) in
   let open PartialAnnot in
   match e, pannot with
   | _, Untyp -> log ~level:3 "Untyp annot generated a fail.@." ; Fail
   | _, Typ -> Ok Typ
-  | Var v, Infer -> needvar v Typ Untyp
+  | Var v, Infer ->
+    if memvar v then Ok Typ else needvar v Infer Untyp
   | Bind _, Inter i ->
     infer_mono_inter
       expl env
@@ -522,7 +521,7 @@ and infer_mono tenv expl env pannot e =
   | Bind _, Infer -> infer_mono tenv expl env (TrySkip Infer) e
   | Bind (v, _, e) as ee, TrySkip pannot ->
     begin match infer_mono_iterated tenv (pi2 expl) env pannot e with
-    | NeedVar (Some v', pannot1, pannot2) when Variable.equals v v' ->
+    | NeedVar (v', pannot1, pannot2) when Variable.equals v v' ->
       log ~level:0 "Var %a needed.@." Variable.pp v ;
       infer_mono tenv expl env (TryKeep (InferA, pannot1, pannot2)) ee
     | Ok pannot -> Ok (Skip pannot)
@@ -530,7 +529,7 @@ and infer_mono tenv expl env pannot e =
     end
   | Bind (v, _, e) as ee, Skip pannot ->
     begin match infer_mono_iterated tenv (pi2 expl) env pannot e with
-    | NeedVar (Some v', _, pannot2) when Variable.equals v v' ->
+    | NeedVar (v', _, pannot2) when Variable.equals v v' ->
       infer_mono tenv expl env (Skip pannot2) ee
     | res -> map_res (fun x -> Skip x) res
     end
@@ -565,6 +564,7 @@ and infer_mono tenv expl env pannot e =
     | Some (env',gammas) ->
       log ~level:1 "Var %a is ok but its DNF needs a split.@." Variable.pp v ;
       let pannot = Propagate (pannot_a, pannot, gammas) in
+      let env' = Env.filter (fun v t -> subtype (Env.find v env) t |> not) env' in
       Split (env', pannot, pannot)
     | None ->
       let pannot = Keep (pannot_a, ([], [], [(any, pannot)], [], [])) in
@@ -612,6 +612,7 @@ and infer_mono tenv expl env pannot e =
         begin match propagate with
         | Some (env',gammas) ->
           log ~level:0 "Var %a is ok but a split must be propagated.@." Variable.pp v ;
+          let env' = Env.filter (fun v t -> subtype (Env.find v env) t |> not) env' in
           Split (env', (i,p,ex,d,s::u), (i,(s,gammas,pannot)::p,ex,d,u)) |> keep
         | None -> aux (i,p,(s, pannot)::ex,d,u)
         end
@@ -665,10 +666,9 @@ let infer tenv env e =
   match infer_mono_iterated tenv empty env Infer e with
   | Fail -> raise (Untypeable ([], "Annotations inference failed."))
   | Ok annot -> infer_poly tenv env annot e
-  | NeedVar (Some v, _, _) ->
+  | NeedVar (v, _, _) ->
     Format.printf "NeedVar %a@." Variable.pp v ;
     assert false
-  | NeedVar (None, _, _) -> assert false
   | Split (gamma, _, _) ->
     Format.printf "Split %a@." Env.pp gamma ;
     assert false

@@ -106,12 +106,6 @@ let is_compatible env gamma =
     is_empty t || (cap t s |> non_empty)
   )
 
-let should_iterate res =
-  match res with
-  | Split (gamma, pannot, _) when Env.is_empty gamma -> Some pannot
-  | Subst ([], _, pannot) -> Some pannot
-  | _ -> None
-
 let subst_more_general s1 s2 =
   let s2m = Subst.codom s2 |> monomorphize in
   Subst.destruct s1 |> List.map (fun (v,t1) ->
@@ -334,39 +328,45 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
   in
   aux b1 expl b2
 
-let normalize env tvars_branch apply_subst_branch estimate mk_inter res =
+let merge_substs tvars tvars_branch apply_subst_branch estimate mk_inter (lst, pannot, default) =
+  let refresh b =
+    let tvs = TVarSet.diff (tvars_branch b) tvars |> TVarSet.filter TVar.can_infer in
+    apply_subst_branch (refresh tvs) b
+  in
+  let lst = lst
+    |> List.map (fun s -> (s, apply_subst_branch s pannot))
+    |> List.map (fun (s, b) -> (s, refresh b))
+  in
+  (* NOTE: It is important for the default case to be inserted at the end (smaller priority). *)
+  let lst = lst@[(Subst.identity, default)] |> List.map
+    (fun (s,pannot) ->
+      let s = Subst.compose_restr (Subst.codom s |> generalize) s in
+      (pannot, s, estimate pannot)
+    ) |> List.filter (fun (_, _, est) -> non_empty est)
+  in
+  begin match lst with
+  | [(default,_,_)] -> default
+  | lst ->
+    let n = List.length lst in
+    if n > 1 then log ~level:2 "@.Creating an intersection with %n branches.@." n ;
+    mk_inter [] lst (false,false)
+  end
+
+let try_merge_substs env tvars_branch apply_subst_branch estimate mk_inter
+  (lst, pannot, default) =
+  let tvars = Env.tvars env |> TVarSet.filter TVar.is_mono in
+  if lst |> List.for_all (fun s -> TVarSet.inter (Subst.dom s) tvars |> TVarSet.is_empty)
+  then Some (merge_substs tvars tvars_branch apply_subst_branch estimate mk_inter
+              (lst, pannot, default))
+  else None
+
+let should_iterate env tvars_branch apply_subst_branch estimate mk_inter res =
   match res with
+  | Split (gamma, pannot, _) when Env.is_empty gamma -> Some pannot
   | Subst (lst, pannot, default) ->
-    let tvars = Env.tvars env |> TVarSet.filter TVar.is_mono in
-    let refresh b =
-      let tvs = TVarSet.diff (tvars_branch b) tvars |> TVarSet.filter TVar.can_infer in
-      apply_subst_branch (refresh tvs) b
-    in
-    let (lst1, lst2) = lst |> List.partition
-      (fun s -> TVarSet.inter (Subst.dom s) tvars |> TVarSet.is_empty) in
-    let lst1 = List.map (fun s -> (s, apply_subst_branch s pannot)) lst1
-      |> List.map (fun (s, b) -> (s, refresh b))
-    in
-    (* NOTE: It is important for the default case to be inserted at the end (smaller priority). *)
-    let lst1 = lst1@[(Subst.identity, default)] |> List.filter_map
-      (fun (s,pannot) ->
-        let est = estimate pannot in
-        if is_empty est then None
-        else
-          let s = Subst.compose_restr (Subst.codom s |> generalize) s in
-          Some (pannot, s, est)
-      )
-    in
-    begin match lst1 with
-    | [(default,_,_)] -> Subst (lst2, pannot, default)
-    | lst1 ->
-      let n = List.length lst1 in
-      if n > 1 then log ~level:2 "@.Creating an intersection with %n branches.@." n ;
-      Subst (lst2, pannot, mk_inter [] lst1 (false,false))
-    end
-  | NeedVar (v, pannot1, pannot2) -> NeedVar (v, pannot1, pannot2)
-  | Split (env', pannot1, pannot2) -> Split (env', pannot1, pannot2)
-  | Ok pannot -> Ok pannot | Fail -> Fail
+    try_merge_substs env tvars_branch apply_subst_branch estimate mk_inter
+      (lst, pannot, default)
+  | _ -> None
 
 let rec infer_mono_a vardef tenv expl env pannot_a a =
   let memvar v = Env.mem v env in
@@ -639,21 +639,23 @@ and infer_mono tenv expl env pannot e =
 
 and infer_mono_a_iterated vardef tenv expl env pannot_a a =
   log ~level:5 "infer_mono_a_iterated@." ;
-  let res = infer_mono_a vardef tenv expl env pannot_a a |>
-    normalize env PartialAnnot.tvars_a PartialAnnot.apply_subst_a
-      estimate_a (fun a b c -> PartialAnnot.InterA (a,b,c))
+  let res = infer_mono_a vardef tenv expl env pannot_a a in
+  let si =
+    should_iterate env PartialAnnot.tvars_a PartialAnnot.apply_subst_a
+      estimate_a (fun a b c -> PartialAnnot.InterA (a,b,c)) res
   in
-  match should_iterate res with
+  match si with
   | None -> res
   | Some pannot_a -> infer_mono_a_iterated vardef tenv expl env pannot_a a
 
 and infer_mono_iterated tenv expl env pannot e =
   log ~level:5 "infer_mono_iterated@." ;
-  let res = infer_mono tenv expl env pannot e |>
-    normalize env PartialAnnot.tvars PartialAnnot.apply_subst
-      estimate (fun a b c -> PartialAnnot.Inter (a,b,c))
+  let res = infer_mono tenv expl env pannot e in
+  let si =
+    should_iterate env PartialAnnot.tvars PartialAnnot.apply_subst
+      estimate (fun a b c -> PartialAnnot.Inter (a,b,c)) res
   in
-  match should_iterate res with
+  match si with
   | None -> res
   | Some pannot -> infer_mono_iterated tenv expl env pannot e
 

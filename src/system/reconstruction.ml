@@ -352,20 +352,15 @@ let merge_substs tvars tvars_branch apply_subst_branch estimate mk_inter (lst, p
     mk_inter [] lst (false,false)
   end
 
-let try_merge_substs env tvars_branch apply_subst_branch estimate mk_inter
-  (lst, pannot, default) =
-  let tvars = Env.tvars env |> TVarSet.filter TVar.is_mono in
-  if lst |> List.for_all (fun s -> TVarSet.inter (Subst.dom s) tvars |> TVarSet.is_empty)
-  then Some (merge_substs tvars tvars_branch apply_subst_branch estimate mk_inter
-              (lst, pannot, default))
-  else None
-
 let should_iterate env tvars_branch apply_subst_branch estimate mk_inter res =
   match res with
   | Split (gamma, pannot, _) when Env.is_empty gamma -> Some pannot
   | Subst (lst, pannot, default) ->
-    try_merge_substs env tvars_branch apply_subst_branch estimate mk_inter
-      (lst, pannot, default)
+    let tvars = Env.tvars env |> TVarSet.filter TVar.is_mono in
+    if lst |> List.for_all (fun s -> TVarSet.inter (Subst.dom s) tvars |> TVarSet.is_empty)
+    then Some (merge_substs tvars tvars_branch apply_subst_branch estimate mk_inter
+                (lst, pannot, default))
+    else None
   | _ -> None
 
 let rec infer_mono_a vardef tenv expl env pannot_a a =

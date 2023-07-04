@@ -10,7 +10,9 @@ let impossible_branch2 = fun x -> fun y ->
   if y is Int then y+1 else x+1
 
 (* TODO: uncomment (Cduce issue) *)
-(* let switch1 f s a b =
+(*
+
+ let switch1 f s a b =
     if s then f a else f b
 
 let switch2 s f a b =
@@ -397,21 +399,31 @@ let filter_aux_pure_noannot filter f l =
   else 42(3)
 
 (*
+The wrap loops:
+
+let filter = fixpoint filter_aux_pure_noannot
+*)
+
+(*
    A new variation that does not require the
    characteristic function to be defined on Any
  *)
 
 let new_filter1_aux
-  (filter : ((('a & 'b) -> True) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ] )
-  (f : (('a & 'b) -> True) & (('a\'b) -> ~True))
+  (filter : ((('a & 'b) -> Any) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ] )
+  (f : (('a & 'b) -> Any) & (('a\'b) -> ~True))
   (l : [ ('a)*  ] )  =
   (* filter f l = *)
   if l is Nil then nil
   else
     if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
 
-let new_filter :  ((('a & 'b) -> True) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ] =
+let new_filter :  ((('a & 'b) -> Any) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ] =
       fixpoint new_filter1_aux
+
+let x = <Int -> Bool>
+
+let partial = new_filter x
 
 (* here a better version with head and tail: it yields exactly the
    same type as the version above but 10% slower
@@ -619,3 +631,8 @@ let filter_stub_noannot filter f l =
     if f(fst(l)) is True
     then (fst(l),filter f (snd(l)))
     else filter f (snd(l))
+
+let rec filter f l = 
+  if l is Nil then nil
+  else
+    if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))

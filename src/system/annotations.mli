@@ -8,7 +8,7 @@ module Domains : sig
     val singleton : Env.t -> t
     val add : t -> Env.t -> t
     val remove_vars : t -> Variable.t list -> t
-    val cap : t -> t -> t
+    val cup : t -> t -> t
     val covers : TVarSet.t -> t -> t -> bool
     val apply_subst : Subst.t -> t -> t
     val tvars : t -> TVarSet.t

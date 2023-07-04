@@ -9,7 +9,7 @@ module Domains = struct
   let add lst e =
     let e = Env.filter (fun x _ -> Variable.is_lambda_var x) e in
     e::lst
-  let cap = (@)
+  let cup = (@)
   let covers tvars t1 t2 =
     let supertype_gen a b =
       let a = Subst.apply (TVarSet.diff (vars a) tvars |> generalize) a in

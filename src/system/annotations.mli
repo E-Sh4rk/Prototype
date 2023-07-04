@@ -2,13 +2,12 @@ open Types.Base
 open Types.Tvar
 
 module PartialAnnot : sig
-    type split =
-        | SInfer of typ * t
-        | SProp of typ * t
-        | SExpl of typ * t
-        | SDone of typ * t
-        | SUnr of typ
-    and union = split list
+    type union_expl = (typ * t) list
+    and union_prop = (typ * Env.t list * t) list
+    and union_infer = union_expl
+    and union_done = (typ * t) list
+    and union_unr = typ list
+    and union = union_infer * union_prop * union_expl * union_done * union_unr
     and 'a annotated_branch = 'a * Subst.t * typ
     and 'a inter = ('a annotated_branch) list (* Explored *)
                  * ('a annotated_branch) list (* Pending *)
@@ -16,23 +15,29 @@ module PartialAnnot : sig
                     * bool (* User defined *))
     and a =
         | InferA | TypA | UntypA
+        | EmptyA | ThenA | ElseA (* NOTE: not in the paper, small optimisation *)
         | LambdaA of typ * t
         | InterA of a inter
     and t =
         | Infer | Typ | Untyp
-        | Keep of (a * union)
+        | Keep of a * union
         | Skip of t
-        | TryKeep of (a * t * t)
+        | TrySkip of t
+        | TryKeep of a * t * t
+        | Propagate of a * t * Env.t list
         | Inter of t inter
 
     val pp_a : Format.formatter -> a -> unit
     val pp : Format.formatter -> t -> unit
 
+    val tvars_a : a -> TVarSet.t
+    val tvars : t -> TVarSet.t
+
     val apply_subst_a : Subst.t -> a -> a
     val apply_subst : Subst.t -> t -> t
 
-    val effective_splits : union -> typ list
-    val effective_splits_annots : union -> t list
+    val unreachable_splits : union -> typ list
+    val effective_splits : union -> (typ * t) list
 end
 
 module FullAnnot : sig
@@ -46,7 +51,7 @@ module FullAnnot : sig
         | PairA of renaming * renaming
         | AppA of inst * inst
         | ProjA of inst
-        | EmptyA | ThenA | ElseA
+        | EmptyA of inst | ThenA of inst | ElseA of inst
         | RecordUpdateA of inst * (renaming option)
         | ConstrA of inst
         | InterA of a inter

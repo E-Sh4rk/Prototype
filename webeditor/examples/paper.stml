@@ -1,0 +1,31 @@
+
+type Falsy = False | "" | 0
+type Truthy = ~Falsy
+
+let toBoolean x =
+    if x is Truthy then true else false
+
+let lOr (x,y) =
+    if toBoolean x then x else y
+
+let (id : 'a -> 'a) x =
+    lOr (x,x)
+
+let fixpoint = fun f ->
+  let delta = fun x ->
+      f ( fun  v -> ( x x v ))
+  in delta delta
+
+let map_stub map f lst =
+  if lst is Nil then nil
+  else (f (fst lst), map f (snd lst))
+
+let map = fixpoint map_stub
+
+let filter_stub filter (f: ('a->Any) & ('b -> ~True)) (l:[('a|'b)*]) =
+  if l is Nil then nil
+  else if f(fst(l)) is True
+  then (fst(l), filter f (snd(l)))
+  else filter f (snd(l))
+
+let filter = fixpoint filter_stub

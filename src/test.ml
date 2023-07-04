@@ -614,6 +614,13 @@ let rec map f (lst:['a*]) =
   | (e,lst) & :List -> ((f e), map f lst)
   end
 
+let rec filter f l =
+  if l is Nil then nil
+  else
+    if f(fst(l)) is True
+    then (fst(l),filter f (snd(l)))
+    else filter f (snd(l))
+
 let rec concat lst1 lst2 =
   match lst1 with
   | :[] -> lst2
@@ -632,7 +639,25 @@ let filter_stub_noannot filter f l =
     then (fst(l),filter f (snd(l)))
     else filter f (snd(l))
 
+
 let rec filter f l = 
   if l is Nil then nil
   else
     if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
+
+let rec eval e =
+  match e with
+  | (:"add", (e1, e2)) -> (eval e1) + (eval e2)
+  | (:"uminus", e) -> 0 - (eval e)
+  | (:"const", x) -> x
+  end
+
+type Expr = ("const", (0--)) | ("add", (Expr, Expr)) | ("uminus", Expr)
+
+let rec eval_ann (e:Expr) =
+  match e with
+  | (:"add", (e1, e2)) -> (eval_ann e1) + (eval_ann e2)
+  | (:"uminus", e) -> 0 - (eval_ann e)
+  | (:"const", x) -> x
+  end
+

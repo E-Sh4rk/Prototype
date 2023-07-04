@@ -62,7 +62,7 @@ module Subst : sig
     val remove : t -> TVarSet.t -> t
     val split : t -> TVarSet.t -> t * t
     val is_renaming : t -> bool
-    val inverse_renaming : t -> t
+    (* val inverse_renaming : t -> t *)
     val short_names : TVarSet.t -> t
     val pp : Format.formatter -> t -> unit
 end
@@ -77,11 +77,9 @@ val check_var : Base.typ -> [ `Not_var | `Pos of TVar.t | `Neg of TVar.t ]
 val is_mono_typ : Base.typ -> bool
 val is_novar_typ : Base.typ -> bool
 
-val refresh : mono:bool -> TVarSet.t -> Subst.t
-val refresh_all : TVarSet.t -> Subst.t
+val refresh : TVarSet.t -> Subst.t
 val generalize : TVarSet.t -> Subst.t
 val monomorphize : TVarSet.t -> Subst.t
-val register_unregistered : mono:bool -> TVarSet.t -> Subst.t
 val pp_typ_short : Format.formatter -> Base.typ -> unit
 val string_of_type_short : Base.typ -> string
 
@@ -94,12 +92,14 @@ module Raw : sig
     in term of the variables that are greater. Thus, greater variables (in particular variables not in var_order)
     are less likely to be constrained. *)
     val tallying : var_order:(TVar.t list) -> TVarSet.t -> (Base.typ * Base.typ) list -> Subst.t list
+    val test_tallying : var_order:(TVar.t list) -> TVarSet.t -> (Base.typ * Base.typ) list -> bool
 end
 
 val clean_type : pos:Base.typ -> neg:Base.typ -> Base.typ -> Base.typ
 val clean_type_subst : pos:Base.typ -> neg:Base.typ -> Base.typ -> Subst.t
 val ground_inf : Base.typ -> Base.typ (* ground type smaller than every instance of t *)
 val ground_sup : Base.typ -> Base.typ (* ground type larger than every instance of t *)
+val test_tallying : (Base.typ * Base.typ) list -> bool
 val tallying : (Base.typ * Base.typ) list -> Subst.t list
 val tallying_infer : (Base.typ * Base.typ) list -> Subst.t list
 

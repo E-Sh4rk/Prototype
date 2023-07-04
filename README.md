@@ -40,8 +40,8 @@ First, build the native version, then:
 ```
 opam install yojson js_of_ocaml-ppx
 make libjs
-cd webeditor
+cd ../webeditor
 npm ci
 ```
 
-Then either serve the whole content of the `src/webeditor/` directory through a Web server or open the file `src/webeditor/index.html` directly from a browser (**warning** : the later will not allow you to load the examples nor benefit from web-workers due to security policies).
+Then either serve the whole content of the `./webeditor/` directory through a Web server or open the file `./webeditor/index.html` directly from a browser (**warning** : the later will not allow you to load the examples nor benefit from web-workers due to security policies).

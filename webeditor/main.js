@@ -15,7 +15,7 @@ requirejs(['vs/editor/editor.main'], function () {
 		}	
 	});
 	let editor = monaco.editor.create(document.getElementById('container'), {
-		value: '(* Press CTRL+Enter to typecheck the program. *)\n(* Press F2 to load an example. *)\n\n',
+		value: '(* Press CTRL+Enter to typecheck the program. *)\n(* Press F2 to load an example. *)\n(* (also accessible through contextual menu) *)\n\n',
 		theme: 'vs-custom',
 		language: 'stml',
 		automaticLayout: true,

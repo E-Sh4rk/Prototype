@@ -7,7 +7,7 @@ let test2_patterns x =
   match x with (a,_)&(_,b) -> (a,b) end
 
 let test3_patterns x y =
-  let pack x y = (x,y) in
+  let pack (x:'a;'b) (y:'a;'b) = (x,y) in
   let (y,x) = pack x y in
   pack x y
 
@@ -54,8 +54,24 @@ let rec map f (lst:['a*]) =
 let rec filter (f: ('a->Any) & ('b -> ~True)) (l:[('a|'b)*]) =
   match l with
   | :Nil -> nil
-  | _ ->
-    if f(fst(l)) is True
-    then (fst(l),filter f (snd(l)))
-    else filter f (snd(l))
+  | (e,l) ->
+    if f e is True
+    then (e, filter f l)
+    else filter f l
+  end
+
+let rec eval e =
+  match e with
+  | (:"add", (e1, e2)) -> (eval e1) + (eval e2)
+  | (:"uminus", e) -> 0 - (eval e)
+  | (:"const", x) -> x
+  end
+
+type Expr = ("const", (0--)) | ("add", (Expr, Expr)) | ("uminus", Expr)
+
+let rec eval_ann (e:Expr) =
+  match e with
+  | (:"add", (e1, e2)) -> (eval_ann e1) + (eval_ann e2)
+  | (:"uminus", e) -> 0 - (eval_ann e)
+  | (:"const", x) -> x
   end

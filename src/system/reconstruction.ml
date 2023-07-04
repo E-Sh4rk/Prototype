@@ -481,7 +481,7 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
   | Lambda (ADomain ts, _, _), InferA ->
     let branches = ts |> List.map (fun t ->
       let pannot_a = LambdaA (t, Infer) in
-      (pannot_a, Subst.identity, any)
+      (pannot_a, Subst.identity, empty)
     ) in
     let pannot_a = InterA ([], branches, (false, true)) in
     infer_mono_a vardef tenv expl env pannot_a a

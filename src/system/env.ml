@@ -72,3 +72,12 @@ let pp_filtered names fmt env =
 let add v t e = assert (mem v e |> not) ; add v t e
 
 let tvars (_, s) = s
+
+let apply_subst s env =
+  if TVarSet.inter (tvars env) (Subst.dom s) |> TVarSet.is_empty
+  then env
+  else
+    let apply = Types.Additions.apply_subst_simplify s in
+    bindings env
+    |> List.map (fun (v,ty) -> (v, apply ty))
+    |> construct

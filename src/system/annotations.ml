@@ -1,6 +1,21 @@
 open Types.Base
 open Types.Tvar
 open Types.Additions
+open Parsing.Variable
+
+module Domains = struct
+  type t = Env.t list
+  [@@deriving show]
+  let empty = []
+  let add lst e =
+    let e = Env.filter (fun x _ -> Variable.is_lambda_var x) e in
+    e::lst
+  let cap = (@)
+  let is_covered _ _ = failwith "TODO"
+  let apply_subst s t = t |> List.map (fun e -> Env.apply_subst s e)
+  let tvars lst =
+    lst |> List.map Env.tvars |> TVarSet.union_many
+end
 
 module PartialAnnot = struct
   type union_expl = (typ * t) list
@@ -15,7 +30,7 @@ module PartialAnnot = struct
   [@@deriving show]
   and union = union_infer * union_prop * union_expl * union_done * union_unr
   [@@deriving show]
-  and 'a annotated_branch = 'a * Subst.t * typ
+  and 'a annotated_branch = 'a * Subst.t * Domains.t
   [@@deriving show]
   and 'a inter = ('a annotated_branch) list (* Explored *)
                * ('a annotated_branch) list (* Pending *)
@@ -38,8 +53,8 @@ module PartialAnnot = struct
     | Inter of t inter
   [@@deriving show]
 
-  let tvars_branch f (a, _, t) =
-    TVarSet.union (f a) (vars t)
+  let tvars_branch f (a, _, d) =
+    TVarSet.union (f a) (Domains.tvars d)
   let rec tvars_union (i,p,e,d,u) =
     let aux1 ty = vars ty in
     let aux2 (ty, t) = TVarSet.union (vars ty) (tvars t) in
@@ -68,18 +83,13 @@ module PartialAnnot = struct
       TVarSet.union_many [tvars_a a ; tvars t ; List.map Env.tvars envs |> TVarSet.union_many ]
     | Inter i -> tvars_inter i
 
-  let apply_subst_branch f s (a, s', t) =
-    (f s a, s' (* The subst never change, and only has polymorphic tvars *), apply_subst_simplify s t)
-  let apply_env s env =
-    let apply = apply_subst_simplify s in
-    Env.bindings env
-    |> List.map (fun (v,ty) -> (v, apply ty))
-    |> Env.construct
+  let apply_subst_branch f s (a, s', d) =
+    (f s a, s' (* The subst never change, and only has polymorphic tvars *), Domains.apply_subst s d)
   let rec apply_subst_union s (i,p,e,d,u) =
     let apply = apply_subst_simplify s in
     let aux1 ty = apply ty in
     let aux2 (ty, t) = (apply ty, apply_subst s t) in
-    let aux3 (ty, env, t) = (apply ty, List.map (apply_env s) env, apply_subst s t) in
+    let aux3 (ty, env, t) = (apply ty, List.map (Env.apply_subst s) env, apply_subst s t) in
     (List.map aux2 i, List.map aux3 p, List.map aux2 e, List.map aux2 d, List.map aux1 u)
   and apply_subst_inter_a s (a, b, flags) =
     (List.map (apply_subst_branch apply_subst_a s) a,
@@ -108,7 +118,7 @@ module PartialAnnot = struct
     | TryKeep (a, t1, t2) ->
       TryKeep (apply_subst_a s a, apply_subst s t1, apply_subst s t2)
     | Propagate (a, t, envs) ->
-      Propagate (apply_subst_a s a, apply_subst s t, List.map (apply_env s) envs)
+      Propagate (apply_subst_a s a, apply_subst s t, List.map (Env.apply_subst s) envs)
     | Inter i -> Inter (apply_subst_inter s i)
 
   let unreachable_splits (_,_,_,_,u) = u

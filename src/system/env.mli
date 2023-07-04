@@ -20,6 +20,7 @@ val cap : t -> t -> t
 val conj : t list -> t
 val filter : (Variable.t -> typ -> bool) -> t -> t
 val tvars : t -> TVarSet.t
+val apply_subst : Subst.t -> t -> t
 
 val equiv : t -> t -> bool
 val leq : t -> t -> bool

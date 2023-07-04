@@ -1,6 +1,17 @@
 open Types.Base
 open Types.Tvar
 
+module Domains : sig
+    type t
+    val empty : t
+    val add : t -> Env.t -> t
+    val cap : t -> t -> t
+    val is_covered : t -> t -> bool
+    val apply_subst : Subst.t -> t -> t
+    val tvars : t -> TVarSet.t
+    val pp : Format.formatter -> t -> unit
+end
+
 module PartialAnnot : sig
     type union_expl = (typ * t) list
     and union_prop = (typ * Env.t list * t) list
@@ -8,7 +19,7 @@ module PartialAnnot : sig
     and union_done = (typ * t) list
     and union_unr = typ list
     and union = union_infer * union_prop * union_expl * union_done * union_unr
-    and 'a annotated_branch = 'a * Subst.t * typ
+    and 'a annotated_branch = 'a * Subst.t * Domains.t
     and 'a inter = ('a annotated_branch) list (* Explored *)
                  * ('a annotated_branch) list (* Pending *)
                  * (  bool (* Typing finished? *)

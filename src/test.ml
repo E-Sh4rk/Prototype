@@ -10,7 +10,9 @@ let impossible_branch2 = fun x -> fun y ->
   if y is Int then y+1 else x+1
 
 (* TODO: uncomment (Cduce issue) *)
-(* let switch1 f s a b =
+(*
+
+ let switch1 f s a b =
     if s then f a else f b
 
 let switch2 s f a b =
@@ -397,21 +399,31 @@ let filter_aux_pure_noannot filter f l =
   else 42(3)
 
 (*
+The wrap loops:
+
+let filter = fixpoint filter_aux_pure_noannot
+*)
+
+(*
    A new variation that does not require the
    characteristic function to be defined on Any
  *)
 
 let new_filter1_aux
-  (filter : ((('a & 'b) -> True) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ] )
-  (f : (('a & 'b) -> True) & (('a\'b) -> ~True))
+  (filter : ((('a & 'b) -> Any) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ] )
+  (f : (('a & 'b) -> Any) & (('a\'b) -> ~True))
   (l : [ ('a)*  ] )  =
   (* filter f l = *)
   if l is Nil then nil
   else
     if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
 
-let new_filter :  ((('a & 'b) -> True) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ] =
+let new_filter :  ((('a & 'b) -> Any) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ] =
       fixpoint new_filter1_aux
+
+let x = <Int -> Bool>
+
+let partial = new_filter x
 
 (* here a better version with head and tail: it yields exactly the
    same type as the version above but 10% slower
@@ -626,12 +638,25 @@ let filter_stub_noannot filter f l =
     if f(fst(l)) is True
     then (fst(l),filter f (snd(l)))
     else filter f (snd(l))
-	
-(* let filter_noannot = fixpoint filter_stub_noannot *)
-(* checked in 31667.95ms:
-(('a -> `true) -> ([ 'a ] -> [ 'a ]) & ([ 'a+ ] -> [ 'a+ ]) & ([  ] -> [  ])) &
-(('a -> Any \ `true) -> [ 'a* ] -> [  ]) & (Any -> [  ] -> [  ]) *)
 
+
+let rec filter f l = 
+  if l is Nil then nil
+  else
+    if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
+
+(* Interesting: the first flatten below gives a type far more precise than the second *)
+    
+let rec flatten x =    
+  if x is Nil then nil else
+  if x is [Any*] then concat (flatten (fst x)) (flatten (snd x))
+  else (x,nil)
+
+let rec flatten (x : Tree('a)) =    
+  if x is Nil then nil else
+  if x is [Any*] then concat (flatten (fst x)) (flatten (snd x))
+  else (x,nil)
+  
 let rec eval e =
   match e with
   | (:"add", (e1, e2)) -> (eval e1) + (eval e2)
@@ -647,3 +672,4 @@ let rec eval_ann (e:Expr) =
   | (:"uminus", e) -> 0 - (eval_ann e)
   | (:"const", x) -> x
   end
+

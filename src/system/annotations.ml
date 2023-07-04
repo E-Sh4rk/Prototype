@@ -19,11 +19,14 @@ module Domains = struct
       try Env.find v env with Not_found -> t
     in
     let dom2 = t2 |> List.map Env.domain |> List.concat |> VarSet.of_list |> VarSet.elements in
-    let (a, b) = dom2 |> List.fold_left (fun (at1, at2) v ->
-      let t1 = t1 |> List.map (find_or empty v) |> disj_o in
-      let t2 = t2 |> List.map (find_or empty v) |> disj_o in
-      (mk_times (cons at1) (cons t1), mk_times (cons at2) (cons t2))
-    ) (any, any) in
+    let type_for env =
+      dom2 |> List.fold_left (fun acc v ->
+        let t = find_or empty v env in
+        mk_times (cons acc) (cons t)
+      ) any
+    in
+    let a = t1 |> List.map type_for |> disj_o in
+    let b = t2 |> List.map type_for |> disj_o in
     supertype_gen a b
 
   let apply_subst s t = t |> List.map (fun e -> Env.apply_subst s e)

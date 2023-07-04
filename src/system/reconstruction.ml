@@ -277,8 +277,8 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
       if ud then pending else
         pending |> List.filter (fun (_,_,d) ->
           let r = Domains.covers tvars expl d |> not in
-          (* if not r then Format.printf "REMOVED: %a@.VS:%a@." pp_typ est pp_typ expl
-          else Format.printf "KEPT: %a@.VS:%a@." pp_typ est pp_typ expl ; *)
+          (* if not r then Format.printf "REMOVED:@.%a@.VS:@.%a@." Domains.pp d Domains.pp expl
+          else Format.printf "KEPT:@.%a@.VS:@.%a@." Domains.pp d Domains.pp expl ; *)
           r
         )
     in

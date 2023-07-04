@@ -30,6 +30,13 @@ module Domains = struct
   let tvars lst =
     lst |> List.map Env.tvars |> TVarSet.union_many
   let empty = []
+  let singleton e = add empty e
+  let remove_vars t vs =
+    let vs = VarSet.of_list vs in
+    let restrict e =
+      e |> Env.filter (fun v _ -> VarSet.mem v vs |> not)
+    in
+    List.map restrict t
 end
 
 module PartialAnnot = struct

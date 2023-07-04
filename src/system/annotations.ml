@@ -6,15 +6,30 @@ open Parsing.Variable
 module Domains = struct
   type t = Env.t list
   [@@deriving show]
-  let empty = []
   let add lst e =
     let e = Env.filter (fun x _ -> Variable.is_lambda_var x) e in
     e::lst
   let cap = (@)
-  let is_covered _ _ = failwith "TODO"
+  let covers tvars t1 t2 =
+    let supertype_gen a b =
+      let a = Subst.apply (TVarSet.diff (vars a) tvars |> generalize) a in
+      supertype_poly a b
+    in  
+    let find_or t v env =
+      try Env.find v env with Not_found -> t
+    in
+    let dom2 = t2 |> List.map Env.domain |> List.concat |> VarSet.of_list |> VarSet.elements in
+    let (a, b) = dom2 |> List.fold_left (fun (at1, at2) v ->
+      let t1 = t1 |> List.map (find_or empty v) |> disj_o in
+      let t2 = t2 |> List.map (find_or empty v) |> disj_o in
+      (mk_times (cons at1) (cons t1), mk_times (cons at2) (cons t2))
+    ) (any, any) in
+    supertype_gen a b
+
   let apply_subst s t = t |> List.map (fun e -> Env.apply_subst s e)
   let tvars lst =
     lst |> List.map Env.tvars |> TVarSet.union_many
+  let empty = []
 end
 
 module PartialAnnot = struct

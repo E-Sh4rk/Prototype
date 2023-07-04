@@ -6,7 +6,7 @@ module Domains : sig
     val empty : t
     val add : t -> Env.t -> t
     val cap : t -> t -> t
-    val is_covered : t -> t -> bool
+    val covers : TVarSet.t -> t -> t -> bool
     val apply_subst : Subst.t -> t -> t
     val tvars : t -> TVarSet.t
     val pp : Format.formatter -> t -> unit

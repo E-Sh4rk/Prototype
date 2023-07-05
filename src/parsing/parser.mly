@@ -26,8 +26,9 @@
   let multi_param_rec_abstraction startpos endpos name lst oty t =
     (* We correlate 'self' and args as much as possible
       (until we have an arg annotated with more than 1 type) *)
-    (* TODO: this seems to improve result for some recursive functions,
-             and to regress for others. Investigate. *)
+    (* NOTE: this does not seem a good idea: while it sometimes improves performances,
+             it also forces intersections to all be put at top-level (before the first lambda)
+             as making a case-disjunction on the type of an argument also impacts the type of 'self'. *)
     (*let rec add_fixed_tvar lst =
       match lst with
       | [] -> []

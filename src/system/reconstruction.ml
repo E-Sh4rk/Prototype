@@ -217,38 +217,6 @@ let simplify_tallying_infer env res_type sols =
     res
   ) *)
 
-let undefined = mk_atom "undefined"
-let rec estimate pannot =
-  let open PartialAnnot in
-  match pannot with
-  | Untyp -> empty
-  | Typ | Infer -> any
-  | TrySkip p -> mk_times any_node (estimate p |> cons)
-  | Skip p -> mk_times (cons undefined) (estimate p |> cons)
-  | TryKeep (pannot_a, pannot1, pannot2) ->
-    let est_a = estimate_a pannot_a in
-    if is_empty est_a
-    then mk_times (cons undefined) (estimate pannot2 |> cons)
-    else mk_times (cup est_a undefined |> cons) (estimate pannot1 |> cons)
-  | Propagate (pannot_a, pannot, _) ->
-    mk_times (cup (estimate_a pannot_a) undefined |> cons) (estimate pannot |> cons)
-  | Keep (pannot_a, u) ->
-    mk_times
-      (cup (estimate_a pannot_a) undefined |> cons)
-      (u |> effective_splits |> List.map snd |> List.map estimate |> conj_o |> cons)
-  | Inter (p1,p2,_) ->
-    p1@p2 |> List.map Utils.fst3 |> List.map estimate |> disj_o
-
-and estimate_a pannot_a =
-  let open PartialAnnot in
-  match pannot_a with
-  | UntypA -> empty
-  | TypA | InferA | EmptyA | ThenA | ElseA -> any
-  | LambdaA (s, pannot) ->
-    mk_times (cons s) (estimate pannot |> cons)
-  | InterA (p1,p2,_) ->
-    p1@p2 |> List.map Utils.fst3 |> List.map estimate_a |> disj_o
-
 let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
   let expl = Domains.remove_vars expl (Env.domain env) in
   let expl = b1 |> List.fold_left (fun acc (_,_,d) -> Domains.cup acc d) expl in
@@ -329,7 +297,7 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
   in
   aux b1 expl b2
 
-let merge_substs vars tvars tvars_branch apply_subst_branch estimate mk_inter (d, lst, pannot, default) =
+let merge_substs vars tvars tvars_branch apply_subst_branch mk_inter (d, lst, pannot, default) =
   let refresh (b, d) =
     let tvs = TVarSet.diff (tvars_branch b) tvars |> TVarSet.filter TVar.can_infer in
     let s = refresh tvs in
@@ -345,7 +313,7 @@ let merge_substs vars tvars tvars_branch apply_subst_branch estimate mk_inter (d
       let s = Subst.compose_restr (Subst.codom s |> generalize) s in
       let d = Domains.remove_vars d vars in
       (pannot, s, d)
-    ) |> List.filter (fun (pannot, _, _) -> estimate pannot |> non_empty) (* TODO: temporary *)
+    )
   in
   begin match lst with
   | [(default,_,_)] -> default
@@ -355,14 +323,14 @@ let merge_substs vars tvars tvars_branch apply_subst_branch estimate mk_inter (d
     mk_inter [] lst (false,false)
   end
 
-let should_iterate env tvars_branch apply_subst_branch estimate mk_inter res =
+let should_iterate env tvars_branch apply_subst_branch mk_inter res =
   match res with
   | Split (gamma, pannot, _) when Env.is_empty gamma -> Some pannot
   | Subst (d, lst, pannot, default) ->
     let tvars = Env.tvars env |> TVarSet.filter TVar.is_mono in
     let vars = Env.domain env in
     if lst |> List.for_all (fun s -> TVarSet.inter (Subst.dom s) tvars |> TVarSet.is_empty)
-    then Some (merge_substs vars tvars tvars_branch apply_subst_branch estimate mk_inter
+    then Some (merge_substs vars tvars tvars_branch apply_subst_branch mk_inter
                 (d, lst, pannot, default))
     else None
   | _ -> None
@@ -495,7 +463,7 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
     if is_empty s then (log ~level:3 "Lambda with empty domain generated a fail.@." ; Fail)
     else
       infer_mono_iterated tenv
-        expl
+        Domains.empty
         (Env.add v s env) pannot e
       |> map_res (fun x -> LambdaA (s, x))
   | _, _ -> assert false
@@ -643,7 +611,7 @@ and infer_mono_a_iterated vardef tenv expl env pannot_a a =
   let res = infer_mono_a vardef tenv expl env pannot_a a in
   let si =
     should_iterate env PartialAnnot.tvars_a PartialAnnot.apply_subst_a
-      estimate_a (fun a b c -> PartialAnnot.InterA (a,b,c)) res
+      (fun a b c -> PartialAnnot.InterA (a,b,c)) res
   in
   match si with
   | None -> res
@@ -654,7 +622,7 @@ and infer_mono_iterated tenv expl env pannot e =
   let res = infer_mono tenv expl env pannot e in
   let si =
     should_iterate env PartialAnnot.tvars PartialAnnot.apply_subst
-      estimate (fun a b c -> PartialAnnot.Inter (a,b,c)) res
+      (fun a b c -> PartialAnnot.Inter (a,b,c)) res
   in
   match si with
   | None -> res

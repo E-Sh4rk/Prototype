@@ -392,11 +392,11 @@ let filter_aux_pure filter (f: ('a->True) & ('b -> ~True)) (l:[('a|'b)*]) =
 
 let filter = fixpoint filter_aux_pure
 
-let filter_aux_pure_noannot filter f l =
+(* let filter_aux_pure_noannot filter f l =
   if l is Nil then nil else
   if l is [Any+] then
       if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
-  else 42(3)
+  else 42(3) *)
 
 (*
 The wrap loops:
@@ -632,13 +632,12 @@ let test_patterns_annots x y =
   let (y,x) = pack x y in
   pack x y
 
-let filter_stub_noannot filter f l =
+(* let filter_stub_noannot filter f l =
   if l is Nil then nil
   else
     if f(fst(l)) is True
     then (fst(l),filter f (snd(l)))
-    else filter f (snd(l))
-
+    else filter f (snd(l)) *)
 
 let rec filter f l = 
   if l is Nil then nil
@@ -647,10 +646,10 @@ let rec filter f l =
 
 (* Interesting: the first flatten below gives a type far more precise than the second *)
     
-let rec flatten x =    
+(* let rec flatten x =    
   if x is Nil then nil else
   if x is [Any*] then concat (flatten (fst x)) (flatten (snd x))
-  else (x,nil)
+  else (x,nil) *)
 
 let rec flatten (x : Tree('a)) =    
   if x is Nil then nil else

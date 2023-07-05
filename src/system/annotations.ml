@@ -58,7 +58,7 @@ module PartialAnnot = struct
   [@@deriving show]
   and union = union_infer * union_prop * union_expl * union_done * union_unr
   [@@deriving show]
-  and 'a annotated_branch = 'a * Subst.t * Domains.t
+  and 'a annotated_branch = 'a * Subst.t * Domains.t * bool
   [@@deriving show]
   and 'a inter = ('a annotated_branch) list (* Explored *)
                * ('a annotated_branch) list (* Pending *)
@@ -81,7 +81,7 @@ module PartialAnnot = struct
     | Inter of t inter
   [@@deriving show]
 
-  let tvars_branch f (a, _, d) =
+  let tvars_branch f (a, _, d, _) =
     TVarSet.union (f a) (Domains.tvars d)
   let rec tvars_union (i,p,e,d,u) =
     let aux1 ty = vars ty in
@@ -111,8 +111,9 @@ module PartialAnnot = struct
       TVarSet.union_many [tvars_a a ; tvars t ; List.map Env.tvars envs |> TVarSet.union_many ]
     | Inter i -> tvars_inter i
 
-  let apply_subst_branch f s (a, s', d) =
-    (f s a, s' (* The subst never change, and only has polymorphic tvars *), Domains.apply_subst s d)
+  let apply_subst_branch f s (a, s', d, b) =
+    (f s a, s' (* The subst never change, and only has polymorphic tvars *),
+    Domains.apply_subst s d, b)
   let rec apply_subst_union s (i,p,e,d,u) =
     let apply = apply_subst_simplify s in
     let aux1 ty = apply ty in

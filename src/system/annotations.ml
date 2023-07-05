@@ -18,10 +18,11 @@ module Domains = struct
     let find_or t v env =
       try Env.find v env with Not_found -> t
     in
-    let dom2 = t2 |> List.map Env.domain |> List.concat |> VarSet.of_list |> VarSet.elements in
+    let dom = (List.map Env.domain t2)@(List.map Env.domain t1)
+      |> List.concat |> VarSet.of_list |> VarSet.elements in
     let type_for env =
-      dom2 |> List.fold_left (fun acc v ->
-        let t = find_or empty v env in
+      dom |> List.fold_left (fun acc v ->
+        let t = find_or any v env in
         mk_times (cons acc) (cons t)
       ) any
     in

@@ -287,18 +287,22 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
     | [] ->
       let explored =
         if tf || ud || List.length explored <= 1 then explored
-        else
+        else (
+          log ~level:5 "Finished reconstructing intersection. Typing it..." ;
           explored
           (* We type each branch and remove useless ones *)
           |> List.map (fun (pannot, s, est) ->
             ((pannot, s, est), typeof pannot)
           )
+          |> (fun r -> log ~level:5 "Simplifying it...@." ; r)
+          (* |> List.map (fun (a, t) -> Format.printf "%a@." pp_typ t ; (a,t)) *)
           |> Utils.filter_among_others
           (fun (_,ty) others ->
             let ty' = others |> List.map snd |> conj in
             subtype_gen ty' ty |> not
           )
           |> List.map fst
+        )
       in
       Ok (explored, [], (true, ud))
     | pending ->

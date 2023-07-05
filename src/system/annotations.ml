@@ -11,6 +11,7 @@ module Domains = struct
     e::lst
   let cup = (@)
   let covers tvars t1 t2 =
+    if t1 = [] then false else
     let supertype_gen a b =
       let a = Subst.apply (TVarSet.diff (vars a) tvars |> generalize) a in
       supertype_poly a b

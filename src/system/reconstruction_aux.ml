@@ -123,8 +123,11 @@ let approximate_app infer t1 t2 resvar =
     tallying [(t1, arrow_type)]
 (* Approximation for tallying instances for the application *)
 let approximate_app ~infer t1 t2 resvar =
-  let is_poly = if infer then TVar.can_infer else TVar.is_poly in
-  let t1s = approximate_arrow is_poly t1 in
+  (* let is_poly = if infer then TVar.can_infer else TVar.is_poly in
+  let t1s = approximate_arrow is_poly t1 in *)
+  (* NOTE: this approximation is disabled (it does not seem to have a big impact
+     on classical examples, and it can produce weaker types) *)
+  let t1s = [t1] in
   let res =
     t1s |> List.map (fun t1 -> approximate_app infer t1 t2 resvar) |> List.flatten
   in

@@ -14,21 +14,23 @@ module Domains = struct
     let supertype_gen a b =
       let a = Subst.apply (TVarSet.diff (vars a) tvars |> generalize) a in
       supertype_poly a b
-    in  
+    in
     let find_or t v env =
       try Env.find v env with Not_found -> t
     in
-    let dom = (List.map Env.domain t2)@(List.map Env.domain t1)
-      |> List.concat |> VarSet.of_list |> VarSet.elements in
-    let type_for env =
-      dom |> List.fold_left (fun acc v ->
-        let t = find_or any v env in
-        mk_times (cons acc) (cons t)
-      ) any
-    in
-    let a = t1 |> List.map type_for |> disj_o in
-    let b = t2 |> List.map type_for |> disj_o in
-    supertype_gen a b
+    t2 |> List.for_all (fun env2 ->
+      let type_for env =
+        let dom = (Env.domain env2)::(List.map Env.domain t1) |> List.flatten
+          |> VarSet.of_list |> VarSet.elements in
+        dom |> List.fold_left (fun acc v ->
+          let t = find_or any v env in
+          mk_times (cons acc) (cons t)
+        ) any
+      in
+      let a = t1 |> List.map type_for |> disj_o in
+      let b = type_for env2 in
+      supertype_gen a b
+    )
 
   let apply_subst s t = t |> List.map (fun e -> Env.apply_subst s e)
   let tvars lst =

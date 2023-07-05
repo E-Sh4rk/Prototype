@@ -242,13 +242,15 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
     let leq (_,s,_) (_,s',_) = leq s s' in
     (* Remove branches that are estimated not to add anything *)
     let pending =
-      if ud then pending else
+      if ud then pending else (
+        (* Format.printf "@.VS:@.%a@." Domains.pp expl ;
+        Format.printf "with tvars:@.%a" TVarSet.pp tvars ; *)
         pending |> List.filter (fun (_,_,d) ->
           let r = Domains.covers tvars expl d |> not in
-          (* if not r then Format.printf "REMOVED:@.%a@.VS:@.%a@." Domains.pp d Domains.pp expl
-          else Format.printf "KEPT:@.%a@.VS:@.%a@." Domains.pp d Domains.pp expl ; *)
+          (* if not r then Format.printf "REMOVED:@.%a@." Domains.pp d
+          else Format.printf "KEPT:@.%a@." Domains.pp d ; *)
           r
-        )
+        ))
     in
     match pending with
     | [] when explored = [] -> log ~level:3 "Intersection generated a fail (0 branch)@." ; Fail
@@ -263,7 +265,7 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
             ((pannot, s, est), typeof pannot)
           )
           |> (fun r -> log ~level:5 "Simplifying it...@." ; r)
-          (* |> List.map (fun (a, t) -> Format.printf "%a@." pp_typ t ; (a,t)) *)
+          (* |> List.map (fun (a, t) -> Format.printf "%a@.@." pp_typ t ; (a,t)) *)
           |> Utils.filter_among_others
           (fun (_,ty) others ->
             let ty' = others |> List.map snd |> conj in

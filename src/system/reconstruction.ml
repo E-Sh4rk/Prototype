@@ -218,7 +218,6 @@ let simplify_tallying_infer env res_type sols =
   ) *)
 
 let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
-  let expl = Domains.remove_vars expl (Env.domain env) in
   let expl = b1 |> List.fold_left (fun acc (_,_,d,_) -> Domains.cup acc d) expl in
   let tvars = env |> Env.filter (fun x _ -> Variable.is_lambda_var x) |> Env.tvars in
   let tvars = TVarSet.filter TVar.is_mono tvars in

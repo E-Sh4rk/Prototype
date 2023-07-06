@@ -113,7 +113,7 @@ module PartialAnnot = struct
     | Inter i -> tvars_inter i
 
   let apply_subst_branch f s (a, s', d, b) =
-    (f s a, s' (* The subst never change, and only has polymorphic tvars *),
+    (f s a, s' (* The subst only has polymorphic vars *),
     Domains.apply_subst s d, b)
   let rec apply_subst_union s (i,p,e,d,u) =
     let apply = apply_subst_simplify s in

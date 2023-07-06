@@ -621,12 +621,6 @@ let rec filter f l =
     then (fst(l),filter f (snd(l)))
     else filter f (snd(l))
 
-let rec concat lst1 lst2 =
-  match lst1 with
-  | :[] -> lst2
-  | (e,lst1) & :List -> (e, concat lst1 lst2)
-  end
-
 let test_patterns_annots x y =
   let pack (x:'a;'b) (y:'a;'b) = (x,y) in
   let (y,x) = pack x y in
@@ -644,10 +638,10 @@ let rec filter f l =
   else
     if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
     
-(* let rec flatten x =    
+let rec flatten x =
   if x is Nil then nil else
   if x is [Any*] then concat (flatten (fst x)) (flatten (snd x))
-  else (x,nil) *)
+  else (x,nil)
 
 let rec flatten (x : Tree('a)) =    
   if x is Nil then nil else

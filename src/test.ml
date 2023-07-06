@@ -643,8 +643,6 @@ let rec filter f l =
   if l is Nil then nil
   else
     if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
-
-(* Interesting: the first flatten below gives a type far more precise than the second *)
     
 (* let rec flatten x =    
   if x is Nil then nil else

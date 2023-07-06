@@ -11,24 +11,24 @@ module Domains = struct
     e::lst
   let cup = (@)
   let covers tvars t1 t2 =
-    if t1 = [] then false else
     let supertype_gen a b =
       let a = Subst.apply (TVarSet.diff (vars a) tvars |> generalize) a in
       supertype_poly a b
     in
-    let find_or t v env =
-      try Env.find v env with Not_found -> t
-    in
     t2 |> List.for_all (fun env2 ->
+      let dom2 = Env.domain env2 |> VarSet.of_list in
+      let has_same_vars env =
+        let dom = Env.domain env |> VarSet.of_list in
+        VarSet.equal dom dom2
+      in
+      let dom2 = dom2 |> VarSet.elements in
       let type_for env =
-        let dom = (Env.domain env2)::(List.map Env.domain t1) |> List.flatten
-          |> VarSet.of_list |> VarSet.elements in
-        dom |> List.fold_left (fun acc v ->
-          let t = find_or any v env in
+        dom2 |> List.fold_left (fun acc v ->
+          let t = Env.find v env in
           mk_times (cons acc) (cons t)
         ) any
       in
-      let a = t1 |> List.map type_for |> disj_o in
+      let a = t1 |> List.filter has_same_vars |> List.map type_for |> disj_o in
       let b = type_for env2 in
       supertype_gen a b
     )

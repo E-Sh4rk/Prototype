@@ -16,6 +16,8 @@ val mem : Variable.t -> t -> bool
 val mem_not_absent : Variable.t -> t -> bool
 val find : Variable.t -> t -> typ
 val rm : Variable.t -> t -> t
+val rms : Variable.t list -> t -> t
+val map : (typ -> typ) -> t -> t
 val cap : t -> t -> t
 val conj : t list -> t
 val filter : (Variable.t -> typ -> bool) -> t -> t

@@ -48,6 +48,10 @@ let conj lst =
 
 let filter f (m, _) = VarMap.filter f m |> reconstruct
 
+let rms vs t =
+  let vs = VarSet.of_list vs in
+  t |> filter (fun v _ -> VarSet.mem v vs |> not)
+
 let leq (m1,_) (m2,_) =
   VarMap.for_all (fun v t ->
     VarMap.mem v m1 && subtype (VarMap.find v m1) t
@@ -73,11 +77,10 @@ let add v t e = assert (mem v e |> not) ; add v t e
 
 let tvars (_, s) = s
 
+let map f t =
+  bindings t |> List.map (fun (v,t) -> (v,f t)) |> construct
+
 let apply_subst s env =
   if TVarSet.inter (tvars env) (Subst.dom s) |> TVarSet.is_empty
   then env
-  else
-    let apply = Types.Additions.apply_subst_simplify s in
-    bindings env
-    |> List.map (fun (v,ty) -> (v, apply ty))
-    |> construct
+  else map (Types.Additions.apply_subst_simplify s) env

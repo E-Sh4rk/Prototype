@@ -8,13 +8,12 @@ module Domains = struct
   [@@deriving show]
   let add lst e =
     let e = Env.filter (fun x _ -> Variable.is_lambda_var x) e in
+    let vars = Env.bindings e |> List.map (fun (_, t) -> vars t)
+      |> TVarSet.union_many in
+    let e = Env.apply_subst (generalize vars) e in
     e::lst
   let cup = (@)
-  let covers tvars t1 t2 =
-    let supertype_gen a b =
-      let a = Subst.apply (TVarSet.diff (vars a) tvars |> generalize) a in
-      supertype_poly a b
-    in
+  let covers t1 t2 =
     t2 |> List.for_all (fun env2 ->
       let dom2 = Env.domain env2 |> VarSet.of_list in
       let has_same_vars env =
@@ -30,20 +29,10 @@ module Domains = struct
       in
       let a = t1 |> List.filter has_same_vars |> List.map type_for |> disj_o in
       let b = type_for env2 in
-      supertype_gen a b
+      supertype_poly a b
     )
-
-  let apply_subst s t = t |> List.map (fun e -> Env.apply_subst s e)
-  let tvars lst =
-    lst |> List.map Env.tvars |> TVarSet.union_many
   let empty = []
   let singleton e = add empty e
-  let remove_vars t vs =
-    let vs = VarSet.of_list vs in
-    let restrict e =
-      e |> Env.filter (fun v _ -> VarSet.mem v vs |> not)
-    in
-    List.map restrict t
 end
 
 module PartialAnnot = struct
@@ -82,8 +71,7 @@ module PartialAnnot = struct
     | Inter of t inter
   [@@deriving show]
 
-  let tvars_branch f (a, _, d, _) =
-    TVarSet.union (f a) (Domains.tvars d)
+  let tvars_branch f (a, _, _, _) = f a
   let rec tvars_union (i,p,e,d,u) =
     let aux1 ty = vars ty in
     let aux2 (ty, t) = TVarSet.union (vars ty) (tvars t) in
@@ -112,9 +100,7 @@ module PartialAnnot = struct
       TVarSet.union_many [tvars_a a ; tvars t ; List.map Env.tvars envs |> TVarSet.union_many ]
     | Inter i -> tvars_inter i
 
-  let apply_subst_branch f s (a, s', d, b) =
-    (f s a, s' (* The subst only has polymorphic vars *),
-    Domains.apply_subst s d, b)
+  let apply_subst_branch f s (a, s', d, b) = (f s a, s', d, b)
   let rec apply_subst_union s (i,p,e,d,u) =
     let apply = apply_subst_simplify s in
     let aux1 ty = apply ty in

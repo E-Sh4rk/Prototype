@@ -85,7 +85,7 @@ type 'a res =
   | Ok of 'a
   | Fail
   | Split of Env.t * 'a * 'a
-  | Subst of (Domains.t * bool (* Low priority default *)) * Subst.t list * 'a * 'a
+  | Subst of (Env.t * bool (* Low priority default *)) * Subst.t list * 'a * 'a
   | NeedVar of Variable.t * 'a * 'a
 
 let map_res f res =
@@ -250,7 +250,7 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
         (* Format.printf "@.VS:@.%a@." Domains.pp expl ;
         Format.printf "with tvars:@.%a" TVarSet.pp tvars ; *)
         pending |> List.filter (fun (_,_,d,_) ->
-          let r = Domains.covers tvars expl d |> not in
+          let r = Domains.covers expl d |> not in
           (* if not r then Format.printf "REMOVED:@.%a@." Domains.pp d
           else Format.printf "KEPT:@.%a@." Domains.pp d ; *)
           r
@@ -305,20 +305,19 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
 
 let merge_substs vars tvars tvars_branch apply_subst_branch mk_inter
   ((d,lpd), lst, pannot, default) =
-  let refresh (b, d) =
+  let refresh b =
     let tvs = TVarSet.diff (tvars_branch b) tvars |> TVarSet.filter TVar.can_infer in
-    let s = refresh tvs in
-    (apply_subst_branch s b, Domains.apply_subst s d)
+    apply_subst_branch (refresh tvs) b
   in
   let lst = lst
-    |> List.map (fun s -> (s, Domains.apply_subst s d, apply_subst_branch s pannot))
-    |> List.map (fun (s, d, b) -> let (b,d) = refresh (b,d) in (s, d, b, false))
+    |> List.map (fun s -> (s, Env.apply_subst s d, apply_subst_branch s pannot))
+    |> List.map (fun (s, d, b) -> (s, d, refresh b, false))
   in
   (* NOTE: It is important for the default case to be inserted at the end (smaller priority). *)
   let lst = lst@[(Subst.identity, d, default, lpd)] |> List.map
     (fun (s,d,pannot,lpd) ->
       let s = Subst.compose_restr (Subst.codom s |> generalize) s in
-      let d = Domains.remove_vars d vars in
+      let d = Env.rms vars d |> Domains.singleton in
       (pannot, s, d, lpd)
     )
   in
@@ -347,7 +346,7 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
   let vartype v = Env.find v env in
   let needvar v a1 a2 = NeedVar (v, a1, a2) in
   (* TODO: enable the lpd flag? (prune some uninteresting branches) *)
-  let needsubst ss a1 a2 = Subst ((Domains.singleton env, (*true*) false), ss, a1, a2) in
+  let needsubst ss a1 a2 = Subst ((env, (*true*) false), ss, a1, a2) in
   let open PartialAnnot in
   match a, pannot_a with
   | a, InterA i ->
@@ -479,7 +478,7 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
 and infer_mono tenv expl env pannot e =
   let memvar v = Env.mem v env in
   let needvar v a1 a2 = NeedVar (v, a1, a2) in
-  let needsubst ss a1 a2 = Subst ((Domains.singleton env, false), ss, a1, a2) in
+  let needsubst ss a1 a2 = Subst ((env, false), ss, a1, a2) in
   let open PartialAnnot in
   match e, pannot with
   | _, Untyp -> log ~level:3 "Untyp annot generated a fail.@." ; Fail

@@ -621,7 +621,6 @@ let rec filter f l =
     then (fst(l),filter f (snd(l)))
     else filter f (snd(l))
 
-(* TODO: FIX *)
 let test_patterns_annots x y =
   let pack (x:'a;'b) (y:'a;'b) = (x,y) in
   let (y,x) = pack x y in

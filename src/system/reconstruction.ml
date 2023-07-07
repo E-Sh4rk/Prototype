@@ -317,7 +317,7 @@ let merge_substs vars tvars tvars_branch apply_subst_branch mk_inter
   (* NOTE: It is important for the default case to be inserted at the end (smaller priority). *)
   let lst = lst@[(d, default, lpd)] |> List.map
     (fun (d,pannot,lpd) ->
-      let d = Env.rms vars d |> Domains.singleton in
+      let d = Env.rms vars d |> Domains.singleton tvars in
       (pannot, d, lpd)
     )
   in

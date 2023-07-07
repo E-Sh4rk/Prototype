@@ -12,7 +12,8 @@ module Domains = struct
       |> TVarSet.union_many in
     let e = Env.apply_subst (generalize vars) e in
     e::lst
-  let cup = (@)
+  let inhabitant = mk_atom "inhabitant"
+  (* (used for convenience, in order to encode several constraints in a product) *)
   let covers t1 t2 =
     t2 |> List.for_all (fun env2 ->
       let dom2 = Env.domain env2 |> VarSet.of_list in
@@ -23,15 +24,17 @@ module Domains = struct
       let dom2 = dom2 |> VarSet.elements in
       let type_for env =
         dom2 |> List.fold_left (fun acc v ->
-          let t = Env.find v env in
+          let t = Env.find v env |> cup inhabitant in
           mk_times (cons acc) (cons t)
         ) any
       in
-      let a = t1 |> List.filter has_same_vars |> List.map type_for |> disj_o in
       let b = type_for env2 in
+      let a = t1 |> List.filter has_same_vars |> List.map type_for
+        |> List.filter (fun a -> subtype_poly a b) |> disj_o in
       supertype_poly a b
     )
   let empty = []
+  let cup = (@)
   let singleton e = add empty e
 end
 

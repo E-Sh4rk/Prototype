@@ -20,7 +20,6 @@ module PartialAnnot : sig
     and union = union_infer * union_prop * union_expl * union_done * union_unr
     and 'a annotated_branch =
         'a
-        * Subst.t (* Substitution from which it originated (used to order exploration) *)
         * Domains.t (* Domains involved (used to prune branches) *)
         * bool (* Low priority default: type only if no other branch is typeable *)
     and 'a inter = ('a annotated_branch) list (* Explored *)

@@ -137,7 +137,7 @@ let approximate_app ~infer t1 t2 resvar =
 
 let infer_poly_inter infer_poly_branch (b1, b2, (tf,_)) =
   assert (b2 = [] && b1 <> [] && tf) ;
-  b1 |> List.map (fun (annot,_,_,_) -> infer_poly_branch annot)
+  b1 |> List.map (fun (annot,_,_) -> infer_poly_branch annot)
 
 let rec infer_poly_a vardef tenv env pannot_a a =
   let open PartialAnnot in

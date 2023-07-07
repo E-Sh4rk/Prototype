@@ -138,6 +138,16 @@ let simplify_tallying_infer env res_type sols =
     let sol1 = Subst.compose_restr (Subst.codom sol1 |> generalize) sol1 in
     nb1 <= nb2 && subst_more_general sol1 sol2
   in
+  let is_minimal_sol (_,r) ss =
+    ss |> List.for_all (fun (_,r') ->
+      subtype_poly r r' || not (subtype_poly r' r)
+    )
+  in
+  let rec order sols =
+    match find_among_others is_minimal_sol sols with
+    | None -> sols
+    | Some (h, sols) -> h::(order sols)
+  in
   sols
   (* Restrict to tvars and store result *)
   |> List.map (fun sol ->
@@ -207,8 +217,8 @@ let simplify_tallying_infer env res_type sols =
   )
   (* Remove "less general" solutions *)
   |> keep_only_minimal better_sol
-  (* Restrict solutions to tvars *)
-  |> List.map fst
+  (* Order solutions (more precise results first) *)
+  |> order |> List.map fst
   (* Printing (debug) *)
   (* |> (fun res ->
     Format.printf "=== Solutions ===@." ;
@@ -218,7 +228,7 @@ let simplify_tallying_infer env res_type sols =
   ) *)
 
 let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
-  let expl = b1 |> List.fold_left (fun acc (_,_,d,_) -> Domains.cup acc d) expl in
+  let expl = b1 |> List.fold_left (fun acc (_,d,_) -> Domains.cup acc d) expl in
   let tvars = env |> Env.filter (fun x _ -> Variable.is_lambda_var x) |> Env.tvars in
   let tvars = TVarSet.filter TVar.is_mono tvars in
   let uNb = List.length b2 and eNb = List.length b1 in
@@ -234,22 +244,17 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
     subtype_poly a b
   in
   let rec aux explored expl pending =
-    let smg s1 s2 =
-      subst_more_general s1 s2 && subst_nb_new_vars s1 <= subst_nb_new_vars s2
-    in
-    let leq s s' = (smg s s' |> not) || smg s' s in
-    let leq (_,s,_,lpd) (_,s',_,lpd') = (lpd' || not lpd) && leq s s' in
     (* Remove low-priority default branches if there is at least one other branch *)
     let pending =
       if explored = [] then pending
-      else pending |> List.filter (fun (_,_,_,lpd) -> not lpd)
+      else pending |> List.filter (fun (_,_,lpd) -> not lpd)
     in
     (* Remove branches that are estimated not to add anything *)
     let pending =
       if ud then pending else (
         (* Format.printf "@.VS:@.%a@." Domains.pp expl ;
         Format.printf "with tvars:@.%a" TVarSet.pp tvars ; *)
-        pending |> List.filter (fun (_,_,d,_) ->
+        pending |> List.filter (fun (_,d,_) ->
           let r = Domains.covers expl d |> not in
           (* if not r then Format.printf "REMOVED:@.%a@." Domains.pp d
           else Format.printf "KEPT:@.%a@." Domains.pp d ; *)
@@ -265,8 +270,8 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
           log ~level:5 "Finished reconstructing intersection. Typing it..." ;
           explored
           (* We type each branch and remove useless ones *)
-          |> List.map (fun (pannot, s, est, lpd) ->
-            ((pannot, s, est, lpd), typeof pannot)
+          |> List.map (fun (pannot, est, lpd) ->
+            ((pannot, est, lpd), typeof pannot)
           )
           |> (fun r -> log ~level:5 "Simplifying it...@." ; r)
           (* |> List.map (fun (a, t) -> Format.printf "%a@.@." pp_typ t ; (a,t)) *)
@@ -279,26 +284,22 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
         )
       in
       Ok (explored, [], (true, ud))
-    | pending ->
-      let f br others = others |> List.for_all (leq br) in
-      (* Select more specific branches first *)
-      (* NOTE: the order also matters (priority to the first) *)
-      let ((pannot, s, est, lpd), pending) = find_among_others f pending |> Option.get in
+    | (pannot, est, lpd)::pending ->
+      (* NOTE: the order matters (priority to the first) *)
       if nontrivial then (
-        log ~level:3 "Exploring intersection issued from %a@." Subst.pp s ;
-        (* pending |> List.iter (fun (_,s,_) -> log ~level:3 "VS %a@." Subst.pp s) *)
+        log ~level:3 "Exploring intersection issued from %a@." Domains.pp est
       ) ;
       let res = infer_branch expl pannot in
       begin match res with
       | Ok pannot ->
-        log ~level:3 "Success of intersection issued from %a@." Subst.pp s;
-        aux ((pannot, s, est, lpd)::explored) (Domains.cup expl est) pending
+        log ~level:3 "Success of intersection issued from %a@." Domains.pp est;
+        aux ((pannot, est, lpd)::explored) (Domains.cup expl est) pending
       | Fail when not ud && (explored <> [] || pending <> []) ->
-        log ~level:3 "Failure of intersection issued from %a@." Subst.pp s;
+        log ~level:3 "Failure of intersection issued from %a@." Domains.pp est;
         aux explored est pending
       | res ->
-        log ~level:3 "Backtracking for intersection issued from %a@." Subst.pp s;
-        map_res (fun x -> (explored, (x,s,est,lpd)::pending, (tf,ud))) res
+        log ~level:3 "Backtracking for intersection issued from %a@." Domains.pp est;
+        map_res (fun x -> (explored, (x,est,lpd)::pending, (tf,ud))) res
       end
   in
   aux b1 expl b2
@@ -310,19 +311,18 @@ let merge_substs vars tvars tvars_branch apply_subst_branch mk_inter
     apply_subst_branch (refresh tvs) b
   in
   let lst = lst
-    |> List.map (fun s -> (s, Env.apply_subst s d, apply_subst_branch s pannot))
-    |> List.map (fun (s, d, b) -> (s, d, refresh b, false))
+    |> List.map (fun s -> (Env.apply_subst s d, apply_subst_branch s pannot))
+    |> List.map (fun (d, b) -> (d, refresh b, false))
   in
   (* NOTE: It is important for the default case to be inserted at the end (smaller priority). *)
-  let lst = lst@[(Subst.identity, d, default, lpd)] |> List.map
-    (fun (s,d,pannot,lpd) ->
-      let s = Subst.compose_restr (Subst.codom s |> generalize) s in
+  let lst = lst@[(d, default, lpd)] |> List.map
+    (fun (d,pannot,lpd) ->
       let d = Env.rms vars d |> Domains.singleton in
-      (pannot, s, d, lpd)
+      (pannot, d, lpd)
     )
   in
   begin match lst with
-  | [(default,_,_,_)] -> default
+  | [(default,_,_)] -> default
   | lst ->
     let n = List.length lst in
     if n > 1 then log ~level:2 "@.Creating an intersection with %n branches.@." n ;
@@ -461,7 +461,7 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
   | Lambda (ADomain ts, _, _), InferA ->
     let branches = ts |> List.map (fun t ->
       let pannot_a = LambdaA (t, Infer) in
-      (pannot_a, Subst.identity, Domains.empty, false)
+      (pannot_a, Domains.empty, false)
     ) in
     let pannot_a = InterA ([], branches, (false, true)) in
     infer_mono_a vardef tenv expl env pannot_a a

@@ -29,3 +29,12 @@ let filter_stub filter (f: ('a->Any) & ('b -> ~True)) (l:[('a|'b)*]) =
   else filter f (snd(l))
 
 let filter = fixpoint filter_stub
+
+let rec (concat : ['a*] -> ['b*] -> ['a* ; 'b*]) x y =
+  if x is Nil then y else (fst x, (concat (snd x) y))
+
+let rec flatten x = match x with
+ | :[] -> []
+ | (h, t & :List) -> concat (flatten h) (flatten t)
+ | _ -> [x] 
+end

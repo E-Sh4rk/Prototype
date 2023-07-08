@@ -15,7 +15,7 @@ requirejs(['vs/editor/editor.main'], function () {
 		}	
 	});
 	let editor = monaco.editor.create(document.getElementById('container'), {
-		value: '(* Press CTRL+Enter to typecheck the program. *)\n(* Press F2 to load an example. *)\n(* (also accessible through contextual menu) *)\n\n',
+		value: '(* Press CTRL-Enter to type the current buffer. *)\n(* Press F2 (or right-click) to load an example. *)\n\n',
 		theme: 'vs-custom',
 		language: 'stml',
 		automaticLayout: true,
@@ -127,7 +127,7 @@ requirejs(['vs/editor/editor.main'], function () {
 		}
 		editor.addAction({
 			id: 'typecheck',
-			label: 'Typecheck program',
+			label: 'Type current buffer',
 			keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
 			precondition: null,
 			keybindingContext: null,

@@ -31,10 +31,13 @@ let filter_stub filter (f: ('a->Any) & ('b -> ~True)) (l:[('a|'b)*]) =
 let filter = fixpoint filter_stub
 
 let rec (concat : ['a*] -> ['b*] -> ['a* ; 'b*]) x y =
-  if x is Nil then y else (fst x, (concat (snd x) y))
+  match x with
+  | :[] -> y
+  | (h, t) -> (h, concat t y)
+  end
 
 let rec flatten x = match x with
  | :[] -> []
- | (h, t & :List) -> concat (flatten h) (flatten t)
+ | (h, t) & :List -> concat (flatten h) (flatten t)
  | _ -> [x] 
 end

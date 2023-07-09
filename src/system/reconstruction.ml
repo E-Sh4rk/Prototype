@@ -278,12 +278,14 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
             ((pannot, est, lpd), typeof pannot)
           )
           |> (fun r -> log ~level:5 "Simplifying it...@." ; r)
-          (* |> List.map (fun (a, t) -> Format.printf "%a@.@." pp_typ t ; (a,t)) *)
+          (* |> List.map (fun (a, t) -> log ~level:5 "%a@.@." pp_typ t ; (a,t)) *)
           |> Utils.filter_among_others
           (fun (_,ty) others ->
             let ty' = others |> List.map snd |> conj in
             subtype_gen ty' ty |> not
           )
+          |> (fun r -> log ~level:5 "Done.@." ; r)
+          (* |> List.map (fun (a, t) -> log ~level:5 "%a@.@." pp_typ t ; (a,t)) *)
           |> List.map fst
         )
       in

@@ -139,7 +139,7 @@ let simplify_tallying_infer env res_type sols =
     let respart1 = Subst.construct [(res_var, cup res1 (TVar.typ res_var_p))] in
     let respart2 = Subst.construct [(res_var, res2)] in
     let sol1, sol2 = Subst.combine sol1 respart1, Subst.combine sol2 respart2 in
-    let sol1 = Subst.compose_restr (Subst.codom sol1 |> generalize_inferable) sol1 in
+    let sol1 = Subst.compose_restr (Subst.codom sol1 |> generalize) sol1 in
     nb1 <= nb2 && subst_more_general sol1 sol2
   in
   let is_minimal_sol (_,r) ss =
@@ -201,7 +201,7 @@ let simplify_tallying_infer env res_type sols =
       )
       |> List.filter (fun s ->
         let res' = Subst.apply s res in
-        let res' = Subst.apply (vars res' |> generalize_inferable) res' in
+        let res' = Subst.apply (vars res' |> generalize) res' in
         subtype_poly res' res
       )
       in

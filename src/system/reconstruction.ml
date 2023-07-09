@@ -558,38 +558,33 @@ and infer_mono tenv expl env pannot e =
           |> List.flatten
         else []
       in
-      let pannot = Propagate (pannot_a, pannot1, propagate) in
+      let pannot = Propagate (pannot_a, propagate, ([(any, pannot1)], [])) in
       infer_mono tenv expl env pannot e
     | Fail -> infer_mono tenv expl env (Skip pannot2) e
     | res -> map_res (fun x -> TryKeep (x, pannot1, pannot2)) res
     end
-  | Bind (v,_,_), Propagate (pannot_a, pannot, gammas) ->
+  | Bind (v,_,_), Propagate (pannot_a, gammas, union) ->
     let propagate = gammas |>
       Utils.find_among_others (fun env' _ -> is_compatible env env') in
     begin match propagate with
     | Some (env',gammas) ->
       log ~level:1 "Var %a is ok but its DNF needs a split.@." Variable.pp v ;
-      let pannot = Propagate (pannot_a, pannot, gammas) in
+      let pannot = Propagate (pannot_a, gammas, union) in
       let env' = Env.filter (fun v t -> subtype (Env.find v env) t |> not) env' in
       Split (env', pannot, pannot)
-    | None ->
-      let pannot = Keep (pannot_a, ([], [(any, pannot)], [])) in
-      infer_mono tenv expl env pannot e
+    | None -> infer_mono tenv expl env (Keep (pannot_a, union)) e
     end
   | Bind (v, a, e), Keep (pannot_a, splits) ->
-    let type_def () =
-      let annot_a = infer_poly_a v tenv env pannot_a a in
-      let t = typeof_a_nofail v tenv env annot_a a in
-      log ~level:1 "Var %a typed with type %a.@." Variable.pp v pp_typ t ;
-      t
-    in
     let keep = map_res (fun x -> Keep (pannot_a, x)) in
     let rec aux splits =
       match splits with
-      | ([],[],[]) -> assert false
-      | ([],[],d) -> Ok (Keep (pannot_a, ([],[],d)))
-      | (p,(s,pannot)::ex,d) ->
-        let t = cap_o (type_def ()) s in
+      | ([],[]) -> assert false
+      | ([],d) -> Ok (Keep (pannot_a, ([],d)))
+      | ((s,pannot)::ex,d) ->
+        let annot_a = infer_poly_a v tenv env pannot_a a in
+        let t = typeof_a_nofail v tenv env annot_a a in
+        log ~level:1 "Var %a typed with type %a.@." Variable.pp v pp_typ t ;  
+        let t = cap_o t s in
         log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
         begin match infer_mono_iterated tenv expl (Env.add v t env) pannot e with
         | Ok pannot ->
@@ -598,28 +593,18 @@ and infer_mono tenv expl env pannot e =
               and apply this substitution to pannot. It might be needed to do
               something equivalent in the polymorphic inference, as a branch
               must be rigourously smaller in order to be assimilated. *)
-          aux (p,ex,(s, pannot)::d)
+          aux (ex,(s, pannot)::d)
         | Split (env', pannot1, pannot2) when Env.mem v env' ->
           let s' = Env.find v env' in
           let t1 = cap_o s s' |> simplify_typ in
           let t2 = diff_o s s' |> simplify_typ in
           let gammas1 = refine_a tenv env a (neg t1) in
           let gammas2 = refine_a tenv env a (neg t2) in
-          let splits1 = ((t1,gammas1,pannot1)::(t2,gammas2,pannot2)::p,ex,d) in
-          let splits2 = (p,(s,pannot2)::ex,d) in
-          Split (Env.rm v env', splits1, splits2) |> keep
-        | res -> res |> map_res (fun x -> (p,(s, x)::ex,d)) |> keep
-        end
-      | ((s,gammas,pannot)::p,ex,d) ->
-        let propagate = gammas |>
-          Utils.find_among_others (fun env' _ -> is_compatible env env') in
-        begin match propagate with
-        | Some (env',gammas) ->
-          log ~level:0 "Var %a is ok but a split must be propagated.@." Variable.pp v ;
-          let env' = Env.filter (fun v t -> subtype (Env.find v env) t |> not) env' in
-          let pannot = ((s,gammas,pannot)::p,ex,d) in
-          Split (env', pannot, pannot) |> keep
-        | None -> aux (p,(s, pannot)::ex,d)
+          let res1 = Propagate (pannot_a, gammas1@gammas2,
+            ((t1,pannot1)::(t2,pannot2)::ex,d)) in
+          let res2 = Keep (pannot_a, ((s,pannot2)::ex,d)) in
+          Split (Env.rm v env', res1, res2)
+        | res -> res |> map_res (fun x -> ((s, x)::ex,d)) |> keep
         end
     in
     aux splits

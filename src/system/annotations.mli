@@ -13,9 +13,8 @@ end
 
 module PartialAnnot : sig
     type union_expl = (typ * t) list
-    and union_prop = (typ * Env.t list * t) list
     and union_done = (typ * t) list
-    and union = union_prop * union_expl * union_done
+    and union = union_expl * union_done
     and 'a annotated_branch =
         'a
         * Domains.t (* Domains involved (used to prune branches) *)
@@ -36,7 +35,7 @@ module PartialAnnot : sig
         | Skip of t
         | TrySkip of t
         | TryKeep of a * t * t
-        | Propagate of a * t * Env.t list
+        | Propagate of a * Env.t list * union
         | Inter of t inter
 
     val pp_a : Format.formatter -> a -> unit

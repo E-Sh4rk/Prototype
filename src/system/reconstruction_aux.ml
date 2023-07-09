@@ -226,8 +226,8 @@ and infer_poly tenv env pannot e =
   | Bind (_, _, e), PartialAnnot.Skip pannot ->
     let annot = infer_poly tenv env pannot e in
     FullAnnot.Skip annot
-  | Bind (v, a, e), PartialAnnot.Keep (pannot_a, (p,ex,d)) ->
-    assert (d <> [] && ex = [] && p = []) ;
+  | Bind (v, a, e), PartialAnnot.Keep (pannot_a, (ex,d)) ->
+    assert (d <> [] && ex = []) ;
     let annot_a = infer_poly_a v tenv env pannot_a a in
     assert (subtype any (List.map fst d |> disj)) ;
     let t = typeof_a_nofail v tenv env annot_a a in

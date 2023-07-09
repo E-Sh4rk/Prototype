@@ -28,6 +28,7 @@ module PartialAnnot : sig
                     * bool (* User defined *))
     and a =
         | InferA | TypA | UntypA
+        | ThenVarA | ElseVarA
         | EmptyA | ThenA | ElseA (* NOTE: not in the paper, small optimisation *)
         | LambdaA of typ * t
         | InterA of a inter

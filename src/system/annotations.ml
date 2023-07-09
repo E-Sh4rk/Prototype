@@ -71,6 +71,7 @@ module PartialAnnot = struct
   [@@deriving show]
   and a =
     | InferA | TypA | UntypA
+    | ThenVarA | ElseVarA
     | EmptyA | ThenA | ElseA
     | LambdaA of typ * t
     | InterA of a inter
@@ -100,7 +101,8 @@ module PartialAnnot = struct
       (List.map (tvars_branch tvars) a |> TVarSet.union_many)
       (List.map (tvars_branch tvars) b |> TVarSet.union_many)
   and tvars_a a = match a with
-  | InferA | TypA | UntypA | EmptyA | ThenA | ElseA -> TVarSet.empty
+  | InferA | TypA | UntypA | ThenVarA | ElseVarA
+  | EmptyA | ThenA | ElseA -> TVarSet.empty
   | LambdaA (ty, t) -> TVarSet.union (vars ty) (tvars t)
   | InterA i -> tvars_inter_a i
   and tvars t =
@@ -133,6 +135,7 @@ module PartialAnnot = struct
   | InferA -> InferA
   | TypA -> TypA
   | UntypA -> UntypA
+  | ThenVarA -> ThenVarA | ElseVarA -> ElseVarA
   | EmptyA -> EmptyA | ThenA -> ThenA | ElseA -> ElseA
   | LambdaA (ty, t) -> LambdaA (apply_subst_simplify s ty, apply_subst s t)
   | InterA i -> InterA (apply_subst_inter_a s i)

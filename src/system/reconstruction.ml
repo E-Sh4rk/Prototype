@@ -346,6 +346,7 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
   let needvar v a1 a2 = NeedVar (v, a1, a2) in
   (* TODO: enable the lpd flag? (prune some uninteresting branches) *)
   let needsubst ss a1 a2 = Subst ((env, (*true*) false), ss, a1, a2) in
+  let needsubst_no_lpd ss a1 a2 = Subst ((env, false), ss, a1, a2) in
   let open PartialAnnot in
   match a, pannot_a with
   | a, InterA i ->
@@ -442,17 +443,30 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
         log ~level:3 "Solution (simplified): %a@." Subst.pp s
       ) ;
       needsubst res TypA UntypA
-  | Ite (v, tau, v1, v2), InferA ->
+  | Ite (v, tau, _, _), InferA ->
     if memvar v then
       let t = vartype v in
-      if subtype_poly t empty
-      then Ok EmptyA
-      else if subtype_poly t tau
-      then (if memvar v1 then Ok ThenA else needvar v1 ThenA UntypA)
-      else if subtype_poly t (neg tau)
-      then (if memvar v2 then Ok ElseA else needvar v2 ElseA UntypA)
+      if subtype t empty then Ok EmptyA
+      else if subtype t tau
+      then
+        let res = tallying_infer [(t, empty)] in
+        let res = simplify_tallying_infer env empty res in
+        if List.exists Subst.is_identity res
+        then Ok EmptyA
+        else needsubst_no_lpd res EmptyA ThenVarA
+      else if subtype t (neg tau)
+      then
+        let res = tallying_infer [(t, empty)] in
+        let res = simplify_tallying_infer env empty res in
+        if List.exists Subst.is_identity res
+        then Ok EmptyA
+        else needsubst_no_lpd res EmptyA ElseVarA
       else Split (Env.singleton v tau, InferA, InferA)
     else needvar v InferA UntypA
+  | Ite (_, _, v1, _), ThenVarA ->
+    if memvar v1 then Ok ThenA else needvar v1 ThenA UntypA
+  | Ite (_, _, _, v2), ElseVarA ->
+    if memvar v2 then Ok ElseA else needvar v2 ElseA UntypA
   | Lambda (Unnanoted, _, _), InferA ->
     let alpha = TVar.mk_mono (Some (Variable.show vardef)) |> TVar.typ in
     let pannot_a = LambdaA (alpha, Infer) in
@@ -473,10 +487,28 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
       |> map_res (fun x -> LambdaA (s, x))
   | _, _ -> assert false
 
+  (*
+        let t = cap_o (type_def ()) s in
+        log ~level:3 "@.Tallying (inference) for %a: %a <= %a@."
+          Variable.pp v pp_typ t pp_typ empty ;
+        let res = tallying_infer [(t, empty)] in
+        res |> List.iter (fun s ->
+          log ~level:3 "Solution: %a@." Subst.pp s
+        ) ;
+        let res = simplify_tallying_infer env empty res in
+        res |> List.iter (fun s ->
+          log ~level:3 "Solution (simplified): %a@." Subst.pp s
+        ) ;
+        if List.exists Subst.is_identity res
+        then aux (i,p,ex,d,s::u)
+        else
+          let gammas = refine_a tenv env a (neg s) in
+          needsubst res (i,p,ex,d,s::u) (i,(s,gammas,pannot)::p,ex,d,u) |> keep
+  *)
+
 and infer_mono tenv expl env pannot e =
   let memvar v = Env.mem v env in
   let needvar v a1 a2 = NeedVar (v, a1, a2) in
-  let needsubst ss a1 a2 = Subst ((env, false), ss, a1, a2) in
   let open PartialAnnot in
   match e, pannot with
   | _, Untyp -> log ~level:3 "Untyp annot generated a fail.@." ; Fail
@@ -588,25 +620,12 @@ and infer_mono tenv expl env pannot e =
           log ~level:0 "Var %a is ok but a split must be propagated.@." Variable.pp v ;
           let env' = Env.filter (fun v t -> subtype (Env.find v env) t |> not) env' in
           Split (env', (i,p,ex,d,s::u), (i,(s,gammas,pannot)::p,ex,d,u)) |> keep
+          (* Split (env', (i,(s,gammas,pannot)::p,ex,d,u), (i,(s,gammas,pannot)::p,ex,d,u)) |> keep *)
         | None -> aux (i,p,(s, pannot)::ex,d,u)
         end
       | ((s, pannot)::i,p,ex,d,u) ->
-        let t = cap_o (type_def ()) s in
-        log ~level:3 "@.Tallying (inference) for %a: %a <= %a@."
-          Variable.pp v pp_typ t pp_typ empty ;
-        let res = tallying_infer [(t, empty)] in
-        res |> List.iter (fun s ->
-          log ~level:3 "Solution: %a@." Subst.pp s
-        ) ;
-        let res = simplify_tallying_infer env empty res in
-        res |> List.iter (fun s ->
-          log ~level:3 "Solution (simplified): %a@." Subst.pp s
-        ) ;
-        if List.exists Subst.is_identity res
-        then aux (i,p,ex,d,s::u)
-        else
-          let gammas = refine_a tenv env a (neg s) in
-          needsubst res (i,p,ex,d,s::u) (i,(s,gammas,pannot)::p,ex,d,u) |> keep
+        let gammas = refine_a tenv env a (neg s) in
+        aux (i,(s,gammas,pannot)::p,ex,d,u)
     in
     aux splits
   | _, _ -> assert false

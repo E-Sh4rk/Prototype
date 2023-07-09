@@ -458,7 +458,7 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
   | Lambda (ADomain ts, _, _), InferA ->
     let branches = ts |> List.map (fun t ->
       let pannot_a = LambdaA (t, Infer) in
-      (pannot_a, Domains.empty, false)
+      (pannot_a, expl, false)
     ) in
     let pannot_a = InterA ([], branches, (false, true)) in
     infer_mono_a vardef tenv expl env pannot_a a
@@ -466,9 +466,8 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
     log ~level:2 "Entering lambda for %a with domain %a.@." Variable.pp v pp_typ s ;
     if is_empty s then (log ~level:3 "Lambda with empty domain generated a fail.@." ; Fail)
     else
-      infer_mono_iterated tenv
-        Domains.empty
-        (Env.add v s env) pannot e
+      let env = Env.add v s env in
+      infer_mono_iterated tenv (Domains.enter_lambda env expl) env pannot e
       |> map_res (fun x -> LambdaA (s, x))
   | _, _ -> assert false
 
@@ -493,7 +492,7 @@ and infer_mono tenv expl env pannot e =
     |> map_res (fun x -> Inter x)
   | Bind _, Infer -> infer_mono tenv expl env (TrySkip Infer) e
   | Bind (v, _, e) as ee, TrySkip pannot ->
-    begin match infer_mono_iterated tenv Domains.empty env pannot e with
+    begin match infer_mono_iterated tenv expl env pannot e with
     | NeedVar (v', pannot1, pannot2) when Variable.equals v v' ->
       log ~level:0 "Var %a needed.@." Variable.pp v ;
       infer_mono tenv expl env (TryKeep (InferA, pannot1, pannot2)) ee
@@ -501,14 +500,14 @@ and infer_mono tenv expl env pannot e =
     | res -> map_res (fun x -> TrySkip x) res
     end
   | Bind (v, _, e) as ee, Skip pannot ->
-    begin match infer_mono_iterated tenv Domains.empty env pannot e with
+    begin match infer_mono_iterated tenv expl env pannot e with
     | NeedVar (v', _, pannot2) when Variable.equals v v' ->
       infer_mono tenv expl env (Skip pannot2) ee
     | res -> map_res (fun x -> Skip x) res
     end
   | Bind (v, a, _), TryKeep (pannot_a, pannot1, pannot2) ->
     log ~level:1 "Trying to type var %a.@." Variable.pp v ;
-    begin match infer_mono_a_iterated v tenv Domains.empty env pannot_a a with
+    begin match infer_mono_a_iterated v tenv expl env pannot_a a with
     | Ok pannot_a ->
       (* If the definition is a function whose DNF has many disjuncts,
           we try to split them. *)
@@ -560,7 +559,7 @@ and infer_mono tenv expl env pannot e =
       | (i,p,(s,pannot)::ex,d,u) ->
         let t = cap_o (type_def ()) s in
         log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
-        begin match infer_mono_iterated tenv Domains.empty (Env.add v t env) pannot e with
+        begin match infer_mono_iterated tenv expl (Env.add v t env) pannot e with
         | Ok pannot ->
           (* TODO: if possible, find a substitution (over type variables not in the env)
               that would make the new split smaller than the union of the previous ones,

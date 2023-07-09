@@ -7,6 +7,7 @@ module Domains : sig
     val singleton : Env.t -> t
     val cup : t -> t -> t
     val covers : t -> t -> bool
+    val enter_lambda : Env.t -> t -> t
     val pp : Format.formatter -> t -> unit
 end
 

@@ -4,7 +4,7 @@ open Types.Tvar
 module Domains : sig
     type t
     val empty : t
-    val singleton : TVarSet.t -> Env.t -> t
+    val singleton : Env.t -> t
     val cup : t -> t -> t
     val covers : t -> t -> bool
     val pp : Format.formatter -> t -> unit

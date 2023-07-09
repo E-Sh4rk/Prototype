@@ -6,9 +6,9 @@ open Parsing.Variable
 module Domains = struct
   type t = Env.t list
   [@@deriving show]
-  let add lst tvars e =
+  let add lst e =
     let e = Env.filter (fun x _ -> Variable.is_lambda_var x) e in
-    let tvars = TVarSet.diff (Env.tvars e) tvars in
+    let tvars = Env.tvars e |> TVarSet.filter TVar.can_infer in
     let e = Env.apply_subst (generalize tvars) e in
     e::lst
   let inhabitant = mk_atom "inhabitant"
@@ -27,19 +27,14 @@ module Domains = struct
           mk_times (cons acc) (cons t)
         ) any
       in
-      let subtype_gen a b =
-        let a = Subst.apply (vars a |> generalize) a in
-        subtype_poly a b    
-      in
       let b = type_for env2 in
       let a = t1 |> List.filter has_same_vars |> List.map type_for
-        |> List.filter (fun a -> subtype_gen a b) |> disj_o in
+        |> List.filter (fun a -> subtype_poly a b) |> disj_o in
       supertype_poly a b
     )
   let empty = []
   let cup = (@)
-  let singleton tvars e = add empty tvars e
-  let apply_subst s t = t |> List.map (Env.apply_subst s)
+  let singleton e = add empty e
 end
 
 module PartialAnnot = struct
@@ -107,7 +102,7 @@ module PartialAnnot = struct
       TVarSet.union_many [tvars_a a ; tvars t ; List.map Env.tvars envs |> TVarSet.union_many ]
     | Inter i -> tvars_inter i
 
-  let apply_subst_branch f s (a, d, b) = (f s a, Domains.apply_subst s d, b)
+  let apply_subst_branch f s (a, d, b) = (f s a, d, b)
   let rec apply_subst_union s (i,p,e,d,u) =
     let apply = apply_subst_simplify s in
     let aux1 ty = apply ty in

@@ -118,6 +118,10 @@ let subst_nb_new_vars s =
   let dom = Subst.dom s |> TVarSet.destruct |> List.length in
   codom - dom
 
+let generalize_inferable tvars =
+  let tvars = TVarSet.filter TVar.can_infer tvars in
+  generalize tvars
+
 let res_var = TVar.mk_mono None
 let res_var_p = TVar.mk_poly None
 let simplify_tallying_infer env res_type sols =
@@ -135,7 +139,7 @@ let simplify_tallying_infer env res_type sols =
     let respart1 = Subst.construct [(res_var, cup res1 (TVar.typ res_var_p))] in
     let respart2 = Subst.construct [(res_var, res2)] in
     let sol1, sol2 = Subst.combine sol1 respart1, Subst.combine sol2 respart2 in
-    let sol1 = Subst.compose_restr (Subst.codom sol1 |> generalize) sol1 in
+    let sol1 = Subst.compose_restr (Subst.codom sol1 |> generalize_inferable) sol1 in
     nb1 <= nb2 && subst_more_general sol1 sol2
   in
   let is_minimal_sol (_,r) ss =
@@ -158,7 +162,7 @@ let simplify_tallying_infer env res_type sols =
   (* Generalize vars in the result when possible *)
   |> List.map (fun (sol, res) ->
     let mono = vars_involved tvars sol in
-    let gen = generalize (TVarSet.diff (vars res) mono) in
+    let gen = generalize_inferable (TVarSet.diff (vars res) mono) in
     let sol, res = Subst.compose_restr gen sol, Subst.apply gen res in
     let clean = clean_type_subst ~pos:empty ~neg:any res in
     (Subst.compose_restr clean sol, Subst.apply clean res)
@@ -188,7 +192,7 @@ let simplify_tallying_infer env res_type sols =
       let t = Subst.find' sol v in
       let mono = vars_involved (TVarSet.rm v tvars) sol in
       let pvs = TVarSet.diff (vars t) mono in
-      let g = generalize pvs in
+      let g = generalize_inferable pvs in
       let t = Subst.apply g t in
       let tallying_res = tallying [(TVar.typ v, t) ; (t, TVar.typ v)]
       |> List.map (fun s ->
@@ -197,7 +201,7 @@ let simplify_tallying_infer env res_type sols =
       )
       |> List.filter (fun s ->
         let res' = Subst.apply s res in
-        let res' = Subst.apply (vars res' |> generalize) res' in
+        let res' = Subst.apply (vars res' |> generalize_inferable) res' in
         subtype_poly res' res
       )
       in
@@ -252,8 +256,8 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
     (* Remove branches that are estimated not to add anything *)
     let pending =
       if ud then pending else (
-        (* Format.printf "@.VS:@.%a@." Domains.pp expl ;
-        Format.printf "with tvars:@.%a" TVarSet.pp tvars ; *)
+        (* Format.printf "@.VS:@.%a@." Domains.pp expl ; *)
+        (* Format.printf "with tvars:@.%a" TVarSet.pp tvars ; *)
         pending |> List.filter (fun (_,d,_) ->
           let r = Domains.covers expl d |> not in
           (* if not r then Format.printf "REMOVED:@.%a@." Domains.pp d
@@ -304,29 +308,23 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
   in
   aux b1 expl b2
 
-let merge_substs vars tvars tvars_branch apply_subst_branch mk_inter
+let merge_substs tvars tvars_branch apply_subst_branch mk_inter
   ((d,lpd), lst, pannot, default) =
   let refresh b =
     let tvs = TVarSet.diff (tvars_branch b) tvars |> TVarSet.filter TVar.can_infer in
     apply_subst_branch (refresh tvs) b
   in
   let lst = lst
-    |> List.map (fun s -> (Env.apply_subst s d, apply_subst_branch s pannot))
-    |> List.map (fun (d, b) -> (d, refresh b, false))
-  in
-  (* NOTE: It is important for the default case to be inserted at the end (smaller priority). *)
-  let lst = lst@[(d, default, lpd)] |> List.map
-    (fun (d,pannot,lpd) ->
-      let d = Env.rms vars d |> Domains.singleton tvars in
-      (pannot, d, lpd)
-    )
+    |> List.map (fun s -> (apply_subst_branch s pannot, Env.apply_subst s d))
+    |> List.map (fun (b, d) -> (refresh b, Domains.singleton d, false))
   in
   begin match lst with
-  | [(default,_,_)] -> default
+  | [] -> default
   | lst ->
-    let n = List.length lst in
-    if n > 1 then log ~level:2 "@.Creating an intersection with %n branches.@." n ;
-    mk_inter [] lst (false,false)
+    let n = List.length lst + 1 in
+    log ~level:2 "@.Creating an intersection with %n branches.@." n ;
+    (* NOTE: It is important for the default case to be inserted at the end (smaller priority). *)
+    mk_inter [] (lst@[default, Domains.singleton d, lpd]) (false,false)
   end
 
 let should_iterate env tvars_branch apply_subst_branch mk_inter res =
@@ -334,9 +332,8 @@ let should_iterate env tvars_branch apply_subst_branch mk_inter res =
   | Split (gamma, pannot, _) when Env.is_empty gamma -> Some pannot
   | Subst (info, lst, pannot, default) ->
     let tvars = Env.tvars env |> TVarSet.filter TVar.is_mono in
-    let vars = Env.domain env in
     if lst |> List.for_all (fun s -> TVarSet.inter (Subst.dom s) tvars |> TVarSet.is_empty)
-    then Some (merge_substs vars tvars tvars_branch apply_subst_branch mk_inter
+    then Some (merge_substs tvars tvars_branch apply_subst_branch mk_inter
                 (info, lst, pannot, default))
     else None
   | _ -> None

@@ -16,8 +16,7 @@ module PartialAnnot : sig
     and union_prop = (typ * Env.t list * t) list
     and union_infer = union_expl
     and union_done = (typ * t) list
-    and union_unr = typ list
-    and union = union_infer * union_prop * union_expl * union_done * union_unr
+    and union = union_infer * union_prop * union_expl * union_done
     and 'a annotated_branch =
         'a
         * Domains.t (* Domains involved (used to prune branches) *)
@@ -49,16 +48,13 @@ module PartialAnnot : sig
 
     val apply_subst_a : Subst.t -> a -> a
     val apply_subst : Subst.t -> t -> t
-
-    val unreachable_splits : union -> typ list
-    val effective_splits : union -> (typ * t) list
 end
 
 module FullAnnot : sig
     type 'a inter = 'a list
     type inst = Subst.t list
     type renaming = Subst.t
-    type union = (typ * t) list * inst
+    type union = (typ * t) list
     and a =
         | ConstA | AliasA | LetA | AbstractA
         | LambdaA of typ * t

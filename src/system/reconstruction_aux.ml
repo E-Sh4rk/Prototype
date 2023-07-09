@@ -226,21 +226,16 @@ and infer_poly tenv env pannot e =
   | Bind (_, _, e), PartialAnnot.Skip pannot ->
     let annot = infer_poly tenv env pannot e in
     FullAnnot.Skip annot
-  | Bind (v, a, e), PartialAnnot.Keep (pannot_a, (i,p,ex,d,u)) ->
+  | Bind (v, a, e), PartialAnnot.Keep (pannot_a, (i,p,ex,d)) ->
     assert (d <> [] && ex = [] && p = [] && i = []) ;
     let annot_a = infer_poly_a v tenv env pannot_a a in
-    assert (subtype any ([List.map fst d ; u] |> List.concat |> disj)) ;
+    assert (subtype any (List.map fst d |> disj)) ;
     let t = typeof_a_nofail v tenv env annot_a a in
-    let inst = u |> List.map (fun si ->
-      let t = cap_o t si in
-      tallying_one [(t, empty)]
-    )
-    in
     let branches = d |> List.map (fun (si, pannot) ->
         let t = cap_o t si in
         let env = Env.add v t env in
         (si, infer_poly tenv env pannot e)
       )
     in
-    FullAnnot.Keep (annot_a, (branches, Utils.remove_duplicates Subst.equiv inst))
+    FullAnnot.Keep (annot_a, branches)
   | _, _ ->  assert false

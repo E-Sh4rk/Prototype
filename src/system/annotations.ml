@@ -58,9 +58,7 @@ module PartialAnnot = struct
   [@@deriving show]
   and union_done = (typ * t) list
   [@@deriving show]
-  and union_unr = typ list
-  [@@deriving show]
-  and union = union_infer * union_prop * union_expl * union_done * union_unr
+  and union = union_infer * union_prop * union_expl * union_done
   [@@deriving show]
   and 'a annotated_branch = 'a * Domains.t * bool
   [@@deriving show]
@@ -87,11 +85,10 @@ module PartialAnnot = struct
   [@@deriving show]
 
   let tvars_branch f (a, _, _) = f a
-  let rec tvars_union (i,p,e,d,u) =
-    let aux1 ty = vars ty in
+  let rec tvars_union (i,p,e,d) =
     let aux2 (ty, t) = TVarSet.union (vars ty) (tvars t) in
     let aux3 (ty, env, t) = TVarSet.union_many [vars ty ; List.map Env.tvars env |> TVarSet.union_many ; tvars t] in
-    TVarSet.union_many ((List.map aux2 i)@(List.map aux3 p)@(List.map aux2 e)@(List.map aux2 d)@(List.map aux1 u))
+    TVarSet.union_many ((List.map aux2 i)@(List.map aux3 p)@(List.map aux2 e)@(List.map aux2 d))
   and tvars_inter_a (a, b, _) =
     TVarSet.union
       (List.map (tvars_branch tvars_a) a |> TVarSet.union_many)
@@ -117,12 +114,11 @@ module PartialAnnot = struct
     | Inter i -> tvars_inter i
 
   let apply_subst_branch f s (a, d, b) = (f s a, d, b)
-  let rec apply_subst_union s (i,p,e,d,u) =
+  let rec apply_subst_union s (i,p,e,d) =
     let apply = apply_subst_simplify s in
-    let aux1 ty = apply ty in
     let aux2 (ty, t) = (apply ty, apply_subst s t) in
     let aux3 (ty, env, t) = (apply ty, List.map (Env.apply_subst s) env, apply_subst s t) in
-    (List.map aux2 i, List.map aux3 p, List.map aux2 e, List.map aux2 d, List.map aux1 u)
+    (List.map aux2 i, List.map aux3 p, List.map aux2 e, List.map aux2 d)
   and apply_subst_inter_a s (a, b, flags) =
     (List.map (apply_subst_branch apply_subst_a s) a,
     List.map (apply_subst_branch apply_subst_a s) b,
@@ -153,10 +149,6 @@ module PartialAnnot = struct
     | Propagate (a, t, envs) ->
       Propagate (apply_subst_a s a, apply_subst s t, List.map (Env.apply_subst s) envs)
     | Inter i -> Inter (apply_subst_inter s i)
-
-  let unreachable_splits (_,_,_,_,u) = u
-  let effective_splits (i,p,e,d,_) =
-    (p |> List.map (fun (t,_,pa) -> (t,pa))) @ (i@e@d)
 end
 
 module FullAnnot = struct
@@ -166,7 +158,7 @@ module FullAnnot = struct
   [@@deriving show]
   type renaming = Subst.t
   [@@deriving show]
-  type union = (typ * t) list * inst
+  type union = (typ * t) list
   [@@deriving show]
   and a =
       | ConstA | AliasA | LetA | AbstractA

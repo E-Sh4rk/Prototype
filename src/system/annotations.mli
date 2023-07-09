@@ -14,9 +14,8 @@ end
 module PartialAnnot : sig
     type union_expl = (typ * t) list
     and union_prop = (typ * Env.t list * t) list
-    and union_infer = union_expl
     and union_done = (typ * t) list
-    and union = union_infer * union_prop * union_expl * union_done
+    and union = union_prop * union_expl * union_done
     and 'a annotated_branch =
         'a
         * Domains.t (* Domains involved (used to prune branches) *)

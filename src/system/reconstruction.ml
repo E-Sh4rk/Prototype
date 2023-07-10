@@ -487,25 +487,6 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
       |> map_res (fun x -> LambdaA (s, x))
   | _, _ -> assert false
 
-  (*
-        let t = cap_o (type_def ()) s in
-        log ~level:3 "@.Tallying (inference) for %a: %a <= %a@."
-          Variable.pp v pp_typ t pp_typ empty ;
-        let res = tallying_infer [(t, empty)] in
-        res |> List.iter (fun s ->
-          log ~level:3 "Solution: %a@." Subst.pp s
-        ) ;
-        let res = simplify_tallying_infer env empty res in
-        res |> List.iter (fun s ->
-          log ~level:3 "Solution (simplified): %a@." Subst.pp s
-        ) ;
-        if List.exists Subst.is_identity res
-        then aux (i,p,ex,d,s::u)
-        else
-          let gammas = refine_a tenv env a (neg s) in
-          needsubst res (i,p,ex,d,s::u) (i,(s,gammas,pannot)::p,ex,d,u) |> keep
-  *)
-
 and infer_mono tenv expl env pannot e =
   let memvar v = Env.mem v env in
   let needvar v a1 a2 = NeedVar (v, a1, a2) in

@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Polymorphic Set-Theoretic Type System/Documentation</title>
+</head>
+<style>
+    .section {
+        padding: 1em;
+    }
+    .section h1 {
+        font-family: monospace;
+        color:darkblue;
+    }
+    .section h2 {
+        font-family: monospace;
+    }
+    p,
+    ul {
+        padding-left: 2em;
+        width: 60vw;
+    }
+
+    ul {
+        padding-left: 3em;
+        list-style-position: outside;
+        list-style-type: square;
+    }
+
+    code,
+    tt {
+        white-space: pre;
+        font-family: monospace;
+        color: #555;
+        font-size: 1rem;
+    }
+
+    code kbd,
+    tt kbd {
+        color: darkblue;
+        font-weight: bold;
+    }
+
+    code var,
+    tt var {
+        color: black;
+        font-style: italic;
+        font-family: serif;
+    }
+
+    code s,
+    tt s {
+        text-decoration: none;
+        color: darkred;
+    }
+</style>
+
+<body>
+    <div class="section">
+        <h1>Documentation for the Polymorphic Set-Theoretic type-system prototype</h1>
+        <a href="#usage">Basic usage</a><br/>
+        <a href="#syntax">Syntax of the language</a><br/>
+        <a href="#caveat">Caveat</a>
+    </div>
+    <div class="section">
+        <h1 id="usage" >Basic usage</h1>
+        <p>The prototype consists of an online text editor (based on <a href="https://microsoft.github.io/monaco-editor/">Monaco Editor</a>).
+        </p>
+        <ul>
+            <li>The basic Monaco keyboard shortcuts (e.g. <tt>Ctrl-/</tt> for
+            single line comment) are available. The command palette can be
+            invoked with the context menu or <kbd>F1</kbd></li>
+            <li><kbd>F2</kbd> presents a menu with a choice of predefined examples.</li>
+            <li><kbd>[Ctrl-Enter]</kbd> types the buffer</li>
+        </ul>
+        <p>Computed types are printed as lenses (above each definition). In case of error, the error message is printed instead
+            (see the <a href="#caveat">caveat section</a> for the printing format).
+        </p>
+    </div>
+    <div class="section">
+        <h1 id="syntax" >Syntax</h1>
+        <h2>Definitions</h2>
+        <p>
+            A program is a sequence of toplevel statements:<br />
+            <code>
+    <var>prog</var> ::= <var>stmt</var>*
+
+    <var>stmt</var> ::=  <kbd>type</kbd> <var>tid</var> <var>tvar</var>* <kbd>=</kbd> <var>t</var> [<kbd>and</kbd> ...]
+           | <kbd>atoms</kbd> <var>id</var>+
+           | <kbd>let</kbd> <var>gid</var> <kbd>:</kbd> <var>t</var> <kbd>=</kbd> <var>e</var>
+           | <kbd>let</kbd> [<kbd>rec</kbd>] <var>gid</var> <var>param</var>* <kbd>=</kbd> <var>e</var>
+           | <kbd>let</kbd> [<kbd>rec</kbd>] <kbd>(</kbd><var>gid</var> <kbd>:</kbd> <var>t</var></var><kbd>)</kbd> <var>param</var>* <kbd>=</kbd> <var>e</var>
+
+           <var>param</var> ::= <var>pat</var> [<kbd>:</kbd> <var>t</var><kbd>,</kbd> ...<kbd>,</kbd><var>t</var>]
+        </code>
+        </p>
+        <p>
+            A statement can be either
+        </p>
+        <ul>
+            <li>
+                a type definition, composed of a type name, a (possibly empty) list of type variables, and a type
+                expression.
+                Several mutually recursive type definitions can be defined together using the <kbd>and</kbd> keyword.
+            </li>
+            <li>
+                atom definitions, introduced by the <kbd>atoms</kbd> keyword and followed by a sequence of identifier.
+                Each identifier defines a constant of that name, and a corresponding singleton type starting with an
+                uppercase letter. So <tt><kbd>atoms</kbd> a foo hello_</tt>
+                defines three constants and three singleton types <tt>A</tt>, <tt>Foo</tt> and <tt>Hello_</tt>
+            </li>
+            <li>a toplevel value definition which follows, roughly, OCaml's
+                syntactic convention. Function parameters can be either simple
+                identifiers or <a href="#patterns">patterns</a> and optionally
+                feature a <a href="#type">type</a> constraint.
+            </li>
+        </ul>
+        <h2>Identifiers</h2>
+        <p>Identifiers come in several flavours :</p>
+        <code>
+    <var>gid</var> ::= <var>id</var> | <kbd>(</kbd> <var>op</var> <kbd>)</kbd>
+
+    <var>id</var> ::= <s>[a-z_][a-zA-Z0-9_']*</s>
+
+    <var>tid</var> ::= <s>[A-Z][a-zA-Z0-9_']*</s>
+
+    <var>tvar</var> ::= <s>'[a-z_][a-zA-Z0-9_]*</s>
+                </code>
+        <ul>
+            <li>value identifiers can be either variable names (starting with a lowercase letter) or prefix or infix
+                operator symbols in parenthesis.</li>
+            <li>type identifiers starts with an uppercase letter</li>
+            <li>type variables start with a single quote <tt><kbd>'</kbd></tt> character. If the second character is
+                <tt>_</tt> then the variable
+                is monomorphic and it's considered a hint for the type reconstruction.
+            </li>
+        </ul>
+        <h2 id="type">Type expressions</h2>
+        <code>
+    <var>t</var> ::= <var>simple_type</var>
+        | t <kbd>-></kbd> t
+        | t <kbd>,</kbd> t
+        | <kbd>[</kbd> <var>tregex</var> <kbd>]</kbd>
+        | <kbd>{</kbd> <var>id</var> <kbd>=</kbd>[<kbd>?</kbd>] <var>t</var><kbd>,</kbd>...<kbd>,</kbd> <var>id</var> <kbd>=</kbd>[<kbd>?</kbd>] <var>t</var> [<kbd>..</kbd>]<kbd>}</kbd>
+        | <var>t</var> <kbd>|</kbd> <var>t</var>
+        | <var>t</var> <kbd>&</kbd> <var>t</var>
+        | <var>t</var> <kbd>\\</kbd> <var>t</var>
+        | <kbd>~</kbd> <var>t</var>
+
+    <var>simple_type</var> ::= <var>b</var>
+                | <var>tid</var> [<var>t</var> ... <var>t</var>]
+                | <var>tvar</var>
+                | <kbd>(</kbd><var>t</var><kbd>)</kbd>
+    <var>b</var> ::= <kbd>()</kbd>
+        | <var>lit</var>
+        | <var>int</var><kbd>--</kbd><var>int</var> | <kbd>(--</kbd><var>int</var><kbd>)</kbd> | <var>int</var><kbd>--)</kbd> | <kbd>(--)</kbd>
+        | <kbd>Any</kbd> | <kbd>Empty</kbd> | <kbd>True</kbd> | <kbd>False</kbd> | <kbd>Bool</kbd> | <kbd>Int</kbd> | <kbd>Char</kbd> | <kbd>Unit</kbd> | <kbd>String</kbd> | <kbd>List</kbd> | <kbd>Nil</kbd>    
+
+        </code>
+        <p>Types are the usual set-theoretic types with product and arrow and record
+            constructors and union, intersection, difference and negation operators. A
+            sequence type constructor is provided as well. The content of a sequence
+            type can be a regular expression over types, using the usual operators
+            (<tt><kbd>*</kbd></tt>, <tt><kbd>+</kbd></tt> and <tt><kbd>?</kbd></tt>).
+            For instance, the type <tt>[ 'a* (Bool|Int)? ]</tt> is equivalent to the type definition</p>
+        <code>
+     type t 'a = ('a, t) | s
+     and  s    = Nil | (Bool | Int, Nil)
+    </code>
+        <p> Record types are given by the list of their fields, that is labels associated with a type.
+            A label may be absent (denoted by <tt><kbd>=?</kbd></tt>). Open record types end their field list with
+            <tt><kbd>..</kbd></tt>.
+            Polymorphic types can be instantiated by giving a list of type parameters.
+            Basic types consists of <a href="#literals">literals</a> (which denote their own singleton type),
+            augmented with integer interval types, and set of builtin type identifiers.
+        </p>
+    <h2>Expressions</h2>
+    <code>
+        <var>e</var> ::= <var>lit</var>
+            | <var>gid</var>
+            | <kbd>magic</kbd>
+            | <kbd>(</kbd><var>e</var> [<kbd>:</kbd> <var>t</var>] <kbd>)</kbd>
+            | <kbd>{</kbd> [<var>e</var> <kbd>with</kbd>] <var>id</var><kbd>=</kbd><var>e</var><kbd>,</kbd>...<kbd>,</kbd><var>id</var><kbd>=</kbd><var>e</var><kbd>}</kbd>
+            | <kbd>[</kbd> <var>e</var><kbd>;</kbd> ...<kbd>;</kbd><var>e</var> <kbd>]</kbd>
+            | <var>e</var><kbd>,</kbd><var>e</var>
+            | <kbd>fun</kbd> <var>param</var> ... <var>param</var> <kbd>-></kbd> <var>e</var>
+            | <kbd>let</kbd> <var>gid</var> <kbd>=</kbd> <var>e</var> <kbd>in</kbd> <var>e</var>
+            | <kbd>let (</kbd><var>pat</var><kbd>) =</kbd> <var>e</var> <kbd>in</kbd> <var>e</var>
+            | <kbd>if</kbd> <var>e</var> [<kbd>is</kbd> <var>t</var>] <kbd>then</kbd> <var>e</var> <kbd>else</kbd> <var>e</var>
+            | <kbd>fst</kbd> <var>e</var> | <kbd>snd</kbd> <var>e</var>
+            | <kbd>match</kbd> <var>e</var> <kbd>with</kbd> [<kbd>|</kbd>] <var>pat</var> <kbd>-></kbd> <var>e</var> <kbd>|</kbd> ... <kbd>|</kbd> <var>pat</var> <kbd>-></kbd> <var>e</var> <kbd>end</kbd>
+
+        <var id="literals">lit</var> ::= <s>[0-9]+</s>
+            | <kbd>'</kbd><s><var>char</var></s><kbd>'</kbd>
+            | <kbd>"</kbd><s><var>char</var>*</s><kbd>"</kbd>
+            | <var>float</var>
+            | <kbd>()</kbd> | <kbd>unit</kbd> | <kbd>false</kbd> | <kbd>true</kbd> | <kbd>nil</kbd>
+        </code>
+        <p>Expressions can be </p>
+        <ul>
+            <li>integer, character (delimited with single quotes), string
+            (delimited with double quotes) or floating point literals</li>
+            <li>predefined atoms such as <tt><kbd>false</kbd></tt>,
+            <tt><kbd>nil</kbd></tt>, …</li>
+            <li>identifiers</li>
+            <li>a <tt><kbd>magic</kbd></tt> constant with type <tt>'a</tt>,
+            which can be used to define a variable of any type (without having
+            to give a proper definition)</li>
+            <li>type annotated expressions, e.g. <kbd> (42 : Int)</kbd> which
+            can be used locally to give hints to the type reconstruction
+            algorithm</li>
+            <li>constructors for products, lists and records</li>
+            <li>anonymous functions</li>
+            <li>local let binding (defined using either a variable or a <a href="#pattern">pattern</a>)</li>
+            <li>a type case. In the tested type, all occurrences of the arrow constructor are of the form <tt>Empty->Any</tt>.
+            If the tested type is missing, it is synonymous for <tt><kbd>is</kbd> <kbd>True</kbd></tt></li>
+            <li>first and second projections for pairs</li>
+            <li>a pattern matching construct similar to the one found in the <a href="https://www.cduce.org">CDuce</a> language.
+            <a href="#patterns">Patterns</a> follow a first match policy.</li>
+        </ul>
+        <h2 id="patterns">Patterns</h2>
+        <code>
+        <var>pat</var> ::= <kbd>:</kbd><var>simple_type</var>
+            | <var>id</var>
+            | <var>pat</var><kbd>,</kbd><var>pat</var> | <var>pat</var><kbd>|</kbd><var>pat</var> | <var>pat</var><kbd>&</kbd><var>pat</var>
+            | <kbd>(</kbd><var>pat</var><kbd>)</kbd>
+            | <kbd>{</kbd> <var>id</var> <kbd>=</kbd>[<kbd>?</kbd>] <var>pat</var><kbd>,</kbd>...<kbd>,</kbd> <var>id</var> <kbd>=</kbd>[<kbd>?</kbd>] <var>pat</var> [<kbd>..</kbd>]<kbd>}</kbd>
+            | <var>id</var> <kbd>=</kbd> <var>lit</var>
+
+        </code>
+        <p>Patterns are essentially types with capture variables. For instance, the following expression</p>
+            <code>
+            match y with
+            | :[ Int* ] -> false
+            | ( x & :Bool, :Int ) | x = false -> x
+            end
+        </code>
+        <p>First checks whether <tt>y</tt> is a list of integers, in which case
+        it returns <tt><kbd>false</kbd></tt>. Or, it tests whether either
+        <tt>y</tt> is a pair of a Boolean and an integer, and captures the
+        Boolean in <tt>x</tt>, or defines <tt>x</tt> to the constant
+        <tt>false</tt>, and then returns <tt>x</tt>.
+    
+    </p>
+    </div>
+    <div class="section">
+        <h1 id="caveat" >Caveat</h1>
+        <ul>
+            <li>The <a href="#syntax">syntax</a> given above is only a rough
+            approximation. The usual priority of common operators should apply,
+            but in case of doubt, parentheses can be used to disambiguate
+            expressions, types or patterns.</li>
+            <li>This online prototype uses <a href="https://ocsigen.org/js_of_ocaml/latest/manual/overview">Js_of_ocaml</a>
+            and is about 8 to 10 times slower than when compiled to native code.
+            Some examples may not terminate in reasonable time or cause a stack
+            overflow due to the relatively shallow recursion stack of web
+            browsers</li>
+            <li>Types are pretty-printed using <a
+            href="https://www.cduce.org/manual_types_patterns.html">CDuce
+            syntax</a> (because the rely on CDuce's internal pretty printer
+            which tries to simplify set theoretic types dans decompile recursive
+            types back to regular expressions). The main difference is that
+            atoms are prefixed with a backtick <kbd>`</kbd> (e.g.
+            <kbd>`false</kbd>), the negation operator <tt><kbd>~</kbd></tt> does
+            not exists (and a type
+            <tt>~t</tt> is written <tt>Any\t</tt>) and recursive types are
+            written in a self-contained expression using the
+            <tt><kbd>where</kbd></tt> keyword.
+        </li>
+        </ul>
+    </div>
+</body>
+
+</html>

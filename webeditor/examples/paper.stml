@@ -41,3 +41,12 @@ let rec flatten x = match x with
  | (h, t) & :List -> concat (flatten h) (flatten t)
  | _ -> [x] 
 end
+
+let rec filter f l =
+  match l with
+  | :[] -> []
+  | (h,t) & :List -> if f h
+             then (h, filter f t)
+             else filter f t
+  end
+

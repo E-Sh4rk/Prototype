@@ -10,5 +10,10 @@
     {
         "name": "Pattern matching",
         "path": "patterns.stml"
+    },
+    {
+        "name": "OCaml's List module",
+        "path": "list.stml"
     }
+    
 ]

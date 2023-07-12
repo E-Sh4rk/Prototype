@@ -1,0 +1,98 @@
+let compare : 'a -> 'a -> Int = magic
+let (<) = < 'a -> 'a -> Bool>
+let (=) = < 'a -> 'a -> Bool >
+
+let failwith : String -> Empty = magic
+
+let rec length_aux n l =
+  match l with
+      | :Nil -> n
+      | (_, l) -> length_aux (n+1) l
+  end
+
+let length l = length_aux 0 l
+
+let hd l =
+  match l with
+    :Nil -> failwith "hd"
+  | (x, _) & :List -> x
+end
+let hd_safe l =
+  match l with
+  | (x, _) & :List -> x
+end
+
+
+let tl l =
+  match l with
+    :Nil -> failwith "tl"
+  | _ & : List-> snd l
+end
+
+let tl_safe l =
+  match l with
+  | _ & : List-> snd l
+end
+
+let rec nth_aux l n =
+  match l with
+    :Nil -> failwith "nth"
+    | (x, ll) -> if n = 0 then x else nth_aux ll (n-1)
+end
+
+let nth l n =
+  if n < 0 then failwith "nth"
+  else nth_aux l n
+
+
+let rec append_alt l1 l2 =
+  match l1 with
+    :Nil -> l2
+    | (x, l) & :List -> x, append_alt l l2
+  end
+
+let (append : [ 'a* ] -> [ 'b* ] -> [ 'a* ; 'b* ]) = append_alt
+let (@) = append
+
+let rec rev_append l1 (l2 :['a*]) =
+  match l1 with
+  :Nil -> l2
+  | (x, ll1) -> rev_append ll1 (x,l2)
+end
+
+let rec flatten l =
+  match l with
+    :Nil -> []
+  | (x, r) -> x @ (flatten r)
+end
+
+let concat = flatten
+
+type Tree 'a = [ ('a | Tree 'a)* ]
+
+let rec deep_flatten (l : Tree '_a) =
+  match l with
+  :Nil -> []
+  | ( (x & :List) , y) -> (deep_flatten x) @ (deep_flatten y)
+  | (x, y) -> (x, deep_flatten y)
+end
+
+let rec map f l =
+  match l with
+  :Nil -> []
+  | (x, ll) -> (f x, map f ll)
+end
+
+let rec mapi_aux i f l =
+  match l with
+  :Nil -> []
+  | (x, ll) -> let r = f i x in (x, mapi_aux (i+1) f ll)
+end
+
+let rec mapi f l = mapi_aux 0 f l
+
+let rec fold_left f l acc =
+  match l with
+  :Nil -> acc
+  | (x, ll) -> fold_left f ll (f acc x)
+end

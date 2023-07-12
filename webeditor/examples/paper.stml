@@ -50,3 +50,8 @@ let rec filter f l =
              else filter f t
   end
 
+let rec fold_right f acc l =
+  match l with
+  :Nil -> acc
+  | (x, ll) -> f x (fold_right f acc ll)
+end

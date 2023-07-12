@@ -86,13 +86,19 @@ end
 let rec mapi_aux i f l =
   match l with
   :Nil -> []
-  | (x, ll) -> let r = f i x in (x, mapi_aux (i+1) f ll)
+  | (x, ll) -> let r = f i x in (r, mapi_aux (i+1) f ll)
 end
 
-let rec mapi f l = mapi_aux 0 f l
+let mapi = mapi_aux 0
 
 let rec fold_left f l acc =
   match l with
   :Nil -> acc
   | (x, ll) -> fold_left f ll (f acc x)
+end
+
+let rec fold_right f acc l =
+  match l with
+  :Nil -> acc
+  | (x, ll) -> f x (fold_right f acc ll)
 end

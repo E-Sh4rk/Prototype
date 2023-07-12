@@ -647,6 +647,14 @@ let rec flatten (x : Tree('a)) =
   if x is Nil then nil else
   if x is [Any*] then concat (flatten (fst x)) (flatten (snd x))
   else (x,nil)
+
+let rec mapi_aux i f l =
+  match l with
+  :Nil -> []
+  | (x, ll) -> let r = f i x in (r, mapi_aux (i+1) f ll)
+end
+
+let mapi f l = mapi_aux 0 f l
   
 let rec eval e =
   match e with

@@ -143,7 +143,9 @@ let simplify_tallying_infer env res_type sols =
     nb1 <= nb2 && subst_more_general sol1 sol2
   in
   let is_minimal_sol (_,r) ss =
+    let r = Subst.apply (vars r |> generalize) r in
     ss |> List.for_all (fun (_,r') ->
+      let r' = Subst.apply (vars r' |> generalize) r' in
       subtype_poly r r' || not (subtype_poly r' r)
     )
   in

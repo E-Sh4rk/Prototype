@@ -638,10 +638,14 @@ let fact_annots = fixpoint fact_annots
     then (fst(l),filter f (snd(l)))
     else filter f (snd(l)) *)
 
-let rec filter f l = 
-  if l is Nil then nil
-  else
-    if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
+let rec filter (f: ('a->Any) & ('b -> ~True)) (l:[('a|'b)*]) =
+  match l with
+  | :Nil -> nil
+  | (e,l) ->
+    if f e is True
+    then (e, filter f l)
+    else filter f l
+  end
     
 let rec flatten x =
   if x is Nil then nil else

@@ -307,14 +307,9 @@ let merge_substs tvars tvars_branch apply_subst_branch mk_inter
     |> List.map (fun s -> (apply_subst_branch s pannot, Env.apply_subst s d))
     |> List.map (fun (b, d) -> (refresh b, Domains.singleton d, false))
   in
-  begin match lst with
-  | [] -> default
-  | lst ->
-    let n = List.length lst + 1 in
-    log ~level:2 "@.Creating an intersection with %n branches.@." n ;
-    (* NOTE: It is important for the default case to be inserted at the end (smaller priority). *)
-    mk_inter (lst@[default, Domains.singleton d, lpd]) [] (Domains.empty,false,false)
-  end
+  log ~level:2 "@.Creating an intersection with %n branches.@." (List.length lst + 1) ;
+  (* NOTE: It is important for the default case to be inserted at the end (smaller priority). *)
+  mk_inter (lst@[default, Domains.singleton d, lpd]) [] (Domains.empty,false,false)
 
 let should_iterate env tvars_branch apply_subst_branch mk_inter res =
   match res with

@@ -510,13 +510,14 @@ type tpath_elt = ArrowLeft of int * int | ArrowRight  of int * int
 let norm_path p =
     let rec aux = function
     | [] -> []
-    | (ArrowLeft (u,_))::tl -> (ArrowLeft (u,0))::tl
-    | (ArrowRight (u,_))::tl -> (ArrowRight (u,0))::(aux tl)
-    | (PairLeft u)::tl -> (PairLeft u)::(aux tl)
-    | (PairRight u)::tl -> (PairRight u)::(aux tl)
-    | (Record (u,str))::tl -> (Record (u,str))::(aux tl)
+    | (ArrowLeft (_,_))::tl -> (ArrowLeft (0,0))::tl
+    | (ArrowRight (_,_))::tl -> (ArrowRight (0,0))::(aux tl)
+    | (PairLeft _)::tl -> (PairLeft 0)::(aux tl)
+    | (PairRight _)::tl -> (PairRight 0)::(aux tl)
+    | (Record (_,str))::tl -> (Record (0,str))::(aux tl)
     in aux p
 
+(* TODO: rework this function so that it correlates tvars between several types. *)
 let reduce_tvars t =
     (* TODO: work on raw DNFs (with nodes for caching, negated parts, etc) *)
     let res = ref (Subst.construct []) in

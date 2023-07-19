@@ -12,9 +12,11 @@ type typecheck_result =
 | TSuccess of typ * Env.t * (float * float)
 | TFailure of (Position.t list) * string * (float * float)
 
-let generalize_all reduce t =
-  let t = Subst.apply (generalize (vars t)) t |> bot_instance |> simplify_typ in
-  if reduce then apply_subst_simplify (reduce_tvars t) t else t
+let generalize_all t =
+  Subst.apply (generalize (vars t)) t |> bot_instance |> simplify_typ
+
+let reduce t =
+  apply_subst_simplify (reduce_tvars t) t
 
 exception IncompatibleType of typ
 let type_check_def tenv env (var,expr,typ_annot) =
@@ -30,19 +32,19 @@ let type_check_def tenv env (var,expr,typ_annot) =
     (msc_time, typ_time)
   in
   let type_additionnal env (v, nf) =
-    let typ = Reconstruction.typeof_simple tenv env nf |> generalize_all true in
+    let typ = Reconstruction.typeof_simple tenv env nf |> generalize_all |> reduce in
     Env.add v typ env
   in
   try
     Utils.log "%a@." Msc.pp_e nf_expr ;
     let env = List.fold_left type_additionnal env nf_addition in
-    let typ = Reconstruction.typeof_simple tenv env nf_expr |> generalize_all true in
+    let typ = Reconstruction.typeof_simple tenv env nf_expr |> generalize_all in
     let typ =
       match typ_annot with
-      | None -> typ
+      | None -> reduce typ
       | Some typ' ->
         if subtype_poly typ typ'
-        then typ' |> generalize_all false
+        then typ' |> generalize_all
         else raise (IncompatibleType typ)
     in
     let env = Env.add var typ env in

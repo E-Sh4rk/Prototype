@@ -32,15 +32,13 @@ module Domains = struct
       let more_specific = more_specific dom2 in
       let a = t1 |> List.filter has_same_vars
       |> List.filter (fun env1 -> more_specific env1 env2)
-      |> List.map type_for |> disj_o in
+      |> List.map type_for |> disj_o |> top_instance in
+      let a = Subst.apply (reduce_tvars a) a in (* NOTE: approximation *)
       let b = type_for env2 in
       supertype_poly a b
     )
-  let enter_lambda _ _ (*env' t*) =
-    []
-    (* NOTE: it is better to reset the domains...
-       otherwise tallying instances may become too complex. *)
-    (* let env' = env' |> Env.filter (fun v _ -> Variable.is_lambda_var v) in
+  let enter_lambda env' t =
+    let env' = env' |> Env.filter (fun v _ -> Variable.is_lambda_var v) in
     let dom' = Env.domain env' |> VarSet.of_list in
     let more_specific = more_specific (VarSet.elements dom') in
     t |> List.filter (fun env ->
@@ -48,7 +46,7 @@ module Domains = struct
       if VarSet.diff dom' dom |> VarSet.is_empty
       then more_specific env env'
       else false
-    ) *)
+    )
   let empty = []
   let cup = (@)
   let singleton e = add empty e

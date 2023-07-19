@@ -466,14 +466,40 @@ let bot_instance =
     clean_type ~pos:empty ~neg:any
 
 let top_instance =
-    clean_type ~pos:any ~neg:empty    
+    clean_type ~pos:any ~neg:empty
 
-let subtype_poly t1 t2 =
-    let t2 = Subst.apply (monomorphize (vars t2)) t2 in
-    test_tallying [(bot_instance t1,t2)]
-let supertype_poly t1 t2 =
-    let t2 = Subst.apply (monomorphize (vars t2)) t2 in
-    test_tallying [(t2, top_instance t1)]
+let clean_types ~pos ~neg lst =
+    let pols = List.map vars_with_polarity lst in
+    let vars = lst |> List.map vars_poly |> TVarSet.union_many in
+    vars |> TVarSet.destruct |> List.map (fun v ->
+        if pols |> List.for_all (fun lst -> lst
+            |> List.for_all (fun (v', k) -> (TVar.equal v v' |> not) || k = `Pos)
+        ) then (v, pos)
+        else if pols |> List.for_all (fun lst -> lst
+            |> List.for_all (fun (v', k) -> (TVar.equal v v' |> not) || k = `Neg)
+        ) then (v, neg)
+        else (v, TVar.typ v)
+    ) |> Subst.construct
+
+let subtypes_poly lst =
+    let m = lst |> List.map snd |> List.map vars
+        |> TVarSet.union_many |> monomorphize
+    in
+    let c = lst |> List.map fst |> clean_types ~pos:empty ~neg:any in
+    lst
+    |> List.map (fun (t1, t2) -> (Subst.apply c t1, Subst.apply m t2))
+    |> test_tallying
+let supertypes_poly lst =
+    let m = lst |> List.map snd |> List.map vars
+        |> TVarSet.union_many |> monomorphize
+    in
+    let c = lst |> List.map fst |> clean_types ~pos:any ~neg:empty in
+    lst
+    |> List.map (fun (t1, t2) -> (Subst.apply m t2, Subst.apply c t1))
+    |> test_tallying
+
+let subtype_poly t1 t2 = subtypes_poly [t1,t2]
+let supertype_poly t1 t2 = supertypes_poly [t1,t2]
 
 (* reduce_tvars *)
 

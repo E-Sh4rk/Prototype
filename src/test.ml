@@ -626,6 +626,11 @@ let test_patterns_annots x y =
   let (y,x) = pack x y in
   pack x y
 
+let fact_annots (fact: '_a -> '_b) (n: '_a) =
+  if n is 0 then 1 else (fact (n-1))*n
+
+let fact_annots = fixpoint fact_annots
+
 (* let filter_stub_noannot filter f l =
   if l is Nil then nil
   else

@@ -11,13 +11,10 @@ module Domains = struct
     let tvars = Env.tvars e |> TVarSet.filter TVar.can_infer in
     let e = Env.apply_subst (generalize tvars) e in
     e::lst
-  let inhabitant = mk_atom "inhabitant"
-  (* (used for convenience, in order to encode several constraints in a product) *)
-  let type_for dom2 env =
-    dom2 |> List.fold_left (fun acc v ->
-      let t = Env.find v env |> cup inhabitant in
-      mk_times (cons acc) (cons t)
-    ) any
+  let more_specific dom env1 env2 =
+    dom |> List.map (fun v ->
+      (Env.find v env1, Env.find v env2)
+    ) |> subtypes_poly
   let covers t1 t2 =
     t2 |> List.for_all (fun env2 ->
       let dom2 = Env.domain env2 |> VarSet.of_list in
@@ -25,23 +22,31 @@ module Domains = struct
         let dom = Env.domain env |> VarSet.of_list in
         VarSet.equal dom dom2
       in
-      let type_for = type_for (VarSet.elements dom2) in
+      let dom2 = VarSet.elements dom2 in
+      let type_for env =
+        dom2 |> List.fold_left (fun acc v ->
+          let t = Env.find v env in
+          mk_times (cons acc) (cons t)
+        ) any
+      in
+      let more_specific = more_specific dom2 in
+      let a = t1 |> List.filter has_same_vars
+      |> List.filter (fun env1 -> more_specific env1 env2)
+      |> List.map type_for |> disj_o in
       let b = type_for env2 in
-      let a = t1 |> List.filter has_same_vars |> List.map type_for
-        |> List.filter (fun a -> subtype_poly a b) |> disj_o in
       supertype_poly a b
     )
   let enter_lambda _ _ (*env' t*) =
-    [] (* NOTE: it is better to reset the domains...
+    []
+    (* NOTE: it is better to reset the domains...
        otherwise tallying instances may become too complex. *)
     (* let env' = env' |> Env.filter (fun v _ -> Variable.is_lambda_var v) in
     let dom' = Env.domain env' |> VarSet.of_list in
-    let type_for = type_for (VarSet.elements dom') in
-    let b = type_for env' in
+    let more_specific = more_specific (VarSet.elements dom') in
     t |> List.filter (fun env ->
       let dom = Env.domain env |> VarSet.of_list in
       if VarSet.diff dom' dom |> VarSet.is_empty
-      then let a = type_for env in subtype_poly a b
+      then more_specific env env'
       else false
     ) *)
   let empty = []

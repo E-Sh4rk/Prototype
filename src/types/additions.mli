@@ -91,6 +91,8 @@ val instantiate : Subst.t list -> typ -> typ
 
 val bot_instance : typ -> typ
 val top_instance : typ -> typ
+val subtypes_poly : (typ * typ) list -> bool
+val supertypes_poly : (typ * typ) list -> bool
 val subtype_poly : typ -> typ -> bool
 val supertype_poly : typ -> typ -> bool
 

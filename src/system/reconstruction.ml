@@ -250,23 +250,6 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
     subtype_poly a b
   in
   let rec aux explored expl pending =
-    (* Remove low-priority default branches if there is at least one other branch *)
-    let pending =
-      if explored = [] then pending
-      else pending |> List.filter (fun (_,_,lpd) -> not lpd)
-    in
-    (* Remove branches that are estimated not to add anything *)
-    let pending =
-      if ud then pending else (
-        (* Format.printf "@.VS:@.%a@." Domains.pp expl ; *)
-        (* Format.printf "with tvars:@.%a" TVarSet.pp tvars ; *)
-        pending |> List.filter (fun (_,d,_) ->
-          let r = Domains.covers expl d |> not in
-          (* if not r then Format.printf "REMOVED:@.%a@." Domains.pp d
-          else Format.printf "KEPT:@.%a@." Domains.pp d ; *)
-          r
-        ))
-    in
     match pending with
     | [] when explored = [] -> log ~level:3 "Intersection generated a fail (0 branch)@." ; Fail
     | [] ->
@@ -293,21 +276,29 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
       in
       Ok (explored, [], (true, ud))
     | (pannot, est, lpd)::pending ->
-      (* NOTE: the order matters (priority to the first) *)
-      if nontrivial then (
-        log ~level:3 "Exploring intersection issued from %a@." Domains.pp est
-      ) ;
-      let res = infer_branch expl pannot in
-      begin match res with
-      | Ok pannot ->
-        log ~level:3 "Success of intersection issued from %a@." Domains.pp est;
-        aux ((pannot, est, lpd)::explored) (Domains.cup expl est) pending
-      | Fail when not ud && (explored <> [] || pending <> []) ->
-        log ~level:3 "Failure of intersection issued from %a@." Domains.pp est;
-        aux explored est pending
-      | res ->
-        log ~level:3 "Backtracking for intersection issued from %a@." Domains.pp est;
-        map_res (fun x -> (explored, (x,est,lpd)::pending, (tf,ud))) res
+      (* Remove branch if it is estimated not to add anything *)
+      if not ud && Domains.covers expl est then aux explored expl pending
+      else begin
+        (* NOTE: the order matters (priority to the first) *)
+        if nontrivial then (
+          log ~level:3 "Exploring intersection issued from %a@." Domains.pp est
+        ) ;
+        let res = infer_branch expl pannot in
+        match res with
+        | Ok pannot ->
+          log ~level:3 "Success of intersection issued from %a@." Domains.pp est;
+          let expl = Domains.cup expl est in
+          (* Remove low-priority default branches *)
+          let pending = pending |> List.filter (fun (_,_,lpd) -> not lpd) in
+          aux ((pannot, est, lpd)::explored) expl pending
+        | Fail when not ud && (explored <> [] || pending <> []) ->
+          log ~level:3 "Failure of intersection issued from %a@." Domains.pp est;
+          (* TODO: remember domains of failed branches *)
+          let expl = Domains.cup expl est in
+          aux explored expl pending
+        | res ->
+          log ~level:3 "Backtracking for intersection issued from %a@." Domains.pp est;
+          map_res (fun x -> (explored, (x,est,lpd)::pending, (tf,ud))) res
       end
   in
   aux b1 expl b2

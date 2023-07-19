@@ -15,13 +15,14 @@ module PartialAnnot : sig
     type union_expl = (typ * t) list
     and union_done = (typ * t) list
     and union = union_expl * union_done
-    and 'a annotated_branch =
+    and 'a pending_branch =
         'a
         * Domains.t (* Domains involved (used to prune branches) *)
         * bool (* Low priority default: type only if no other branch is typeable *)
-    and 'a inter = ('a annotated_branch) list (* Explored *)
-                 * ('a annotated_branch) list (* Pending *)
-                 * (  bool (* Typing finished? *)
+    and 'a inter = ('a pending_branch) list (* Pending *)
+                 * 'a list (* Explored *)
+                 * (Domains.t (* Explored domains *)
+                    * bool (* Typing finished? *)
                     * bool (* User defined *))
     and a =
         | InferA | TypA | UntypA

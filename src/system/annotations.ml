@@ -56,11 +56,12 @@ module PartialAnnot = struct
   [@@deriving show]
   and union = union_expl * union_done
   [@@deriving show]
-  and 'a annotated_branch = 'a * Domains.t * bool
+  and 'a pending_branch = 'a * Domains.t * bool
   [@@deriving show]
-  and 'a inter = ('a annotated_branch) list (* Explored *)
-               * ('a annotated_branch) list (* Pending *)
-               * (  bool (* Typing finished? *)
+  and 'a inter = ('a pending_branch) list (* Pending *)
+               * 'a list (* Explored *)
+               * (Domains.t (* Explored domains *)
+                  * bool (* Typing finished? *)
                   * bool (* User defined *))
   [@@deriving show]
   and a =
@@ -87,11 +88,11 @@ module PartialAnnot = struct
   and tvars_inter_a (a, b, _) =
     TVarSet.union
       (List.map (tvars_branch tvars_a) a |> TVarSet.union_many)
-      (List.map (tvars_branch tvars_a) b |> TVarSet.union_many)
+      (List.map tvars_a b |> TVarSet.union_many)
   and tvars_inter (a, b, _) =
     TVarSet.union
       (List.map (tvars_branch tvars) a |> TVarSet.union_many)
-      (List.map (tvars_branch tvars) b |> TVarSet.union_many)
+      (List.map tvars b |> TVarSet.union_many)
   and tvars_a a = match a with
   | InferA | TypA | UntypA | ThenVarA | ElseVarA
   | EmptyA | ThenA | ElseA -> TVarSet.empty
@@ -115,11 +116,11 @@ module PartialAnnot = struct
     (List.map aux2 e, List.map aux2 d)
   and apply_subst_inter_a s (a, b, flags) =
     (List.map (apply_subst_branch apply_subst_a s) a,
-    List.map (apply_subst_branch apply_subst_a s) b,
+    List.map (apply_subst_a s) b,
     flags)
   and apply_subst_inter s (a, b, flags) =
     (List.map (apply_subst_branch apply_subst s) a,
-    List.map (apply_subst_branch apply_subst s) b,
+    List.map (apply_subst s) b,
     flags)
   and apply_subst_a s a = match a with
   | InferA -> InferA

@@ -233,17 +233,13 @@ let simplify_tallying_infer env res_type sols =
     res
   ) *)
 
-let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
-  let expl = b1 |> List.fold_left (fun acc (_,d,_) -> Domains.cup acc d) expl in
+let infer_mono_inter expl' env infer_branch typeof (b1, b2, (expl, tf,ud)) =
   let tvars = env |> Env.filter (fun x _ -> Variable.is_lambda_var x) |> Env.tvars in
   let tvars = TVarSet.filter TVar.is_mono tvars in
-  let uNb = List.length b2 and eNb = List.length b1 in
+  let uNb = List.length b1 and eNb = List.length b2 in
   let nontrivial = uNb + eNb > 1 in
   if nontrivial then begin
-    log ~level:0 "Typing intersection with %n unexplored branches (and %n explored).@."
-      uNb eNb ;
-    (* if uNb >= 5 then
-      b2 |> List.iter (fun (_,_,est) -> Format.printf "Est: %a@." pp_typ est) *)
+    log ~level:0 "Typing intersection with %n unexplored branches (and %n explored).@." uNb eNb
   end ;
   let subtype_gen a b =
     let a = Subst.apply (TVarSet.diff (vars a) tvars |> generalize) a in
@@ -259,8 +255,8 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
           log ~level:5 "Finished reconstructing intersection. Typing it..." ;
           explored
           (* We type each branch and remove useless ones *)
-          |> List.map (fun (pannot, est, lpd) ->
-            ((pannot, est, lpd), typeof pannot)
+          |> List.map (fun pannot ->
+            (pannot, typeof pannot)
           )
           |> (fun r -> log ~level:5 "Simplifying it...@." ; r)
           (* |> List.map (fun (a, t) -> log ~level:5 "%a@.@." pp_typ t ; (a,t)) *)
@@ -274,34 +270,32 @@ let infer_mono_inter expl env infer_branch typeof (b1, b2, (tf,ud)) =
           |> List.map fst
         )
       in
-      Ok (explored, [], (true, ud))
+      Ok ([], explored, (expl, true, ud))
     | (pannot, est, lpd)::pending ->
       (* Remove branch if it is estimated not to add anything *)
-      if not ud && Domains.covers expl est then aux explored expl pending
+      let expl' = Domains.cup expl expl' in
+      if not ud && Domains.covers expl' est then aux explored expl pending
       else begin
         (* NOTE: the order matters (priority to the first) *)
         if nontrivial then (
           log ~level:3 "Exploring intersection issued from %a@." Domains.pp est
         ) ;
-        let res = infer_branch expl pannot in
+        let res = infer_branch expl' pannot in
         match res with
         | Ok pannot ->
           log ~level:3 "Success of intersection issued from %a@." Domains.pp est;
-          let expl = Domains.cup expl est in
           (* Remove low-priority default branches *)
           let pending = pending |> List.filter (fun (_,_,lpd) -> not lpd) in
-          aux ((pannot, est, lpd)::explored) expl pending
+          aux (pannot::explored) (Domains.cup expl est) pending
         | Fail when not ud && (explored <> [] || pending <> []) ->
           log ~level:3 "Failure of intersection issued from %a@." Domains.pp est;
-          (* TODO: remember domains of failed branches *)
-          let expl = Domains.cup expl est in
-          aux explored expl pending
+          aux explored (Domains.cup expl est) pending
         | res ->
           log ~level:3 "Backtracking for intersection issued from %a@." Domains.pp est;
-          map_res (fun x -> (explored, (x,est,lpd)::pending, (tf,ud))) res
+          map_res (fun x -> ((x,est,lpd)::pending, explored, (expl,tf,ud))) res
       end
   in
-  aux b1 expl b2
+  aux b2 expl b1
 
 let merge_substs tvars tvars_branch apply_subst_branch mk_inter
   ((d,lpd), lst, pannot, default) =
@@ -319,7 +313,7 @@ let merge_substs tvars tvars_branch apply_subst_branch mk_inter
     let n = List.length lst + 1 in
     log ~level:2 "@.Creating an intersection with %n branches.@." n ;
     (* NOTE: It is important for the default case to be inserted at the end (smaller priority). *)
-    mk_inter [] (lst@[default, Domains.singleton d, lpd]) (false,false)
+    mk_inter (lst@[default, Domains.singleton d, lpd]) [] (Domains.empty,false,false)
   end
 
 let should_iterate env tvars_branch apply_subst_branch mk_inter res =
@@ -469,7 +463,7 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
       let pannot_a = LambdaA (t, Infer) in
       (pannot_a, expl, false)
     ) in
-    let pannot_a = InterA ([], branches, (false, true)) in
+    let pannot_a = InterA (branches, [], (Domains.empty, false, true)) in
     infer_mono_a vardef tenv expl env pannot_a a
   | Lambda (_, v, e), LambdaA (s, pannot) ->
     log ~level:2 "Entering lambda for %a with domain %a.@." Variable.pp v pp_typ s ;

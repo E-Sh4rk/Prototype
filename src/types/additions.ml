@@ -503,62 +503,91 @@ let supertype_poly t1 t2 = supertypes_poly [t1,t2]
 
 (* reduce_tvars *)
 
-type tpath_elt = ArrowLeft of int * int | ArrowRight  of int * int
-    | PairLeft of int | PairRight of int
-    | Record of int * string
+module TPath = struct
+    type elt = PInter of int | PUnion of int | PNeg
+    | PArrowLeft | PArrowRight | PPairLeft | PPairRight | PRecord of string
+    type t = elt list
+    let compare = compare
+end
+module TPS = Set.Make(TPath)
+module TPSM = Map.Make(TPS)
 
-let norm_path p =
-    let rec aux = function
-    | [] -> []
-    | (ArrowLeft (_,_))::tl -> (ArrowLeft (0,0))::tl
-    | (ArrowRight (_,_))::tl -> (ArrowRight (0,0))::(aux tl)
-    | (PairLeft _)::tl -> (PairLeft 0)::(aux tl)
-    | (PairRight _)::tl -> (PairRight 0)::(aux tl)
-    | (Record (_,str))::tl -> (Record (0,str))::(aux tl)
-    in aux p
+let gather_locations t =
+    let open TPath in
+    let tvh = TVH.create 5 in
+    let cache = NHT.create 5 in
+    let add_var_path v p =
+        if TVar.is_poly v then
+            let p = List.rev p in
+            match TVH.find_opt tvh v with
+            | None -> TVH.add tvh v (TPS.singleton p)
+            | Some set -> TVH.replace tvh v (TPS.add p set)
+    in
+    let rec aux p node =
+        let aux_pair p (a,b) = aux (PPairLeft::p) a ; aux (PPairRight::p) b in
+        let aux_arrow p (a,b) = aux (PArrowLeft::p) a ; aux (PArrowRight::p) b in
+        let aux_record p (_, labelmap) = LabelMap.iteri
+            (fun label t -> aux ((PRecord (from_label label))::p) t) labelmap in
+        let aux_lines aux_line p = List.iteri (fun i t -> aux_line ((PInter i)::p) t) in
+        let aux_branch aux_line p ((pvs, nvs), (ps,ns)) =
+            pvs |> List.iter (fun v -> add_var_path v p) ;
+            nvs |> List.iter (fun v -> add_var_path v (PNeg::p)) ;
+            aux_lines aux_line p ps ; aux_lines aux_line (PNeg::p) ns
+        in
+        let aux_atom_branch p ((pvs, nvs), _) =
+            pvs |> List.iter (fun v -> add_var_path v p) ;
+            nvs |> List.iter (fun v -> add_var_path v (PNeg::p))
+        in
+        let aux_branches aux_line p =
+            List.iteri (fun i t -> aux_branch aux_line ((PUnion i)::p) t) in
+        let aux_atom_branches p =
+            List.iteri (fun i t -> aux_atom_branch ((PUnion i)::p) t) in    
+        match NHT.find_opt cache node with
+        | Some () -> ()
+        | None ->
+            NHT.add cache node () ;
+            let open Iter in
+            iter (fun pack t ->
+                match pack with
+                | Absent -> ()
+                | Abstract m | Char m | Int m | Atom m ->
+                    let module K = (val m : Kind) in
+                    K.get_vars t |> K.Dnf.get_partial |> aux_atom_branches p
+                | Times m ->
+                    let module K = (val m) in
+                    K.get_vars t |> K.Dnf.get_full
+                    |> aux_branches aux_pair p
+                | Xml m ->
+                    let module K = (val m) in
+                    K.get_vars t |> K.Dnf.get_full
+                    |> aux_branches aux_pair p
+                | Function m ->
+                    let module K = (val m) in
+                    K.get_vars t |> K.Dnf.get_full
+                    |> aux_branches aux_arrow p
+                | Record m ->
+                    let module K = (val m) in
+                    K.get_vars t |> K.Dnf.get_full
+                    |> aux_branches aux_record p
+            ) (descr node)
+    in
+    aux [] (cons t) ;
+    tvh |> TVH.to_seq |> List.of_seq
 
-(* TODO: rework this function so that it correlates tvars between several types. *)
-let reduce_tvars t =
-    (* TODO: work on raw DNFs (with nodes for caching, negated parts, etc) *)
-    let res = ref (Subst.construct []) in
-    let paths_cache = Hashtbl.create 20 in
-    let treat_var path v =
-        if Subst.mem (!res) v then ()
-        else
-            let path = norm_path (List.rev path) in
-            let v' =
-                if Hashtbl.mem paths_cache path
-                then Hashtbl.find paths_cache path
-                else TVar.mk_poly (Some (TVar.display_name v))
-            in
-            Hashtbl.replace paths_cache path v' ;
-            res := Subst.combine (!res) (Subst.construct [(v, TVar.typ v')])
+let reduce_tvars lst =
+    let map = lst |> List.fold_left (fun acc t ->
+            let locs = gather_locations t in
+            locs |> List.fold_left (fun acc (v,locs) ->
+                let vs = match TPSM.find_opt locs acc with
+                | None -> TVarSet.construct [v]
+                | Some vs -> TVarSet.add v vs
+                in
+                TPSM.add locs vs acc
+            ) acc
+        ) TPSM.empty
     in
-    let treat_vars path tvs =
-        let tvs = TVarSet.destruct tvs |> List.filter TVar.is_poly in
-        match tvs with [tv] -> treat_var path tv | _ -> ()
-    in
-    let visited = ref Compare.TypeMap.empty in
-    let rec aux path t =
-        if Compare.TypeMap.mem t (!visited) then ()
-        else begin
-            visited := Compare.TypeMap.add t () (!visited) ;
-            treat_vars path (top_vars t) ;
-            dnf t |> List.iteri (fun i arrows ->
-                arrows |> List.iteri (fun j (a,b) ->
-                    aux ((ArrowLeft (i,j))::path) a ;
-                    aux ((ArrowRight (i,j))::path) b
-                )
-            ) ;
-            pair_dnf t |> List.iteri (fun i (a,b) ->
-                aux ((PairLeft i)::path) a ; aux ((PairRight i)::path) b
-            ) ;
-            record_dnf t |> List.map fst
-            |> List.iteri (fun i fields ->
-                fields |> List.iter (fun (str,(_,t)) ->
-                    aux ((Record (i,str))::path) t
-                )
-            )
-        end
-    in
-    aux [] t ; !res
+    let sets = TPSM.bindings map |> List.map snd in
+    sets |> List.map (fun vs ->
+        let v' = TVar.mk_poly None in
+        vs |> TVarSet.destruct |> List.map (fun v -> (v, TVar.typ v'))
+    ) |> List.concat |> Subst.construct

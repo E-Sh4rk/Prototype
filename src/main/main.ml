@@ -15,8 +15,8 @@ type typecheck_result =
 let generalize_all t =
   Subst.apply (generalize (vars t)) t |> bot_instance |> simplify_typ
 
-let reduce t =
-  apply_subst_simplify (reduce_tvars t) t
+let reduce t = t (* TODO *)
+  (* apply_subst_simplify (reduce_tvars t) t *)
 
 exception IncompatibleType of typ
 let type_check_def tenv env (var,expr,typ_annot) =

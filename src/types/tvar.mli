@@ -22,6 +22,8 @@ module TVar : sig
     val pp : Format.formatter -> t -> unit
 end
 
+module TVH : Hashtbl.S with type key = TVar.t
+
 module TVarSet : sig
     type t
     val empty : t

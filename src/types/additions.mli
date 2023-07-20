@@ -96,4 +96,4 @@ val supertypes_poly : (typ * typ) list -> bool
 val subtype_poly : typ -> typ -> bool
 val supertype_poly : typ -> typ -> bool
 
-val reduce_tvars : typ -> Subst.t
+val reduce_tvars : typ list -> Subst.t

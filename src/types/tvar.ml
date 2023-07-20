@@ -1,8 +1,10 @@
 
 module CD = Cduce_types
 
+module TVH = Hashtbl.Make(CD.Var)
+
 module TVar = struct
-  type t = Cduce_types.Var.t
+  type t = CD.Var.t
 
   type vardata = {
     poly: bool;
@@ -10,20 +12,19 @@ module TVar = struct
     dname: string
   }
 
-  module VH = Hashtbl.Make(CD.Var)
-  let data = VH.create 100
+  let data = TVH.create 100
 
   let is_unregistered t =
-    VH.mem data t |> not
+    TVH.mem data t |> not
 
-  let is_poly t = (VH.find data t).poly
+  let is_poly t = (TVH.find data t).poly
   let is_mono t = is_poly t |> not
-  let can_infer t = (VH.find data t).infer
+  let can_infer t = (TVH.find data t).infer
 
   let equal = CD.Var.equal
   let compare = CD.Var.compare
   let name = CD.Var.name
-  let display_name t = (VH.find data t).dname
+  let display_name t = (TVH.find data t).dname
 
   let unique_mono_id =
     let last = ref 0 in
@@ -45,14 +46,14 @@ module TVar = struct
     let norm_name = (string_of_int id)^"M" in
     let name = match name with None -> norm_name | Some str -> str in
     let var = CD.Var.mk norm_name in
-    VH.add data var {poly=false; infer; dname=name} ;
+    TVH.add data var {poly=false; infer; dname=name} ;
     var
   let mk_poly name =
     let id = unique_poly_id () in
     let norm_name = (string_of_int id)^"P" in
     let name = match name with None -> norm_name | Some str -> str in
     let var = CD.Var.mk norm_name in
-    VH.add data var {poly=true; infer=true; dname=name} ;
+    TVH.add data var {poly=true; infer=true; dname=name} ;
     var
   let mk_fresh t =
     let dname = display_name t in

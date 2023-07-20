@@ -590,4 +590,21 @@ let reduce_tvars lst =
     sets |> List.map (fun vs ->
         let v' = TVar.mk_poly None in
         vs |> TVarSet.destruct |> List.map (fun v -> (v, TVar.typ v'))
-    ) |> List.concat |> Subst.construct
+    ) |> List.concat |> List.sort_uniq (fun (v1,_) (v2,_) -> TVar.compare v1 v2)
+    |> Subst.construct
+
+let reduce_tvars_of_fun f =
+    let rec aux fuel fs =
+        if fuel = 0 then Subst.identity
+        else
+            let (doms, fs) =
+                fs |> List.map dnf |> List.flatten |> List.flatten |> List.split in
+            let s = reduce_tvars doms in
+            let m = monomorphize (Subst.codom s) in
+            let s = Subst.compose_restr m s in
+            let s' = List.map (Subst.apply s) fs |> aux (fuel-1) in
+            Subst.combine s s'
+    in
+    let s = aux 5 [f] in
+    let g = generalize (Subst.codom s) in
+    Subst.compose_restr g s

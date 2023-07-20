@@ -177,7 +177,7 @@ module FullAnnot = struct
       | Inter of t inter
   [@@deriving show]
 
-  let rec apply_subst_union s lst =
+  (* let rec apply_subst_union s lst =
     lst |> List.map (fun (ty, t) -> (apply_subst_simplify s ty, apply_subst s t))
   and apply_subst_a s a =
     let compose = Subst.compose_restr s in
@@ -199,5 +199,5 @@ module FullAnnot = struct
     | BVar r -> BVar (Subst.compose_restr s r)
     | Keep (a, b) -> Keep (apply_subst_a s a, apply_subst_union s b)
     | Skip t -> Skip (apply_subst s t)
-    | Inter i -> Inter (List.map (apply_subst s) i)
+    | Inter i -> Inter (List.map (apply_subst s) i) *)
 end

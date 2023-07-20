@@ -176,4 +176,28 @@ module FullAnnot = struct
       | Skip of t
       | Inter of t inter
   [@@deriving show]
+
+  let rec apply_subst_union s lst =
+    lst |> List.map (fun (ty, t) -> (apply_subst_simplify s ty, apply_subst s t))
+  and apply_subst_a s a =
+    let compose = Subst.compose_restr s in
+    match a with
+    | ConstA -> ConstA | AliasA -> AliasA | LetA -> LetA | AbstractA -> AbstractA
+    | LambdaA (ty, t) -> LambdaA (apply_subst_simplify s ty, apply_subst s t)
+    | PairA (r1, r2) -> PairA (compose r1, compose r2)
+    | AppA (ss1, ss2) -> AppA (List.map compose ss1, List.map compose ss2)
+    | ProjA ss -> ProjA (List.map compose ss)
+    | EmptyA ss -> EmptyA (List.map compose ss)
+    | ThenA ss -> ThenA (List.map compose ss)
+    | ElseA ss -> ElseA (List.map compose ss)
+    | RecordUpdateA (ss, ro) -> RecordUpdateA (List.map compose ss, Option.map compose ro)
+    | ConstrA ss -> ConstrA (List.map compose ss)
+    | InterA i -> InterA (List.map (apply_subst_a s) i)
+  and apply_subst s t =
+    if Subst.is_identity s then t
+    else match t with
+    | BVar r -> BVar (Subst.compose_restr s r)
+    | Keep (a, b) -> Keep (apply_subst_a s a, apply_subst_union s b)
+    | Skip t -> Skip (apply_subst s t)
+    | Inter i -> Inter (List.map (apply_subst s) i)
 end

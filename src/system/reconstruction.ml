@@ -17,11 +17,6 @@ let rec is_undesirable s =
   dnf s |> List.for_all
     (List.exists (fun (a, b) -> non_empty a && is_undesirable b))
 
-(* let specific_inst t =
-  let s = vars_poly t |> TVarSet.destruct
-    |> List.map (fun v -> (v, empty)) |> Subst.construct in
-  Subst.apply s t *)
-
 let refine_a tenv env a t =
   log ~level:5 "refine_a@." ;
   match a with
@@ -60,21 +55,34 @@ let refine_a tenv env a t =
       )
   | TypeConstr (v, _) -> [Env.singleton v t]
   | App (v1, v2) ->
-    let t1 = Env.find v1 env in
     let alpha = TVar.mk_poly None in
-    let constr = [ (t1, mk_arrow (TVar.typ alpha |> cons) (cons t)) ] in
-    let res = tallying constr in
-    res |> List.map (fun sol ->
-      (* let t1 = apply_subst_simplify sol t1 in
-      let t2 = Subst.find' sol alpha in
-      let clean_subst = clean_type_subst ~pos:any ~neg:empty t2 in
-      let t1 = Subst.apply clean_subst t1 in
-      let t2 = Subst.apply clean_subst t2 in
-      Env.construct_dup [ (v1, t1 |> specific_inst) ; (v2, t2) ] *)
-      Env.singleton v2 (Subst.find' sol alpha |> top_instance)
+    let dnf = Env.find v1 env |> dnf in
+    dnf |> List.map (
+      fun arrows ->
+        let t1 = branch_type arrows in
+        let constr = [ (t1, mk_arrow (TVar.typ alpha |> cons) (cons t)) ] in
+        let res = tallying constr in
+        let pvars = ref TVarSet.empty in
+        let res =
+          res |> List.map (fun sol ->
+            let t1 = apply_subst_simplify sol t1 in
+            let t2 = Subst.find' sol alpha in
+            let clean_subst = clean_type_subst ~pos:any ~neg:empty t2 in
+            let t1 = Subst.apply clean_subst t1 in
+            let t2 = Subst.apply clean_subst t2 in
+            pvars := TVarSet.union !pvars (vars_poly t1) ;
+            pvars := TVarSet.union !pvars (vars_poly t2) ;
+            if List.length dnf <= 1
+            then Env.singleton v2 t2
+            else Env.construct_dup [(v1, t1) ; (v2, t2)]
+          )
+        in
+        let mono = monomorphize !pvars in
+        res |> List.map (fun env ->
+          Env.apply_subst mono env
+        )
     )
-    |> List.filter (fun env -> env |> Env.tvars
-        |> TVarSet.filter TVar.is_poly |> TVarSet.is_empty)
+    |> List.flatten
     |> List.filter (fun env -> Env.bindings env |>
         List.for_all (fun (_,t) -> not (is_undesirable t)))
   | Ite (v, s, v1, v2) ->
@@ -510,22 +518,7 @@ and infer_mono tenv expl env pannot e =
     log ~level:1 "Trying to type var %a.@." Variable.pp v ;
     begin match infer_mono_a_iterated v tenv expl env pannot_a a with
     | Ok pannot_a ->
-      (* If the definition is a function whose DNF has many disjuncts,
-          we try to split them. *)
-      let annot_a = infer_poly_a v tenv env pannot_a a in
-      let t = typeof_a_nofail v tenv env annot_a a in
-      let propagate =
-        let dnf = dnf t |> simplify_dnf in
-        if subtype t arrow_any && List.length dnf >= 2 then
-          dnf |> Utils.map_among_others' (fun _ others ->
-            let s = others |> List.map branch_type |> disj |> bot_instance in
-            let s = Subst.apply (vars_poly s |> monomorphize) s in
-            refine_a tenv env a s
-          )
-          |> List.flatten
-        else []
-      in
-      let pannot = Propagate (pannot_a, propagate, ([(any, pannot1)], [])) in
+      let pannot = Keep (pannot_a, ([(any, pannot1)], [])) in
       infer_mono tenv expl env pannot e
     | Fail -> infer_mono tenv expl env (Skip pannot2) e
     | res -> map_res (fun x -> TryKeep (x, pannot1, pannot2)) res

@@ -68,6 +68,13 @@ val branch_type : (typ*typ) list -> typ
 val simplify_dnf : (typ * typ) list list -> (typ * typ) list list
 val simplify_typ : typ -> typ
 
+val split_typ : typ -> typ list
+(** [split_typ t] splits a type into a
+    list of individual types whose union is the original type.
+    Each individual type is either a conjunction of (positive and negative) atomic arrows,
+    a conjunction of atomic products, a conjunction of atomic records, the absent type,
+    or an union of base types. *)
+
 (* Record manipulation *)
 
 val record_any_with : string -> typ
@@ -75,10 +82,6 @@ val record_any_with : string -> typ
 
 val record_any_without : string -> typ
 (** [record_any_without l] creates the record type {l =? Empty ..} *)
-
-val split_record : typ -> typ list
-(** [split_record t] splits a union of record types 
-    into a list of individual record types *)
 
 val remove_field_info : typ -> string -> typ
 (** [remove_field_info t label] removes all the information

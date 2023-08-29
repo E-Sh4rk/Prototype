@@ -429,23 +429,40 @@ let simplify_typ t =
     let t' = aux (cons t) |> descr in
     assert (equiv t t') ; t'
 
+let split_typ t =
+    let res = ref [] in
+    let open Iter in
+    iter (fun pack t ->
+        let ts = match pack with
+        | Absent -> [absent]
+        | Abstract m | Char m | Int m | Atom m ->
+            let module K = (val m : Kind) in
+            [K.get_vars t |> K.mk]
+        | Times m ->
+            let module K = (val m) in
+            K.get_vars t |> K.Dnf.get_full
+            |> List.map full_product_branch_type
+        | Xml m ->
+            let module K = (val m) in
+            [K.get_vars t |> K.mk]
+        | Function m ->
+            let module K = (val m) in
+            K.get_vars t |> K.Dnf.get_full
+            |> List.map full_branch_type
+        | Record m ->
+            let module K = (val m) in
+            K.get_vars t |> K.Dnf.get_full
+            |> List.map full_record_branch_type
+        in
+        res := ts@(!res)
+    ) t ;
+    !res
+
 (* Record manipulation *)
 
 let record_any_with l = mk_record true [l, any_node]
 
 let record_any_without l = mk_record true [l, (or_absent empty |> cons)]
-
-let split_record t =
-  let to_node (is_absent, t) =
-    if is_absent
-    then cons (CD.Types.Record.or_absent t)
-    else cons t
-  in
-  let to_record (labels, is_open, _) =
-    let labels = LabelMap.map to_node labels in
-    CD.Types.record_fields (is_open, labels)
-  in
-  CD.Types.Record.get t |> List.map to_record
 
 let remove_field_info t label =
     let t = remove_field t label in

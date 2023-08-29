@@ -31,26 +31,27 @@ let refine_a tenv env a t =
   | Alias v when subtype (Env.find v env) t -> [Env.empty]
   | Alias _ | Abstract _ | Const _ -> []
   | Pair (v1, v2) ->
-    (* TODO: ignore disjuncts containing top-level type variables *)
-    pair_dnf t
+    let t = cap t pair_any in
+    split_typ t
+    |> List.filter (fun t -> top_vars t |> TVarSet.is_empty)
     |> List.map (
-      fun (t1, t2) -> Env.construct_dup [(v1,t1) ; (v2, t2)]
+      fun ti -> Env.construct_dup [(v1, pi1 ti) ; (v2, pi2 ti)]
     )
   | Projection (Fst, v) -> [Env.singleton v (mk_times (cons t) any_node)]
   | Projection (Snd, v) -> [Env.singleton v (mk_times any_node (cons t))]
   | Projection (Field label, v) ->
     [Env.singleton v (mk_record true [(label, cons t)])]
   | RecordUpdate (v, label, None) ->
-    (* TODO: ignore disjuncts containing top-level type variables *)
     let t = cap t (record_any_without label) in
-    split_record t
+    split_typ t
+    |> List.filter (fun t -> top_vars t |> TVarSet.is_empty)
     |> List.map (
       fun ti -> Env.singleton v (remove_field_info ti label)
     )
   | RecordUpdate (v, label, Some x) ->
-    (* TODO: ignore disjuncts containing top-level type variables *)
     let t = cap t (record_any_with label) in
-    split_record t
+    split_typ t
+    |> List.filter (fun t -> top_vars t |> TVarSet.is_empty)
     |> List.map (
       fun ti ->
         let field_type = get_field_assuming_not_absent ti label in

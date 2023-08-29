@@ -31,6 +31,7 @@ let refine_a tenv env a t =
   | Alias v when subtype (Env.find v env) t -> [Env.empty]
   | Alias _ | Abstract _ | Const _ -> []
   | Pair (v1, v2) ->
+    (* TODO: ignore disjuncts containing top-level type variables *)
     pair_dnf t
     |> List.map (
       fun (t1, t2) -> Env.construct_dup [(v1,t1) ; (v2, t2)]
@@ -40,12 +41,14 @@ let refine_a tenv env a t =
   | Projection (Field label, v) ->
     [Env.singleton v (mk_record true [(label, cons t)])]
   | RecordUpdate (v, label, None) ->
+    (* TODO: ignore disjuncts containing top-level type variables *)
     let t = cap t (record_any_without label) in
     split_record t
     |> List.map (
       fun ti -> Env.singleton v (remove_field_info ti label)
     )
   | RecordUpdate (v, label, Some x) ->
+    (* TODO: ignore disjuncts containing top-level type variables *)
     let t = cap t (record_any_with label) in
     split_record t
     |> List.map (
@@ -532,9 +535,10 @@ and infer_mono tenv expl env pannot e =
     begin match propagate with
     | Some (env',gammas) ->
       log ~level:1 "Var %a is ok but its DNF needs a split.@." Variable.pp v ;
-      let pannot = Propagate (pannot_a, gammas, union) in
+      let pannot1 = Keep (pannot_a, union) in
+      let pannot2 = Propagate (pannot_a, gammas, union) in
       let env' = Env.filter (fun v t -> subtype (Env.find v env) t |> not) env' in
-      Split (env', pannot, pannot)
+      Split (env', pannot1, pannot2)
     | None -> infer_mono tenv expl env (Keep (pannot_a, union)) e
     end
   | Bind (v, a, e), Keep (pannot_a, splits) ->

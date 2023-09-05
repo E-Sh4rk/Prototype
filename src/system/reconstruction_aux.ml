@@ -182,8 +182,7 @@ let rec infer_poly_a vardef tenv env pannot_a a =
     let r = refresh (vartype v2 |> vars_poly) in
     RecordUpdateA (res, Some r)
   | TypeConstr (v, s), TypA ->
-    let res = tallying_nonempty [(vartype v, s)] in
-    ConstrA res
+    ConstrA [tallying_one [(vartype v, s)]]
   | App (v1, v2), TypA ->
     let t1 = vartype v1 in
     let t2 = vartype v2 in

@@ -201,30 +201,28 @@ let remove_patterns_and_fixpoints e =
     let e =
       match e with
       | Ast.PatMatch (e, pats) ->
-        let x = Variable.create_other None in
-        Variable.attach_location x (Position.position annot) ;
-        let xe = (annot, Ast.Var x) in
         let t = pats |> List.map fst |> List.map type_of_pat
           |> Types.Additions.disj in
-        let e = (annot, Ast.TypeConstr (e, t)) in
-        let body_of_pat pat e =
+        let body_of_pat pat e' =
           let vars = vars_of_pat pat in
           let add_def acc v =
-            let d = def_of_var_pat pat v xe in
+            let d = def_of_var_pat pat v e in
             (annot, Ast.Let (v, d, acc))
           in
-          List.fold_left add_def e (VarSet.elements vars)
+          List.fold_left add_def e' (VarSet.elements vars)
         in
-        let add_branch acc (t, e) =
-          (annot, Ast.Ite (xe, t, e, acc))
+        let add_branch acc (t, e') =
+          (annot, Ast.Ite (e, t, e', acc))
         in
-        let pats = pats |> List.map (fun (pat, e) ->
-          (type_of_pat pat, body_of_pat pat e)) |> List.rev in
-        let e' = match pats with
+        let pats = pats |> List.map (fun (pat, e') ->
+          (type_of_pat pat, body_of_pat pat e')) |> List.rev in
+        let body = match pats with
         | [] -> assert false 
-        | (_, e)::pats -> List.fold_left add_branch e pats
+        | (_, e')::pats -> List.fold_left add_branch e' pats
         in
-        Ast.Let (x, e, e')
+        let x = Variable.create_other None in
+        Variable.attach_location x (Position.position annot) ;
+        Ast.Let (x, (annot, Ast.TypeConstr (e, t)), body)
       | Ast.Fixpoint e ->
         let v = Variable.create_other (Some "fixpoint_aux") in
         aux_defs := (v,e)::(!aux_defs) ;

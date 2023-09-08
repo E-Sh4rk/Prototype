@@ -39,17 +39,15 @@ let refine_a tenv env a t =
   | RecordUpdate (v, label, None) ->
     let t = cap t (record_any_without label) in
     split_typ t
-    |> List.filter (fun t -> top_vars t |> TVarSet.is_empty)
     |> List.map (
       fun ti -> Env.singleton v (remove_field_info ti label)
     )
   | RecordUpdate (v, label, Some x) ->
     let t = cap t (record_any_with label) in
     split_typ t
-    |> List.filter (fun t -> top_vars t |> TVarSet.is_empty)
     |> List.map (
       fun ti ->
-        let field_type = get_field_assuming_not_absent ti label in
+        let field_type = get_field ti label in
         let ti = remove_field_info ti label in
         Env.construct_dup [(v, ti) ; (x, field_type)]
       )

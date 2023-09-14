@@ -68,9 +68,9 @@ end
 
 let concat = flatten
 
-type Tree 'a = [ ('a | Tree 'a)* ]
+type Tree 'a = [ ('a\[Any*] | Tree 'a)* ]
 
-let rec deep_flatten (l : Tree '_a) =
+let rec deep_flatten (l : Tree 'a) =
   match l with
   :Nil -> []
   | ( (x & :List) , y) -> (deep_flatten x) @ (deep_flatten y)

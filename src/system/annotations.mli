@@ -14,7 +14,8 @@ end
 module PartialAnnot : sig
     type union_expl = (typ * t) list
     and union_done = (typ * t) list
-    and union = union_expl * union_done
+    and union_unr = typ list
+    and union = union_expl * union_done * union_unr
     and 'a pending_branch =
         'a
         * Domains.t (* Domains involved (used to prune branches) *)
@@ -36,7 +37,7 @@ module PartialAnnot : sig
         | Skip of t
         | TrySkip of t
         | TryKeep of a * t * t
-        | Propagate of a * Env.t list * union
+        | Propagate of a * (Env.t * union) list * union
         | Inter of t inter
 
     val pp_a : Format.formatter -> a -> unit
@@ -66,7 +67,7 @@ module FullAnnot : sig
         | InterA of a inter
     and t =
         | BVar of renaming
-        | Keep of a * union
+        | Keep of a * union * inst
         | Skip of t
         | Inter of t inter
 

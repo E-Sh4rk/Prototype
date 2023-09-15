@@ -26,11 +26,10 @@ let refine_a tenv env a t =
   | Alias v when subtype (Env.find v env) t -> [Env.empty]
   | Alias _ | Abstract _ | Const _ -> []
   | Pair (v1, v2) ->
-    let t = cap t pair_any in
-    split_typ t
-    |> List.filter (fun t -> top_vars t |> TVarSet.is_empty)
+    pair_dnf t
+    |> List.filter (fun b -> subtype (pair_branch_type b) t)
     |> List.map (
-      fun ti -> Env.construct_dup [(v1, pi1 ti) ; (v2, pi2 ti)]
+      fun (t1,t2) -> Env.construct_dup [(v1, t1) ; (v2, t2)]
     )
   | Projection (Fst, v) -> [Env.singleton v (mk_times (cons t) any_node)]
   | Projection (Snd, v) -> [Env.singleton v (mk_times any_node (cons t))]
@@ -38,13 +37,17 @@ let refine_a tenv env a t =
     [Env.singleton v (mk_record true [(label, cons t)])]
   | RecordUpdate (v, label, None) ->
     let t = cap t (record_any_without label) in
-    split_typ t
+    record_dnf t
+    |> List.map (fun b -> record_branch_type b)
+    |> List.filter (fun ti -> subtype ti t)
     |> List.map (
       fun ti -> Env.singleton v (remove_field_info ti label)
     )
   | RecordUpdate (v, label, Some x) ->
     let t = cap t (record_any_with label) in
-    split_typ t
+    record_dnf t
+    |> List.map (fun b -> record_branch_type b)
+    |> List.filter (fun ti -> subtype ti t)
     |> List.map (
       fun ti ->
         let field_type = get_field ti label in
@@ -54,8 +57,7 @@ let refine_a tenv env a t =
   | TypeConstr (v, _) -> [Env.singleton v t]
   | App (v1, v2) ->
     let alpha = TVar.mk_poly None in
-    let dnf = Env.find v1 env |> dnf in
-    dnf |> List.map (
+    Env.find v1 env |> dnf |> List.map (
       fun arrows ->
         let t1 = branch_type arrows in
         let constr = [ (t1, mk_arrow (TVar.typ alpha |> cons) (cons t)) ] in
@@ -70,9 +72,7 @@ let refine_a tenv env a t =
             let t2 = Subst.apply clean_subst t2 in
             pvars := TVarSet.union !pvars (vars_poly t1) ;
             pvars := TVarSet.union !pvars (vars_poly t2) ;
-            if List.length dnf <= 1
-            then Env.singleton v2 t2
-            else Env.construct_dup [(v1, t1) ; (v2, t2)]
+            Env.construct_dup [(v1, t1) ; (v2, t2)]
           )
         in
         let mono = monomorphize !pvars in
@@ -516,20 +516,20 @@ and infer_mono tenv expl env pannot e =
     log ~level:1 "Trying to type var %a.@." Variable.pp v ;
     begin match infer_mono_a_iterated v tenv expl env pannot_a a with
     | Ok pannot_a ->
-      let pannot = Keep (pannot_a, ([(any, pannot1)], [])) in
+      let pannot = Keep (pannot_a, ([(any, pannot1)], [], [])) in
       infer_mono tenv expl env pannot e
     | Fail -> infer_mono tenv expl env (Skip pannot2) e
     | res -> map_res (fun x -> TryKeep (x, pannot1, pannot2)) res
     end
   | Bind (v,_,_), Propagate (pannot_a, gammas, union) ->
     let propagate = gammas |>
-      Utils.find_among_others (fun env' _ -> is_compatible env env') in
+      Utils.find_among_others (fun (env',_) _ -> is_compatible env env') in
     begin match propagate with
-    | Some (env',gammas) ->
+    | Some ((env',union'),gammas) ->
       log ~level:1 "Var %a is ok but its DNF needs a split.@." Variable.pp v ;
-      let pannot1 = Keep (pannot_a, union) in
+      let pannot1 = Keep (pannot_a, union') in
       let pannot2 = Propagate (pannot_a, gammas, union) in
-      let env' = Env.filter (fun v t -> subtype (Env.find v env) t |> not) env' in
+      let env' = Env.filter (fun v t -> subtype_poly (Env.find v env) t |> not) env' in
       Split (env', pannot1, pannot2)
     | None -> infer_mono tenv expl env (Keep (pannot_a, union)) e
     end
@@ -537,9 +537,9 @@ and infer_mono tenv expl env pannot e =
     let keep = map_res (fun x -> Keep (pannot_a, x)) in
     let rec aux splits =
       match splits with
-      | ([],[]) -> assert false
-      | ([],d) -> Ok (Keep (pannot_a, ([],d)))
-      | ((s,pannot)::ex,d) ->
+      | ([],[],_) -> assert false
+      | ([],d,u) -> Ok (Keep (pannot_a, ([],d,u)))
+      | ((s,pannot)::ex,d,u) ->
         let annot_a = infer_poly_a v tenv env pannot_a a in
         let t = typeof_a_nofail v tenv env annot_a a in
         log ~level:1 "Var %a typed with type %a.@." Variable.pp v pp_typ t ;  
@@ -552,18 +552,22 @@ and infer_mono tenv expl env pannot e =
               and apply this substitution to pannot. It might be needed to do
               something equivalent in the polymorphic inference, as a branch
               must be rigourously smaller in order to be assimilated. *)
-          aux (ex,(s, pannot)::d)
+          aux (ex,(s, pannot)::d,u)
         | Split (env', pannot1, pannot2) when Env.mem v env' ->
           let s' = Env.find v env' in
           let t1 = cap_o s s' |> simplify_typ in
           let t2 = diff_o s s' |> simplify_typ in
-          let gammas1 = refine_a tenv env a (neg t1) in
-          let gammas2 = refine_a tenv env a (neg t2) in
+          let gammas1 = refine_a tenv env a (neg t1)
+            |> List.map (fun g -> (g, ((t2,pannot2)::ex,d,t1::u)))
+          in
+          let gammas2 = refine_a tenv env a (neg t2)
+            |> List.map (fun g -> (g, ((t1,pannot1)::ex,d,t2::u)))
+          in
           let res1 = Propagate (pannot_a, gammas1@gammas2,
-            ((t1,pannot1)::(t2,pannot2)::ex,d)) in
-          let res2 = Keep (pannot_a, ((s,pannot2)::ex,d)) in
+            ((t1,pannot1)::(t2,pannot2)::ex,d,u)) in
+          let res2 = Keep (pannot_a, ((s,pannot2)::ex,d,u)) in
           Split (Env.rm v env', res1, res2)
-        | res -> res |> map_res (fun x -> ((s, x)::ex,d)) |> keep
+        | res -> res |> map_res (fun x -> ((s, x)::ex,d,u)) |> keep
         end
     in
     aux splits

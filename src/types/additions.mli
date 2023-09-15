@@ -62,6 +62,8 @@ val disj_o : typ list -> typ
 val is_test_type : typ -> bool
 
 val branch_type : (typ*typ) list -> typ
+val pair_branch_type : (typ*typ) -> typ
+val record_branch_type : ((string * (bool * typ)) list * bool) -> typ
 
 (* Simplification of types *)
 

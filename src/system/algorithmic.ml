@@ -156,21 +156,22 @@ and typeof tenv env annot e =
   | Bind (v, _, e), Skip annot ->
     assert (Env.mem v env |> not) ;
     typeof tenv env annot e
-  | Bind (v, a, e), Keep (annot_a, splits) ->
+  | Bind (v, a, e), Keep (annot_a, splits, ss) ->
     let t = typeof_a v tenv env annot_a a in
     let pos = Variable.get_locations v in
     let untypeable str = raise (Untypeable (pos, str)) in
     if splits = []
     then untypeable ("Invalid decomposition: there must be at least 1 branch.")
     else
-      if subtype any (splits |> List.map fst |> disj)
+      let ti = t |> instantiate_check pos ss in
+      if subtype ti (splits |> List.map fst |> disj)
       then
         splits |> List.map (fun (s, annot) ->
           check_mono pos s ;
           let env = Env.add v (cap t s) env in
           typeof tenv env annot e
         ) |> disj_o
-      else untypeable ("Invalid decomposition: does not cover Any.")
+      else untypeable ("Invalid decomposition: does not cover the type of the definition.")
   | _, _ -> raise (Untypeable ([], "Invalid annotations."))
   end
   |> bot_instance |> simplify_typ

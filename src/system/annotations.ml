@@ -58,7 +58,9 @@ module PartialAnnot = struct
   [@@deriving show]
   and union_done = (typ * t) list
   [@@deriving show]
-  and union = union_expl * union_done
+  and union_unr = typ list
+  [@@deriving show]
+  and union = union_expl * union_done * union_unr
   [@@deriving show]
   and 'a pending_branch = 'a * Domains.t * bool
   [@@deriving show]
@@ -81,14 +83,14 @@ module PartialAnnot = struct
     | Skip of t
     | TrySkip of t
     | TryKeep of a * t * t
-    | Propagate of a * Env.t list * union
+    | Propagate of a * (Env.t * union) list * union
     | Inter of t inter
   [@@deriving show]
 
   let tvars_branch f (a, _, _) = f a
-  let rec tvars_union (e,d) =
+  let rec tvars_union (e,d,u) =
     let aux2 (ty, t) = TVarSet.union (vars ty) (tvars t) in
-    TVarSet.union_many ((List.map aux2 e)@(List.map aux2 d))
+    TVarSet.union_many ((List.map aux2 e)@(List.map aux2 d)@(List.map vars u))
   and tvars_inter_a (a, b, _) =
     TVarSet.union
       (List.map (tvars_branch tvars_a) a |> TVarSet.union_many)
@@ -110,14 +112,16 @@ module PartialAnnot = struct
     | TryKeep (a, t1, t2) ->
       TVarSet.union_many [tvars_a a ; tvars t1 ; tvars t2]
     | Propagate (a, envs, t) ->
-      TVarSet.union_many [tvars_a a ; List.map Env.tvars envs |> TVarSet.union_many ; tvars_union t]
+      let (envs, ts) = List.split envs in
+      [tvars_a a ; tvars_union t]@(List.map Env.tvars envs)
+      @(List.map tvars_union ts) |> TVarSet.union_many
     | Inter i -> tvars_inter i
 
   let apply_subst_branch f s (a, d, b) = (f s a, d, b)
-  let rec apply_subst_union s (e,d) =
+  let rec apply_subst_union s (e,d,u) =
     let apply = apply_subst_simplify s in
     let aux2 (ty, t) = (apply ty, apply_subst s t) in
-    (List.map aux2 e, List.map aux2 d)
+    (List.map aux2 e, List.map aux2 d, List.map apply u)
   and apply_subst_inter_a s (a, b, flags) =
     (List.map (apply_subst_branch apply_subst_a s) a,
     List.map (apply_subst_a s) b,
@@ -146,7 +150,10 @@ module PartialAnnot = struct
     | TryKeep (a, t1, t2) ->
       TryKeep (apply_subst_a s a, apply_subst s t1, apply_subst s t2)
     | Propagate (a, envs, t) ->
-      Propagate (apply_subst_a s a, List.map (Env.apply_subst s) envs, apply_subst_union s t)
+      let aux2 (env, t) =
+        (Env.apply_subst s env, apply_subst_union s t)
+      in
+      Propagate (apply_subst_a s a, List.map aux2 envs, apply_subst_union s t)
     | Inter i -> Inter (apply_subst_inter s i)
 end
 
@@ -172,7 +179,7 @@ module FullAnnot = struct
   [@@deriving show]
   and t =
       | BVar of renaming
-      | Keep of a * union
+      | Keep of a * union * inst
       | Skip of t
       | Inter of t inter
   [@@deriving show]

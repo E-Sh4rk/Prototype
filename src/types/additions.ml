@@ -244,6 +244,12 @@ let branch_type lst =
         |> List.map (fun (a, b) -> mk_arrow (cons a) (cons b))
         |> conj
     end
+let pair_branch_type (a,b) =
+     mk_times (cons a) (cons b)
+let record_branch_type (fields, o) =
+    mk_record o (fields |> List.map (fun (str, (o,t)) ->
+        let t = if o then cup absent t else t in
+        (str, cons t)))
 
 let full_branch_type_aux line_typ ((pvs, nvs), (ps, ns)) =
     let pvs = pvs |> List.map TVar.typ |> conj in
@@ -456,7 +462,7 @@ let split_typ t =
         in
         res := ts@(!res)
     ) t ;
-    !res
+    !res |> List.filter non_empty
 
 (* Record manipulation *)
 

@@ -62,22 +62,15 @@ let refine_a tenv env a t =
         let t1 = branch_type arrows in
         let constr = [ (t1, mk_arrow (TVar.typ alpha |> cons) (cons t)) ] in
         let res = tallying constr in
-        let pvars = ref TVarSet.empty in
-        let res =
-          res |> List.map (fun sol ->
-            let t1 = apply_subst_simplify sol t1 in
-            let t2 = Subst.find' sol alpha in
-            let clean_subst = clean_type_subst ~pos:any ~neg:empty t2 in
-            let t1 = Subst.apply clean_subst t1 in
-            let t2 = Subst.apply clean_subst t2 in
-            pvars := TVarSet.union !pvars (vars_poly t1) ;
-            pvars := TVarSet.union !pvars (vars_poly t2) ;
-            Env.construct_dup [(v1, t1) ; (v2, t2)]
-          )
-        in
-        let mono = monomorphize !pvars in
-        res |> List.map (fun env ->
-          Env.apply_subst mono env
+        res |> List.map (fun sol ->
+          let t1 = apply_subst_simplify sol t1 in
+          let t2 = Subst.find' sol alpha in
+          let clean_subst = clean_type_subst ~pos:any ~neg:empty t2 in
+          let t1 = Subst.apply clean_subst t1 in
+          let t2 = Subst.apply clean_subst t2 in
+          let pvars = TVarSet.union (vars_poly t1) (vars_poly t2) in
+          let mono = monomorphize pvars in
+          Env.construct_dup [(v1, t1) ; (v2, t2)] |> Env.apply_subst mono
         )
     )
     |> List.flatten

@@ -109,24 +109,10 @@ let is_compatible env gamma =
     is_empty t || (cap t s |> non_empty)
   )
 
-let subst_more_general s1 s2 =
-  let s2m = Subst.codom s2 |> monomorphize in
-  Subst.destruct s1 |> List.map (fun (v,t1) ->
-    let t2 = Subst.find' s2 v in
-    let t2 = Subst.apply s2m t2 in
-    [(t1, t2) ; (t2, t1)]
-  ) |> List.flatten |> test_tallying
-let subst_nb_new_vars s =
-  let codom = Subst.codom s |> TVarSet.destruct |> List.length in
-  let dom = Subst.dom s |> TVarSet.destruct |> List.length in
-  codom - dom
-
 let generalize_inferable tvars =
   let tvars = TVarSet.filter TVar.can_infer tvars in
   generalize tvars
 
-let res_var = TVar.mk_mono None
-let res_var_p = TVar.mk_poly None
 let simplify_tallying_infer env res_type sols =
   let tvars = Env.tvars env |> TVarSet.filter TVar.is_mono in
   let params_types = Env.domain env |>
@@ -136,14 +122,6 @@ let simplify_tallying_infer env res_type sols =
   let vars_involved dom sol =
     let sol = Subst.restrict sol dom in
     TVarSet.union (Subst.codom sol) dom
-  in
-  let better_sol (sol1, res1) (sol2, res2) =
-    let nb1, nb2 = subst_nb_new_vars sol1, subst_nb_new_vars sol2 in
-    let respart1 = Subst.construct [(res_var, cup res1 (TVar.typ res_var_p))] in
-    let respart2 = Subst.construct [(res_var, res2)] in
-    let sol1, sol2 = Subst.combine sol1 respart1, Subst.combine sol2 respart2 in
-    let sol1 = Subst.compose_restr (Subst.codom sol1 |> generalize) sol1 in
-    nb1 <= nb2 && subst_more_general sol1 sol2
   in
   let is_minimal_sol (_,r) ss =
     let r = Subst.apply (vars r |> generalize) r in
@@ -224,17 +202,16 @@ let simplify_tallying_infer env res_type sols =
     let res = List.map snd to_merge |> conj in
     (sol, res)
   )
-  (* Remove "less general" solutions *)
-  |> keep_only_minimal better_sol
   (* Order solutions (more precise results first) *)
-  |> order |> List.map fst
+  |> order
   (* Printing (debug) *)
   (* |> (fun res ->
     Format.printf "=== Solutions ===@." ;
     Format.printf "with tvars=%a@." TVarSet.pp tvars ;
-    res |> List.iter (fun s -> Format.printf "%a@." Subst.pp s) ;
+    res |> List.iter (fun (s,r) -> Format.printf "%a@.res:%a@." Subst.pp s pp_typ r) ;
     res
   ) *)
+  |> List.map fst
 
 let infer_mono_inter expl' env infer_branch typeof (b1, b2, (expl, tf,ud)) =
   let tvars = env |> Env.filter (fun x _ -> Variable.is_lambda_var x) |> Env.tvars in

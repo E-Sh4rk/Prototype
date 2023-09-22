@@ -13,7 +13,8 @@ type typecheck_result =
 | TFailure of (Position.t list) * string * (float * float)
 
 let generalize_all t =
-  Subst.apply (generalize (vars t)) t |> bot_instance |> simplify_typ
+  Subst.apply (generalize (vars t)) t
+  |> uncorrelate_tvars |> bot_instance |> simplify_typ
 
 let reduce t =
   apply_subst_simplify (reduce_tvars_of_fun t) t

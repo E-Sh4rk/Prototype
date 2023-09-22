@@ -277,27 +277,23 @@ let infer_mono_inter expl' env infer_branch typeof (b1, b2, (expl, tf,ud)) =
   in
   aux b2 expl b1
 
-let merge_substs tvars tvars_branch apply_subst_branch mk_inter
+let merge_substs apply_subst_branch mk_inter
   ((d,lpd), lst, pannot, default) =
-  let refresh b =
-    let tvs = TVarSet.diff (tvars_branch b) tvars |> TVarSet.filter TVar.can_infer in
-    apply_subst_branch (refresh tvs) b
-  in
   let lst = lst
     |> List.map (fun s -> (apply_subst_branch s pannot, Env.apply_subst s d))
-    |> List.map (fun (b, d) -> (refresh b, Domains.singleton d, false))
+    |> List.map (fun (b, d) -> (b, Domains.singleton d, false))
   in
   log ~level:2 "@.Creating an intersection with %n branches.@." (List.length lst + 1) ;
   (* NOTE: It is important for the default case to be inserted at the end (smaller priority). *)
   mk_inter (lst@[default, Domains.singleton d, lpd]) [] (Domains.empty,false,false)
 
-let should_iterate env tvars_branch apply_subst_branch mk_inter res =
+let should_iterate env apply_subst_branch mk_inter res =
   match res with
   | Split (gamma, pannot, _) when Env.is_empty gamma -> Some pannot
   | Subst (info, lst, pannot, default) ->
     let tvars = Env.tvars env |> TVarSet.filter TVar.is_mono in
     if lst |> List.for_all (fun s -> TVarSet.inter (Subst.dom s) tvars |> TVarSet.is_empty)
-    then Some (merge_substs tvars tvars_branch apply_subst_branch mk_inter
+    then Some (merge_substs apply_subst_branch mk_inter
                 (info, lst, pannot, default))
     else None
   | _ -> None
@@ -516,13 +512,7 @@ and infer_mono tenv expl env pannot e =
         let t = cap_o t s in
         log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
         begin match infer_mono_iterated tenv expl (Env.add v t env) pannot e with
-        | Ok pannot ->
-          (* TODO: if possible, find a substitution (over type variables not in the env)
-              that would make the new split smaller than the union of the previous ones,
-              and apply this substitution to pannot. It might be needed to do
-              something equivalent in the polymorphic inference, as a branch
-              must be rigourously smaller in order to be assimilated. *)
-          aux (ex,(s, pannot)::d,u)
+        | Ok pannot -> aux (ex,(s, pannot)::d,u)
         | Split (env', pannot1, pannot2) when Env.mem v env' ->
           let s' = Env.find v env' in
           let t1 = cap_o s s' |> simplify_typ in
@@ -547,7 +537,7 @@ and infer_mono_a_iterated vardef tenv expl env pannot_a a =
   log ~level:5 "infer_mono_a_iterated@." ;
   let res = infer_mono_a vardef tenv expl env pannot_a a in
   let si =
-    should_iterate env PartialAnnot.tvars_a PartialAnnot.apply_subst_a
+    should_iterate env PartialAnnot.apply_subst_a
       (fun a b c -> PartialAnnot.InterA (a,b,c)) res
   in
   match si with
@@ -558,7 +548,7 @@ and infer_mono_iterated tenv expl env pannot e =
   log ~level:5 "infer_mono_iterated@." ;
   let res = infer_mono tenv expl env pannot e in
   let si =
-    should_iterate env PartialAnnot.tvars PartialAnnot.apply_subst
+    should_iterate env PartialAnnot.apply_subst
       (fun a b c -> PartialAnnot.Inter (a,b,c)) res
   in
   match si with

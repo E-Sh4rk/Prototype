@@ -37,9 +37,6 @@ module FullAnnot : sig
     val pp_renaming : Format.formatter -> renaming -> unit
     val pp_a : Format.formatter -> a -> unit
     val pp : Format.formatter -> t -> unit
-
-    (* val apply_subst_a : Subst.t -> a -> a
-    val apply_subst : Subst.t -> t -> t *)
 end
 
 module PartialAnnot : sig
@@ -74,9 +71,6 @@ module PartialAnnot : sig
 
     val pp_a : Format.formatter -> a -> unit
     val pp : Format.formatter -> t -> unit
-
-    val tvars_a : a -> TVarSet.t
-    val tvars : t -> TVarSet.t
 
     val apply_subst_a : Subst.t -> a -> a
     val apply_subst : Subst.t -> t -> t

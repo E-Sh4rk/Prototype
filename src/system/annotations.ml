@@ -79,8 +79,6 @@ module FullAnnot = struct
       | Skip of t
       | Inter of t inter
   [@@deriving show]
-
-  (* TODO: function to "decorelate" intersection branches? *)
 end
 
 module PartialAnnot = struct
@@ -118,36 +116,6 @@ module PartialAnnot = struct
     | Propagate of a * (Env.t * union) list * union * cache
     | Inter of t inter
   [@@deriving show]
-
-  let tvars_branch f (a, _, _) = f a
-  let rec tvars_union (e,d,u) =
-    let aux2 (ty, t) = TVarSet.union (vars ty) (tvars t) in
-    TVarSet.union_many ((List.map aux2 e)@(List.map aux2 d)@(List.map vars u))
-  and tvars_inter_a (a, b, _) =
-    TVarSet.union
-      (List.map (tvars_branch tvars_a) a |> TVarSet.union_many)
-      (List.map tvars_a b |> TVarSet.union_many)
-  and tvars_inter (a, b, _) =
-    TVarSet.union
-      (List.map (tvars_branch tvars) a |> TVarSet.union_many)
-      (List.map tvars b |> TVarSet.union_many)
-  and tvars_a a = match a with
-  | InferA | TypA | UntypA | ThenVarA | ElseVarA
-  | EmptyA | ThenA | ElseA -> TVarSet.empty
-  | LambdaA (ty, t) -> TVarSet.union (vars ty) (tvars t)
-  | InterA i -> tvars_inter_a i
-  and tvars t =
-    match t with
-    | Infer | Typ | Untyp -> TVarSet.empty
-    | Keep (a, b, _) -> TVarSet.union (tvars_a a) (tvars_union b)
-    | Skip t | TrySkip t -> tvars t
-    | TryKeep (a, t1, t2) ->
-      TVarSet.union_many [tvars_a a ; tvars t1 ; tvars t2]
-    | Propagate (a, envs, t, _) ->
-      let (envs, ts) = List.split envs in
-      [tvars_a a ; tvars_union t]@(List.map Env.tvars envs)
-      @(List.map tvars_union ts) |> TVarSet.union_many
-    | Inter i -> tvars_inter i
 
   let apply_subst_branch f s (a, d, b) = (f s a, d, b)
   let rec apply_subst_union s (e,d,u) =

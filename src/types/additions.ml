@@ -631,3 +631,23 @@ let reduce_tvars_of_fun f =
     let s = aux 5 [f] in
     let g = generalize (Subst.codom s) in
     Subst.compose_restr g s
+
+let rec uncorrelate_tvars keep t =
+    if TVarSet.diff (vars_poly t) keep |> TVarSet.is_empty
+    then t
+    else
+        let dnf, non_arrow = dnf t, cap t (neg arrow_any) in
+        let dnf = dnf |> List.map (fun arrows ->
+            arrows |> List.map (fun (a,b) ->
+                let to_rename = TVarSet.diff (vars_poly a) keep in
+                let rename = refresh to_rename in
+                let keep = TVarSet.union keep (Subst.codom rename) in
+                let a = Subst.apply rename a in
+                let b = Subst.apply rename b |> uncorrelate_tvars keep in
+                (a, b)
+            )
+        ) in
+        let t = List.map branch_type dnf |> disj in
+        cup t non_arrow
+
+let uncorrelate_tvars = uncorrelate_tvars TVarSet.empty

@@ -103,3 +103,5 @@ val supertype_poly : typ -> typ -> bool
 
 val reduce_tvars : typ list -> Subst.t
 val reduce_tvars_of_fun : typ -> Subst.t
+
+val uncorrelate_tvars : typ -> typ

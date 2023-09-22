@@ -53,7 +53,39 @@ module Domains = struct
   let singleton e = add empty e
 end
 
+module FullAnnot = struct
+  type 'a inter = 'a list
+  [@@deriving show]
+  type inst = Subst.t list
+  [@@deriving show]
+  type renaming = Subst.t
+  [@@deriving show]
+  type union = (typ * t) list
+  [@@deriving show]
+  and a =
+      | ConstA | AliasA | LetA | AbstractA
+      | LambdaA of typ * t
+      | PairA of renaming * renaming
+      | AppA of inst * inst
+      | ProjA of inst
+      | EmptyA of inst | ThenA of inst | ElseA of inst
+      | RecordUpdateA of inst * (renaming option)
+      | ConstrA of inst
+      | InterA of a inter
+  [@@deriving show]
+  and t =
+      | BVar of renaming
+      | Keep of a * union * inst
+      | Skip of t
+      | Inter of t inter
+  [@@deriving show]
+
+  (* TODO: function to "decorelate" intersection branches? *)
+end
+
 module PartialAnnot = struct
+  type cache = { depends_on:VarSet.t ; prev_typ:typ option ; prev_fa:FullAnnot.a option }
+  let pp_cache fmt _ = Format.fprintf fmt "cache"
   type union_expl = (typ * t) list
   [@@deriving show]
   and union_done = (typ * t) list
@@ -79,11 +111,11 @@ module PartialAnnot = struct
   [@@deriving show]
   and t =
     | Infer | Typ | Untyp
-    | Keep of a * union
+    | Keep of a * union * cache
     | Skip of t
     | TrySkip of t
     | TryKeep of a * t * t
-    | Propagate of a * (Env.t * union) list * union
+    | Propagate of a * (Env.t * union) list * union * cache
     | Inter of t inter
   [@@deriving show]
 
@@ -107,11 +139,11 @@ module PartialAnnot = struct
   and tvars t =
     match t with
     | Infer | Typ | Untyp -> TVarSet.empty
-    | Keep (a, b) -> TVarSet.union (tvars_a a) (tvars_union b)
+    | Keep (a, b, _) -> TVarSet.union (tvars_a a) (tvars_union b)
     | Skip t | TrySkip t -> tvars t
     | TryKeep (a, t1, t2) ->
       TVarSet.union_many [tvars_a a ; tvars t1 ; tvars t2]
-    | Propagate (a, envs, t) ->
+    | Propagate (a, envs, t, _) ->
       let (envs, ts) = List.split envs in
       [tvars_a a ; tvars_union t]@(List.map Env.tvars envs)
       @(List.map tvars_union ts) |> TVarSet.union_many
@@ -144,67 +176,19 @@ module PartialAnnot = struct
     | Infer -> Infer
     | Typ -> Typ
     | Untyp -> Untyp
-    | Keep (a, b) -> Keep (apply_subst_a s a, apply_subst_union s b)
+    | Keep (a, b, c) -> Keep (apply_subst_a s a, apply_subst_union s b, c)
     | Skip t -> Skip (apply_subst s t)
     | TrySkip t -> TrySkip (apply_subst s t)
     | TryKeep (a, t1, t2) ->
       TryKeep (apply_subst_a s a, apply_subst s t1, apply_subst s t2)
-    | Propagate (a, envs, t) ->
+    | Propagate (a, envs, t, c) ->
       let aux2 (env, t) =
         (Env.apply_subst s env, apply_subst_union s t)
       in
-      Propagate (apply_subst_a s a, List.map aux2 envs, apply_subst_union s t)
+      Propagate (apply_subst_a s a, List.map aux2 envs, apply_subst_union s t, c)
     | Inter i -> Inter (apply_subst_inter s i)
-end
 
-module FullAnnot = struct
-  type 'a inter = 'a list
-  [@@deriving show]
-  type inst = Subst.t list
-  [@@deriving show]
-  type renaming = Subst.t
-  [@@deriving show]
-  type union = (typ * t) list
-  [@@deriving show]
-  and a =
-      | ConstA | AliasA | LetA | AbstractA
-      | LambdaA of typ * t
-      | PairA of renaming * renaming
-      | AppA of inst * inst
-      | ProjA of inst
-      | EmptyA of inst | ThenA of inst | ElseA of inst
-      | RecordUpdateA of inst * (renaming option)
-      | ConstrA of inst
-      | InterA of a inter
-  [@@deriving show]
-  and t =
-      | BVar of renaming
-      | Keep of a * union * inst
-      | Skip of t
-      | Inter of t inter
-  [@@deriving show]
-
-  (* let rec apply_subst_union s lst =
-    lst |> List.map (fun (ty, t) -> (apply_subst_simplify s ty, apply_subst s t))
-  and apply_subst_a s a =
-    let compose = Subst.compose_restr s in
-    match a with
-    | ConstA -> ConstA | AliasA -> AliasA | LetA -> LetA | AbstractA -> AbstractA
-    | LambdaA (ty, t) -> LambdaA (apply_subst_simplify s ty, apply_subst s t)
-    | PairA (r1, r2) -> PairA (compose r1, compose r2)
-    | AppA (ss1, ss2) -> AppA (List.map compose ss1, List.map compose ss2)
-    | ProjA ss -> ProjA (List.map compose ss)
-    | EmptyA ss -> EmptyA (List.map compose ss)
-    | ThenA ss -> ThenA (List.map compose ss)
-    | ElseA ss -> ElseA (List.map compose ss)
-    | RecordUpdateA (ss, ro) -> RecordUpdateA (List.map compose ss, Option.map compose ro)
-    | ConstrA ss -> ConstrA (List.map compose ss)
-    | InterA i -> InterA (List.map (apply_subst_a s) i)
-  and apply_subst s t =
-    if Subst.is_identity s then t
-    else match t with
-    | BVar r -> BVar (Subst.compose_restr s r)
-    | Keep (a, b) -> Keep (apply_subst_a s a, apply_subst_union s b)
-    | Skip t -> Skip (apply_subst s t)
-    | Inter i -> Inter (List.map (apply_subst s) i) *)
+  let init_cache a =
+    { depends_on = VarSet.union (Msc.fv_a a) (Msc.bv_a a) ;
+      prev_typ = None ; prev_fa = None }
 end

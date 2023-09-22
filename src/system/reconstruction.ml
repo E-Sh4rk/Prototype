@@ -280,8 +280,8 @@ let infer_mono_inter expl' env infer_branch typeof (b1, b2, (expl, tf,ud)) =
 let merge_substs apply_subst_branch mk_inter
   ((d,lpd), lst, pannot, default) =
   let lst = lst
-    |> List.map (fun s -> (apply_subst_branch s pannot, Env.apply_subst s d))
-    |> List.map (fun (b, d) -> (b, Domains.singleton d, false))
+    |> List.map (fun s ->
+      (apply_subst_branch s pannot, Env.apply_subst s d |> Domains.singleton, false))
   in
   log ~level:2 "@.Creating an intersection with %n branches.@." (List.length lst + 1) ;
   (* NOTE: It is important for the default case to be inserted at the end (smaller priority). *)

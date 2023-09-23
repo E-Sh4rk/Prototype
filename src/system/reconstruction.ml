@@ -8,6 +8,8 @@ open Utils
 open Algorithmic
 open Reconstruction_aux
 
+module Make () = struct
+
 (* ====================================== *)
 (* =============== REFINE =============== *)
 (* ====================================== *)
@@ -591,3 +593,5 @@ let infer tenv env e =
 let typeof_simple tenv env e =
   let annot = infer tenv env e in
   typeof_nofail tenv env annot e
+
+end

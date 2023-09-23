@@ -125,66 +125,76 @@ module PartialAnnot = struct
   and t_cached = t * FullAnnot.t cache
   [@@deriving show]
 
-  let rec apply_subst_aux s = (* TODO: update annot_changed flags *)
+  let update_cache changed c =
+    if changed
+    then { c with annot_changed = true }
+    else c
+
+  let rec apply_subst_aux s =
     if Subst.is_identity s then ((fun t -> (t,false)), (fun a -> (a,false)))
     else
       let dom = Subst.dom s in
       let change = ref false in
+      let update_change b = change := b || !change in
       let apply_typ t =
         if TVarSet.inter (vars t) dom |> TVarSet.is_empty
-        then t else (change := true ; apply_subst_simplify s t) in
-      let apply_subst_branch f (a, d, b) = (f a, d, b) in
-      let rec apply_subst_union (e,d,u) =
-        let aux2 (ty, t) = (apply_typ ty, apply t) in
-        (List.map aux2 e, List.map aux2 d, List.map apply_typ u)
-      and apply_subst_inter_a (a, b, flags) =
-        (List.map (apply_subst_branch apply_a) a,
-        List.map apply_a b,
-        flags)
-      and apply_subst_inter (a, b, flags) =
-        (List.map (apply_subst_branch apply) a,
-        List.map apply b,
-        flags)
-      and apply_a (a,c) =
-        let a = match a with
+        then t else (change := true ; apply_subst_simplify s t)
+      and apply_subst_a a =
+        let (a, changed) = apply_subst_a s a in
+        update_change changed ; a
+      and apply_subst t =
+        let (t, changed) = apply_subst s t in
+        update_change changed ; t
+      in
+      let apply_a a = match a with
         | InferA -> InferA
         | TypA -> TypA
         | UntypA -> UntypA
         | ThenVarA -> ThenVarA | ElseVarA -> ElseVarA
         | EmptyA -> EmptyA | ThenA -> ThenA | ElseA -> ElseA
-        | LambdaA (ty, t) -> LambdaA (apply_typ ty, apply t)
-        | InterA i -> InterA (apply_subst_inter_a i)
+        | LambdaA (ty, t) -> LambdaA (apply_typ ty, apply_subst t)
+        | InterA (a, b, flags) -> InterA (
+          List.map (fun (a,d,b) -> (apply_subst_a a,d,b)) a,
+          List.map apply_subst_a b,
+          flags)
+      and apply t =
+        let apply_subst_union (e,d,u) =
+          let aux2 (ty, t) = (apply_typ ty, apply_subst t) in
+          (List.map aux2 e, List.map aux2 d, List.map apply_typ u)
         in
-        (a,c)
-      and apply (t,c) =
-        let t = match t with
+        match t with
         | Infer -> Infer
         | Typ -> Typ
         | Untyp -> Untyp
-        | Keep (a, b) -> Keep (apply_a a, apply_subst_union b)
-        | Skip t -> Skip (apply t)
-        | TrySkip t -> TrySkip (apply t)
+        | Keep (a, b) -> Keep (apply_subst_a a, apply_subst_union b)
+        | Skip t -> Skip (apply_subst t)
+        | TrySkip t -> TrySkip (apply_subst t)
         | TryKeep (a, t1, t2) ->
-          TryKeep (apply_a a, apply t1, apply t2)
+          TryKeep (apply_subst_a a, apply_subst t1, apply_subst t2)
         | Propagate (a, envs, t) ->
           let aux2 (env, t) =
             (Env.apply_subst s env, apply_subst_union t)
           in
-          Propagate (apply_a a, List.map aux2 envs, apply_subst_union t)
-        | Inter i -> Inter (apply_subst_inter i)
-        in
-        (t,c)
+          Propagate (apply_subst_a a, List.map aux2 envs, apply_subst_union t)
+        | Inter (a, b, flags) -> Inter (
+          List.map (fun (a,d,b) -> (apply_subst a,d,b)) a,
+          List.map apply_subst b,
+          flags)
       in
       ((fun t -> let res = apply t in (res, !change)),
-       (fun a -> let res = apply_a a in (res, !change)))
+        (fun a -> let res = apply_a a in (res, !change)))    
 
-  and apply_subst_a s =
+  and apply_subst_a s (a,c) =
     let (_, apply_subst_a) = apply_subst_aux s in
-    apply_subst_a
+    let (a,b) = apply_subst_a a in
+    let c = update_cache b c in
+    ((a,c),b)
 
-  and apply_subst s =
+  and apply_subst s (t,c) =
     let (apply_subst, _) = apply_subst_aux s in
-    apply_subst
+    let (t,b) = apply_subst t in
+    let c = update_cache b c in
+    ((t,c),b)
 
   let apply_subst_a s a = apply_subst_a s a |> fst
   let apply_subst s t = apply_subst s t |> fst

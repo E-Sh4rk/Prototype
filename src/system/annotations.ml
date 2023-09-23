@@ -82,18 +82,21 @@ module FullAnnot = struct
 end
 
 module PartialAnnot = struct
-  type cache = { depends_on:VarSet.t ; annot_changed:bool ;
-    prev_typ:typ option ; prev_fa:FullAnnot.a option }
-  let pp_cache fmt _ = Format.fprintf fmt "cache"
-  type union_expl = (typ * t) list
+  type 'a cache = { depends_on:VarSet.t ; annot_changed:bool ;
+    prev_typ:typ option ; prev_fa:'a option }
+  let pp_cache _ fmt _ = Format.fprintf fmt "cache"
+  type union_expl = (typ * t_cached) list
   [@@deriving show]
-  and union_done = (typ * t) list
+  and union_done = (typ * t_cached) list
   [@@deriving show]
   and union_unr = typ list
   [@@deriving show]
   and union = union_expl * union_done * union_unr
   [@@deriving show]
-  and 'a pending_branch = 'a * Domains.t * bool
+  and 'a pending_branch =
+      'a
+      * Domains.t (* Domains involved (used to prune branches) *)
+      * bool (* Low priority default: type only if no other branch is typeable *)
   [@@deriving show]
   and 'a inter = ('a pending_branch) list (* Pending *)
                * 'a list (* Explored *)
@@ -102,23 +105,27 @@ module PartialAnnot = struct
                   * bool (* User defined *))
   [@@deriving show]
   and a =
-    | InferA | TypA | UntypA
-    | ThenVarA | ElseVarA
-    | EmptyA | ThenA | ElseA
-    | LambdaA of typ * t
-    | InterA of a inter
+      | InferA | TypA | UntypA
+      | ThenVarA | ElseVarA
+      | EmptyA | ThenA | ElseA (* NOTE: not in the paper, small optimisation *)
+      | LambdaA of typ * t_cached
+      | InterA of a_cached inter
   [@@deriving show]
   and t =
-    | Infer | Typ | Untyp
-    | Keep of a * union * cache
-    | Skip of t
-    | TrySkip of t
-    | TryKeep of a * t * t
-    | Propagate of a * (Env.t * union) list * union * cache
-    | Inter of t inter
+      | Infer | Typ | Untyp
+      | Keep of a_cached * union
+      | Skip of t_cached
+      | TrySkip of t_cached
+      | TryKeep of a_cached * t_cached * t_cached
+      | Propagate of a_cached * (Env.t * union) list * union
+      | Inter of t_cached inter
+  [@@deriving show]
+  and a_cached = a * FullAnnot.a cache
+  [@@deriving show]
+  and t_cached = t * FullAnnot.t cache
   [@@deriving show]
 
-  let rec apply_subst_aux s =
+  let rec apply_subst_aux s = (* TODO: update annot_changed flags *)
     if Subst.is_identity s then ((fun t -> (t,false)), (fun a -> (a,false)))
     else
       let dom = Subst.dom s in
@@ -138,30 +145,35 @@ module PartialAnnot = struct
         (List.map (apply_subst_branch apply) a,
         List.map apply b,
         flags)
-      and apply_a a = match a with
-      | InferA -> InferA
-      | TypA -> TypA
-      | UntypA -> UntypA
-      | ThenVarA -> ThenVarA | ElseVarA -> ElseVarA
-      | EmptyA -> EmptyA | ThenA -> ThenA | ElseA -> ElseA
-      | LambdaA (ty, t) -> LambdaA (apply_typ ty, apply t)
-      | InterA i -> InterA (apply_subst_inter_a i)
-      and apply t =
-        match t with
+      and apply_a (a,c) =
+        let a = match a with
+        | InferA -> InferA
+        | TypA -> TypA
+        | UntypA -> UntypA
+        | ThenVarA -> ThenVarA | ElseVarA -> ElseVarA
+        | EmptyA -> EmptyA | ThenA -> ThenA | ElseA -> ElseA
+        | LambdaA (ty, t) -> LambdaA (apply_typ ty, apply t)
+        | InterA i -> InterA (apply_subst_inter_a i)
+        in
+        (a,c)
+      and apply (t,c) =
+        let t = match t with
         | Infer -> Infer
         | Typ -> Typ
         | Untyp -> Untyp
-        | Keep (a, b, c) -> Keep (apply_a a, apply_subst_union b, c)
+        | Keep (a, b) -> Keep (apply_a a, apply_subst_union b)
         | Skip t -> Skip (apply t)
         | TrySkip t -> TrySkip (apply t)
         | TryKeep (a, t1, t2) ->
           TryKeep (apply_a a, apply t1, apply t2)
-        | Propagate (a, envs, t, c) ->
+        | Propagate (a, envs, t) ->
           let aux2 (env, t) =
             (Env.apply_subst s env, apply_subst_union t)
           in
-          Propagate (apply_a a, List.map aux2 envs, apply_subst_union t, c)
+          Propagate (apply_a a, List.map aux2 envs, apply_subst_union t)
         | Inter i -> Inter (apply_subst_inter i)
+        in
+        (t,c)
       in
       ((fun t -> let res = apply t in (res, !change)),
        (fun a -> let res = apply_a a in (res, !change)))
@@ -177,7 +189,13 @@ module PartialAnnot = struct
   let apply_subst_a s a = apply_subst_a s a |> fst
   let apply_subst s t = apply_subst s t |> fst
 
-  let init_cache a =
-    { depends_on = VarSet.union (Msc.fv_a a) (Msc.bv_a a) ;
-      annot_changed = false ; prev_typ = None ; prev_fa = None }
+  let init_cache_a a =
+    { depends_on = Msc.fv_a a ; annot_changed = false ;
+      prev_typ = None ; prev_fa = None }
+  let init_cache t =
+    { depends_on = Msc.fv_e t ; annot_changed = false ;
+      prev_typ = None ; prev_fa = None }
+  let init_cache' vs =
+    { depends_on = vs ; annot_changed = false ;
+      prev_typ = None ; prev_fa = None }
 end

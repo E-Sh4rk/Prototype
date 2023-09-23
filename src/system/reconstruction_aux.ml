@@ -139,7 +139,7 @@ let infer_poly_inter infer_poly_branch (b1, b2, (_,tf,_)) =
   assert (b1 = [] && b2 <> [] && tf) ;
   b2 |> List.map infer_poly_branch
 
-let rec infer_poly_a vardef tenv env pannot_a a =
+let rec infer_poly_a vardef tenv env (pannot_a, _) a =
   let open PartialAnnot in
   let open FullAnnot in
   let vartype v = Env.find v env in
@@ -212,7 +212,7 @@ let rec infer_poly_a vardef tenv env pannot_a a =
     LambdaA (s, annot)
   | _, _ ->  assert false
 
-and infer_poly tenv env pannot e =
+and infer_poly tenv env (pannot, _) e =
   let open PartialAnnot in
   let open FullAnnot in
   let vartype v = Env.find v env in
@@ -225,7 +225,7 @@ and infer_poly tenv env pannot e =
   | Bind (_, _, e), PartialAnnot.Skip pannot ->
     let annot = infer_poly tenv env pannot e in
     FullAnnot.Skip annot
-  | Bind (v, a, e), PartialAnnot.Keep (pannot_a, (ex,d,u), _) ->
+  | Bind (v, a, e), PartialAnnot.Keep (pannot_a, (ex,d,u)) ->
     assert (d <> [] && ex = []) ;
     let annot_a = infer_poly_a v tenv env pannot_a a in
     let t = typeof_a_nofail v tenv env annot_a a in

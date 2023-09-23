@@ -298,258 +298,270 @@ let should_iterate env apply_subst_branch mk_inter res =
     else None
   | _ -> None
 
-let rec infer_mono_a vardef tenv expl env pannot_a a =
+let rec infer_mono_a vardef tenv expl env (pannot_a,c_a) a =
   let memvar v = Env.mem v env in
   let vartype v = Env.find v env in
   let needvar v a1 a2 = NeedVar (v, a1, a2) in
   (* TODO: enable the lpd flag? (prune some uninteresting branches) *)
   let needsubst ss a1 a2 = Subst ((env, (*true*) false), ss, a1, a2) in
   let needsubst_no_lpd ss a1 a2 = Subst ((env, false), ss, a1, a2) in
-  let open PartialAnnot in
-  match a, pannot_a with
-  | a, InterA i ->
-    infer_mono_inter
-      expl env
-      (fun expl pannot_a -> infer_mono_a_iterated vardef tenv expl env pannot_a a)
-      (fun pannot_a ->
-        let annot_a = infer_poly_a vardef tenv env pannot_a a in
-        typeof_a vardef tenv env annot_a a)
-      i
-    |> map_res (fun x -> InterA x)
-  | _, TypA -> Ok (TypA)
-  | _, EmptyA -> Ok (EmptyA)
-  | _, ThenA -> Ok (ThenA)
-  | _, ElseA -> Ok (ElseA)
-  | _, UntypA -> log ~level:3 "Untyp annot generated a fail.@." ; Fail
-  | Alias v, InferA when memvar v -> Ok (TypA)
-  | Alias v, InferA -> log ~level:3 "Unknown var %s generated a fail.@." (Variable.show v) ; Fail
-  | Abstract _, InferA | Const _, InferA -> Ok (TypA)
-  | Pair (v1, v2), InferA | Let (v1, v2), InferA ->
-    if memvar v1 |> not
-    then needvar v1 InferA UntypA
-    else if memvar v2 |> not
-    then needvar v2 InferA UntypA
-    else Ok TypA
-  | Projection (p, v), InferA ->
-    if memvar v then
-      let t = vartype v in
-      let alpha = TVar.mk_mono (Some (Variable.show vardef)) in
-      let s =
-        begin match p with
-        | Parsing.Ast.Field label ->
-          mk_record true [label, TVar.typ alpha |> cons]
-        | Parsing.Ast.Fst ->
-          mk_times (TVar.typ alpha |> cons) any_node
-        | Parsing.Ast.Snd ->
-          mk_times any_node (TVar.typ alpha |> cons)
-        end
-      in
-      log ~level:3 "@.Tallying (inference) for %a: %a <= %a@."
-        Variable.pp vardef pp_typ t pp_typ s ;
-      let res = tallying_infer [(t, s)] in
-      res |> List.iter (fun s ->
-        log ~level:3 "Solution: %a@." Subst.pp s
-      ) ;
-      let res = simplify_tallying_infer env (TVar.typ alpha) res in
-      res |> List.iter (fun s ->
-        log ~level:3 "Solution (simplified): %a@." Subst.pp s
-      ) ;
-      needsubst res TypA UntypA
-    else
-      needvar v InferA UntypA
-  | RecordUpdate (v, _, None), InferA ->
-    if memvar v then
-      let res = tallying_infer [(vartype v, record_any)] in
-      let res = simplify_tallying_infer env empty res in
-      needsubst res TypA UntypA
-    else
-      needvar v InferA UntypA
-  | RecordUpdate (v, _, Some v'), InferA ->
-    if memvar v |> not
-    then needvar v InferA UntypA
-    else if memvar v' |> not
-    then needvar v' InferA UntypA
-    else
-      let res = tallying_infer [(vartype v, record_any)] in
-      let res = simplify_tallying_infer env empty res in
-      needsubst res TypA UntypA
-  | TypeConstr (v, s), InferA ->
-    if memvar v then
-      let res = tallying_infer [(vartype v, s)] in
-      let res = simplify_tallying_infer env empty res in
-      needsubst res TypA UntypA
-    else
-      needvar v InferA UntypA
-  | App (v1, v2), InferA ->
-    if memvar v1 |> not
-    then needvar v1 InferA UntypA
-    else if memvar v2 |> not
-    then needvar v2 InferA UntypA
-    else
-      let t1 = vartype v1 in
-      let t2 = vartype v2 in
-      let alpha = TVar.mk_mono (Some (Variable.show vardef)) in
-      let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
-      log ~level:3 "@.Approximate tallying (inference) for %a: %a <= %a@."
-        Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
-      let res = approximate_app ~infer:true t1 t2 alpha in
-      res |> List.iter (fun s ->
-        log ~level:3 "Solution: %a@." Subst.pp s
-      ) ;
-      let res = simplify_tallying_infer env (TVar.typ alpha) res in
-      res |> List.iter (fun s ->
-        log ~level:3 "Solution (simplified): %a@." Subst.pp s
-      ) ;
-      needsubst res TypA UntypA
-  | Ite (v, tau, _, _), InferA ->
-    if memvar v then
-      let t = vartype v in
-      if subtype t empty then Ok EmptyA
-      else if subtype t tau
-      then
-        let res = tallying_infer [(t, empty)] in
+  let rec aux pannot_a a =
+    let open PartialAnnot in
+    match a, pannot_a with
+    | a, InterA i ->
+      infer_mono_inter
+        expl env
+        (fun expl pannot_a -> infer_mono_a_iterated vardef tenv expl env pannot_a a)
+        (fun pannot_a ->
+          let annot_a = infer_poly_a vardef tenv env pannot_a a in
+          typeof_a vardef tenv env annot_a a)
+        i
+      |> map_res (fun x -> InterA x)
+    | _, TypA -> Ok (TypA)
+    | _, EmptyA -> Ok (EmptyA)
+    | _, ThenA -> Ok (ThenA)
+    | _, ElseA -> Ok (ElseA)
+    | _, UntypA -> log ~level:3 "Untyp annot generated a fail.@." ; Fail
+    | Alias v, InferA when memvar v -> Ok (TypA)
+    | Alias v, InferA -> log ~level:3 "Unknown var %s generated a fail.@." (Variable.show v) ; Fail
+    | Abstract _, InferA | Const _, InferA -> Ok (TypA)
+    | Pair (v1, v2), InferA | Let (v1, v2), InferA ->
+      if memvar v1 |> not
+      then needvar v1 InferA UntypA
+      else if memvar v2 |> not
+      then needvar v2 InferA UntypA
+      else Ok TypA
+    | Projection (p, v), InferA ->
+      if memvar v then
+        let t = vartype v in
+        let alpha = TVar.mk_mono (Some (Variable.show vardef)) in
+        let s =
+          begin match p with
+          | Parsing.Ast.Field label ->
+            mk_record true [label, TVar.typ alpha |> cons]
+          | Parsing.Ast.Fst ->
+            mk_times (TVar.typ alpha |> cons) any_node
+          | Parsing.Ast.Snd ->
+            mk_times any_node (TVar.typ alpha |> cons)
+          end
+        in
+        log ~level:3 "@.Tallying (inference) for %a: %a <= %a@."
+          Variable.pp vardef pp_typ t pp_typ s ;
+        let res = tallying_infer [(t, s)] in
+        res |> List.iter (fun s ->
+          log ~level:3 "Solution: %a@." Subst.pp s
+        ) ;
+        let res = simplify_tallying_infer env (TVar.typ alpha) res in
+        res |> List.iter (fun s ->
+          log ~level:3 "Solution (simplified): %a@." Subst.pp s
+        ) ;
+        needsubst res TypA UntypA
+      else
+        needvar v InferA UntypA
+    | RecordUpdate (v, _, None), InferA ->
+      if memvar v then
+        let res = tallying_infer [(vartype v, record_any)] in
         let res = simplify_tallying_infer env empty res in
-        if List.exists Subst.is_identity res
-        then Ok EmptyA
-        else needsubst_no_lpd res EmptyA ThenVarA
-      else if subtype t (neg tau)
-      then
-        let res = tallying_infer [(t, empty)] in
+        needsubst res TypA UntypA
+      else
+        needvar v InferA UntypA
+    | RecordUpdate (v, _, Some v'), InferA ->
+      if memvar v |> not
+      then needvar v InferA UntypA
+      else if memvar v' |> not
+      then needvar v' InferA UntypA
+      else
+        let res = tallying_infer [(vartype v, record_any)] in
         let res = simplify_tallying_infer env empty res in
-        if List.exists Subst.is_identity res
-        then Ok EmptyA
-        else needsubst_no_lpd res EmptyA ElseVarA
-      else Split (Env.singleton v tau, InferA, InferA)
-    else needvar v InferA UntypA
-  | Ite (_, _, v1, _), ThenVarA ->
-    if memvar v1 then Ok ThenA else needvar v1 ThenA UntypA
-  | Ite (_, _, _, v2), ElseVarA ->
-    if memvar v2 then Ok ElseA else needvar v2 ElseA UntypA
-  | Lambda (Unnanoted, _, _), InferA ->
-    let alpha = TVar.mk_mono (Some (Variable.show vardef)) |> TVar.typ in
-    let pannot_a = LambdaA (alpha, Infer) in
-    infer_mono_a vardef tenv expl env pannot_a a
-  | Lambda (ADomain ts, _, _), InferA ->
-    let branches = ts |> List.map (fun t ->
-      let pannot_a = LambdaA (t, Infer) in
-      (pannot_a, expl, false)
-    ) in
-    let pannot_a = InterA (branches, [], (Domains.empty, false, true)) in
-    infer_mono_a vardef tenv expl env pannot_a a
-  | Lambda (_, v, e), LambdaA (s, pannot) ->
-    log ~level:2 "Entering lambda for %a with domain %a.@." Variable.pp v pp_typ s ;
-    if is_empty s then (log ~level:3 "Lambda with empty domain generated a fail.@." ; Fail)
-    else
-      let env = Env.add v s env in
-      infer_mono_iterated tenv (Domains.enter_lambda env expl) env pannot e
-      |> map_res (fun x -> LambdaA (s, x))
-  | _, _ -> assert false
+        needsubst res TypA UntypA
+    | TypeConstr (v, s), InferA ->
+      if memvar v then
+        let res = tallying_infer [(vartype v, s)] in
+        let res = simplify_tallying_infer env empty res in
+        needsubst res TypA UntypA
+      else
+        needvar v InferA UntypA
+    | App (v1, v2), InferA ->
+      if memvar v1 |> not
+      then needvar v1 InferA UntypA
+      else if memvar v2 |> not
+      then needvar v2 InferA UntypA
+      else
+        let t1 = vartype v1 in
+        let t2 = vartype v2 in
+        let alpha = TVar.mk_mono (Some (Variable.show vardef)) in
+        let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
+        log ~level:3 "@.Approximate tallying (inference) for %a: %a <= %a@."
+          Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
+        let res = approximate_app ~infer:true t1 t2 alpha in
+        res |> List.iter (fun s ->
+          log ~level:3 "Solution: %a@." Subst.pp s
+        ) ;
+        let res = simplify_tallying_infer env (TVar.typ alpha) res in
+        res |> List.iter (fun s ->
+          log ~level:3 "Solution (simplified): %a@." Subst.pp s
+        ) ;
+        needsubst res TypA UntypA
+    | Ite (v, tau, _, _), InferA ->
+      if memvar v then
+        let t = vartype v in
+        if subtype t empty then Ok EmptyA
+        else if subtype t tau
+        then
+          let res = tallying_infer [(t, empty)] in
+          let res = simplify_tallying_infer env empty res in
+          if List.exists Subst.is_identity res
+          then Ok EmptyA
+          else needsubst_no_lpd res EmptyA ThenVarA
+        else if subtype t (neg tau)
+        then
+          let res = tallying_infer [(t, empty)] in
+          let res = simplify_tallying_infer env empty res in
+          if List.exists Subst.is_identity res
+          then Ok EmptyA
+          else needsubst_no_lpd res EmptyA ElseVarA
+        else Split (Env.singleton v tau, InferA, InferA)
+      else needvar v InferA UntypA
+    | Ite (_, _, v1, _), ThenVarA ->
+      if memvar v1 then Ok ThenA else needvar v1 ThenA UntypA
+    | Ite (_, _, _, v2), ElseVarA ->
+      if memvar v2 then Ok ElseA else needvar v2 ElseA UntypA
+    | Lambda (Unnanoted, _, e), InferA ->
+      let cache = init_cache e in
+      let alpha = TVar.mk_mono (Some (Variable.show vardef)) |> TVar.typ in
+      let pannot_a = LambdaA (alpha, (Infer, cache)) in
+      aux pannot_a a
+    | Lambda (ADomain ts, _, e), InferA ->
+      let cache = init_cache e in
+      let branches = ts |> List.map (fun t ->
+        let pannot_a = (LambdaA (t, (Infer, cache)), c_a) in
+        (pannot_a, expl, false)
+      ) in
+      let pannot_a = InterA (branches, [], (Domains.empty, false, true)) in
+      aux pannot_a a
+    | Lambda (_, v, e), LambdaA (s, pannot) ->
+      log ~level:2 "Entering lambda for %a with domain %a.@." Variable.pp v pp_typ s ;
+      if is_empty s then (log ~level:3 "Lambda with empty domain generated a fail.@." ; Fail)
+      else
+        let env = Env.add v s env in
+        infer_mono_iterated tenv (Domains.enter_lambda env expl) env pannot e
+        |> map_res (fun x -> LambdaA (s, x))
+    | _, _ -> assert false
+  in
+  map_res (fun a -> (a,c_a)) (aux pannot_a a)
 
-and infer_mono tenv expl env pannot e =
+and infer_mono tenv expl env (pannot, c) e =
   let memvar v = Env.mem v env in
   let needvar v a1 a2 = NeedVar (v, a1, a2) in
   let open PartialAnnot in
-  match e, pannot with
-  | _, Untyp -> log ~level:3 "Untyp annot generated a fail.@." ; Fail
-  | _, Typ -> Ok Typ
-  | Var v, Infer ->
-    if memvar v then Ok Typ else needvar v Infer Untyp
-  | Bind _, Inter i ->
-    infer_mono_inter
-      expl env
-      (fun expl pannot -> infer_mono_iterated tenv expl env pannot e)
-      (fun pannot ->
-        let annot = infer_poly tenv env pannot e in
-        typeof tenv env annot e)
-      i
-    |> map_res (fun x -> Inter x)
-  | Bind _, Infer -> infer_mono tenv expl env (TrySkip Infer) e
-  | Bind (v, _, e) as ee, TrySkip pannot ->
-    begin match infer_mono_iterated tenv expl env pannot e with
-    | NeedVar (v', pannot1, pannot2) when Variable.equals v v' ->
-      log ~level:0 "Var %a needed.@." Variable.pp v ;
-      infer_mono tenv expl env (TryKeep (InferA, pannot1, pannot2)) ee
-    | Ok pannot -> Ok (Skip pannot)
-    | res -> map_res (fun x -> TrySkip x) res
-    end
-  | Bind (v, _, e) as ee, Skip pannot ->
-    begin match infer_mono_iterated tenv expl env pannot e with
-    | NeedVar (v', _, pannot2) when Variable.equals v v' ->
-      infer_mono tenv expl env (Skip pannot2) ee
-    | res -> map_res (fun x -> Skip x) res
-    end
-  | Bind (v, a, _), TryKeep (pannot_a, pannot1, pannot2) ->
-    log ~level:1 "Trying to type var %a.@." Variable.pp v ;
-    begin match infer_mono_a_iterated v tenv expl env pannot_a a with
-    | Ok pannot_a ->
-      let pannot = Keep (pannot_a, ([(any, pannot1)], [], []), init_cache a) in
-      infer_mono tenv expl env pannot e
-    | Fail -> infer_mono tenv expl env (Skip pannot2) e
-    | res -> map_res (fun x -> TryKeep (x, pannot1, pannot2)) res
-    end
-  | Bind (v,_,_), Propagate (pannot_a, gammas, union, c) ->
-    let propagate = gammas |>
-      Utils.find_among_others (fun (env',_) _ -> is_compatible env env') in
-    begin match propagate with
-    | Some ((env',union'),gammas) ->
-      log ~level:1 "Var %a is ok but its DNF needs a split.@." Variable.pp v ;
-      let pannot1 = Keep (pannot_a, union', c) in
-      let pannot2 = Propagate (pannot_a, gammas, union, c) in
-      let env' = Env.filter (fun v t -> subtype_poly (Env.find v env) t |> not) env' in
-      Split (env', pannot1, pannot2)
-    | None -> infer_mono tenv expl env (Keep (pannot_a, union, c)) e
-    end
-  | Bind (v, a, e), Keep (pannot_a, splits, c) ->
-    let keep = map_res (fun x -> Keep (pannot_a, x, c)) in
-    let rec aux splits =
-      match splits with
-      | ([],[],_) -> assert false
-      | ([],d,u) -> Ok (Keep (pannot_a, ([],d,u), c))
-      | ((s,pannot)::ex,d,u) ->
-        let annot_a = infer_poly_a v tenv env pannot_a a in
-        let t = typeof_a_nofail v tenv env annot_a a in
-        log ~level:1 "Var %a typed with type %a.@." Variable.pp v pp_typ t ;  
-        let t = cap_o t s in
-        log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
-        begin match infer_mono_iterated tenv expl (Env.add v t env) pannot e with
-        | Ok pannot -> aux (ex,(s, pannot)::d,u)
-        | Split (env', pannot1, pannot2) when Env.mem v env' ->
-          let s' = Env.find v env' in
-          let t1 = cap_o s s' |> simplify_typ in
-          let t2 = diff_o s s' |> simplify_typ in
-          let gammas1 = refine_a tenv env a (neg t1)
-            |> List.map (fun g -> (g, ((t2,pannot2)::ex,d,t1::u)))
-          in
-          let gammas2 = refine_a tenv env a (neg t2)
-            |> List.map (fun g -> (g, ((t1,pannot1)::ex,d,t2::u)))
-          in
-          let res1 = Propagate (pannot_a, gammas1@gammas2,
-            ((t1,pannot1)::(t2,pannot2)::ex,d,u), c) in
-          let res2 = Keep (pannot_a, ((s,pannot2)::ex,d,u), c) in
-          Split (Env.rm v env', res1, res2)
-        | res -> res |> map_res (fun x -> ((s, x)::ex,d,u)) |> keep
-        end
-    in
-    aux splits
-  | _, _ -> assert false
+  let rec aux pannot e =
+    match e, pannot with
+    | _, Untyp -> log ~level:3 "Untyp annot generated a fail.@." ; Fail
+    | _, Typ -> Ok Typ
+    | Var v, Infer ->
+      if memvar v then Ok Typ else needvar v Infer Untyp
+    | Bind _, Inter i ->
+      infer_mono_inter
+        expl env
+        (fun expl pannot -> infer_mono_iterated tenv expl env pannot e)
+        (fun pannot ->
+          let annot = infer_poly tenv env pannot e in
+          typeof tenv env annot e)
+        i
+      |> map_res (fun x -> Inter x)
+    | Bind (_, _, e'), Infer -> aux (TrySkip (Infer, init_cache e')) e
+    | Bind (v, a, e) as ee, TrySkip pannot ->
+      begin match infer_mono_iterated tenv expl env pannot e with
+      | NeedVar (v', pannot1, pannot2) when Variable.equals v v' ->
+        log ~level:0 "Var %a needed.@." Variable.pp v ;
+        aux (TryKeep ((InferA, init_cache_a a), pannot1, pannot2)) ee
+      | Ok pannot -> Ok (Skip pannot)
+      | res -> map_res (fun x -> TrySkip x) res
+      end
+    | Bind (v, _, e) as ee, Skip pannot ->
+      begin match infer_mono_iterated tenv expl env pannot e with
+      | NeedVar (v', _, pannot2) when Variable.equals v v' ->
+        aux (Skip pannot2) ee
+      | res -> map_res (fun x -> Skip x) res
+      end
+    | Bind (v, a, _), TryKeep (pannot_a, pannot1, pannot2) ->
+      log ~level:1 "Trying to type var %a.@." Variable.pp v ;
+      begin match infer_mono_a_iterated v tenv expl env pannot_a a with
+      | Ok pannot_a ->
+        let pannot = Keep (pannot_a, ([(any, pannot1)], [], [])) in
+        aux pannot e
+      | Fail -> aux (Skip pannot2) e
+      | res -> map_res (fun x -> TryKeep (x, pannot1, pannot2)) res
+      end
+    | Bind (v,_,_), Propagate (pannot_a, gammas, union) ->
+      let propagate = gammas |>
+        Utils.find_among_others (fun (env',_) _ -> is_compatible env env') in
+      begin match propagate with
+      | Some ((env',union'),gammas) ->
+        log ~level:1 "Var %a is ok but its DNF needs a split.@." Variable.pp v ;
+        let pannot1 = Keep (pannot_a, union') in
+        let pannot2 = Propagate (pannot_a, gammas, union) in
+        let env' = Env.filter (fun v t -> subtype_poly (Env.find v env) t |> not) env' in
+        Split (env', pannot1, pannot2)
+      | None -> aux (Keep (pannot_a, union)) e
+      end
+    | Bind (v, a, e), Keep (pannot_a, splits) ->
+      let keep = map_res (fun x -> Keep (pannot_a, x)) in
+      let rec aux_splits splits =
+        match splits with
+        | ([],[],_) -> assert false
+        | ([],d,u) -> Ok (Keep (pannot_a, ([],d,u)))
+        | ((s,pannot)::ex,d,u) ->
+          let annot_a = infer_poly_a v tenv env pannot_a a in
+          let t = typeof_a_nofail v tenv env annot_a a in
+          log ~level:1 "Var %a typed with type %a.@." Variable.pp v pp_typ t ;  
+          let t = cap_o t s in
+          log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
+          begin match infer_mono_iterated tenv expl (Env.add v t env) pannot e with
+          | Ok pannot -> aux_splits (ex,(s, pannot)::d,u)
+          | Split (env', pannot1, pannot2) when Env.mem v env' ->
+            let s' = Env.find v env' in
+            let t1 = cap_o s s' |> simplify_typ in
+            let t2 = diff_o s s' |> simplify_typ in
+            let gammas1 = refine_a tenv env a (neg t1)
+              |> List.map (fun g -> (g, ((t2,pannot2)::ex,d,t1::u)))
+            in
+            let gammas2 = refine_a tenv env a (neg t2)
+              |> List.map (fun g -> (g, ((t1,pannot1)::ex,d,t2::u)))
+            in
+            let res1 = Propagate (pannot_a, gammas1@gammas2,
+              ((t1,pannot1)::(t2,pannot2)::ex,d,u)) in
+            let res2 = Keep (pannot_a, ((s,pannot2)::ex,d,u)) in
+            Split (Env.rm v env', res1, res2)
+          | res -> res |> map_res (fun x -> ((s, x)::ex,d,u)) |> keep
+          end
+      in
+      aux_splits splits
+    | _, _ -> assert false
+  in
+  map_res (fun t -> (t,c)) (aux pannot e)
 
 and infer_mono_a_iterated vardef tenv expl env pannot_a a =
+  let open PartialAnnot in
   log ~level:5 "infer_mono_a_iterated@." ;
+  let vs = (snd pannot_a).depends_on in
   let res = infer_mono_a vardef tenv expl env pannot_a a in
   let si =
-    should_iterate env PartialAnnot.apply_subst_a
-      (fun a b c -> PartialAnnot.InterA (a,b,c)) res
+    should_iterate env apply_subst_a
+      (fun a b c -> (InterA (a,b,c), init_cache' vs)) res
   in
   match si with
   | None -> res
   | Some pannot_a -> infer_mono_a_iterated vardef tenv expl env pannot_a a
 
 and infer_mono_iterated tenv expl env pannot e =
+  let open PartialAnnot in
   log ~level:5 "infer_mono_iterated@." ;
+  let vs = (snd pannot).depends_on in
   let res = infer_mono tenv expl env pannot e in
   let si =
-    should_iterate env PartialAnnot.apply_subst
-      (fun a b c -> PartialAnnot.Inter (a,b,c)) res
+    should_iterate env apply_subst
+      (fun a b c -> (Inter (a,b,c), init_cache' vs)) res
   in
   match si with
   | None -> res
@@ -561,7 +573,8 @@ and infer_mono_iterated tenv expl env pannot e =
 
 let infer tenv env e =
   let open PartialAnnot in
-  match infer_mono_iterated tenv Domains.empty env Infer e with
+  let initial_pannot = (Infer, init_cache e) in
+  match infer_mono_iterated tenv Domains.empty env initial_pannot e with
   | Fail -> raise (Untypeable ([], "Annotations inference failed."))
   | Ok annot -> infer_poly tenv env annot e
   | NeedVar (v, _, _) ->

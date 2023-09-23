@@ -13,6 +13,7 @@ module Domains : sig
 end
 
 module FullAnnot : sig
+    (* TODO: add cache *)
     type 'a inter = 'a list
     type inst = Subst.t list
     type renaming = Subst.t
@@ -40,10 +41,10 @@ module FullAnnot : sig
 end
 
 module PartialAnnot : sig
-    type cache = { depends_on:VarSet.t ; annot_changed:bool ;
-        prev_typ:typ option ; prev_fa:FullAnnot.a option }
-    type union_expl = (typ * t) list
-    and union_done = (typ * t) list
+    type 'a cache = { depends_on:VarSet.t ; annot_changed:bool ;
+        prev_typ:typ option ; prev_fa:'a option }
+    type union_expl = (typ * t_cached) list
+    and union_done = (typ * t_cached) list
     and union_unr = typ list
     and union = union_expl * union_done * union_unr
     and 'a pending_branch =
@@ -59,22 +60,28 @@ module PartialAnnot : sig
         | InferA | TypA | UntypA
         | ThenVarA | ElseVarA
         | EmptyA | ThenA | ElseA (* NOTE: not in the paper, small optimisation *)
-        | LambdaA of typ * t
-        | InterA of a inter
+        | LambdaA of typ * t_cached
+        | InterA of a_cached inter
     and t =
         | Infer | Typ | Untyp
-        | Keep of a * union * cache
-        | Skip of t
-        | TrySkip of t
-        | TryKeep of a * t * t
-        | Propagate of a * (Env.t * union) list * union * cache
-        | Inter of t inter
+        | Keep of a_cached * union
+        | Skip of t_cached
+        | TrySkip of t_cached
+        | TryKeep of a_cached * t_cached * t_cached
+        | Propagate of a_cached * (Env.t * union) list * union
+        | Inter of t_cached inter
+    and a_cached = a * FullAnnot.a cache
+    and t_cached = t * FullAnnot.t cache
 
     val pp_a : Format.formatter -> a -> unit
     val pp : Format.formatter -> t -> unit
+    val pp_a_cached : Format.formatter -> a_cached -> unit
+    val pp_t_cached : Format.formatter -> t_cached -> unit
 
-    val apply_subst_a : Subst.t -> a -> a
-    val apply_subst : Subst.t -> t -> t
+    val apply_subst_a : Subst.t -> a_cached -> a_cached
+    val apply_subst : Subst.t -> t_cached -> t_cached
 
-    val init_cache : Msc.a -> cache
+    val init_cache_a : Msc.a -> FullAnnot.a cache
+    val init_cache : Msc.e -> FullAnnot.t cache
+    val init_cache' : VarSet.t -> 'a cache
 end

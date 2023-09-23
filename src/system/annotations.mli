@@ -40,7 +40,8 @@ module FullAnnot : sig
 end
 
 module PartialAnnot : sig
-    type cache = { depends_on:VarSet.t ; prev_typ:typ option ; prev_fa:FullAnnot.a option }
+    type cache = { depends_on:VarSet.t ; annot_changed:bool ;
+        prev_typ:typ option ; prev_fa:FullAnnot.a option }
     type union_expl = (typ * t) list
     and union_done = (typ * t) list
     and union_unr = typ list

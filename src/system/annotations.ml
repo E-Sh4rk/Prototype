@@ -82,7 +82,8 @@ module FullAnnot = struct
 end
 
 module PartialAnnot = struct
-  type cache = { depends_on:VarSet.t ; prev_typ:typ option ; prev_fa:FullAnnot.a option }
+  type cache = { depends_on:VarSet.t ; annot_changed:bool ;
+    prev_typ:typ option ; prev_fa:FullAnnot.a option }
   let pp_cache fmt _ = Format.fprintf fmt "cache"
   type union_expl = (typ * t) list
   [@@deriving show]
@@ -117,46 +118,66 @@ module PartialAnnot = struct
     | Inter of t inter
   [@@deriving show]
 
-  let apply_subst_branch f s (a, d, b) = (f s a, d, b)
-  let rec apply_subst_union s (e,d,u) =
-    let apply = apply_subst_simplify s in
-    let aux2 (ty, t) = (apply ty, apply_subst s t) in
-    (List.map aux2 e, List.map aux2 d, List.map apply u)
-  and apply_subst_inter_a s (a, b, flags) =
-    (List.map (apply_subst_branch apply_subst_a s) a,
-    List.map (apply_subst_a s) b,
-    flags)
-  and apply_subst_inter s (a, b, flags) =
-    (List.map (apply_subst_branch apply_subst s) a,
-    List.map (apply_subst s) b,
-    flags)
-  and apply_subst_a s a = match a with
-  | InferA -> InferA
-  | TypA -> TypA
-  | UntypA -> UntypA
-  | ThenVarA -> ThenVarA | ElseVarA -> ElseVarA
-  | EmptyA -> EmptyA | ThenA -> ThenA | ElseA -> ElseA
-  | LambdaA (ty, t) -> LambdaA (apply_subst_simplify s ty, apply_subst s t)
-  | InterA i -> InterA (apply_subst_inter_a s i)
-  and apply_subst s t =
-    if Subst.is_identity s then t
-    else match t with
-    | Infer -> Infer
-    | Typ -> Typ
-    | Untyp -> Untyp
-    | Keep (a, b, c) -> Keep (apply_subst_a s a, apply_subst_union s b, c)
-    | Skip t -> Skip (apply_subst s t)
-    | TrySkip t -> TrySkip (apply_subst s t)
-    | TryKeep (a, t1, t2) ->
-      TryKeep (apply_subst_a s a, apply_subst s t1, apply_subst s t2)
-    | Propagate (a, envs, t, c) ->
-      let aux2 (env, t) =
-        (Env.apply_subst s env, apply_subst_union s t)
+  let rec apply_subst_aux s =
+    if Subst.is_identity s then ((fun t -> (t,false)), (fun a -> (a,false)))
+    else
+      let dom = Subst.dom s in
+      let change = ref false in
+      let apply_typ t =
+        if TVarSet.inter (vars t) dom |> TVarSet.is_empty
+        then t else (change := true ; apply_subst_simplify s t) in
+      let apply_subst_branch f (a, d, b) = (f a, d, b) in
+      let rec apply_subst_union (e,d,u) =
+        let aux2 (ty, t) = (apply_typ ty, apply t) in
+        (List.map aux2 e, List.map aux2 d, List.map apply_typ u)
+      and apply_subst_inter_a (a, b, flags) =
+        (List.map (apply_subst_branch apply_a) a,
+        List.map apply_a b,
+        flags)
+      and apply_subst_inter (a, b, flags) =
+        (List.map (apply_subst_branch apply) a,
+        List.map apply b,
+        flags)
+      and apply_a a = match a with
+      | InferA -> InferA
+      | TypA -> TypA
+      | UntypA -> UntypA
+      | ThenVarA -> ThenVarA | ElseVarA -> ElseVarA
+      | EmptyA -> EmptyA | ThenA -> ThenA | ElseA -> ElseA
+      | LambdaA (ty, t) -> LambdaA (apply_typ ty, apply t)
+      | InterA i -> InterA (apply_subst_inter_a i)
+      and apply t =
+        match t with
+        | Infer -> Infer
+        | Typ -> Typ
+        | Untyp -> Untyp
+        | Keep (a, b, c) -> Keep (apply_a a, apply_subst_union b, c)
+        | Skip t -> Skip (apply t)
+        | TrySkip t -> TrySkip (apply t)
+        | TryKeep (a, t1, t2) ->
+          TryKeep (apply_a a, apply t1, apply t2)
+        | Propagate (a, envs, t, c) ->
+          let aux2 (env, t) =
+            (Env.apply_subst s env, apply_subst_union t)
+          in
+          Propagate (apply_a a, List.map aux2 envs, apply_subst_union t, c)
+        | Inter i -> Inter (apply_subst_inter i)
       in
-      Propagate (apply_subst_a s a, List.map aux2 envs, apply_subst_union s t, c)
-    | Inter i -> Inter (apply_subst_inter s i)
+      ((fun t -> let res = apply t in (res, !change)),
+       (fun a -> let res = apply_a a in (res, !change)))
+
+  and apply_subst_a s =
+    let (_, apply_subst_a) = apply_subst_aux s in
+    apply_subst_a
+
+  and apply_subst s =
+    let (apply_subst, _) = apply_subst_aux s in
+    apply_subst
+
+  let apply_subst_a s a = apply_subst_a s a |> fst
+  let apply_subst s t = apply_subst s t |> fst
 
   let init_cache a =
     { depends_on = VarSet.union (Msc.fv_a a) (Msc.bv_a a) ;
-      prev_typ = None ; prev_fa = None }
+      annot_changed = false ; prev_typ = None ; prev_fa = None }
 end

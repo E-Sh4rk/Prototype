@@ -51,7 +51,7 @@ let typeof_inter typeof_branch pos branches =
     |> List.map (fun annot -> typeof_branch annot)
     |> conj_o
 
-let rec typeof_a vardef tenv env annot_a a =
+let rec typeof_a vardef tenv env (annot_a,_) a =
   let open FullAnnot in
   let pos = Variable.get_locations vardef in
   let var_type v = var_type v env in
@@ -147,7 +147,7 @@ let rec typeof_a vardef tenv env annot_a a =
   end
   |> bot_instance |> simplify_typ
   
-and typeof tenv env annot e =
+and typeof tenv env (annot,_) e =
   let open FullAnnot in
   begin match e, annot with
   | e, Inter branches ->

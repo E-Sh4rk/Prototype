@@ -13,31 +13,37 @@ module Domains : sig
 end
 
 module FullAnnot : sig
-    (* TODO: add cache *)
+    type cache = { typ: typ option }
     type 'a inter = 'a list
     type inst = Subst.t list
     type renaming = Subst.t
-    type union = (typ * t) list
+    type union = (typ * t_cached) list
     and a =
         | ConstA | AliasA | LetA | AbstractA
-        | LambdaA of typ * t
+        | LambdaA of typ * t_cached
         | PairA of renaming * renaming
         | AppA of inst * inst
         | ProjA of inst
         | EmptyA of inst | ThenA of inst | ElseA of inst
         | RecordUpdateA of inst * (renaming option)
         | ConstrA of inst
-        | InterA of a inter
+        | InterA of a_cached inter
     and t =
         | BVar of renaming
-        | Keep of a * union * inst
-        | Skip of t
-        | Inter of t inter
+        | Keep of a_cached * union * inst
+        | Skip of t_cached
+        | Inter of t_cached inter
+    and a_cached = a * cache
+    and t_cached = t * cache
 
     val pp_inst : Format.formatter -> inst -> unit
     val pp_renaming : Format.formatter -> renaming -> unit
     val pp_a : Format.formatter -> a -> unit
     val pp : Format.formatter -> t -> unit
+    val pp_a_cached : Format.formatter -> a_cached -> unit
+    val pp_t_cached : Format.formatter -> t_cached -> unit
+
+    val init_cache : cache
 end
 
 module PartialAnnot : sig

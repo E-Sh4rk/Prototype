@@ -54,31 +54,39 @@ module Domains = struct
 end
 
 module FullAnnot = struct
+  type cache = { typ: typ option }
+  let pp_cache fmt _ = Format.fprintf fmt "cache"
   type 'a inter = 'a list
   [@@deriving show]
   type inst = Subst.t list
   [@@deriving show]
   type renaming = Subst.t
   [@@deriving show]
-  type union = (typ * t) list
+  type union = (typ * t_cached) list
   [@@deriving show]
   and a =
       | ConstA | AliasA | LetA | AbstractA
-      | LambdaA of typ * t
+      | LambdaA of typ * t_cached
       | PairA of renaming * renaming
       | AppA of inst * inst
       | ProjA of inst
       | EmptyA of inst | ThenA of inst | ElseA of inst
       | RecordUpdateA of inst * (renaming option)
       | ConstrA of inst
-      | InterA of a inter
+      | InterA of a_cached inter
   [@@deriving show]
   and t =
       | BVar of renaming
-      | Keep of a * union * inst
-      | Skip of t
-      | Inter of t inter
+      | Keep of a_cached * union * inst
+      | Skip of t_cached
+      | Inter of t_cached inter
   [@@deriving show]
+  and a_cached = a * cache
+  [@@deriving show]
+  and t_cached = t * cache
+  [@@deriving show]
+
+  let init_cache = { typ = None }
 end
 
 module PartialAnnot = struct

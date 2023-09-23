@@ -143,7 +143,7 @@ let rec infer_poly_a vardef tenv env (pannot_a, _) a =
   let open PartialAnnot in
   let open FullAnnot in
   let vartype v = Env.find v env in
-  match a, pannot_a with
+  let annot_a = match a, pannot_a with
   | a, PartialAnnot.InterA i ->
     InterA (infer_poly_inter (fun pannot_a -> infer_poly_a vardef tenv env pannot_a a) i)
   | Alias _, TypA -> AliasA
@@ -211,12 +211,14 @@ let rec infer_poly_a vardef tenv env (pannot_a, _) a =
     let annot = infer_poly tenv env pannot e in
     LambdaA (s, annot)
   | _, _ ->  assert false
+  in
+  (annot_a, init_cache)
 
 and infer_poly tenv env (pannot, _) e =
   let open PartialAnnot in
   let open FullAnnot in
   let vartype v = Env.find v env in
-  match e, pannot with
+  let annot = match e, pannot with
   | e, PartialAnnot.Inter i ->
     Inter (infer_poly_inter (fun pannot -> infer_poly tenv env pannot e) i)
   | Var v, Typ ->
@@ -239,3 +241,5 @@ and infer_poly tenv env (pannot, _) e =
     let inst = u |> List.map (fun u -> tallying_one [(t, neg u)]) in
     FullAnnot.Keep (annot_a, branches, inst)
   | _, _ ->  assert false
+  in
+  (annot, init_cache)

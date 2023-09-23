@@ -428,15 +428,13 @@ let rec infer_mono_a vardef tenv expl env (pannot_a,c_a) a =
       if memvar v1 then Ok ThenA else needvar v1 ThenA UntypA
     | Ite (_, _, _, v2), ElseVarA ->
       if memvar v2 then Ok ElseA else needvar v2 ElseA UntypA
-    | Lambda (Unnanoted, _, e), InferA ->
-      let cache = init_cache e in
+    | Lambda (Unnanoted, _, _), InferA ->
       let alpha = TVar.mk_mono (Some (Variable.show vardef)) |> TVar.typ in
-      let pannot_a = LambdaA (alpha, (Infer, cache)) in
+      let pannot_a = LambdaA (alpha, (Infer, init_cache)) in
       aux pannot_a a
-    | Lambda (ADomain ts, _, e), InferA ->
-      let cache = init_cache e in
+    | Lambda (ADomain ts, _, _), InferA ->
       let branches = ts |> List.map (fun t ->
-        let pannot_a = (LambdaA (t, (Infer, cache)), c_a) in
+        let pannot_a = (LambdaA (t, (Infer, init_cache)), c_a) in
         (pannot_a, expl, false)
       ) in
       let pannot_a = InterA (branches, [], (Domains.empty, false, true)) in
@@ -471,12 +469,12 @@ and infer_mono tenv expl env (pannot, c) e =
           typeof tenv env annot e)
         i
       |> map_res (fun x -> Inter x)
-    | Bind (_, _, e'), Infer -> aux (TrySkip (Infer, init_cache e')) e
-    | Bind (v, a, e) as ee, TrySkip pannot ->
+    | Bind _, Infer -> aux (TrySkip (Infer, init_cache)) e
+    | Bind (v, _, e) as ee, TrySkip pannot ->
       begin match infer_mono_iterated tenv expl env pannot e with
       | NeedVar (v', pannot1, pannot2) when Variable.equals v v' ->
         log ~level:0 "Var %a needed.@." Variable.pp v ;
-        aux (TryKeep ((InferA, init_cache_a a), pannot1, pannot2)) ee
+        aux (TryKeep ((InferA, init_cache), pannot1, pannot2)) ee
       | Ok pannot -> Ok (Skip pannot)
       | res -> map_res (fun x -> TrySkip x) res
       end
@@ -546,11 +544,10 @@ and infer_mono tenv expl env (pannot, c) e =
 and infer_mono_a_iterated vardef tenv expl env pannot_a a =
   let open PartialAnnot in
   log ~level:5 "infer_mono_a_iterated@." ;
-  let vs = (snd pannot_a).depends_on in
   let res = infer_mono_a vardef tenv expl env pannot_a a in
   let si =
     should_iterate env apply_subst_a
-      (fun a b c -> (InterA (a,b,c), init_cache' vs)) res
+      (fun a b c -> (InterA (a,b,c), init_cache)) res
   in
   match si with
   | None -> res
@@ -559,11 +556,10 @@ and infer_mono_a_iterated vardef tenv expl env pannot_a a =
 and infer_mono_iterated tenv expl env pannot e =
   let open PartialAnnot in
   log ~level:5 "infer_mono_iterated@." ;
-  let vs = (snd pannot).depends_on in
   let res = infer_mono tenv expl env pannot e in
   let si =
     should_iterate env apply_subst
-      (fun a b c -> (Inter (a,b,c), init_cache' vs)) res
+      (fun a b c -> (Inter (a,b,c), init_cache)) res
   in
   match si with
   | None -> res
@@ -575,7 +571,7 @@ and infer_mono_iterated tenv expl env pannot e =
 
 let infer tenv env e =
   let open PartialAnnot in
-  let initial_pannot = (Infer, init_cache e) in
+  let initial_pannot = (Infer, init_cache) in
   match infer_mono_iterated tenv Domains.empty env initial_pannot e with
   | Fail -> raise (Untypeable ([], "Annotations inference failed."))
   | Ok annot -> infer_poly tenv env annot e

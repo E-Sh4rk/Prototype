@@ -1,6 +1,5 @@
 open Types.Base
 open Types.Tvar
-open Parsing.Variable
 
 module Domains : sig
     type t
@@ -47,7 +46,7 @@ module FullAnnot : sig
 end
 
 module PartialAnnot : sig
-    type 'a cache = { depends_on:VarSet.t ; annot_changed:bool ;
+    type 'a cache = { env_changed:bool ; annot_changed:bool ;
         prev_typ:typ option ; prev_fa:'a option }
     type union_expl = (typ * t_cached) list
     and union_done = (typ * t_cached) list
@@ -87,7 +86,5 @@ module PartialAnnot : sig
     val apply_subst_a : Subst.t -> a_cached -> a_cached
     val apply_subst : Subst.t -> t_cached -> t_cached
 
-    val init_cache_a : Msc.a -> FullAnnot.a cache
-    val init_cache : Msc.e -> FullAnnot.t cache
-    val init_cache' : VarSet.t -> 'a cache
+    val init_cache : 'a cache
 end

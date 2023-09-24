@@ -54,7 +54,7 @@ module Domains = struct
 end
 
 module FullAnnot = struct
-  type cache = { typ: typ option }
+  type cache = { mutable typ: typ option }
   let pp_cache fmt _ = Format.fprintf fmt "cache"
   type 'a inter = 'a list
   [@@deriving show]
@@ -86,12 +86,11 @@ module FullAnnot = struct
   and t_cached = t * cache
   [@@deriving show]
 
-  let init_cache = { typ = None }
+  let init_cache () = { typ = None }
 end
 
 module PartialAnnot = struct
-  type 'a cache = { env_changed:bool ; annot_changed:bool ;
-    prev_typ:typ option ; prev_fa:'a option }
+  type 'a cache = { env_changed:bool ; annot_changed:bool ; prev_fa:'a option }
   let pp_cache _ fmt _ = Format.fprintf fmt "cache"
   type union_expl = (typ * t_cached) list
   [@@deriving show]
@@ -208,6 +207,5 @@ module PartialAnnot = struct
   let apply_subst s t = apply_subst s t |> fst
 
   let init_cache =
-    { env_changed = false ; annot_changed = false ;
-      prev_typ = None ; prev_fa = None }
+    { env_changed = false ; annot_changed = false ; prev_fa = None }
 end

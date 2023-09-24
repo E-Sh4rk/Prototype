@@ -12,7 +12,7 @@ module Domains : sig
 end
 
 module FullAnnot : sig
-    type cache = { typ: typ option }
+    type cache = { mutable typ: typ option }
     type 'a inter = 'a list
     type inst = Subst.t list
     type renaming = Subst.t
@@ -42,12 +42,11 @@ module FullAnnot : sig
     val pp_a_cached : Format.formatter -> a_cached -> unit
     val pp_t_cached : Format.formatter -> t_cached -> unit
 
-    val init_cache : cache
+    val init_cache : unit -> cache
 end
 
 module PartialAnnot : sig
-    type 'a cache = { env_changed:bool ; annot_changed:bool ;
-        prev_typ:typ option ; prev_fa:'a option }
+    type 'a cache = { env_changed:bool ; annot_changed:bool ; prev_fa:'a option }
     type union_expl = (typ * t_cached) list
     and union_done = (typ * t_cached) list
     and union_unr = typ list

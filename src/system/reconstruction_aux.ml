@@ -212,7 +212,7 @@ let rec infer_poly_a vardef tenv env (pannot_a, _) a =
     LambdaA (s, annot)
   | _, _ ->  assert false
   in
-  (annot_a, init_cache)
+  (annot_a, init_cache ())
 
 and infer_poly tenv env (pannot, _) e =
   let open PartialAnnot in
@@ -242,4 +242,4 @@ and infer_poly tenv env (pannot, _) e =
     FullAnnot.Keep (annot_a, branches, inst)
   | _, _ ->  assert false
   in
-  (annot, init_cache)
+  (annot, init_cache ())

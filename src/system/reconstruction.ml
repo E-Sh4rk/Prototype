@@ -395,6 +395,11 @@ let should_iterate env apply_subst_branch mk_inter res =
     else None
   | _ -> None
 
+let def_cache_equiv dc t =
+  match dc.PartialAnnot.prev_typ with
+  | None -> false
+  | Some t' -> equiv t t'
+
 let rec infer_mono_a vardef tenv expl env (pannot_a,c_a) a =
   let memvar v = Env.mem v env in
   let vartype v = Env.find v env in
@@ -534,14 +539,18 @@ let rec infer_mono_a vardef tenv expl env (pannot_a,c_a) a =
       ) in
       let pannot_a = InterA (branches, [], (Domains.empty, false, true)) in
       aux pannot_a a
-    | Lambda (_, v, e), LambdaA (s, pannot, _) ->
+    | Lambda (_, v, e), LambdaA (s, pannot, dc) ->
       log ~level:2 "Entering lambda for %a with domain %a.@." Variable.pp v pp_typ s ;
       if is_empty s then (log ~level:3 "Lambda with empty domain generated a fail.@." ; Fail)
       else
-        let ndc = def_cache s in
+        let pannot =
+          if def_cache_equiv dc s
+          then pannot else invalidate_cache v e pannot
+        in
+        let dc = def_cache s in
         let env = Env.add v s env in
         infer_mono_iterated tenv (Domains.enter_lambda env expl) env pannot e
-        |> map_res (fun x -> LambdaA (s, x, ndc))
+        |> map_res (fun x -> LambdaA (s, x, dc))
     | _, _ -> assert false
   in
   map_res (fun a -> (a,c_a)) (aux pannot_a a)
@@ -610,8 +619,18 @@ and infer_mono tenv expl env (pannot, c) e =
         | ((s,pannot)::ex,d,u) ->
           let annot_a = infer_poly_a v tenv env pannot_a a in
           let t = typeof_a_nofail v tenv env annot_a a in
-          let ndc = def_cache t in
-          let keep = map_res (fun x -> Keep (pannot_a, x, ndc)) in
+          let (pannot, ex, d) =
+            if def_cache_equiv dc t
+            then (pannot, ex, d)
+            else
+              let inv = invalidate_cache v e in
+              let pannot = inv pannot in
+              let ex = ex |> List.map (fun (s,t) -> (s, inv t)) in
+              let d = d |> List.map (fun (s,t) -> (s, inv t)) in
+              (pannot, ex, d)
+          in  
+          let dc = def_cache t in
+          let keep = map_res (fun x -> Keep (pannot_a, x, dc)) in
           log ~level:1 "Var %a typed with type %a.@." Variable.pp v pp_typ t ;  
           let t = cap_o t s in
           log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
@@ -628,8 +647,8 @@ and infer_mono tenv expl env (pannot, c) e =
               |> List.map (fun g -> (g, 1))
             in
             let res1 = Propagate (pannot_a, gammas1@gammas2,
-              ((t1,pannot1)::(t2,pannot2)::ex,d,u), ndc) in
-            let res2 = Keep (pannot_a, ((s,pannot2)::ex,d,u), ndc) in
+              ((t1,pannot1)::(t2,pannot2)::ex,d,u), dc) in
+            let res2 = Keep (pannot_a, ((s,pannot2)::ex,d,u), dc) in
             Split (Env.rm v env', res1, res2)
           | res -> res |> map_res (fun x -> ((s, x)::ex,d,u)) |> keep
           end

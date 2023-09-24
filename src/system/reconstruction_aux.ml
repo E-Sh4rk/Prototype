@@ -139,107 +139,119 @@ let infer_poly_inter infer_poly_branch (b1, b2, (_,tf,_)) =
   assert (b1 = [] && b2 <> [] && tf) ;
   b2 |> List.map infer_poly_branch
 
-let rec infer_poly_a vardef tenv env (pannot_a, _) a =
+let cached c =
   let open PartialAnnot in
-  let open FullAnnot in
-  let vartype v = Env.find v env in
-  let annot_a = match a, pannot_a with
-  | a, PartialAnnot.InterA i ->
-    InterA (infer_poly_inter (fun pannot_a -> infer_poly_a vardef tenv env pannot_a a) i)
-  | Alias _, TypA -> AliasA
-  | Const _, TypA -> ConstA
-  | Let _, TypA -> LetA
-  | Abstract _, TypA -> AbstractA
-  | Pair (v1, v2), TypA ->
-    let r1 = refresh (vartype v1 |> vars_poly) in
-    let r2 = refresh (vartype v2 |> vars_poly) in
-    PairA (r1, r2)
-  | Projection (p, v), TypA ->
-    let t = vartype v in
-    let alpha = TVar.mk_poly None in
-    let s =
-      begin match p with
-      | Parsing.Ast.Field label ->
-        mk_record true [label, TVar.typ alpha |> cons]
-      | Parsing.Ast.Fst ->
-        mk_times (TVar.typ alpha |> cons) any_node
-      | Parsing.Ast.Snd ->
-        mk_times any_node (TVar.typ alpha |> cons)
-      end
-    in
-    log ~level:4 "@.Tallying for %a: %a <= %a@."
-      Variable.pp vardef pp_typ t pp_typ s ;
-    let res = tallying_nonempty [(t, s)] in
-    let res = simplify_tallying (TVar.typ alpha) res in
-    ProjA res
-  | RecordUpdate (v, _, None), TypA ->
-    let res = tallying_nonempty [(vartype v, record_any)] in
-    let res = simplify_tallying record_any res in
-    RecordUpdateA (res, None)
-  | RecordUpdate (v, _, Some v2), TypA ->
-    let res = tallying_nonempty [(vartype v, record_any)] in
-    let res = simplify_tallying record_any res in
-    let r = refresh (vartype v2 |> vars_poly) in
-    RecordUpdateA (res, Some r)
-  | TypeConstr (v, s), TypA ->
-    ConstrA [tallying_one [(vartype v, s)]]
-  | App (v1, v2), TypA ->
-    let t1 = vartype v1 in
-    let t2 = vartype v2 in
-    let r1 = refresh (vars_poly t1) in
-    let r2 = refresh (vars_poly t2) in
-    let t1 = Subst.apply r1 t1 in
-    let t2 = Subst.apply r2 t2 in
-    let alpha = TVar.mk_poly None in
-    let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
-    log ~level:4 "@.Approximate tallying for %a: %a <= %a@."
-      Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
-    let res = approximate_app ~infer:false t1 t2 alpha in
-    let res = simplify_tallying (TVar.typ alpha) res in
-    let (s1, s2) = res |> List.map (fun s ->
-      (Subst.compose_restr s r1, Subst.compose_restr s r2)
-    ) |> List.split in
-    AppA (s1, s2)
-  | Ite (v, _, _, _), EmptyA ->
-    EmptyA [tallying_one [(vartype v, empty)]]
-  | Ite (v, s, _, _), ThenA ->
-    ThenA [tallying_one [(vartype v, s)]]
-  | Ite (v, s, _, _), ElseA ->
-    ElseA [tallying_one [(vartype v, neg s)]]
-  | Lambda (_, v, e), PartialAnnot.LambdaA (s, pannot) ->
-    let env = Env.add v s env in
-    let annot = infer_poly tenv env pannot e in
-    LambdaA (s, annot)
-  | _, _ ->  assert false
-  in
-  (annot_a, init_cache ())
+  if c.annot_changed || c.env_changed
+  then None
+  else c.prev_fa
 
-and infer_poly tenv env (pannot, _) e =
+let rec infer_poly_a vardef tenv env (pannot_a, c_a) a =
   let open PartialAnnot in
   let open FullAnnot in
-  let vartype v = Env.find v env in
-  let annot = match e, pannot with
-  | e, PartialAnnot.Inter i ->
-    Inter (infer_poly_inter (fun pannot -> infer_poly tenv env pannot e) i)
-  | Var v, Typ ->
-    let r = refresh (vartype v |> vars_poly) in
-    BVar r
-  | Bind (_, _, e), PartialAnnot.Skip pannot ->
-    let annot = infer_poly tenv env pannot e in
-    FullAnnot.Skip annot
-  | Bind (v, a, e), PartialAnnot.Keep (pannot_a, (ex,d,u)) ->
-    assert (d <> [] && ex = []) ;
-    let annot_a = infer_poly_a v tenv env pannot_a a in
-    let t = typeof_a_nofail v tenv env annot_a a in
-    assert (subtype any (u@(List.map fst d) |> disj)) ;
-    let branches = d |> List.map (fun (si, pannot) ->
-        let t = cap_o t si in
-        let env = Env.add v t env in
-        (si, infer_poly tenv env pannot e)
-      )
+  match cached c_a with
+  | Some annot_a -> annot_a
+  | None ->
+    let vartype v = Env.find v env in
+    let annot_a = match a, pannot_a with
+    | a, PartialAnnot.InterA i ->
+      InterA (infer_poly_inter (fun pannot_a -> infer_poly_a vardef tenv env pannot_a a) i)
+    | Alias _, TypA -> AliasA
+    | Const _, TypA -> ConstA
+    | Let _, TypA -> LetA
+    | Abstract _, TypA -> AbstractA
+    | Pair (v1, v2), TypA ->
+      let r1 = refresh (vartype v1 |> vars_poly) in
+      let r2 = refresh (vartype v2 |> vars_poly) in
+      PairA (r1, r2)
+    | Projection (p, v), TypA ->
+      let t = vartype v in
+      let alpha = TVar.mk_poly None in
+      let s =
+        begin match p with
+        | Parsing.Ast.Field label ->
+          mk_record true [label, TVar.typ alpha |> cons]
+        | Parsing.Ast.Fst ->
+          mk_times (TVar.typ alpha |> cons) any_node
+        | Parsing.Ast.Snd ->
+          mk_times any_node (TVar.typ alpha |> cons)
+        end
+      in
+      log ~level:4 "@.Tallying for %a: %a <= %a@."
+        Variable.pp vardef pp_typ t pp_typ s ;
+      let res = tallying_nonempty [(t, s)] in
+      let res = simplify_tallying (TVar.typ alpha) res in
+      ProjA res
+    | RecordUpdate (v, _, None), TypA ->
+      let res = tallying_nonempty [(vartype v, record_any)] in
+      let res = simplify_tallying record_any res in
+      RecordUpdateA (res, None)
+    | RecordUpdate (v, _, Some v2), TypA ->
+      let res = tallying_nonempty [(vartype v, record_any)] in
+      let res = simplify_tallying record_any res in
+      let r = refresh (vartype v2 |> vars_poly) in
+      RecordUpdateA (res, Some r)
+    | TypeConstr (v, s), TypA ->
+      ConstrA [tallying_one [(vartype v, s)]]
+    | App (v1, v2), TypA ->
+      let t1 = vartype v1 in
+      let t2 = vartype v2 in
+      let r1 = refresh (vars_poly t1) in
+      let r2 = refresh (vars_poly t2) in
+      let t1 = Subst.apply r1 t1 in
+      let t2 = Subst.apply r2 t2 in
+      let alpha = TVar.mk_poly None in
+      let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
+      log ~level:4 "@.Approximate tallying for %a: %a <= %a@."
+        Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
+      let res = approximate_app ~infer:false t1 t2 alpha in
+      let res = simplify_tallying (TVar.typ alpha) res in
+      let (s1, s2) = res |> List.map (fun s ->
+        (Subst.compose_restr s r1, Subst.compose_restr s r2)
+      ) |> List.split in
+      AppA (s1, s2)
+    | Ite (v, _, _, _), EmptyA ->
+      EmptyA [tallying_one [(vartype v, empty)]]
+    | Ite (v, s, _, _), ThenA ->
+      ThenA [tallying_one [(vartype v, s)]]
+    | Ite (v, s, _, _), ElseA ->
+      ElseA [tallying_one [(vartype v, neg s)]]
+    | Lambda (_, v, e), PartialAnnot.LambdaA (s, pannot) ->
+      let env = Env.add v s env in
+      let annot = infer_poly tenv env pannot e in
+      LambdaA (s, annot)
+    | _, _ ->  assert false
     in
-    let inst = u |> List.map (fun u -> tallying_one [(t, neg u)]) in
-    FullAnnot.Keep (annot_a, branches, inst)
-  | _, _ ->  assert false
-  in
-  (annot, init_cache ())
+    (annot_a, init_cache ())
+
+and infer_poly tenv env (pannot, c) e =
+  let open PartialAnnot in
+  let open FullAnnot in
+  match cached c with
+  | Some annot -> annot
+  | None ->
+    let vartype v = Env.find v env in
+    let annot = match e, pannot with
+    | e, PartialAnnot.Inter i ->
+      Inter (infer_poly_inter (fun pannot -> infer_poly tenv env pannot e) i)
+    | Var v, Typ ->
+      let r = refresh (vartype v |> vars_poly) in
+      BVar r
+    | Bind (_, _, e), PartialAnnot.Skip pannot ->
+      let annot = infer_poly tenv env pannot e in
+      FullAnnot.Skip annot
+    | Bind (v, a, e), PartialAnnot.Keep (pannot_a, (ex,d,u)) ->
+      assert (d <> [] && ex = []) ;
+      let annot_a = infer_poly_a v tenv env pannot_a a in
+      let t = typeof_a_nofail v tenv env annot_a a in
+      assert (subtype any (u@(List.map fst d) |> disj)) ;
+      let branches = d |> List.map (fun (si, pannot) ->
+          let t = cap_o t si in
+          let env = Env.add v t env in
+          (si, infer_poly tenv env pannot e)
+        )
+      in
+      let inst = u |> List.map (fun u -> tallying_one [(t, neg u)]) in
+      FullAnnot.Keep (annot_a, branches, inst)
+    | _, _ ->  assert false
+    in
+    (annot, init_cache ())

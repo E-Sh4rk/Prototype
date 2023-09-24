@@ -127,9 +127,9 @@ module PartialAnnot = struct
       | Propagate of a_cached * (Env.t * union) list * union
       | Inter of t_cached inter
   [@@deriving show]
-  and a_cached = a * FullAnnot.a cache
+  and a_cached = a * FullAnnot.a_cached cache
   [@@deriving show]
-  and t_cached = t * FullAnnot.t cache
+  and t_cached = t * FullAnnot.t_cached cache
   [@@deriving show]
 
   let update_cache changed c =

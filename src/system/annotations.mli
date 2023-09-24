@@ -74,8 +74,8 @@ module PartialAnnot : sig
         | TryKeep of a_cached * t_cached * t_cached
         | Propagate of a_cached * (Env.t * union) list * union
         | Inter of t_cached inter
-    and a_cached = a * FullAnnot.a cache
-    and t_cached = t * FullAnnot.t cache
+    and a_cached = a * FullAnnot.a_cached cache
+    and t_cached = t * FullAnnot.t_cached cache
 
     val pp_a : Format.formatter -> a -> unit
     val pp : Format.formatter -> t -> unit

@@ -87,6 +87,8 @@ module PartialAnnot : sig
     val apply_subst : Subst.t -> t_cached -> t_cached
 
     val init_cache : 'a cache
+    val cache : 'a -> 'a cache
     val init_def_cache : def_cache
     val def_cache : typ -> def_cache
+    val def_typ_unchanged : def_cache -> typ -> bool
 end

@@ -6,9 +6,11 @@ open Msc
 open Annotations
 open Utils
 open Algorithmic
-open Reconstruction_aux
 
 module Make () = struct
+
+  module Aux = Reconstruction_aux.Make ()
+  open Aux
 
 (* ====================================== *)
 (* =============== REFINE =============== *)
@@ -81,89 +83,6 @@ let refine_a tenv env a t =
   | Ite (v, s, v1, v2) ->
     [Env.construct_dup [(v,s);(v1,t)] ; Env.construct_dup [(v,neg s);(v2,t)]]
   | Let (_, v2) -> [Env.singleton v2 t]
-
-(* ====================================== *)
-(* ============== CACHING =============== *)
-(* ====================================== *)
-
-let fv_def_htbl = Hashtbl.create 100
-let fv_body_htbl = Hashtbl.create 100
-let init_fv_htbl =
-  let rec init_a v a =
-    Hashtbl.add fv_def_htbl v (Msc.fv_a a) ;
-    match a with
-    | Lambda (_,_,e) -> init e
-    | _ -> ()
-  and init e =
-    match e with
-    | Var _ -> ()
-    | Bind (v, a, e) ->
-      Hashtbl.add fv_body_htbl v (Msc.fv_e e) ;
-      init_a v a ; init e
-  in
-  init
-
-let fv_def v = Hashtbl.find fv_def_htbl v
-let fv_body v = Hashtbl.find fv_body_htbl v
-
-let invalidate c = { c with PartialAnnot.env_changed = true }
-
-let invalidate_cache_inter f (pending, expl, flags) =
-  let pending = pending |> List.map (fun (branch,d,b) -> (f branch,d,b)) in
-  let expl = expl |> List.map f in
-  (pending, expl, flags)
-
-let rec invalidate_cache_a v bind_var a (pannot_a, c_a) =
-  let open PartialAnnot in
-  let depends_on = fv_def bind_var in
-  if VarSet.mem v depends_on then
-    let pannot_a =
-      match pannot_a, a with
-      | LambdaA (ty, pannot, dc), Lambda (_,_,e) ->
-        LambdaA (ty, invalidate_cache v e pannot, dc)
-      | _, _ -> pannot_a
-    in
-    (pannot_a, invalidate c_a)
-  else (pannot_a, c_a)
-
-and invalidate_cache v e (pannot, c) =
-  let open PartialAnnot in
-  match e with
-  | Var v' when Variable.equals v v' -> (pannot, invalidate c)
-  | Var _ -> (pannot, c)
-  | Bind (v', a, e) ->
-    assert (Variable.equals v v' |> not) ;
-    let fv = VarSet.union (fv_body v') (fv_def v') in
-    if VarSet.mem v fv then
-      let treat_union (ex,d,u) =
-        let aux (ty, t) = (ty, invalidate_cache v e t) in
-        (List.map aux ex, List.map aux d, u)
-      in
-      let pannot =
-        begin match pannot with
-        | Infer -> Infer
-        | Skip pannot -> Skip (invalidate_cache v e pannot)
-        | TrySkip pannot -> TrySkip (invalidate_cache v e pannot)
-        | Keep (pannot_a, union, dc) ->
-          let pannot_a = invalidate_cache_a v v' a pannot_a in
-          let union = treat_union union in
-          Keep (pannot_a, union, dc)
-        | TryKeep (pannot_a, pannot1, pannot2) ->
-          let pannot_a = invalidate_cache_a v v' a pannot_a in
-          let pannot1 = invalidate_cache v e pannot1 in
-          let pannot2 = invalidate_cache v e pannot2 in
-          TryKeep (pannot_a, pannot1, pannot2)
-        | Propagate (pannot_a, lst, union, dc) ->
-          let pannot_a = invalidate_cache_a v v' a pannot_a in
-          let union = treat_union union in
-          Propagate (pannot_a, lst, union, dc)
-        | Inter i ->
-          Inter (invalidate_cache_inter (invalidate_cache v e) i)
-        | _ -> assert false
-        end
-      in
-      (pannot, invalidate c)
-    else (pannot, c)
 
 (* ====================================== *)
 (* ============ MAIN SYSTEM ============= *)
@@ -395,11 +314,6 @@ let should_iterate env apply_subst_branch mk_inter res =
     else None
   | _ -> None
 
-let def_cache_equiv dc t =
-  match dc.PartialAnnot.prev_typ with
-  | None -> false
-  | Some t' -> equiv t t'
-
 let rec infer_mono_a vardef tenv expl env (pannot_a,c_a) a =
   let memvar v = Env.mem v env in
   let vartype v = Env.find v env in
@@ -415,7 +329,7 @@ let rec infer_mono_a vardef tenv expl env (pannot_a,c_a) a =
         expl env
         (fun expl pannot_a -> infer_mono_a_iterated vardef tenv expl env pannot_a a)
         (fun pannot_a ->
-          let annot_a = infer_poly_a vardef tenv env pannot_a a in
+          let (_, annot_a) = infer_poly_a vardef tenv env pannot_a a in
           typeof_a vardef tenv env annot_a a)
         i
       |> map_res (fun x -> InterA x)
@@ -544,7 +458,7 @@ let rec infer_mono_a vardef tenv expl env (pannot_a,c_a) a =
       if is_empty s then (log ~level:3 "Lambda with empty domain generated a fail.@." ; Fail)
       else
         let pannot =
-          if def_cache_equiv dc s
+          if def_typ_unchanged dc s
           then pannot else invalidate_cache v e pannot
         in
         let dc = def_cache s in
@@ -570,7 +484,7 @@ and infer_mono tenv expl env (pannot, c) e =
         expl env
         (fun expl pannot -> infer_mono_iterated tenv expl env pannot e)
         (fun pannot ->
-          let annot = infer_poly tenv env pannot e in
+          let (_, annot) = infer_poly tenv env pannot e in
           typeof tenv env annot e)
         i
       |> map_res (fun x -> Inter x)
@@ -617,10 +531,10 @@ and infer_mono tenv expl env (pannot, c) e =
         | ([],[],_) -> assert false
         | ([],d,u) -> Ok (Keep (pannot_a, ([],d,u), dc))
         | ((s,pannot)::ex,d,u) ->
-          let annot_a = infer_poly_a v tenv env pannot_a a in
+          let (pannot_a, annot_a) = infer_poly_a v tenv env pannot_a a in
           let t = typeof_a_nofail v tenv env annot_a a in
           let (pannot, ex, d) =
-            if def_cache_equiv dc t
+            if def_typ_unchanged dc t
             then (pannot, ex, d)
             else
               let inv = invalidate_cache v e in
@@ -692,7 +606,7 @@ let infer tenv env e =
   let initial_pannot = (Infer, init_cache) in
   match infer_mono_iterated tenv Domains.empty env initial_pannot e with
   | Fail -> raise (Untypeable ([], "Annotations inference failed."))
-  | Ok annot -> infer_poly tenv env annot e
+  | Ok annot -> infer_poly tenv env annot e |> snd
   | NeedVar (v, _, _) ->
     Format.printf "NeedVar %a@." Variable.pp v ;
     assert false

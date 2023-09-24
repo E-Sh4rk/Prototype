@@ -208,6 +208,13 @@ module PartialAnnot = struct
 
   let init_cache =
     { env_changed = false ; annot_changed = false ; prev_fa = None }
+  let cache a =
+    { env_changed = false ; annot_changed = false ; prev_fa = Some a }
   let init_def_cache = { prev_typ = None }
   let def_cache t = { prev_typ = Some t }
+
+  let def_typ_unchanged dc t =
+    match dc.prev_typ with
+    | None -> false
+    | Some t' -> equiv t t'  
 end

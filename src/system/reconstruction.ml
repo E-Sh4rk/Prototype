@@ -83,6 +83,81 @@ let refine_a tenv env a t =
   | Let (_, v2) -> [Env.singleton v2 t]
 
 (* ====================================== *)
+(* ============== CACHING =============== *)
+(* ====================================== *)
+
+let fv_def_htbl = Hashtbl.create 100
+let fv_body_htbl = Hashtbl.create 100
+let init_fv_htbl =
+  let rec init_a v a =
+    Hashtbl.add fv_def_htbl v (Msc.fv_a a) ;
+    match a with
+    | Lambda (_,_,e) -> init e
+    | _ -> ()
+  and init e =
+    match e with
+    | Var _ -> ()
+    | Bind (v, a, e) ->
+      Hashtbl.add fv_body_htbl v (Msc.fv_e e) ;
+      init_a v a ; init e
+  in
+  init
+
+let fv_def v = Hashtbl.find fv_def_htbl v
+let fv_body v = Hashtbl.find fv_body_htbl v
+
+let invalidate c = { c with PartialAnnot.env_changed = true }
+
+let invalidate_cache_inter v depends_on i =
+  failwith "TODO"
+
+let rec invalidate_cache_a v depends_on a (pannot_a, c_a) =
+  failwith "TODO"
+
+and invalidate_cache v e (pannot, c) =
+  let open PartialAnnot in
+  match e with
+  | Var v' when Variable.equals v v' -> (pannot, invalidate c)
+  | Var _ -> (pannot, c)
+  | Bind (v', a, e) ->
+    assert (Variable.equals v v' |> not) ;
+    let fv_body = fv_body v' in
+    let fv_def = fv_def v' in
+    let fv = VarSet.union fv_body fv_def in
+    if VarSet.mem v fv then
+      let treat_union (ex,d,u) =
+        let aux (ty, t) = (ty, invalidate_cache v e t) in
+        (List.map aux ex, List.map aux d, u)
+      in
+      let pannot =
+        begin match pannot with
+        | Infer -> Infer
+        | Skip pannot -> Skip (invalidate_cache v e pannot)
+        | TrySkip pannot -> TrySkip (invalidate_cache v e pannot)
+        | Keep (pannot_a, union) ->
+          let pannot_a = invalidate_cache_a v fv_def a pannot_a in
+          let union = treat_union union in
+          Keep (pannot_a, union)
+        | TryKeep (pannot_a, pannot1, pannot2) ->
+          let pannot_a = invalidate_cache_a v fv_def a pannot_a in
+          let pannot1 = invalidate_cache v e pannot1 in
+          let pannot2 = invalidate_cache v e pannot2 in
+          TryKeep (pannot_a, pannot1, pannot2)
+        | Propagate (pannot_a, lst, union) ->
+          let pannot_a = invalidate_cache_a v fv_def a pannot_a in
+          let lst = lst |> List.map (fun (env, union) -> (env, treat_union union)) in
+          let union = treat_union union in
+          Propagate (pannot_a, lst, union)
+        | Inter i ->
+          let i = invalidate_cache_inter v fv_body i in
+          Inter i
+        | _ -> assert false
+        end
+      in
+      (pannot, invalidate c)
+    else (pannot, c)
+
+(* ====================================== *)
 (* ============ MAIN SYSTEM ============= *)
 (* ====================================== *)
 
@@ -571,6 +646,7 @@ and infer_mono_iterated tenv expl env pannot e =
 
 let infer tenv env e =
   let open PartialAnnot in
+  init_fv_htbl e ;
   let initial_pannot = (Infer, init_cache) in
   match infer_mono_iterated tenv Domains.empty env initial_pannot e with
   | Fail -> raise (Untypeable ([], "Annotations inference failed."))

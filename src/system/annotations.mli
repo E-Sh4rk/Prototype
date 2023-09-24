@@ -46,7 +46,8 @@ module FullAnnot : sig
 end
 
 module PartialAnnot : sig
-    type 'a cache = { env_changed:bool ; annot_changed:bool ; prev_fa:'a option }
+    type 'a cache = { env_changed:bool ; annot_changed:bool ;
+        prev_fa:'a option ; prev_typ: typ option }
     type union_expl = (typ * t_cached) list
     and union_done = (typ * t_cached) list
     and union_unr = typ list

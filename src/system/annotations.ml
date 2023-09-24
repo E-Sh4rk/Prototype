@@ -90,7 +90,8 @@ module FullAnnot = struct
 end
 
 module PartialAnnot = struct
-  type 'a cache = { env_changed:bool ; annot_changed:bool ; prev_fa:'a option }
+  type 'a cache = { env_changed:bool ; annot_changed:bool ;
+    prev_fa:'a option ; prev_typ: typ option }
   let pp_cache _ fmt _ = Format.fprintf fmt "cache"
   type union_expl = (typ * t_cached) list
   [@@deriving show]
@@ -207,5 +208,6 @@ module PartialAnnot = struct
   let apply_subst s t = apply_subst s t |> fst
 
   let init_cache =
-    { env_changed = false ; annot_changed = false ; prev_fa = None }
+    { env_changed = false ; annot_changed = false ;
+      prev_fa = None ; prev_typ = None }
 end

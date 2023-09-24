@@ -215,7 +215,7 @@ let rec infer_poly_a vardef tenv env (pannot_a, c_a) a =
       ThenA [tallying_one [(vartype v, s)]]
     | Ite (v, s, _, _), ElseA ->
       ElseA [tallying_one [(vartype v, neg s)]]
-    | Lambda (_, v, e), PartialAnnot.LambdaA (s, pannot) ->
+    | Lambda (_, v, e), PartialAnnot.LambdaA (s, pannot, _) ->
       let env = Env.add v s env in
       let annot = infer_poly tenv env pannot e in
       LambdaA (s, annot)
@@ -239,7 +239,7 @@ and infer_poly tenv env (pannot, c) e =
     | Bind (_, _, e), PartialAnnot.Skip pannot ->
       let annot = infer_poly tenv env pannot e in
       FullAnnot.Skip annot
-    | Bind (v, a, e), PartialAnnot.Keep (pannot_a, (ex,d,u)) ->
+    | Bind (v, a, e), PartialAnnot.Keep (pannot_a, (ex,d,u), _) ->
       assert (d <> [] && ex = []) ;
       let annot_a = infer_poly_a v tenv env pannot_a a in
       let t = typeof_a_nofail v tenv env annot_a a in

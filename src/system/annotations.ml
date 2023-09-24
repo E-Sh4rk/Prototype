@@ -90,8 +90,9 @@ module FullAnnot = struct
 end
 
 module PartialAnnot = struct
-  type 'a cache = { env_changed:bool ; annot_changed:bool ;
-    prev_fa:'a option ; prev_typ: typ option }
+  type def_cache = { prev_typ: typ option }
+  let pp_def_cache fmt _ = Format.fprintf fmt "cache"
+  type 'a cache = { env_changed:bool ; annot_changed:bool ; prev_fa:'a option }
   let pp_cache _ fmt _ = Format.fprintf fmt "cache"
   type union_expl = (typ * t_cached) list
   [@@deriving show]
@@ -116,16 +117,16 @@ module PartialAnnot = struct
       | InferA | TypA | UntypA
       | ThenVarA | ElseVarA
       | EmptyA | ThenA | ElseA (* NOTE: not in the paper, small optimisation *)
-      | LambdaA of typ * t_cached
+      | LambdaA of typ * t_cached * def_cache
       | InterA of a_cached inter
   [@@deriving show]
   and t =
       | Infer | Typ | Untyp
-      | Keep of a_cached * union
+      | Keep of a_cached * union * def_cache
       | Skip of t_cached
       | TrySkip of t_cached
       | TryKeep of a_cached * t_cached * t_cached
-      | Propagate of a_cached * (Env.t * int) list * union
+      | Propagate of a_cached * (Env.t * int) list * union * def_cache
       | Inter of t_cached inter
   [@@deriving show]
   and a_cached = a * FullAnnot.a_cached cache
@@ -160,7 +161,7 @@ module PartialAnnot = struct
         | UntypA -> UntypA
         | ThenVarA -> ThenVarA | ElseVarA -> ElseVarA
         | EmptyA -> EmptyA | ThenA -> ThenA | ElseA -> ElseA
-        | LambdaA (ty, t) -> LambdaA (apply_typ ty, apply_subst t)
+        | LambdaA (ty, t, dc) -> LambdaA (apply_typ ty, apply_subst t, dc)
         | InterA (a, b, flags) -> InterA (
           List.map (fun (a,d,b) -> (apply_subst_a a,d,b)) a,
           List.map apply_subst_a b,
@@ -174,14 +175,14 @@ module PartialAnnot = struct
         | Infer -> Infer
         | Typ -> Typ
         | Untyp -> Untyp
-        | Keep (a, b) -> Keep (apply_subst_a a, apply_subst_union b)
+        | Keep (a, b, dc) -> Keep (apply_subst_a a, apply_subst_union b, dc)
         | Skip t -> Skip (apply_subst t)
         | TrySkip t -> TrySkip (apply_subst t)
         | TryKeep (a, t1, t2) ->
           TryKeep (apply_subst_a a, apply_subst t1, apply_subst t2)
-        | Propagate (a, envs, t) ->
+        | Propagate (a, envs, t, dc) ->
           let aux2 (env, i) = (Env.apply_subst s env, i) in
-          Propagate (apply_subst_a a, List.map aux2 envs, apply_subst_union t)
+          Propagate (apply_subst_a a, List.map aux2 envs, apply_subst_union t, dc)
         | Inter (a, b, flags) -> Inter (
           List.map (fun (a,d,b) -> (apply_subst a,d,b)) a,
           List.map apply_subst b,
@@ -206,6 +207,7 @@ module PartialAnnot = struct
   let apply_subst s t = apply_subst s t |> fst
 
   let init_cache =
-    { env_changed = false ; annot_changed = false ;
-      prev_fa = None ; prev_typ = None }
+    { env_changed = false ; annot_changed = false ; prev_fa = None }
+  let init_def_cache = { prev_typ = None }
+  let def_cache t = { prev_typ = Some t }
 end

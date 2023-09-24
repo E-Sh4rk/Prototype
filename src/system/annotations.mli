@@ -46,8 +46,8 @@ module FullAnnot : sig
 end
 
 module PartialAnnot : sig
-    type 'a cache = { env_changed:bool ; annot_changed:bool ;
-        prev_fa:'a option ; prev_typ: typ option }
+    type def_cache = { prev_typ: typ option }
+    type 'a cache = { env_changed:bool ; annot_changed:bool ; prev_fa:'a option }
     type union_expl = (typ * t_cached) list
     and union_done = (typ * t_cached) list
     and union_unr = typ list
@@ -65,15 +65,15 @@ module PartialAnnot : sig
         | InferA | TypA | UntypA
         | ThenVarA | ElseVarA
         | EmptyA | ThenA | ElseA (* NOTE: not in the paper, small optimisation *)
-        | LambdaA of typ * t_cached
+        | LambdaA of typ * t_cached * def_cache
         | InterA of a_cached inter
     and t =
         | Infer | Typ | Untyp
-        | Keep of a_cached * union
+        | Keep of a_cached * union * def_cache
         | Skip of t_cached
         | TrySkip of t_cached
         | TryKeep of a_cached * t_cached * t_cached
-        | Propagate of a_cached * (Env.t * int) list * union
+        | Propagate of a_cached * (Env.t * int) list * union * def_cache
         | Inter of t_cached inter
     and a_cached = a * FullAnnot.a_cached cache
     and t_cached = t * FullAnnot.t_cached cache
@@ -87,4 +87,6 @@ module PartialAnnot : sig
     val apply_subst : Subst.t -> t_cached -> t_cached
 
     val init_cache : 'a cache
+    val init_def_cache : def_cache
+    val def_cache : typ -> def_cache
 end

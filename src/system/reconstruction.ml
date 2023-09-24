@@ -108,11 +108,23 @@ let fv_body v = Hashtbl.find fv_body_htbl v
 
 let invalidate c = { c with PartialAnnot.env_changed = true }
 
-let invalidate_cache_inter v depends_on i =
-  failwith "TODO"
+let invalidate_cache_inter f (pending, expl, flags) =
+  let pending = pending |> List.map (fun (branch,d,b) -> (f branch,d,b)) in
+  let expl = expl |> List.map f in
+  (pending, expl, flags)
 
-let rec invalidate_cache_a v depends_on a (pannot_a, c_a) =
-  failwith "TODO"
+let rec invalidate_cache_a v bind_var a (pannot_a, c_a) =
+  let open PartialAnnot in
+  let depends_on = fv_def bind_var in
+  if VarSet.mem v depends_on then
+    let pannot_a =
+      match pannot_a, a with
+      | LambdaA (ty, pannot), Lambda (_,_,e) ->
+        LambdaA (ty, invalidate_cache v e pannot)
+      | _, _ -> pannot_a
+    in
+    (pannot_a, invalidate c_a)
+  else (pannot_a, c_a)
 
 and invalidate_cache v e (pannot, c) =
   let open PartialAnnot in
@@ -121,9 +133,7 @@ and invalidate_cache v e (pannot, c) =
   | Var _ -> (pannot, c)
   | Bind (v', a, e) ->
     assert (Variable.equals v v' |> not) ;
-    let fv_body = fv_body v' in
-    let fv_def = fv_def v' in
-    let fv = VarSet.union fv_body fv_def in
+    let fv = VarSet.union (fv_body v') (fv_def v') in
     if VarSet.mem v fv then
       let treat_union (ex,d,u) =
         let aux (ty, t) = (ty, invalidate_cache v e t) in
@@ -135,21 +145,20 @@ and invalidate_cache v e (pannot, c) =
         | Skip pannot -> Skip (invalidate_cache v e pannot)
         | TrySkip pannot -> TrySkip (invalidate_cache v e pannot)
         | Keep (pannot_a, union) ->
-          let pannot_a = invalidate_cache_a v fv_def a pannot_a in
+          let pannot_a = invalidate_cache_a v v' a pannot_a in
           let union = treat_union union in
           Keep (pannot_a, union)
         | TryKeep (pannot_a, pannot1, pannot2) ->
-          let pannot_a = invalidate_cache_a v fv_def a pannot_a in
+          let pannot_a = invalidate_cache_a v v' a pannot_a in
           let pannot1 = invalidate_cache v e pannot1 in
           let pannot2 = invalidate_cache v e pannot2 in
           TryKeep (pannot_a, pannot1, pannot2)
         | Propagate (pannot_a, lst, union) ->
-          let pannot_a = invalidate_cache_a v fv_def a pannot_a in
+          let pannot_a = invalidate_cache_a v v' a pannot_a in
           let union = treat_union union in
           Propagate (pannot_a, lst, union)
         | Inter i ->
-          let i = invalidate_cache_inter v fv_body i in
-          Inter i
+          Inter (invalidate_cache_inter (invalidate_cache v e) i)
         | _ -> assert false
         end
       in

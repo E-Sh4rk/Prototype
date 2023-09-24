@@ -145,7 +145,6 @@ and invalidate_cache v e (pannot, c) =
           TryKeep (pannot_a, pannot1, pannot2)
         | Propagate (pannot_a, lst, union) ->
           let pannot_a = invalidate_cache_a v fv_def a pannot_a in
-          let lst = lst |> List.map (fun (env, union) -> (env, treat_union union)) in
           let union = treat_union union in
           Propagate (pannot_a, lst, union)
         | Inter i ->
@@ -185,6 +184,18 @@ let is_compatible env gamma =
     let t = Env.find v env in
     is_empty t || (cap t s |> non_empty)
   )
+
+let remove_split i (ex,d,u) =
+  let rec aux i ex =
+    match i, ex with
+    | 0, (t,_)::ex -> (t, ex)
+    | i, h::ex ->
+      let (t, ex) = aux (i-1) ex in
+      (t, h::ex)
+    | _ -> assert false
+  in
+  let (t, ex) = aux i ex in
+  (ex,d,t::u)
 
 let generalize_inferable tvars =
   let tvars = TVarSet.filter TVar.can_infer tvars in
@@ -572,8 +583,9 @@ and infer_mono tenv expl env (pannot, c) e =
       let propagate = gammas |>
         Utils.find_among_others (fun (env',_) _ -> is_compatible env env') in
       begin match propagate with
-      | Some ((env',union'),gammas) ->
+      | Some ((env',i'),gammas) ->
         log ~level:1 "Var %a is ok but its DNF needs a split.@." Variable.pp v ;
+        let union' = remove_split i' union in
         let pannot1 = Keep (pannot_a, union') in
         let pannot2 = Propagate (pannot_a, gammas, union) in
         let env' = Env.filter (fun v t -> subtype_poly (Env.find v env) t |> not) env' in
@@ -599,10 +611,10 @@ and infer_mono tenv expl env (pannot, c) e =
             let t1 = cap_o s s' |> simplify_typ in
             let t2 = diff_o s s' |> simplify_typ in
             let gammas1 = refine_a tenv env a (neg t1)
-              |> List.map (fun g -> (g, ((t2,pannot2)::ex,d,t1::u)))
+              |> List.map (fun g -> (g, 0))
             in
             let gammas2 = refine_a tenv env a (neg t2)
-              |> List.map (fun g -> (g, ((t1,pannot1)::ex,d,t2::u)))
+              |> List.map (fun g -> (g, 1))
             in
             let res1 = Propagate (pannot_a, gammas1@gammas2,
               ((t1,pannot1)::(t2,pannot2)::ex,d,u)) in

@@ -125,7 +125,7 @@ module PartialAnnot = struct
       | Skip of t_cached
       | TrySkip of t_cached
       | TryKeep of a_cached * t_cached * t_cached
-      | Propagate of a_cached * (Env.t * union) list * union
+      | Propagate of a_cached * (Env.t * int) list * union
       | Inter of t_cached inter
   [@@deriving show]
   and a_cached = a * FullAnnot.a_cached cache
@@ -180,9 +180,7 @@ module PartialAnnot = struct
         | TryKeep (a, t1, t2) ->
           TryKeep (apply_subst_a a, apply_subst t1, apply_subst t2)
         | Propagate (a, envs, t) ->
-          let aux2 (env, t) =
-            (Env.apply_subst s env, apply_subst_union t)
-          in
+          let aux2 (env, i) = (Env.apply_subst s env, i) in
           Propagate (apply_subst_a a, List.map aux2 envs, apply_subst_union t)
         | Inter (a, b, flags) -> Inter (
           List.map (fun (a,d,b) -> (apply_subst a,d,b)) a,

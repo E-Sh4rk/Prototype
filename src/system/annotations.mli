@@ -73,7 +73,7 @@ module PartialAnnot : sig
         | Skip of t_cached
         | TrySkip of t_cached
         | TryKeep of a_cached * t_cached * t_cached
-        | Propagate of a_cached * (Env.t * union) list * union
+        | Propagate of a_cached * (Env.t * int) list * union
         | Inter of t_cached inter
     and a_cached = a * FullAnnot.a_cached cache
     and t_cached = t * FullAnnot.t_cached cache

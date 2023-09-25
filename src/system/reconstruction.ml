@@ -561,7 +561,7 @@ and infer_mono tenv expl env (pannot, c) e =
               |> List.map (fun g -> (g, 1))
             in
             let pannot1' = invalidate_cache v e pannot1 in
-            let pannot2' = invalidate_cache v e pannot1 in
+            let pannot2' = invalidate_cache v e pannot2 in
             let res1 = Propagate (pannot_a, gammas1@gammas2,
               ((t1,pannot1')::(t2,pannot2')::ex,d,u), dc) in
             let res2 = Keep (pannot_a, ((s,pannot2)::ex,d,u), dc) in

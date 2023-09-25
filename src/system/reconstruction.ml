@@ -533,15 +533,13 @@ and infer_mono tenv expl env (pannot, c) e =
         | ((s,pannot)::ex,d,u) ->
           let (pannot_a, annot_a) = infer_poly_a v tenv env pannot_a a in
           let t = typeof_a_nofail v tenv env annot_a a in
-          let (pannot, ex, d) =
+          let (pannot, (ex, d, u)) =
             if def_typ_unchanged dc t
-            then (pannot, ex, d)
+            then (pannot, (ex, d, u))
             else
-              let inv = invalidate_cache v e in
-              let pannot = inv pannot in
-              let ex = ex |> List.map (fun (s,t) -> (s, inv t)) in
-              let d = d |> List.map (fun (s,t) -> (s, inv t)) in
-              (pannot, ex, d)
+              let pannot = invalidate_cache v e pannot in
+              let union = invalidate_cache_union v e (ex,d,u) in
+              (pannot, union)
           in  
           let dc = def_cache t in
           let keep = map_res (fun x -> Keep (pannot_a, x, dc)) in

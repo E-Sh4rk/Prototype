@@ -64,10 +64,6 @@ and invalidate_cache v e (pannot, c) =
     assert (Variable.equals v v' |> not) ;
     let fv = VarSet.union (fv_body v') (fv_def v') in
     if VarSet.mem v fv then
-      let treat_union (ex,d,u) =
-        let aux (ty, t) = (ty, invalidate_cache v e t) in
-        (List.map aux ex, List.map aux d, u)
-      in
       let pannot =
         begin match pannot with
         | Infer -> Infer
@@ -75,7 +71,7 @@ and invalidate_cache v e (pannot, c) =
         | TrySkip pannot -> TrySkip (invalidate_cache v e pannot)
         | Keep (pannot_a, union, dc) ->
           let pannot_a = invalidate_cache_a v v' a pannot_a in
-          let union = treat_union union in
+          let union = invalidate_cache_union v e union in
           Keep (pannot_a, union, dc)
         | TryKeep (pannot_a, pannot1, pannot2) ->
           let pannot_a = invalidate_cache_a v v' a pannot_a in
@@ -84,7 +80,7 @@ and invalidate_cache v e (pannot, c) =
           TryKeep (pannot_a, pannot1, pannot2)
         | Propagate (pannot_a, lst, union, dc) ->
           let pannot_a = invalidate_cache_a v v' a pannot_a in
-          let union = treat_union union in
+          let union = invalidate_cache_union v e union in
           Propagate (pannot_a, lst, union, dc)
         | Inter i ->
           Inter (invalidate_cache_inter (invalidate_cache v e) i)
@@ -93,6 +89,10 @@ and invalidate_cache v e (pannot, c) =
       in
       (pannot, invalidate c)
     else (pannot, c)
+
+and invalidate_cache_union v e (ex,d,u) =
+  let aux (ty, t) = (ty, invalidate_cache v e t) in
+  (List.map aux ex, List.map aux d, u)
 
 (* ====================================== *)
 (* ============= POLY INFER ============= *)
@@ -349,12 +349,10 @@ and infer_poly tenv env (pannot, c) e =
       let (pannot_a, annot_a) = infer_poly_a v tenv env pannot_a a in
       let t = typeof_a_nofail v tenv env annot_a a in
       assert (subtype any (u@(List.map fst d) |> disj)) ;
-      let d =
+      let (ex,d,u) =
         if def_typ_unchanged dc t
-        then d
-        else
-          let inv = invalidate_cache v e in
-          d |> List.map (fun (s,t) -> (s, inv t))
+        then (ex,d,u)
+        else invalidate_cache_union v e (ex,d,u)
       in  
       let dc = def_cache t in
       let (d, branches) = d |> List.map (fun (si, pannot) ->

@@ -9,6 +9,8 @@ module Make () : sig
     val init_fv_htbl : e -> unit
     val invalidate_cache : Variable.t -> e ->
         PartialAnnot.t_cached -> PartialAnnot.t_cached
+    val invalidate_cache_union : Variable.t -> e ->
+        PartialAnnot.union -> PartialAnnot.union
 
     val replace_vars : typ -> TVarSet.t -> TVar.t -> Subst.t
     val approximate_app : infer:bool -> typ -> typ -> TVar.t -> Subst.t list

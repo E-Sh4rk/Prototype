@@ -48,6 +48,8 @@ let rec invalidate_cache_a v bind_var a (pannot_a, c_a) =
       match pannot_a, a with
       | LambdaA (ty, pannot, dc), Lambda (_,_,e) ->
         LambdaA (ty, invalidate_cache v e pannot, dc)
+      | InterA i, a ->
+        InterA (invalidate_cache_inter (invalidate_cache_a v bind_var a) i)
       | _, _ -> pannot_a
     in
     (pannot_a, invalidate c_a)
@@ -297,8 +299,6 @@ let rec infer_poly_a vardef tenv env (pannot_a, c_a) a =
       log ~level:4 "@.Approximate tallying for %a: %a <= %a@."
         Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
       let res = approximate_app ~infer:false t1 t2 alpha in
-      if List.length res = 0 then Format.printf "ERROR: %a@.%a@." pp_typ t1 pp_typ t2 ;
-      (* TODO: fix Assertion failed *)
       assert (List.length res > 0) ;
       let res = simplify_tallying (TVar.typ alpha) res in
       let (s1, s2) = res |> List.map (fun s ->

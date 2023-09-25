@@ -18,3 +18,7 @@ libjs:
 
 test:
 	dune runtest
+
+perf:
+	sudo perf record --call-graph=dwarf -- ./_build/default/main/prototype.exe
+	sudo perf report

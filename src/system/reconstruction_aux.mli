@@ -11,6 +11,7 @@ module Make () : sig
         PartialAnnot.t_cached -> PartialAnnot.t_cached
     val invalidate_cache_union : Variable.t -> e ->
         PartialAnnot.union -> PartialAnnot.union
+    val fv_def : Variable.t -> VarSet.t
 
     val replace_vars : typ -> TVarSet.t -> TVar.t -> Subst.t
     val approximate_app : infer:bool -> typ -> typ -> TVar.t -> Subst.t list

@@ -85,6 +85,26 @@ let refine_a tenv env a t =
   | Let (_, v2) -> [Env.singleton v2 t]
 
 (* ====================================== *)
+(* ============== CACHING =============== *)
+(* ====================================== *)
+
+type icache = { context: Env.t ; pannot: PartialAnnot.a_cached }
+
+let inter_cache = Hashtbl.create 100
+
+let add_to_inter_cache x env pannot =
+  let fv = fv_def x in
+  let env = Env.filter (fun v _ -> VarSet.mem v fv) env in
+  Hashtbl.add inter_cache x { context=env; pannot=pannot }
+
+let get_inter_cache x env =
+  let fv = fv_def x in
+  let env = Env.filter (fun v _ -> VarSet.mem v fv) env in
+  let caches = Hashtbl.find_all inter_cache x in
+  caches |> List.find_opt (fun ic -> Env.equiv env ic.context)
+  |> Option.map (fun ic -> ic.pannot)
+
+(* ====================================== *)
 (* ============ MAIN SYSTEM ============= *)
 (* ====================================== *)
 
@@ -493,7 +513,13 @@ and infer_mono tenv expl env (pannot, c) e =
       begin match infer_mono_iterated tenv expl env pannot e with
       | NeedVar (v', pannot1, pannot2) when Variable.equals v v' ->
         log ~level:0 "Var %a needed.@." Variable.pp v ;
-        aux (TryKeep ((InferA, init_cache), pannot1, pannot2)) ee
+        begin match get_inter_cache v env with
+        | None -> aux (TryKeep ((InferA, init_cache), pannot1, pannot2)) ee
+        | Some pannot_a ->
+          (* Format.printf "Cached: %a@." Variable.pp v ; *)
+          let pannot = Keep (pannot_a, ([(any, pannot1)], [], []), init_def_cache) in
+          aux pannot ee
+        end
       | Ok pannot -> Ok (Skip pannot)
       | res -> map_res (fun x -> TrySkip x) res
       end
@@ -507,6 +533,7 @@ and infer_mono tenv expl env (pannot, c) e =
       log ~level:1 "Trying to type var %a.@." Variable.pp v ;
       begin match infer_mono_a_iterated v tenv expl env pannot_a a with
       | Ok pannot_a ->
+        add_to_inter_cache v env pannot_a ;
         let pannot = Keep (pannot_a, ([(any, pannot1)], [], []), init_def_cache) in
         aux pannot e
       | Fail -> aux (Skip pannot2) e

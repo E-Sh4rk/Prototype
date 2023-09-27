@@ -84,36 +84,71 @@ let refine_a tenv env a t =
     [Env.construct_dup [(v,s);(v1,t)] ; Env.construct_dup [(v,neg s);(v2,t)]]
   | Let (_, v2) -> [Env.singleton v2 t]
 
+type 'a res =
+| Ok of 'a
+| Fail
+| Split of Env.t * 'a * 'a
+| Subst of (Env.t * bool (* Low priority default *)) * Subst.t list * 'a * 'a
+| NeedVar of Variable.t * 'a * 'a
+(* [@@deriving show] *)
+
 (* ====================================== *)
 (* ============== CACHING =============== *)
 (* ====================================== *)
 
-type icache = { context: Env.t ; pannot: PartialAnnot.a_cached }
+(* TODO: cache for forms *)
+
+module PAnnot = struct
+  type t = PartialAnnot.a_cached
+  (* let compare = compare *)
+  let rec equals (a1,_) (a2,_) =
+    let open PartialAnnot in
+    match a1, a2 with
+    | InferA, InferA | TypA, TypA | UntypA, UntypA
+    | ThenVarA, ThenVarA | ElseVarA, ElseVarA
+    | EmptyA, EmptyA | ThenA, ThenA | ElseA, ElseA -> true
+    | LambdaA (s1, t1, _), LambdaA (s2, t2, _) ->
+      equiv s1 s2 && equals_e t1 t2
+    | InterA _, InterA _ -> false (* TODO *)
+    | _, _ -> false
+  and equals_e (e1, _) (e2, _) =
+    let open PartialAnnot in
+    match e1, e2 with
+    | Infer, Infer | Typ, Typ | Untyp, Untyp -> true
+    | Skip t1, Skip t2 -> equals_e t1 t2
+    | TrySkip t1, TrySkip t2 -> equals_e t1 t2
+    | Propagate (a1, _, u1, _), Propagate (a2, _, u2, _)
+    | Keep (a1, u1, _), Keep (a2, u2, _) ->
+      ignore (a1, a2, u1, u2) ;
+      (* equals a1 a2 TODO *)
+      false
+    | TryKeep (a1, t1, t1'), TryKeep (a2, t2, t2') ->
+      equals a1 a2 && equals_e t1 t2 && equals_e t1' t2'
+    | Inter _, Inter _ -> false (* TODO *)
+    | _, _ -> false
+end
+(* module AnnotMap = Map.Make(PAnnot) *)
+
+type icache = { context: Env.t ; pannot: PAnnot.t ; res: PartialAnnot.a_cached res }
 
 let inter_cache = Hashtbl.create 100
 
-let add_to_inter_cache x env pannot =
+let add_to_inter_cache x env pannot res =
   let fv = fv_def x in
   let env = Env.filter (fun v _ -> VarSet.mem v fv) env in
-  Hashtbl.add inter_cache x { context=env; pannot=pannot }
+  Hashtbl.add inter_cache x { context=env; pannot=pannot; res=res }
 
-let get_inter_cache x env =
+let get_inter_cache x env pannot =
   let fv = fv_def x in
   let env = Env.filter (fun v _ -> VarSet.mem v fv) env in
   let caches = Hashtbl.find_all inter_cache x in
-  caches |> List.find_opt (fun ic -> Env.equiv env ic.context)
-  |> Option.map (fun ic -> ic.pannot)
+  caches |> List.find_opt
+    (fun ic -> PAnnot.equals pannot ic.pannot && Env.equiv env ic.context)
+  |> Option.map (fun ic -> ic.res)
 
 (* ====================================== *)
 (* ============ MAIN SYSTEM ============= *)
 (* ====================================== *)
-
-type 'a res =
-  | Ok of 'a
-  | Fail
-  | Split of Env.t * 'a * 'a
-  | Subst of (Env.t * bool (* Low priority default *)) * Subst.t list * 'a * 'a
-  | NeedVar of Variable.t * 'a * 'a
 
 let map_res f res =
   match res with
@@ -151,10 +186,6 @@ let generalize_inferable tvars =
 
 let simplify_tallying_infer env res_type sols =
   let tvars = Env.tvars env |> TVarSet.filter TVar.is_mono in
-  let params_types = Env.domain env |>
-    List.filter Variable.is_lambda_var |>
-    List.map (fun v -> Env.find v env)
-  in
   let vars_involved dom sol =
     let sol = Subst.restrict sol dom in
     TVarSet.union (Subst.codom sol) dom
@@ -185,13 +216,6 @@ let simplify_tallying_infer env res_type sols =
     let sol, res = Subst.compose_restr gen sol, Subst.apply gen res in
     let clean = clean_type_subst ~pos:empty ~neg:any res in
     (Subst.compose_restr clean sol, Subst.apply clean res)
-  )
-  (* Remove solutions that require "undesirable" lambda branches *)
-  |> List.filter (fun (sol, _) ->
-    params_types |> List.for_all (fun t ->
-      TVarSet.inter (vars_mono t) (Subst.dom sol) |> TVarSet.is_empty ||
-      is_undesirable t || not (is_undesirable (Subst.apply sol t))
-    )
   )
   (* Simplify *)
   |> List.map (fun (sol, res) ->
@@ -313,15 +337,20 @@ let infer_mono_inter expl' env infer_branch typeof (b1, b2, (expl, tf,ud)) =
   in
   aux b2 expl b1
 
-let merge_substs apply_subst_branch mk_inter
-  ((d,lpd), lst, pannot, default) =
+let merge_substs env apply_subst_branch mk_inter ((d,lpd), lst, pannot, default) =
+  let tvars = Env.tvars env in
   let lst = lst
-    |> List.map (fun s ->
-      (apply_subst_branch s pannot, Env.apply_subst s d |> Domains.singleton, false))
+    |> List.filter_map (fun s ->
+      let d' = Env.apply_subst s d in
+      if List.for_all2 (fun (_, t) (_, t') ->
+        is_undesirable t || not (is_undesirable t')
+      ) (Env.bindings d) (Env.bindings d')
+      then Some (apply_subst_branch s pannot, Domains.singleton tvars d', false)
+      else None)
   in
   log ~level:2 "@.Creating an intersection with %n branches.@." (List.length lst + 1) ;
-  (* NOTE: It is important for the default case to be inserted at the end (smaller priority). *)
-  mk_inter (lst@[default, Domains.singleton d, lpd]) [] (Domains.empty,false,false)
+  (* NOTE: it is important for the default case to be inserted at the end (smaller priority) *)
+  mk_inter (lst@[default, Domains.singleton tvars d, lpd]) [] (Domains.empty,false,false)
 
 let should_iterate env apply_subst_branch mk_inter res =
   match res with
@@ -329,7 +358,7 @@ let should_iterate env apply_subst_branch mk_inter res =
   | Subst (info, lst, pannot, default) ->
     let tvars = Env.tvars env |> TVarSet.filter TVar.is_mono in
     if lst |> List.for_all (fun s -> TVarSet.inter (Subst.dom s) tvars |> TVarSet.is_empty)
-    then Some (merge_substs apply_subst_branch mk_inter
+    then Some (merge_substs env apply_subst_branch mk_inter
                 (info, lst, pannot, default))
     else None
   | _ -> None
@@ -339,8 +368,8 @@ let rec infer_mono_a vardef tenv expl env (pannot_a,c_a) a =
   let vartype v = Env.find v env in
   let needvar v a1 a2 = NeedVar (v, a1, a2) in
   (* TODO: enable the lpd flag? (prune some uninteresting branches) *)
-  let needsubst ss a1 a2 = Subst ((env, (*true*) false), ss, a1, a2) in
-  let needsubst_no_lpd ss a1 a2 = Subst ((env, false), ss, a1, a2) in
+  let needsubst ss a1 a2 = Subst ((Env.empty, (*true*) false), ss, a1, a2) in
+  let needsubst_no_lpd ss a1 a2 = Subst ((Env.empty, false), ss, a1, a2) in
   let rec aux pannot_a a =
     let open PartialAnnot in
     match a, pannot_a with
@@ -483,8 +512,13 @@ let rec infer_mono_a vardef tenv expl env (pannot_a,c_a) a =
         in
         let dc = def_cache s in
         let env = Env.add v s env in
-        infer_mono_iterated tenv (Domains.enter_lambda env expl) env pannot e
+        infer_mono_iterated tenv (Domains.enter_lambda v s expl) env pannot e
         |> map_res (fun x -> LambdaA (s, x, dc))
+        |> (fun res -> match res with
+          | Subst ((env',b), ss, pannot1, pannot2) ->
+            Subst ((Env.add v s env',b), ss, pannot1, pannot2)
+          | res -> res
+        )
     | _, _ -> assert false
   in
   map_res (fun a -> (a,c_a)) (aux pannot_a a)
@@ -513,13 +547,7 @@ and infer_mono tenv expl env (pannot, c) e =
       begin match infer_mono_iterated tenv expl env pannot e with
       | NeedVar (v', pannot1, pannot2) when Variable.equals v v' ->
         log ~level:0 "Var %a needed.@." Variable.pp v ;
-        begin match get_inter_cache v env with
-        | None -> aux (TryKeep ((InferA, init_cache), pannot1, pannot2)) ee
-        | Some pannot_a ->
-          (* Format.printf "Cached: %a@." Variable.pp v ; *)
-          let pannot = Keep (pannot_a, ([(any, pannot1)], [], []), init_def_cache) in
-          aux pannot ee
-        end
+        aux (TryKeep ((InferA, init_cache), pannot1, pannot2)) ee
       | Ok pannot -> Ok (Skip pannot)
       | res -> map_res (fun x -> TrySkip x) res
       end
@@ -533,7 +561,6 @@ and infer_mono tenv expl env (pannot, c) e =
       log ~level:1 "Trying to type var %a.@." Variable.pp v ;
       begin match infer_mono_a_iterated v tenv expl env pannot_a a with
       | Ok pannot_a ->
-        add_to_inter_cache v env pannot_a ;
         let pannot = Keep (pannot_a, ([(any, pannot1)], [], []), init_def_cache) in
         aux pannot e
       | Fail -> aux (Skip pannot2) e
@@ -601,15 +628,21 @@ and infer_mono tenv expl env (pannot, c) e =
 
 and infer_mono_a_iterated vardef tenv expl env pannot_a a =
   let open PartialAnnot in
-  log ~level:5 "infer_mono_a_iterated@." ;
-  let res = infer_mono_a vardef tenv expl env pannot_a a in
-  let si =
-    should_iterate env apply_subst_a
-      (fun a b c -> (InterA (a,b,c), init_cache)) res
-  in
-  match si with
-  | None -> res
-  | Some pannot_a -> infer_mono_a_iterated vardef tenv expl env pannot_a a
+  match get_inter_cache vardef env pannot_a with
+  | Some res -> res
+  | None ->
+    log ~level:5 "infer_mono_a_iterated@." ;
+    let res = infer_mono_a vardef tenv expl env pannot_a a in
+    let si =
+      should_iterate env apply_subst_a
+        (fun a b c -> (InterA (a,b,c), init_cache)) res
+    in
+    let res = match si with
+    | None -> res
+    | Some pannot_a -> infer_mono_a_iterated vardef tenv expl env pannot_a a
+    in
+    add_to_inter_cache vardef env pannot_a res ;
+    res
 
 and infer_mono_iterated tenv expl env pannot e =
   let open PartialAnnot in

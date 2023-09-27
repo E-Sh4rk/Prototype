@@ -1,13 +1,14 @@
 open Types.Base
 open Types.Tvar
+open Parsing.Variable
 
 module Domains : sig
     type t
     val empty : t
-    val singleton : Env.t -> t
+    val singleton : TVarSet.t -> Env.t -> t
     val cup : t -> t -> t
     val covers : t -> t -> bool
-    val enter_lambda : Env.t -> t -> t
+    val enter_lambda : Variable.t -> typ -> t -> t
     val pp : Format.formatter -> t -> unit
 end
 

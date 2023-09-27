@@ -6,9 +6,10 @@ open Parsing.Variable
 module Domains = struct
   type t = Env.t list
   [@@deriving show]
-  let add lst e =
+  let add lst mono e =
     let e = Env.filter (fun x _ -> Variable.is_lambda_var x) e in
     let tvars = Env.tvars e |> TVarSet.filter TVar.can_infer in
+    let tvars = TVarSet.diff tvars mono in
     let e = Env.apply_subst (generalize tvars) e in
     e::lst
   let more_specific dom env1 env2 =
@@ -38,19 +39,10 @@ module Domains = struct
       let b = type_for env2 in
       supertype_poly a b
     )
-  let enter_lambda env' t =
-    let env' = env' |> Env.filter (fun v _ -> Variable.is_lambda_var v) in
-    let dom' = Env.domain env' |> VarSet.of_list in
-    let more_specific = more_specific (VarSet.elements dom') in
-    t |> List.filter (fun env ->
-      let dom = Env.domain env |> VarSet.of_list in
-      if VarSet.diff dom' dom |> VarSet.is_empty
-      then more_specific env env'
-      else false
-    )
   let empty = []
+  let enter_lambda _ _ _ = empty
   let cup = (@)
-  let singleton e = add empty e
+  let singleton mono e = add empty mono e
 end
 
 module FullAnnot = struct

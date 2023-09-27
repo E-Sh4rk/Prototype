@@ -96,11 +96,8 @@ type 'a res =
 (* ============== CACHING =============== *)
 (* ====================================== *)
 
-(* TODO: cache for forms *)
-
-module PAnnot = struct
+module AtomPAnnot = struct
   type t = PartialAnnot.a_cached
-  (* let compare = compare *)
   let rec equals (a1,_) (a2,_) =
     let open PartialAnnot in
     match a1, a2 with
@@ -109,27 +106,43 @@ module PAnnot = struct
     | EmptyA, EmptyA | ThenA, ThenA | ElseA, ElseA -> true
     | LambdaA (s1, t1, _), LambdaA (s2, t2, _) ->
       equiv s1 s2 && equals_e t1 t2
-    | InterA _, InterA _ -> false (* TODO *)
+    | InterA (i1,i1',_), InterA (i2,i2',_) ->
+      List.length i1 = List.length i2 &&
+      List.length i1' = List.length i2' &&
+      List.for_all2 (fun (a,_,_) (b,_,_) -> equals a b) i1 i2 &&
+      List.for_all2 equals i1' i2'
     | _, _ -> false
   and equals_e (e1, _) (e2, _) =
     let open PartialAnnot in
+    let equals_union (ex1,d1,u1) (ex2,d2,u2) =
+      let aux (s1, t1) (s2, t2) =
+        equiv s1 s2 && equals_e t1 t2
+      in
+      List.length ex1 = List.length ex2 &&
+      List.length d1 = List.length d2 &&
+      List.length u1 = List.length u2 &&
+      List.for_all2 equiv u1 u2 &&
+      List.for_all2 aux ex1 ex2 &&
+      List.for_all2 aux d1 d2
+    in
     match e1, e2 with
     | Infer, Infer | Typ, Typ | Untyp, Untyp -> true
     | Skip t1, Skip t2 -> equals_e t1 t2
     | TrySkip t1, TrySkip t2 -> equals_e t1 t2
-    | Propagate (a1, _, u1, _), Propagate (a2, _, u2, _)
+    | Propagate _, _ -> false
     | Keep (a1, u1, _), Keep (a2, u2, _) ->
-      ignore (a1, a2, u1, u2) ;
-      (* equals a1 a2 TODO *)
-      false
+      equals a1 a2 && equals_union u1 u2
     | TryKeep (a1, t1, t1'), TryKeep (a2, t2, t2') ->
       equals a1 a2 && equals_e t1 t2 && equals_e t1' t2'
-    | Inter _, Inter _ -> false (* TODO *)
+    | Inter (i1,i1',_), Inter (i2,i2',_) ->
+      List.length i1 = List.length i2 &&
+      List.length i1' = List.length i2' &&
+      List.for_all2 (fun (a,_,_) (b,_,_) -> equals_e a b) i1 i2 &&
+      List.for_all2 equals_e i1' i2'
     | _, _ -> false
 end
-(* module AnnotMap = Map.Make(PAnnot) *)
 
-type icache = { context: Env.t ; pannot: PAnnot.t ; res: PartialAnnot.a_cached res }
+type icache = { context: Env.t ; pannot: AtomPAnnot.t ; res: AtomPAnnot.t res }
 
 let inter_cache = Hashtbl.create 100
 
@@ -143,7 +156,7 @@ let get_inter_cache x env pannot =
   let env = Env.filter (fun v _ -> VarSet.mem v fv) env in
   let caches = Hashtbl.find_all inter_cache x in
   caches |> List.find_opt
-    (fun ic -> PAnnot.equals pannot ic.pannot && Env.equiv env ic.context)
+    (fun ic -> AtomPAnnot.equals pannot ic.pannot && Env.equiv env ic.context)
   |> Option.map (fun ic -> ic.res)
 
 (* ====================================== *)

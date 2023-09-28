@@ -1,24 +1,21 @@
 let succ = <Int->Int>
 
-let more_than_declarative (x : Any -> Any) = 
-    let y = x in if x y is Int then (y x) + 1 else 42
+let aliasing (x : Any -> Any) = 
+  let y = x in if x y is Int then (y x) + 1 else 42
 
 let impossible_branch = fun x ->
-    if x is Int then x + 1 else (42 3)
+  if x is Int then x + 1 else (42 3)
 
 let impossible_branch2 = fun x -> fun y ->
   if y is Int then y+1 else x+1
 
 (* TODO: uncomment (Cduce issue) *)
 (*
-
  let switch1 f s a b =
     if s then f a else f b
 
 let switch2 s f a b =
     if s then f a else f b *)
-
-(* ======================================= *)
 
 let typeof x =
   if x is Unit|Nil then "Nil"
@@ -27,8 +24,6 @@ let typeof x =
   else if x is Int then "Number"
   else if x is Bool then "Boolean"
   else "Object"
-
-(* ======================================= *)
 
 let lnot = fun a ->
   if a is True then false else true
@@ -39,7 +34,7 @@ let lor = fun a -> fun b ->
 let land = fun a -> fun b ->
   if a is True then if b is False then false else true else false
 
-let test_1 = fun x -> fun y ->
+let tautology = fun x -> fun y ->
   if land (lor x (lnot x)) (lor (lnot y) y) then true else false
 
 (* ============== RECURSIVE ============= *)
@@ -51,7 +46,6 @@ let fixpoint = fun f ->
   let delta = fun x ->
      f ( fun  v -> ( x x v ))
    in delta delta
-
 
 let fact fact n =
   if n is 0 then 1 else (fact (n-1))*n
@@ -286,8 +280,6 @@ fun extra ->
      add (strlen input) (fst extra)
 else 0
 
-
-     
 (*******************************
  *                             *
  *  Examples for polymorphism  *
@@ -297,38 +289,21 @@ else 0
 type Falsy = False | "" | 0
 type Truthy = ~Falsy
 
-let succ = <Int -> Int>
-
 let and_js = fun x -> fun y ->
   if x is Falsy then x else y
-
-(* expected type:    
-      ('a & Falsy -> Any -> 'a & Falsy)
-     &(Truthy -> 'b -> 'b)
-*)
-
 
 let not_js = fun x -> if x is Falsy then 1 else 0
 
 let or_js = fun x -> fun y ->
-   if x is Truthy then x else y
+  if x is Truthy then x else y
 
 let identity_js = fun x -> or_js x x
 
 let and_pair = fun x -> fun y ->
   if x is Falsy then x else (y, succ x)
 
-(* expected type:
-      ('a & Falsy -> Any -> 'a & Falsy)
-     &(Truthy&(Int\0) -> 'b -> ('b,Int))
-*)
-
- let test = fun x ->
-   if fst x is Falsy then (fst x) + (snd x) else succ (fst x)
-
-(* expected type
-    (0,Int) | (Int\0,Any) -> Int
-*)
+let test = fun x ->
+  if fst x is Falsy then (fst x) + (snd x) else succ (fst x)
 
 (*
   version of fixpoint with simpler typing:
@@ -343,8 +318,6 @@ let and_pair = fun x -> fun y ->
 let concat_stub concat x y =
    if x is Nil then y else (fst x, (concat (snd x) y))
 
-let concat = fixpoint concat_stub
-
 let concat : ['a*] -> ['b*] -> ['a* ; 'b*] = fixpoint concat_stub
 
 let flatten_ocaml flatten (x:['_a*]) =
@@ -354,62 +327,36 @@ let flatten_ocaml flatten (x:['_a*]) =
 
 let flatten_ocaml : [['a*]*] -> ['a*] = fixpoint flatten_ocaml 
 
-let reverse_aux reverse l  =
+let reverse_stub reverse l  =
     if l is Nil then nil else concat (reverse (snd l)) [(fst l)]
     
-let reverse  = fixpoint reverse_aux
+let reverse = fixpoint reverse_stub
 
-let reverse_ann : [ ('a)*] -> [('a)*] = fixpoint reverse_aux
+let reverse_ann : [ ('a)*] -> [('a)*] = reverse
 
-let rev_tl_aux rev_tl l acc  =
+let rev_tl_stub rev_tl l acc  =
      if l is Nil then acc else rev_tl (snd l) (fst l, acc)
 
-(* two different typings for fixpoint:
-let fixpoint = <(('a -> 'b) -> ('a -> 'b)) -> ('a -> 'b) >
-let fixpoint = <(('a -> 'b) -> (('a -> 'b) & 'c)) -> (('a -> 'b) & 'c) >
-*)
-let fixpoint = <(('a -> 'b) -> (('a -> 'b) & 'c)) -> (('a -> 'b) & 'c) >
+let rev_tl l = (fixpoint rev_tl_stub) l nil
 
-let rev_tl l = (fixpoint rev_tl_aux) l nil
-
-let foldr_aux foldr f l acc =
+let foldr_stub foldr f l acc =
    if l is Nil then acc else f (fst l) (foldr f (snd l) acc)
 
-let foldr = fixpoint foldr_aux
+let foldr = fixpoint foldr_stub
 
-let foldr_ann : ('a -> 'b -> 'b ) -> [ 'a* ] -> 'b -> 'b = fixpoint foldr_aux
+let foldr_ann : ('a -> 'b -> 'b ) -> [ 'a* ] -> 'b -> 'b = foldr
 
-(* let foldr_ann2 : (('a -> 'b -> 'b ) -> [ 'a* ] -> 'b -> 'b) & (Any -> [] -> 'c -> 'c)  =
-    fixpoint foldr_aux  *)
+(* MANY VARIANTS OF FILTER *)
 
-(* FILTER FUNCTION *)
-
-let filter_aux_pure filter (f: ('a->True) & ('b -> ~True)) (l:[('a|'b)*]) =
+let filter_stub filter (f: ('a->True) & ('b -> ~True)) (l:[('a|'b)*]) =
    if l is Nil then nil else
    if l is [Any+] then
        if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
    else 42(3)
 
-let filter = fixpoint filter_aux_pure
+let filter = fixpoint filter_stub
 
-(* let filter_aux_pure_noannot filter f l =
-  if l is Nil then nil else
-  if l is [Any+] then
-      if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
-  else 42(3) *)
-
-(*
-The wrap loops:
-
-let filter = fixpoint filter_aux_pure_noannot
-*)
-
-(*
-   A new variation that does not require the
-   characteristic function to be defined on Any
- *)
-
-let new_filter1_aux
+let filter2_stub
   (filter : ((('a & 'b) -> Any) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ] )
   (f : (('a & 'b) -> Any) & (('a\'b) -> ~True))
   (l : [ ('a)*  ] )  =
@@ -418,18 +365,19 @@ let new_filter1_aux
   else
     if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
 
-let new_filter :  ((('a & 'b) -> Any) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ] =
-      fixpoint new_filter1_aux
+let filter2 :  ((('a & 'b) -> Any) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ] =
+      fixpoint filter2_stub
 
 let x = <Int -> Bool>
 
-let partial = new_filter x
+let filter2_partial_app = filter2 x
 
-(* here a better version with head and tail: it yields exactly the
-   same type as the version above but 10% slower
- *)
+(*
+    Here a better version with head and tail:
+    it yields exactly the same type as the version above
+*)
 
-let new_filter_aux
+let filter3_stub
   (filter : ((('a & 'b) -> True) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ] )
   (f : (('a & 'b) -> True) & (('a\'b) -> ~True))
   (l : [ ('a)*  ] )  =
@@ -438,14 +386,10 @@ let new_filter_aux
        let t = snd(l) in
        if f h is True then (h ,filter f t) else filter f t
 
-let new_filter :  ((('a & 'b) -> True) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ] =
-      fixpoint new_filter_aux
+let filter3 :  ((('a & 'b) -> True) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ] =
+      fixpoint filter3_stub
 
-(* Notice that with the following version the result of the application is much less precise
-   despite the cross typing of both works
- *)
-
-let new_filter_2_aux
+let filter4_stub
   (filter : ((('a) -> True) & (('b) -> ~True)) -> [ ('a|'b)* ] -> [ ('a)* ] )
   (f : (('a) -> True) & (('b) -> ~True))
   (l : [ ('a|'b)* ] )  =
@@ -454,68 +398,50 @@ let new_filter_2_aux
        let t = snd(l) in
        if f h is True then (h ,filter f t) else filter f t
 
-let new_filter_2 : ((('a) -> True) & (('b) -> ~True)) -> [ ('a|'b)* ] -> [ ('a)* ]  = fixpoint new_filter_2_aux
-
+let filter4 : ((('a) -> True) & (('b) -> ~True)) -> [ ('a|'b)* ] -> [ ('a)* ] =
+      fixpoint filter4_stub
 
 let xi = <(Int -> True) & (Bool -> False)>
 
-let filter_test = new_filter xi [1;3;true;42]
+let filter3_test = filter3 xi [1;3;true;42]
 
-let filter_2_test = new_filter_2 xi (1, (3, (true,(42,nil))))
+let filter4_test = filter4 xi (1, (3, (true,(42,nil))))
 
 (* cross typing on the two versions *)
 
-let new_filter_2_as_1 :  ((('a & 'b) -> True) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ] =
-      fixpoint new_filter_2_aux
+let filter4_as_3 : ((('a & 'b) -> True) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ] =
+      fixpoint filter4_stub
 
-let new_filter_1_as_2 : ((('a) -> True) & (('b) -> ~True)) -> [ ('a|'b)* ] -> [ ('a)* ]  =
-      fixpoint new_filter_aux
+let filter3_as_4 : ((('a) -> True) & (('b) -> ~True)) -> [ ('a|'b)* ] -> [ ('a)* ]  =
+      fixpoint filter3_stub
 
-let filter_aux_classic
-(filter : (('a) -> Bool) -> [ ('a)* ] -> [ ('a)* ] ) ( f : 'a -> Bool) (l : [ ('a)* ] )  =
+let filter_classic_stub
+  (filter : (('a) -> Bool) -> [ ('a)* ] -> [ ('a)* ] ) ( f : 'a -> Bool) (l : [ ('a)* ] ) =
   (* filter f l = *)
   if l is Nil then nil
   else
     if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
 
+let filter_classic = fixpoint filter_classic_stub
 
-let filter_classic = fixpoint filter_aux_classic
+(* A version where the predicate function must cover Any *)
 
-(* Tail recursive version *)
-
-(* The following make the type-checker diverge *)
- (* let filter : ((('a & 'b) -> True) & (('a\'b) -> ~True)) -> [ 'a* ] -> [ ('a&'b)* ]  =
-   fun f -> fun l ->
-   let filter_tr_aux  
-     (filter : (((('a & 'b) -> True) & (('a\'b) -> ~True)), [ 'a* ] , ['a*] ) -> [ ('a&'b)* ] )
-     (args : (((('a & 'b) -> True) & (('a\'b) -> ~True)), [ ('a)* ], [ ('a)* ]) )  =
-      let f = fst args in
-      let l = fst (snd args) in
-      let acc = snd (snd args) in
-      if l is Nil then acc else
-         let h = fst(l) in
-         let t = snd(l) in
-         if f h is True then filter (f, t , (h,acc)) else filter (f , t , acc)
-   in (fixpoint filter_tr_aux) (f , l , []) *)
-
-(* This type checks but it requires the domain of the function to be Any *)
-
-let filter_aux (filter : (('a -> True) & ((~('a)) -> ~True)) -> [ Any* ] -> [ ('a)* ] ) ( f : (('a -> True) & ((~('a)) -> ~True))) (l : [ Any* ] )  =
+let filter_total_stub
+  (filter : (('a -> True) & ((~('a)) -> ~True)) -> [ Any* ] -> [ ('a)* ] )
+  ( f : (('a -> True) & ((~('a)) -> ~True))) (l : [ Any* ] )  =
    if l is Nil then nil else
    if f(fst(l)) is True then (fst(l),filter f (snd(l))) else filter f (snd(l))
 
-
-let filter : (('a -> True) & ((~'a) -> ~True)) -> [Any*] -> [ ('a)* ] = fixpoint filter_aux
-
+let filter_total : (('a -> True) & ((~'a) -> ~True)) -> [Any*] -> [ ('a)* ] = fixpoint filter_total_stub
 
 (* DEEP FLATTEN FUNCTION *)
 
-let flatten_pure flatten x =
+let flatten_noannot_stub flatten x =
   if x is Nil then nil else
   if x is [Any*] then concat (flatten (fst x)) (flatten (snd x))
   else (x,nil)
 
-(* let flatten_pure = fixpoint flatten_pure *)
+(* let flatten_noannot = fixpoint flatten_noannot_stub *)
 
 type Tree 'a = ('a \ [Any*]) | [(Tree 'a)*]
 
@@ -524,13 +450,13 @@ let flatten_stub flatten (x : Tree 'a) =
   if x is [Any*] then concat (flatten (fst x)) (flatten (snd x))
   else (x,nil)
 
-(* let flatten = < (Tree 'a -> ['a*]) -> (Tree 'a -> ['a*]) > *)
-
 let flatten = fixpoint flatten_stub
 
-let flatten_ann : (Tree 'a -> ['a*]) = fixpoint flatten_stub 
+let flatten_ann : (Tree 'a -> ['a*]) = flatten 
 
 let test_flatten = flatten ((1,(true,nil)),(((42,(false,nil)),0),"ok"))
+
+(* MISCELLANEOUS *)
 
 type TRUE 'a 'b  =  'a -> 'b -> 'a
 type FALSE 'a 'b  =  'a -> 'b -> 'b
@@ -538,7 +464,6 @@ type FALSE 'a 'b  =  'a -> 'b -> 'b
 let ifthenelse (b : TRUE 'a 'b; FALSE 'a 'b )  x y = b x y
 
 let check :    (TRUE 'c 'd -> 'c -> 'd -> 'c) & (FALSE 'c 'd -> 'c -> 'd -> 'd) = ifthenelse
-
 
 (* Parametric types examples *)
 
@@ -560,6 +485,11 @@ let test3_patterns x y =
   let (y,x) = pack x y in
   pack x y
 
+let test3_patterns_ann x y =
+  let pack (x:'a;'b) (y:'a;'b) = (x,y) in
+  let (y,x) = pack x y in
+  pack x y
+
 let typeof_patterns x =
   match x with
   | :Unit | :Nil -> "Nil"
@@ -576,33 +506,33 @@ let land_patterns a b =
   | :Any -> false
   end
 
-let fact_pat fact n =
+let fact_pat_stub fact n =
   match n with
   | :0 -> 1
   | n -> (fact (n-1))*n
   end
 
-let fact = fixpoint fact_pat
+let fact_pat = fixpoint fact_pat_stub
 
-let length_pat length lst =
+let length_pat_stub length lst =
   match lst with
   | :[] -> 0
   | (_, tl & :List) -> succ (length tl)
   end
 
-let length = fixpoint length_pat
+let length_pat = fixpoint length_pat_stub
 
-let map_pat map f lst =
+let map_pat_stub map f lst =
   match lst with
   | :[] -> []
   | (hd, tl) & :List -> (f hd, map f tl)
   end
 
-let map = fixpoint map_pat
+let map_pat = fixpoint map_pat_stub
 
-(* Recursive functions *)
+(* Recursive functions and partial user type annotations *)
 
-let rec map f lst =
+let rec map_noannot f lst =
   match lst with
   | :[] -> []
   | (e,lst) & :List -> ((f e), map f lst)
@@ -614,29 +544,12 @@ let rec map f (lst:['a*]) =
   | (e,lst) & :List -> ((f e), map f lst)
   end
 
-let rec filter f l =
+let rec filter_noannot f l =
   if l is Nil then nil
   else
     if f(fst(l)) is True
     then (fst(l),filter f (snd(l)))
     else filter f (snd(l))
-
-let test_patterns_annots x y =
-  let pack (x:'a;'b) (y:'a;'b) = (x,y) in
-  let (y,x) = pack x y in
-  pack x y
-
-let fact_annots (fact: '_a -> '_b) (n: '_a) =
-  if n is 0 then 1 else (fact (n-1))*n
-
-let fact_annots = fixpoint fact_annots
-
-(* let filter_stub_noannot filter f l =
-  if l is Nil then nil
-  else
-    if f(fst(l)) is True
-    then (fst(l),filter f (snd(l)))
-    else filter f (snd(l)) *)
 
 let rec filter (f: ('a->Any) & ('b -> ~True)) (l:[('a|'b)*]) =
   match l with
@@ -647,7 +560,7 @@ let rec filter (f: ('a->Any) & ('b -> ~True)) (l:[('a|'b)*]) =
     else filter f l
   end
     
-let rec flatten x =
+let rec flatten_noannot x =
   if x is Nil then nil else
   if x is [Any*] then concat (flatten (fst x)) (flatten (snd x))
   else (x,nil)

@@ -96,22 +96,28 @@ type 'a res =
 | NeedVar of Variable.t * 'a * 'a
 (* [@@deriving show] *)
 
+let caching_status = Aux.caching_status
+let set_caching_status = Aux.set_caching_status
+
 type icache = { context: Env.t ; pannot: PartialAnnot.a ; res: PartialAnnot.a res }
 
 let inter_cache = Hashtbl.create 100
 
 let add_to_inter_cache x env pannot res =
-  let fv = fv_def x in
-  let env = Env.filter (fun v _ -> VarSet.mem v fv) env in
-  Hashtbl.add inter_cache x { context=env; pannot=pannot; res=res }
+  if Aux.caching_status () then
+    let fv = fv_def x in
+    let env = Env.filter (fun v _ -> VarSet.mem v fv) env in
+    Hashtbl.add inter_cache x { context=env; pannot=pannot; res=res }
 
 let get_inter_cache x env pannot =
-  let fv = fv_def x in
-  let env = Env.filter (fun v _ -> VarSet.mem v fv) env in
-  let caches = Hashtbl.find_all inter_cache x in
-  caches |> List.find_opt
-    (fun ic -> PartialAnnot.equals_a pannot ic.pannot && Env.equiv env ic.context)
-  |> Option.map (fun ic -> ic.res)
+  if Aux.caching_status () then
+    let fv = fv_def x in
+    let env = Env.filter (fun v _ -> VarSet.mem v fv) env in
+    let caches = Hashtbl.find_all inter_cache x in
+    caches |> List.find_opt
+      (fun ic -> PartialAnnot.equals_a pannot ic.pannot && Env.equiv env ic.context)
+    |> Option.map (fun ic -> ic.res)
+  else None
 
 (* ====================================== *)
 (* ============ MAIN SYSTEM ============= *)

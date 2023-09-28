@@ -30,22 +30,29 @@ let init_fv_htbl =
 
 let fv_def v = Hashtbl.find fv_def_htbl v
 
+let caching = ref true
+let caching_status () = !caching
+let set_caching_status b = caching := b
+
 type icache = { context: Env.t ; pannot: PartialAnnot.a ; res: FullAnnot.a_cached }
 
 let inter_cache = Hashtbl.create 100
 
 let add_to_inter_cache x env pannot res =
-  let fv = fv_def x in
-  let env = Env.filter (fun v _ -> VarSet.mem v fv) env in
-  Hashtbl.add inter_cache x { context=env; pannot=pannot; res=res }
+  if !caching then
+    let fv = fv_def x in
+    let env = Env.filter (fun v _ -> VarSet.mem v fv) env in
+    Hashtbl.add inter_cache x { context=env; pannot=pannot; res=res }
 
 let get_inter_cache x env pannot =
-  let fv = fv_def x in
-  let env = Env.filter (fun v _ -> VarSet.mem v fv) env in
-  let caches = Hashtbl.find_all inter_cache x in
-  caches |> List.find_opt
-    (fun ic -> PartialAnnot.equals_a pannot ic.pannot && Env.equiv env ic.context)
-  |> Option.map (fun ic -> ic.res)
+  if !caching then
+    let fv = fv_def x in
+    let env = Env.filter (fun v _ -> VarSet.mem v fv) env in
+    let caches = Hashtbl.find_all inter_cache x in
+    caches |> List.find_opt
+      (fun ic -> PartialAnnot.equals_a pannot ic.pannot && Env.equiv env ic.context)
+    |> Option.map (fun ic -> ic.res)
+  else None
 
 (* ====================================== *)
 (* ============= POLY INFER ============= *)

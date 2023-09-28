@@ -97,14 +97,14 @@ type 'a res =
 (* ====================================== *)
 
 module AtomPAnnot = struct
-  type t = PartialAnnot.a_cached
-  let rec equals (a1,_) (a2,_) =
+  type t = PartialAnnot.a
+  let rec equals a1 a2 =
     let open PartialAnnot in
     match a1, a2 with
     | InferA, InferA | TypA, TypA | UntypA, UntypA
     | ThenVarA, ThenVarA | ElseVarA, ElseVarA
     | EmptyA, EmptyA | ThenA, ThenA | ElseA, ElseA -> true
-    | LambdaA (s1, t1, _), LambdaA (s2, t2, _) ->
+    | LambdaA (s1, t1), LambdaA (s2, t2) ->
       equiv s1 s2 && equals_e t1 t2
     | InterA (i1,i1',_), InterA (i2,i2',_) ->
       List.length i1 = List.length i2 &&
@@ -112,7 +112,7 @@ module AtomPAnnot = struct
       List.for_all2 (fun (a,_,_) (b,_,_) -> equals a b) i1 i2 &&
       List.for_all2 equals i1' i2'
     | _, _ -> false
-  and equals_e (e1, _) (e2, _) =
+  and equals_e e1 e2 =
     let open PartialAnnot in
     let equals_union (ex1,d1,u1) (ex2,d2,u2) =
       let aux (s1, t1) (s2, t2) =
@@ -130,7 +130,7 @@ module AtomPAnnot = struct
     | Skip t1, Skip t2 -> equals_e t1 t2
     | TrySkip t1, TrySkip t2 -> equals_e t1 t2
     | Propagate _, _ -> false
-    | Keep (a1, u1, _), Keep (a2, u2, _) ->
+    | Keep (a1, u1), Keep (a2, u2) ->
       equals a1 a2 && equals_union u1 u2
     | TryKeep (a1, t1, t1'), TryKeep (a2, t2, t2') ->
       equals a1 a2 && equals_e t1 t2 && equals_e t1' t2'
@@ -376,7 +376,7 @@ let should_iterate env apply_subst_branch mk_inter res =
     else None
   | _ -> None
 
-let rec infer_mono_a vardef tenv expl env (pannot_a,c_a) a =
+let rec infer_mono_a vardef tenv expl env pannot_a a =
   let memvar v = Env.mem v env in
   let vartype v = Env.find v env in
   let needvar v a1 a2 = NeedVar (v, a1, a2) in
@@ -391,7 +391,7 @@ let rec infer_mono_a vardef tenv expl env (pannot_a,c_a) a =
         expl env
         (fun expl pannot_a -> infer_mono_a_iterated vardef tenv expl env pannot_a a)
         (fun pannot_a ->
-          let (_, annot_a) = infer_poly_a vardef tenv env pannot_a a in
+          let annot_a = infer_poly_a vardef tenv env pannot_a a in
           typeof_a vardef tenv env annot_a a)
         i
       |> map_res (fun x -> InterA x)
@@ -506,27 +506,22 @@ let rec infer_mono_a vardef tenv expl env (pannot_a,c_a) a =
       if memvar v2 then Ok ElseA else needvar v2 ElseA UntypA
     | Lambda (Unnanoted, _, _), InferA ->
       let alpha = TVar.mk_mono (Some (Variable.show vardef)) |> TVar.typ in
-      let pannot_a = LambdaA (alpha, (Infer, init_cache), init_def_cache) in
+      let pannot_a = LambdaA (alpha, Infer) in
       aux pannot_a a
     | Lambda (ADomain ts, _, _), InferA ->
       let branches = ts |> List.map (fun t ->
-        let pannot_a = (LambdaA (t, (Infer, init_cache), init_def_cache), c_a) in
-        (pannot_a, expl, false)
+        let pannot_a = LambdaA (t, Infer) in
+        (pannot_a, Domains.empty, false)
       ) in
       let pannot_a = InterA (branches, [], (Domains.empty, false, true)) in
       aux pannot_a a
-    | Lambda (_, v, e), LambdaA (s, pannot, dc) ->
+    | Lambda (_, v, e), LambdaA (s, pannot) ->
       log ~level:2 "Entering lambda for %a with domain %a.@." Variable.pp v pp_typ s ;
       if is_empty s then (log ~level:3 "Lambda with empty domain generated a fail.@." ; Fail)
       else
-        let pannot =
-          if def_typ_unchanged dc s
-          then pannot else invalidate_cache v e pannot
-        in
-        let dc = def_cache s in
         let env = Env.add v s env in
         infer_mono_iterated tenv (Domains.enter_lambda v s expl) env pannot e
-        |> map_res (fun x -> LambdaA (s, x, dc))
+        |> map_res (fun x -> LambdaA (s, x))
         |> (fun res -> match res with
           | Subst ((env',b), ss, pannot1, pannot2) ->
             Subst ((Env.add v s env',b), ss, pannot1, pannot2)
@@ -534,9 +529,9 @@ let rec infer_mono_a vardef tenv expl env (pannot_a,c_a) a =
         )
     | _, _ -> assert false
   in
-  map_res (fun a -> (a,c_a)) (aux pannot_a a)
+  aux pannot_a a
 
-and infer_mono tenv expl env (pannot, c) e =
+and infer_mono tenv expl env pannot e =
   let memvar v = Env.mem v env in
   let needvar v a1 a2 = NeedVar (v, a1, a2) in
   let open PartialAnnot in
@@ -551,16 +546,16 @@ and infer_mono tenv expl env (pannot, c) e =
         expl env
         (fun expl pannot -> infer_mono_iterated tenv expl env pannot e)
         (fun pannot ->
-          let (_, annot) = infer_poly tenv env pannot e in
+          let annot = infer_poly tenv env pannot e in
           typeof tenv env annot e)
         i
       |> map_res (fun x -> Inter x)
-    | Bind _, Infer -> aux (TrySkip (Infer, init_cache)) e
+    | Bind _, Infer -> aux (TrySkip Infer) e
     | Bind (v, _, e) as ee, TrySkip pannot ->
       begin match infer_mono_iterated tenv expl env pannot e with
       | NeedVar (v', pannot1, pannot2) when Variable.equals v v' ->
         log ~level:0 "Var %a needed.@." Variable.pp v ;
-        aux (TryKeep ((InferA, init_cache), pannot1, pannot2)) ee
+        aux (TryKeep (InferA, pannot1, pannot2)) ee
       | Ok pannot -> Ok (Skip pannot)
       | res -> map_res (fun x -> TrySkip x) res
       end
@@ -574,42 +569,33 @@ and infer_mono tenv expl env (pannot, c) e =
       log ~level:1 "Trying to type var %a.@." Variable.pp v ;
       begin match infer_mono_a_iterated v tenv expl env pannot_a a with
       | Ok pannot_a ->
-        let pannot = Keep (pannot_a, ([(any, pannot1)], [], []), init_def_cache) in
+        let pannot = Keep (pannot_a, ([(any, pannot1)], [], [])) in
         aux pannot e
       | Fail -> aux (Skip pannot2) e
       | res -> map_res (fun x -> TryKeep (x, pannot1, pannot2)) res
       end
-    | Bind (v,_,_), Propagate (pannot_a, gammas, union, dc) ->
+    | Bind (v,_,_), Propagate (pannot_a, gammas, union) ->
       let propagate = gammas |>
         Utils.find_among_others (fun (env',_) _ -> is_compatible env env') in
       begin match propagate with
       | Some ((env',i'),gammas) ->
         log ~level:1 "Var %a is ok but its DNF needs a split.@." Variable.pp v ;
         let union' = remove_split i' union in
-        let pannot1 = Keep (pannot_a, union', dc) in
-        let pannot2 = Propagate (pannot_a, gammas, union, dc) in
+        let pannot1 = Keep (pannot_a, union') in
+        let pannot2 = Propagate (pannot_a, gammas, union) in
         let env' = Env.filter (fun v t -> subtype_poly (Env.find v env) t |> not) env' in
         Split (env', pannot1, pannot2)
-      | None -> aux (Keep (pannot_a, union, dc)) e
+      | None -> aux (Keep (pannot_a, union)) e
       end
-    | Bind (v, a, e), Keep (pannot_a, splits, dc) ->
+    | Bind (v, a, e), Keep (pannot_a, splits) ->
       let rec aux_splits splits =
         match splits with
         | ([],[],_) -> assert false
-        | ([],d,u) -> Ok (Keep (pannot_a, ([],d,u), dc))
+        | ([],d,u) -> Ok (Keep (pannot_a, ([],d,u)))
         | ((s,pannot)::ex,d,u) ->
-          let (pannot_a, annot_a) = infer_poly_a v tenv env pannot_a a in
+          let annot_a = infer_poly_a v tenv env pannot_a a in
           let t = typeof_a_nofail v tenv env annot_a a in
-          let (pannot, (ex, d, u)) =
-            if def_typ_unchanged dc t
-            then (pannot, (ex, d, u))
-            else
-              let pannot = invalidate_cache v e pannot in
-              let union = invalidate_cache_union v e (ex,d,u) in
-              (pannot, union)
-          in  
-          let dc = def_cache t in
-          let keep = map_res (fun x -> Keep (pannot_a, x, dc)) in
+          let keep = map_res (fun x -> Keep (pannot_a, x)) in
           log ~level:1 "Var %a typed with type %a.@." Variable.pp v pp_typ t ;  
           let t = cap_o t s in
           log ~level:1 "Exploring split %a for %a.@." pp_typ s Variable.pp v ;
@@ -625,11 +611,9 @@ and infer_mono tenv expl env (pannot, c) e =
             let gammas2 = refine_a tenv env a (neg t2)
               |> List.map (fun g -> (g, 1))
             in
-            let pannot1' = invalidate_cache v e pannot1 in
-            let pannot2' = invalidate_cache v e pannot2 in
             let res1 = Propagate (pannot_a, gammas1@gammas2,
-              ((t1,pannot1')::(t2,pannot2')::ex,d,u), dc) in
-            let res2 = Keep (pannot_a, ((s,pannot2)::ex,d,u), dc) in
+              ((t1,pannot1)::(t2,pannot2)::ex,d,u)) in
+            let res2 = Keep (pannot_a, ((s,pannot2)::ex,d,u)) in
             Split (Env.rm v env', res1, res2)
           | res -> res |> map_res (fun x -> ((s, x)::ex,d,u)) |> keep
           end
@@ -637,7 +621,7 @@ and infer_mono tenv expl env (pannot, c) e =
       aux_splits splits
     | _, _ -> assert false
   in
-  map_res (fun t -> (t,c)) (aux pannot e)
+  aux pannot e
 
 and infer_mono_a_iterated vardef tenv expl env pannot_a a =
   let open PartialAnnot in
@@ -648,7 +632,7 @@ and infer_mono_a_iterated vardef tenv expl env pannot_a a =
     let res = infer_mono_a vardef tenv expl env pannot_a a in
     let si =
       should_iterate env apply_subst_a
-        (fun a b c -> (InterA (a,b,c), init_cache)) res
+        (fun a b c -> InterA (a,b,c)) res
     in
     let res = match si with
     | None -> res
@@ -663,7 +647,7 @@ and infer_mono_iterated tenv expl env pannot e =
   let res = infer_mono tenv expl env pannot e in
   let si =
     should_iterate env apply_subst
-      (fun a b c -> (Inter (a,b,c), init_cache)) res
+      (fun a b c -> Inter (a,b,c)) res
   in
   match si with
   | None -> res
@@ -676,10 +660,10 @@ and infer_mono_iterated tenv expl env pannot e =
 let infer tenv env e =
   let open PartialAnnot in
   init_fv_htbl e ;
-  let initial_pannot = (Infer, init_cache) in
+  let initial_pannot = Infer in
   match infer_mono_iterated tenv Domains.empty env initial_pannot e with
   | Fail -> raise (Untypeable ([], "Annotations inference failed."))
-  | Ok annot -> infer_poly tenv env annot e |> snd
+  | Ok annot -> infer_poly tenv env annot e
   | NeedVar (v, _, _) ->
     Format.printf "NeedVar %a@." Variable.pp v ;
     assert false

@@ -7,17 +7,12 @@ open Annotations
 
 module Make () : sig
     val init_fv_htbl : e -> unit
-    val invalidate_cache : Variable.t -> e ->
-        PartialAnnot.t_cached -> PartialAnnot.t_cached
-    val invalidate_cache_union : Variable.t -> e ->
-        PartialAnnot.union -> PartialAnnot.union
     val fv_def : Variable.t -> VarSet.t
 
     val replace_vars : typ -> TVarSet.t -> TVar.t -> Subst.t
     val approximate_app : infer:bool -> typ -> typ -> TVar.t -> Subst.t list
 
-    val infer_poly_a : Variable.t -> type_env -> Env.t -> PartialAnnot.a_cached ->
-        a -> PartialAnnot.a_cached * FullAnnot.a_cached
-    val infer_poly : type_env -> Env.t -> PartialAnnot.t_cached ->
-        e -> PartialAnnot.t_cached * FullAnnot.t_cached
+    val infer_poly_a : Variable.t -> type_env -> Env.t -> PartialAnnot.a ->
+        a -> FullAnnot.a_cached
+    val infer_poly : type_env -> Env.t -> PartialAnnot.t -> e -> FullAnnot.t_cached
 end

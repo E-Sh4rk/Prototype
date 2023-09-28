@@ -82,13 +82,9 @@ module FullAnnot = struct
 end
 
 module PartialAnnot = struct
-  type def_cache = { prev_typ: typ option }
-  let pp_def_cache fmt _ = Format.fprintf fmt "cache"
-  type 'a cache = { env_changed:bool ; annot_changed:bool ; prev_fa:'a option }
-  let pp_cache _ fmt _ = Format.fprintf fmt "cache"
-  type union_expl = (typ * t_cached) list
+  type union_expl = (typ * t) list
   [@@deriving show]
-  and union_done = (typ * t_cached) list
+  and union_done = (typ * t) list
   [@@deriving show]
   and union_unr = typ list
   [@@deriving show]
@@ -109,27 +105,18 @@ module PartialAnnot = struct
       | InferA | TypA | UntypA
       | ThenVarA | ElseVarA
       | EmptyA | ThenA | ElseA (* NOTE: not in the paper, small optimisation *)
-      | LambdaA of typ * t_cached * def_cache
-      | InterA of a_cached inter
+      | LambdaA of typ * t
+      | InterA of a inter
   [@@deriving show]
   and t =
       | Infer | Typ | Untyp
-      | Keep of a_cached * union * def_cache
-      | Skip of t_cached
-      | TrySkip of t_cached
-      | TryKeep of a_cached * t_cached * t_cached
-      | Propagate of a_cached * (Env.t * int) list * union * def_cache
-      | Inter of t_cached inter
+      | Keep of a * union
+      | Skip of t
+      | TrySkip of t
+      | TryKeep of a * t * t
+      | Propagate of a * (Env.t * int) list * union
+      | Inter of t inter
   [@@deriving show]
-  and a_cached = a * FullAnnot.a_cached cache
-  [@@deriving show]
-  and t_cached = t * FullAnnot.t_cached cache
-  [@@deriving show]
-
-  let update_cache changed c =
-    if changed
-    then { c with annot_changed = true }
-    else c
 
   let rec apply_subst_aux s =
     if Subst.is_identity s then ((fun t -> (t,false)), (fun a -> (a,false)))
@@ -153,7 +140,7 @@ module PartialAnnot = struct
         | UntypA -> UntypA
         | ThenVarA -> ThenVarA | ElseVarA -> ElseVarA
         | EmptyA -> EmptyA | ThenA -> ThenA | ElseA -> ElseA
-        | LambdaA (ty, t, dc) -> LambdaA (apply_typ ty, apply_subst t, dc)
+        | LambdaA (ty, t) -> LambdaA (apply_typ ty, apply_subst t)
         | InterA (a, b, flags) -> InterA (
           List.map (fun (a,d,b) -> (apply_subst_a a,d,b)) a,
           List.map apply_subst_a b,
@@ -167,14 +154,14 @@ module PartialAnnot = struct
         | Infer -> Infer
         | Typ -> Typ
         | Untyp -> Untyp
-        | Keep (a, b, dc) -> Keep (apply_subst_a a, apply_subst_union b, dc)
+        | Keep (a, b) -> Keep (apply_subst_a a, apply_subst_union b)
         | Skip t -> Skip (apply_subst t)
         | TrySkip t -> TrySkip (apply_subst t)
         | TryKeep (a, t1, t2) ->
           TryKeep (apply_subst_a a, apply_subst t1, apply_subst t2)
-        | Propagate (a, envs, t, dc) ->
+        | Propagate (a, envs, t) ->
           let aux2 (env, i) = (Env.apply_subst s env, i) in
-          Propagate (apply_subst_a a, List.map aux2 envs, apply_subst_union t, dc)
+          Propagate (apply_subst_a a, List.map aux2 envs, apply_subst_union t)
         | Inter (a, b, flags) -> Inter (
           List.map (fun (a,d,b) -> (apply_subst a,d,b)) a,
           List.map apply_subst b,
@@ -183,30 +170,18 @@ module PartialAnnot = struct
       ((fun t -> let res = apply t in (res, !change)),
         (fun a -> let res = apply_a a in (res, !change)))    
 
-  and apply_subst_a s (a,c) =
+  and apply_subst_a s a =
     let (_, apply_subst_a) = apply_subst_aux s in
     let (a,b) = apply_subst_a a in
-    let c = update_cache b c in
-    ((a,c),b)
+    (* let c = update_cache b c in *)
+    (a,b)
 
-  and apply_subst s (t,c) =
+  and apply_subst s t =
     let (apply_subst, _) = apply_subst_aux s in
     let (t,b) = apply_subst t in
-    let c = update_cache b c in
-    ((t,c),b)
+    (* let c = update_cache b c in *)
+    (t,b)
 
   let apply_subst_a s a = apply_subst_a s a |> fst
   let apply_subst s t = apply_subst s t |> fst
-
-  let init_cache =
-    { env_changed = false ; annot_changed = false ; prev_fa = None }
-  let cache a =
-    { env_changed = false ; annot_changed = false ; prev_fa = Some a }
-  let init_def_cache = { prev_typ = None }
-  let def_cache t = { prev_typ = Some t }
-
-  let def_typ_unchanged dc t =
-    match dc.prev_typ with
-    | None -> false
-    | Some t' -> equiv t t'  
 end

@@ -47,10 +47,8 @@ module FullAnnot : sig
 end
 
 module PartialAnnot : sig
-    type def_cache = { prev_typ: typ option }
-    type 'a cache = { env_changed:bool ; annot_changed:bool ; prev_fa:'a option }
-    type union_expl = (typ * t_cached) list
-    and union_done = (typ * t_cached) list
+    type union_expl = (typ * t) list
+    and union_done = (typ * t) list
     and union_unr = typ list
     and union = union_expl * union_done * union_unr
     and 'a pending_branch =
@@ -66,30 +64,20 @@ module PartialAnnot : sig
         | InferA | TypA | UntypA
         | ThenVarA | ElseVarA
         | EmptyA | ThenA | ElseA (* NOTE: not in the paper, small optimisation *)
-        | LambdaA of typ * t_cached * def_cache
-        | InterA of a_cached inter
+        | LambdaA of typ * t
+        | InterA of a inter
     and t =
         | Infer | Typ | Untyp
-        | Keep of a_cached * union * def_cache
-        | Skip of t_cached
-        | TrySkip of t_cached
-        | TryKeep of a_cached * t_cached * t_cached
-        | Propagate of a_cached * (Env.t * int) list * union * def_cache
-        | Inter of t_cached inter
-    and a_cached = a * FullAnnot.a_cached cache
-    and t_cached = t * FullAnnot.t_cached cache
+        | Keep of a * union
+        | Skip of t
+        | TrySkip of t
+        | TryKeep of a * t * t
+        | Propagate of a * (Env.t * int) list * union
+        | Inter of t inter
 
     val pp_a : Format.formatter -> a -> unit
     val pp : Format.formatter -> t -> unit
-    val pp_a_cached : Format.formatter -> a_cached -> unit
-    val pp_t_cached : Format.formatter -> t_cached -> unit
 
-    val apply_subst_a : Subst.t -> a_cached -> a_cached
-    val apply_subst : Subst.t -> t_cached -> t_cached
-
-    val init_cache : 'a cache
-    val cache : 'a -> 'a cache
-    val init_def_cache : def_cache
-    val def_cache : typ -> def_cache
-    val def_typ_unchanged : def_cache -> typ -> bool
+    val apply_subst_a : Subst.t -> a -> a
+    val apply_subst : Subst.t -> t -> t
 end

@@ -59,11 +59,17 @@ module Caching = struct
       List.for_all2 aux ex1 ex2 &&
       List.for_all2 aux d1 d2
     in
+    let equals_prop (env1,i1) (env2,i2) =
+      i1=i2 && Env.equiv env1 env2
+    in
     match e1, e2 with
     | Infer, Infer | Typ, Typ | Untyp, Untyp -> true
     | Skip t1, Skip t2 -> equals_e t1 t2
     | TrySkip t1, TrySkip t2 -> equals_e t1 t2
-    | Propagate _, _ -> false
+    | Propagate (a1, envs1, u1), Propagate (a2, envs2, u2) ->
+      List.length envs1 = List.length envs2 &&
+      List.for_all2 equals_prop envs1 envs2 &&
+      equals a1 a2 && equals_union u1 u2
     | Keep (a1, u1), Keep (a2, u2) ->
       equals a1 a2 && equals_union u1 u2
     | TryKeep (a1, t1, t1'), TryKeep (a2, t2, t2') ->

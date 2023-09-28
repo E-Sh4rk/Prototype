@@ -44,6 +44,7 @@ module FullAnnot : sig
     val pp_t_cached : Format.formatter -> t_cached -> unit
 
     val init_cache : unit -> cache
+    val clear_cache : t_cached -> t_cached
 end
 
 module PartialAnnot : sig

@@ -631,6 +631,7 @@ let infer tenv env e =
 
 let typeof_simple tenv env e =
   let annot = infer tenv env e in
+  (* let annot = FullAnnot.clear_cache annot in *)
   typeof_nofail tenv env annot e
 
 end

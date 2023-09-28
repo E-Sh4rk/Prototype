@@ -79,6 +79,26 @@ module FullAnnot = struct
   [@@deriving show]
 
   let init_cache () = { typ = None }
+
+  let rec clear_cache (t, _) =
+    let t = match t with
+    | Keep (a, u, i) ->
+      let aux (typ, t) = (typ, clear_cache t) in
+      Keep (clear_cache_a a, List.map aux u, i)
+    | Skip t -> Skip (clear_cache t)
+    | BVar r -> BVar r
+    | Inter lst -> Inter (List.map clear_cache lst)
+    in
+    (t, init_cache ())
+
+  and clear_cache_a (a, _) =
+  let a = match a with
+  | ConstA | AliasA | LetA | AbstractA |PairA _ | AppA _ | ProjA _
+  | EmptyA _ | ThenA _ | ElseA _ | RecordUpdateA _ | ConstrA _ -> a
+  | InterA lst -> InterA (List.map clear_cache_a lst)
+  | LambdaA (typ, t) -> LambdaA (typ, clear_cache t)
+  in
+  (a, init_cache ())
 end
 
 module PartialAnnot = struct

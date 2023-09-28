@@ -54,6 +54,10 @@ let get_inter_cache x env pannot =
     |> Option.map (fun ic -> ic.res)
   else None
 
+let clear_cache () =
+  Hashtbl.clear inter_cache ;
+  Hashtbl.clear fv_def_htbl
+
 (* ====================================== *)
 (* ============= POLY INFER ============= *)
 (* ====================================== *)

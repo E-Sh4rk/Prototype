@@ -119,6 +119,9 @@ let get_inter_cache x env pannot =
     |> Option.map (fun ic -> ic.res)
   else None
 
+let clear_cache () =
+  Hashtbl.clear inter_cache
+
 (* ====================================== *)
 (* ============ MAIN SYSTEM ============= *)
 (* ====================================== *)
@@ -618,21 +621,24 @@ and infer_mono_iterated tenv expl env pannot e =
 
 let infer tenv env e =
   let open PartialAnnot in
-  init_fv_htbl e ;
+  Aux.init_fv_htbl e ;
   let initial_pannot = Infer in
-  match infer_mono_iterated tenv Domains.empty env initial_pannot e with
-  | Fail -> raise (Untypeable ([], "Annotations inference failed."))
-  | Ok annot -> infer_poly tenv env annot e
-  | NeedVar (v, _, _) ->
-    Format.printf "NeedVar %a@." Variable.pp v ;
-    assert false
-  | Split (gamma, _, _) ->
-    Format.printf "Split %a@." Env.pp gamma ;
-    assert false
-  | Subst (_, ss, _, _) ->
-    Format.printf "Subst %a@."
-      (pp_long_list TVarSet.pp) (List.map Subst.dom ss) ;
-    assert false
+  let res =
+    match infer_mono_iterated tenv Domains.empty env initial_pannot e with
+    | Fail -> raise (Untypeable ([], "Annotations inference failed."))
+    | Ok annot -> infer_poly tenv env annot e
+    | NeedVar (v, _, _) ->
+      Format.printf "NeedVar %a@." Variable.pp v ;
+      assert false
+    | Split (gamma, _, _) ->
+      Format.printf "Split %a@." Env.pp gamma ;
+      assert false
+    | Subst (_, ss, _, _) ->
+      Format.printf "Subst %a@."
+        (pp_long_list TVarSet.pp) (List.map Subst.dom ss) ;
+      assert false
+  in
+  clear_cache () ; Aux.clear_cache () ; res
 
 let typeof_simple tenv env e =
   let annot = infer tenv env e in

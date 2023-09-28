@@ -190,11 +190,10 @@ let simplify_tallying_infer env res_type sols =
     let clean = clean_type_subst ~pos:empty ~neg:any res in
     (Subst.compose_restr clean sol, Subst.apply clean res)
   )
-  (* Simplify *)
+  (* Simplify and make it reuse the same tvars if possible (better for caching) *)
   |> List.map (fun (sol, res) ->
     List.fold_left (fun (sol, res) v ->
       let t = Subst.find' sol v in
-      (* let v = TVar.mk_fresh v in *)
       (* NOTE: we allow to rename mono vars even if it corresponds to a
          mono var already in the env (tvars)...
          this might create an uneeded correlation but it simplifies a lot. *)

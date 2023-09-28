@@ -142,7 +142,6 @@ let rec approximate_arrow is_poly t =
       carthesian_product fres rres |> List.map
         (fun (f, r) -> cup (cap (TVar.typ v) f) r)
   end else [t]
-
 let is_opened_arrow t =
   subtype t arrow_any &&
   match dnf t with
@@ -186,10 +185,6 @@ let approximate_app ~infer t1 t2 resvar =
   then approximate_app infer t1 t2 resvar
   else res
 
-let infer_poly_inter infer_poly_branch (b1, b2, (_,tf,_)) =
-  assert (b1 = [] && b2 <> [] && tf) ;
-  b2 |> List.map infer_poly_branch
-
 let rec infer_poly_a vardef tenv env pannot_a a =
   let open PartialAnnot in
   let open FullAnnot in
@@ -198,11 +193,11 @@ let rec infer_poly_a vardef tenv env pannot_a a =
   | None ->
     let vartype v = Env.find v env in
     let annot_a = match a, pannot_a with
-    | a, PartialAnnot.InterA i ->
-      let annots_a = infer_poly_inter
-        (fun pannot_a -> infer_poly_a vardef tenv env pannot_a a) i
-      in
-      InterA annots_a
+    | a, InterA (b1, b2, (_,tf,_)) ->
+      assert (b1 = [] && b2 <> [] && tf) ;
+      let lst = b2 |> List.map
+        (fun pannot_a -> infer_poly_a vardef tenv env pannot_a a)
+      in InterA lst
     | Alias _, TypA -> AliasA
     | Const _, TypA -> ConstA
     | Let _, TypA -> LetA
@@ -279,11 +274,10 @@ and infer_poly tenv env pannot e =
   let open FullAnnot in
   let vartype v = Env.find v env in
   let annot = match e, pannot with
-  | e, PartialAnnot.Inter i ->
-    let annots = infer_poly_inter
-      (fun pannot -> infer_poly tenv env pannot e) i
-    in
-    Inter annots
+  | e, Inter (b1, b2, (_,tf,_)) ->
+    assert (b1 = [] && b2 <> [] && tf) ;
+    let lst = b2 |> List.map (fun pannot -> infer_poly tenv env pannot e)
+    in Inter lst
   | Var v, Typ ->
     let r = refresh (vartype v |> vars_poly) in
     BVar r

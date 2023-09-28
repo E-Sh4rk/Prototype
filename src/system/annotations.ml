@@ -118,6 +118,8 @@ module PartialAnnot = struct
       | Inter of t inter
   [@@deriving show]
 
+  (* === APPLY_SUBST === *)
+
   let rec apply_subst_aux s =
     if Subst.is_identity s then ((fun t -> (t,false)), (fun a -> (a,false)))
     else
@@ -184,4 +186,48 @@ module PartialAnnot = struct
 
   let apply_subst_a s a = apply_subst_a s a |> fst
   let apply_subst s t = apply_subst s t |> fst
+
+  (* === EQUALS (for caching) === *)
+
+  let rec equals_a a1 a2 =
+    match a1, a2 with
+    | InferA, InferA | TypA, TypA | UntypA, UntypA
+    | ThenVarA, ThenVarA | ElseVarA, ElseVarA
+    | EmptyA, EmptyA | ThenA, ThenA | ElseA, ElseA -> true
+    | LambdaA (s1, t1), LambdaA (s2, t2) ->
+      equiv s1 s2 && equals t1 t2
+    | InterA (i1,i1',_), InterA (i2,i2',_) ->
+      List.for_all2 (fun (a,_,_) (b,_,_) -> equals_a a b) i1 i2 &&
+      List.for_all2 equals_a i1' i2'
+    | _, _ -> false
+  and equals e1 e2 =
+    let equals_union (ex1,d1,u1) (ex2,d2,u2) =
+      let aux (s1, t1) (s2, t2) =
+        equiv s1 s2 && equals t1 t2
+      in
+      List.for_all2 equiv u1 u2 &&
+      List.for_all2 aux ex1 ex2 &&
+      List.for_all2 aux d1 d2
+    in
+    match e1, e2 with
+    | Infer, Infer | Typ, Typ | Untyp, Untyp -> true
+    | Skip t1, Skip t2 -> equals t1 t2
+    | TrySkip t1, TrySkip t2 -> equals t1 t2
+    | Propagate (a1, envs1, u1), Propagate (a2, envs2, u2) ->
+      let aux (env1,i1) (env2,i2) = i1=i2 && Env.equiv env1 env2 in  
+      List.for_all2 aux envs1 envs2 &&
+      equals_a a1 a2 && equals_union u1 u2
+    | Keep (a1, u1), Keep (a2, u2) ->
+      equals_a a1 a2 && equals_union u1 u2
+    | TryKeep (a1, t1, t1'), TryKeep (a2, t2, t2') ->
+      equals_a a1 a2 && equals t1 t2 && equals t1' t2'
+    | Inter (i1,i1',_), Inter (i2,i2',_) ->
+      List.for_all2 (fun (a,_,_) (b,_,_) -> equals a b) i1 i2 &&
+      List.for_all2 equals i1' i2'
+    | _, _ -> false
+
+  let equals t1 t2 =
+    try equals t1 t2 with Invalid_argument _ -> false
+  let equals_a t1 t2 =
+    try equals_a t1 t2 with Invalid_argument _ -> false  
 end

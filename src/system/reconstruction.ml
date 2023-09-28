@@ -84,6 +84,10 @@ let refine_a tenv env a t =
     [Env.construct_dup [(v,s);(v1,t)] ; Env.construct_dup [(v,neg s);(v2,t)]]
   | Let (_, v2) -> [Env.singleton v2 t]
 
+(* ====================================== *)
+(* ============== CACHING =============== *)
+(* ====================================== *)
+
 type 'a res =
 | Ok of 'a
 | Fail
@@ -92,11 +96,7 @@ type 'a res =
 | NeedVar of Variable.t * 'a * 'a
 (* [@@deriving show] *)
 
-(* ====================================== *)
-(* ============== CACHING =============== *)
-(* ====================================== *)
-
-type icache = { context: Env.t ; pannot: Caching.t ; res: Caching.t res }
+type icache = { context: Env.t ; pannot: PartialAnnot.a ; res: PartialAnnot.a res }
 
 let inter_cache = Hashtbl.create 100
 
@@ -110,7 +110,7 @@ let get_inter_cache x env pannot =
   let env = Env.filter (fun v _ -> VarSet.mem v fv) env in
   let caches = Hashtbl.find_all inter_cache x in
   caches |> List.find_opt
-    (fun ic -> Caching.equals pannot ic.pannot && Env.equiv env ic.context)
+    (fun ic -> PartialAnnot.equals_a pannot ic.pannot && Env.equiv env ic.context)
   |> Option.map (fun ic -> ic.res)
 
 (* ====================================== *)

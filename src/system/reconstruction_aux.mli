@@ -8,10 +8,6 @@ open Annotations
 module Make () : sig
     val init_fv_htbl : e -> unit
     val fv_def : Variable.t -> VarSet.t
-    module Caching : sig
-        type t = PartialAnnot.a
-        val equals: t -> t -> bool
-    end
 
     val replace_vars : typ -> TVarSet.t -> TVar.t -> Subst.t
     val approximate_app : infer:bool -> typ -> typ -> TVar.t -> Subst.t list

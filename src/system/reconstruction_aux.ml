@@ -30,6 +30,69 @@ let init_fv_htbl =
 
 let fv_def v = Hashtbl.find fv_def_htbl v
 
+module Caching = struct
+  type t = PartialAnnot.a
+  let rec equals a1 a2 =
+    let open PartialAnnot in
+    match a1, a2 with
+    | InferA, InferA | TypA, TypA | UntypA, UntypA
+    | ThenVarA, ThenVarA | ElseVarA, ElseVarA
+    | EmptyA, EmptyA | ThenA, ThenA | ElseA, ElseA -> true
+    | LambdaA (s1, t1), LambdaA (s2, t2) ->
+      equiv s1 s2 && equals_e t1 t2
+    | InterA (i1,i1',_), InterA (i2,i2',_) ->
+      List.length i1 = List.length i2 &&
+      List.length i1' = List.length i2' &&
+      List.for_all2 (fun (a,_,_) (b,_,_) -> equals a b) i1 i2 &&
+      List.for_all2 equals i1' i2'
+    | _, _ -> false
+  and equals_e e1 e2 =
+    let open PartialAnnot in
+    let equals_union (ex1,d1,u1) (ex2,d2,u2) =
+      let aux (s1, t1) (s2, t2) =
+        equiv s1 s2 && equals_e t1 t2
+      in
+      List.length ex1 = List.length ex2 &&
+      List.length d1 = List.length d2 &&
+      List.length u1 = List.length u2 &&
+      List.for_all2 equiv u1 u2 &&
+      List.for_all2 aux ex1 ex2 &&
+      List.for_all2 aux d1 d2
+    in
+    match e1, e2 with
+    | Infer, Infer | Typ, Typ | Untyp, Untyp -> true
+    | Skip t1, Skip t2 -> equals_e t1 t2
+    | TrySkip t1, TrySkip t2 -> equals_e t1 t2
+    | Propagate _, _ -> false
+    | Keep (a1, u1), Keep (a2, u2) ->
+      equals a1 a2 && equals_union u1 u2
+    | TryKeep (a1, t1, t1'), TryKeep (a2, t2, t2') ->
+      equals a1 a2 && equals_e t1 t2 && equals_e t1' t2'
+    | Inter (i1,i1',_), Inter (i2,i2',_) ->
+      List.length i1 = List.length i2 &&
+      List.length i1' = List.length i2' &&
+      List.for_all2 (fun (a,_,_) (b,_,_) -> equals_e a b) i1 i2 &&
+      List.for_all2 equals_e i1' i2'
+    | _, _ -> false
+end
+
+type icache = { context: Env.t ; pannot: Caching.t ; res: FullAnnot.a_cached }
+
+let inter_cache = Hashtbl.create 100
+
+let add_to_inter_cache x env pannot res =
+  let fv = fv_def x in
+  let env = Env.filter (fun v _ -> VarSet.mem v fv) env in
+  Hashtbl.add inter_cache x { context=env; pannot=pannot; res=res }
+
+let get_inter_cache x env pannot =
+  let fv = fv_def x in
+  let env = Env.filter (fun v _ -> VarSet.mem v fv) env in
+  let caches = Hashtbl.find_all inter_cache x in
+  caches |> List.find_opt
+    (fun ic -> Caching.equals pannot ic.pannot && Env.equiv env ic.context)
+  |> Option.map (fun ic -> ic.res)
+
 (* ====================================== *)
 (* ============= POLY INFER ============= *)
 (* ====================================== *)
@@ -169,81 +232,86 @@ let infer_poly_inter infer_poly_branch (b1, b2, (_,tf,_)) =
 let rec infer_poly_a vardef tenv env pannot_a a =
   let open PartialAnnot in
   let open FullAnnot in
-  let vartype v = Env.find v env in
-  let annot_a = match a, pannot_a with
-  | a, PartialAnnot.InterA i ->
-    let annots_a = infer_poly_inter
-      (fun pannot_a -> infer_poly_a vardef tenv env pannot_a a) i
+  match get_inter_cache vardef env pannot_a with
+  | Some res -> res
+  | None ->
+    let vartype v = Env.find v env in
+    let annot_a = match a, pannot_a with
+    | a, PartialAnnot.InterA i ->
+      let annots_a = infer_poly_inter
+        (fun pannot_a -> infer_poly_a vardef tenv env pannot_a a) i
+      in
+      InterA annots_a
+    | Alias _, TypA -> AliasA
+    | Const _, TypA -> ConstA
+    | Let _, TypA -> LetA
+    | Abstract _, TypA -> AbstractA
+    | Pair (v1, v2), TypA ->
+      let r1 = refresh (vartype v1 |> vars_poly) in
+      let r2 = refresh (vartype v2 |> vars_poly) in
+      PairA (r1, r2)
+    | Projection (p, v), TypA ->
+      let t = vartype v in
+      let alpha = TVar.mk_poly None in
+      let s =
+        begin match p with
+        | Parsing.Ast.Field label ->
+          mk_record true [label, TVar.typ alpha |> cons]
+        | Parsing.Ast.Fst ->
+          mk_times (TVar.typ alpha |> cons) any_node
+        | Parsing.Ast.Snd ->
+          mk_times any_node (TVar.typ alpha |> cons)
+        end
+      in
+      log ~level:4 "@.Tallying for %a: %a <= %a@."
+        Variable.pp vardef pp_typ t pp_typ s ;
+      let res = tallying_nonempty [(t, s)] in
+      let res = simplify_tallying (TVar.typ alpha) res in
+      ProjA res
+    | RecordUpdate (v, _, None), TypA ->
+      let res = tallying_nonempty [(vartype v, record_any)] in
+      let res = simplify_tallying record_any res in
+      RecordUpdateA (res, None)
+    | RecordUpdate (v, _, Some v2), TypA ->
+      let res = tallying_nonempty [(vartype v, record_any)] in
+      let res = simplify_tallying record_any res in
+      let r = refresh (vartype v2 |> vars_poly) in
+      RecordUpdateA (res, Some r)
+    | TypeConstr (v, s), TypA ->
+      ConstrA [tallying_one [(vartype v, s)]]
+    | App (v1, v2), TypA ->
+      let t1 = vartype v1 in
+      let t2 = vartype v2 in
+      let r1 = refresh (vars_poly t1) in
+      let r2 = refresh (vars_poly t2) in
+      let t1 = Subst.apply r1 t1 in
+      let t2 = Subst.apply r2 t2 in
+      let alpha = TVar.mk_poly None in
+      let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
+      log ~level:4 "@.Approximate tallying for %a: %a <= %a@."
+        Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
+      let res = approximate_app ~infer:false t1 t2 alpha in
+      assert (List.length res > 0) ;
+      let res = simplify_tallying (TVar.typ alpha) res in
+      let (s1, s2) = res |> List.map (fun s ->
+        (Subst.compose_restr s r1, Subst.compose_restr s r2)
+      ) |> List.split in
+      AppA (s1, s2)
+    | Ite (v, _, _, _), EmptyA ->
+      EmptyA [tallying_one [(vartype v, empty)]]
+    | Ite (v, s, _, _), ThenA ->
+      ThenA [tallying_one [(vartype v, s)]]
+    | Ite (v, s, _, _), ElseA ->
+      ElseA [tallying_one [(vartype v, neg s)]]
+    | Lambda (_, v, e), PartialAnnot.LambdaA (s, pannot) ->
+      let env = Env.add v s env in
+      let annot = infer_poly tenv env pannot e in
+      LambdaA (s, annot)
+    | _, _ ->  assert false
     in
-    InterA annots_a
-  | Alias _, TypA -> AliasA
-  | Const _, TypA -> ConstA
-  | Let _, TypA -> LetA
-  | Abstract _, TypA -> AbstractA
-  | Pair (v1, v2), TypA ->
-    let r1 = refresh (vartype v1 |> vars_poly) in
-    let r2 = refresh (vartype v2 |> vars_poly) in
-    PairA (r1, r2)
-  | Projection (p, v), TypA ->
-    let t = vartype v in
-    let alpha = TVar.mk_poly None in
-    let s =
-      begin match p with
-      | Parsing.Ast.Field label ->
-        mk_record true [label, TVar.typ alpha |> cons]
-      | Parsing.Ast.Fst ->
-        mk_times (TVar.typ alpha |> cons) any_node
-      | Parsing.Ast.Snd ->
-        mk_times any_node (TVar.typ alpha |> cons)
-      end
-    in
-    log ~level:4 "@.Tallying for %a: %a <= %a@."
-      Variable.pp vardef pp_typ t pp_typ s ;
-    let res = tallying_nonempty [(t, s)] in
-    let res = simplify_tallying (TVar.typ alpha) res in
-    ProjA res
-  | RecordUpdate (v, _, None), TypA ->
-    let res = tallying_nonempty [(vartype v, record_any)] in
-    let res = simplify_tallying record_any res in
-    RecordUpdateA (res, None)
-  | RecordUpdate (v, _, Some v2), TypA ->
-    let res = tallying_nonempty [(vartype v, record_any)] in
-    let res = simplify_tallying record_any res in
-    let r = refresh (vartype v2 |> vars_poly) in
-    RecordUpdateA (res, Some r)
-  | TypeConstr (v, s), TypA ->
-    ConstrA [tallying_one [(vartype v, s)]]
-  | App (v1, v2), TypA ->
-    let t1 = vartype v1 in
-    let t2 = vartype v2 in
-    let r1 = refresh (vars_poly t1) in
-    let r2 = refresh (vars_poly t2) in
-    let t1 = Subst.apply r1 t1 in
-    let t2 = Subst.apply r2 t2 in
-    let alpha = TVar.mk_poly None in
-    let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
-    log ~level:4 "@.Approximate tallying for %a: %a <= %a@."
-      Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
-    let res = approximate_app ~infer:false t1 t2 alpha in
-    assert (List.length res > 0) ;
-    let res = simplify_tallying (TVar.typ alpha) res in
-    let (s1, s2) = res |> List.map (fun s ->
-      (Subst.compose_restr s r1, Subst.compose_restr s r2)
-    ) |> List.split in
-    AppA (s1, s2)
-  | Ite (v, _, _, _), EmptyA ->
-    EmptyA [tallying_one [(vartype v, empty)]]
-  | Ite (v, s, _, _), ThenA ->
-    ThenA [tallying_one [(vartype v, s)]]
-  | Ite (v, s, _, _), ElseA ->
-    ElseA [tallying_one [(vartype v, neg s)]]
-  | Lambda (_, v, e), PartialAnnot.LambdaA (s, pannot) ->
-    let env = Env.add v s env in
-    let annot = infer_poly tenv env pannot e in
-    LambdaA (s, annot)
-  | _, _ ->  assert false
-  in
-  (annot_a, init_cache ())
+    let annot_a = (annot_a, init_cache ()) in
+    add_to_inter_cache vardef env pannot_a annot_a ;
+    annot_a
 
 and infer_poly tenv env pannot e =
   let open PartialAnnot in

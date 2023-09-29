@@ -43,6 +43,7 @@ module Domains = struct
   let enter_lambda _ _ _ = empty
   let cup = (@)
   let singleton mono e = add empty mono e
+  let apply_subst s = List.map (Env.apply_subst s)
 end
 
 module FullAnnot = struct
@@ -156,6 +157,13 @@ module PartialAnnot = struct
         let (t, changed) = apply_subst s t in
         update_change changed ; t
       in
+      let apply_inter apply_branch (a, b, (d,tf,ud)) =
+        (
+          List.map (fun (a,d,b) -> (apply_branch a,Domains.apply_subst s d,b)) a,
+          List.map apply_branch b,
+          (Domains.apply_subst s d,tf,ud)
+        )
+      in
       let apply_a a = match a with
         | InferA -> InferA
         | TypA -> TypA
@@ -163,10 +171,7 @@ module PartialAnnot = struct
         | ThenVarA -> ThenVarA | ElseVarA -> ElseVarA
         | EmptyA -> EmptyA | ThenA -> ThenA | ElseA -> ElseA
         | LambdaA (ty, t) -> LambdaA (apply_typ ty, apply_subst t)
-        | InterA (a, b, flags) -> InterA (
-          List.map (fun (a,d,b) -> (apply_subst_a a,d,b)) a,
-          List.map apply_subst_a b,
-          flags)
+        | InterA i -> InterA (apply_inter apply_subst_a i)
       and apply t =
         let apply_subst_union (e,d,u) =
           let aux2 (ty, t) = (apply_typ ty, apply_subst t) in
@@ -184,10 +189,7 @@ module PartialAnnot = struct
         | Propagate (a, envs, t) ->
           let aux2 (env, i) = (Env.apply_subst s env, i) in
           Propagate (apply_subst_a a, List.map aux2 envs, apply_subst_union t)
-        | Inter (a, b, flags) -> Inter (
-          List.map (fun (a,d,b) -> (apply_subst a,d,b)) a,
-          List.map apply_subst b,
-          flags)
+        | Inter i -> Inter (apply_inter apply_subst i)
       in
       ((fun t -> let res = apply t in (res, !change)),
         (fun a -> let res = apply_a a in (res, !change)))    

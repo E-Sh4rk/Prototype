@@ -29,7 +29,7 @@ make
 
 ### Running the prototype
 
-Once compiled, the prototype can be executed with `dune exec -- ./prototype.exe [file]`.
+Once compiled, the prototype can be executed with `dune exec -- ./main/prototype.exe [file]`.
 If no file is given, the file `test.ml` from the current path is used.
 
 ## Javascript version (web editor)

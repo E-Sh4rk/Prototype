@@ -160,8 +160,14 @@ let generalize_inferable tvars =
   let tvars = TVarSet.filter TVar.can_infer tvars in
   generalize tvars
 
+let mono_tvars env = Env.tvars env |> TVarSet.filter TVar.is_mono
+
+let lambda_tvars env =
+  env |> Env.filter (fun x _ -> Variable.is_lambda_var x) |> Env.tvars
+  |> TVarSet.filter TVar.is_mono  
+
 let simplify_tallying_infer env res_type sols =
-  let tvars = Env.tvars env |> TVarSet.filter TVar.is_mono in
+  let tvars = mono_tvars env in
   let vars_involved dom sol =
     let sol = Subst.restrict sol dom in
     TVarSet.union (Subst.codom sol) dom
@@ -249,8 +255,7 @@ let simplify_tallying_infer env res_type sols =
   |> List.map fst
 
 let infer_mono_inter expl' env infer_branch typeof (b1, b2, (expl, tf,ud)) =
-  let tvars = env |> Env.filter (fun x _ -> Variable.is_lambda_var x) |> Env.tvars in
-  let tvars = TVarSet.filter TVar.is_mono tvars in
+  let tvars = lambda_tvars env in
   let uNb = List.length b1 and eNb = List.length b2 in
   let nontrivial = uNb + eNb > 1 in
   if nontrivial then begin
@@ -313,7 +318,7 @@ let infer_mono_inter expl' env infer_branch typeof (b1, b2, (expl, tf,ud)) =
   aux b2 expl b1
 
 let merge_substs env apply_subst_branch mk_inter ((d,lpd), lst, pannot, default) =
-  let tvars = Env.tvars env in
+  let tvars = lambda_tvars env in
   let lst = lst
     |> List.filter_map (fun s ->
       let d' = Env.apply_subst s d in
@@ -331,7 +336,7 @@ let should_iterate env apply_subst_branch mk_inter res =
   match res with
   | Split (gamma, pannot, _) when Env.is_empty gamma -> Some pannot
   | Subst (info, lst, pannot, default) ->
-    let tvars = Env.tvars env |> TVarSet.filter TVar.is_mono in
+    let tvars = mono_tvars env in
     if lst |> List.for_all (fun s -> TVarSet.inter (Subst.dom s) tvars |> TVarSet.is_empty)
     then Some (merge_substs env apply_subst_branch mk_inter
                 (info, lst, pannot, default))

@@ -33,9 +33,7 @@ module Domains = struct
       let more_specific = more_specific dom2 in
       let a = t1 |> List.filter has_same_vars
       |> List.filter (fun env1 -> more_specific env1 env2)
-      |> List.map type_for in
-      let s = reduce_tvars a in (* NOTE: approximation *)
-      let a = a |> List.map (Subst.apply s) |> disj_o in
+      |> List.map type_for |> disj_o in
       let b = type_for env2 in
       supertype_poly a b
     )

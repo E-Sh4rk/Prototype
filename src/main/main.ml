@@ -14,12 +14,9 @@ type typecheck_result =
 
 module Reconstruct = Reconstruction.Make ()
 
-let generalize_all t =
-  Subst.apply (generalize (vars t)) t
-  |> uncorrelate_tvars |> bot_instance |> simplify_typ
-
-let reduce t =
-  apply_subst_simplify (reduce_tvars_of_fun t) t
+let generalize_all ~uncorrelate t =
+  let aux = if uncorrelate then uncorrelate_tvars else Utils.identity in
+  Subst.apply (generalize (vars t)) t |> aux |> bot_instance |> simplify_typ
 
 exception IncompatibleType of typ
 let type_check_def tenv env (var,expr,typ_annot) =
@@ -35,23 +32,23 @@ let type_check_def tenv env (var,expr,typ_annot) =
     (msc_time, typ_time)
   in
   let type_additionnal env (v, nf) =
-    let typ = Reconstruct.typeof_simple tenv env nf |> generalize_all |> reduce in
+    let typ = Reconstruct.typeof_simple tenv env nf |> generalize_all ~uncorrelate:false in
     Env.add v typ env
   in
   try
     Utils.log "%a@." Msc.pp_e nf_expr ;
     let env = List.fold_left type_additionnal env nf_addition in
     Reconstruct.set_caching_status true ;
-    let typ = Reconstruct.typeof_simple tenv env nf_expr |> generalize_all in
+    let typ = Reconstruct.typeof_simple tenv env nf_expr |> generalize_all ~uncorrelate:true in
     (* Reconstruct.set_caching_status false ;
     let typ' = Reconstruct.typeof_simple tenv env nf_expr |> generalize_all in
     assert (subtype_poly typ typ' && subtype_poly typ' typ) ; *)
     let typ =
       match typ_annot with
-      | None -> reduce typ
+      | None -> typ
       | Some typ' ->
         if subtype_poly typ typ'
-        then typ' |> generalize_all
+        then typ' |> generalize_all ~uncorrelate:false
         else raise (IncompatibleType typ)
     in
     let env = Env.add var typ env in

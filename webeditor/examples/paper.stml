@@ -42,7 +42,7 @@ let rec flatten x = match x with
  | _ -> [x] 
 end
 
-let rec filter f l =
+let rec filter f (l:['a*]) =
   match l with
   | :[] -> []
   | (h,t) & :List -> if f h

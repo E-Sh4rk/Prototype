@@ -544,12 +544,12 @@ let rec map f (lst:['a*]) =
   | (e,lst) & :List -> ((f e), map f lst)
   end
 
-let rec filter_noannot f l =
+(* let rec filter_noannot f l =
   if l is Nil then nil
   else
     if f(fst(l)) is True
     then (fst(l),filter f (snd(l)))
-    else filter f (snd(l))
+    else filter f (snd(l)) *)
 
 let rec filter (f: ('a->Any) & ('b -> ~True)) (l:[('a|'b)*]) =
   match l with
@@ -560,10 +560,10 @@ let rec filter (f: ('a->Any) & ('b -> ~True)) (l:[('a|'b)*]) =
     else filter f l
   end
     
-let rec flatten_noannot x =
+(* let rec flatten_noannot x =
   if x is Nil then nil else
   if x is [Any*] then concat (flatten (fst x)) (flatten (snd x))
-  else (x,nil)
+  else (x,nil) *)
 
 let rec flatten (x : Tree('a)) =    
   if x is Nil then nil else

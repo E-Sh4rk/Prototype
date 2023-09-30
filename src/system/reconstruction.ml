@@ -254,43 +254,16 @@ let simplify_tallying_infer env res_type sols =
   ) *)
   |> List.map fst
 
-let infer_mono_inter expl' env infer_branch typeof (b1, b2, (expl, tf,ud)) =
-  let tvars = lambda_tvars env in
+let infer_mono_inter expl' infer_branch (b1, b2, (expl, tf,ud)) =
   let uNb = List.length b1 and eNb = List.length b2 in
   let nontrivial = uNb + eNb > 1 in
   if nontrivial then begin
     log ~level:0 "Typing intersection with %n unexplored branches (and %n explored).@." uNb eNb
   end ;
-  let subtype_gen a b =
-    let a = Subst.apply (TVarSet.diff (vars a) tvars |> generalize) a in
-    subtype_poly a b
-  in
   let rec aux explored expl pending =
     match pending with
     | [] when explored = [] -> log ~level:3 "Intersection generated a fail (0 branch)@." ; Fail
-    | [] ->
-      let explored =
-        if tf || ud || List.length explored <= 1 then explored
-        else (
-          log ~level:5 "Finished reconstructing intersection. Typing it..." ;
-          explored
-          (* We type each branch and remove useless ones *)
-          |> List.map (fun pannot ->
-            (pannot, typeof pannot)
-          )
-          |> (fun r -> log ~level:5 "Simplifying it...@." ; r)
-          (* |> List.map (fun (a, t) -> log ~level:5 "%a@.@." pp_typ t ; (a,t)) *)
-          |> Utils.filter_among_others
-          (fun (_,ty) others ->
-            let ty' = others |> List.map snd |> conj in
-            subtype_gen ty' ty |> not
-          )
-          |> (fun r -> log ~level:5 "Done.@." ; r)
-          (* |> List.map (fun (a, t) -> log ~level:5 "%a@.@." pp_typ t ; (a,t)) *)
-          |> List.map fst
-        )
-      in
-      Ok ([], explored, (expl, true, ud))
+    | [] -> Ok ([], explored, (expl, true, ud))
     | (pannot, est, lpd)::pending ->
       (* Remove branch if it is estimated not to add anything *)
       let expl' = Domains.cup expl expl' in
@@ -354,13 +327,8 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
     let open PartialAnnot in
     match a, pannot_a with
     | a, InterA i ->
-      infer_mono_inter
-        expl env
-        (fun expl pannot_a -> infer_mono_a_iterated vardef tenv expl env pannot_a a)
-        (fun pannot_a ->
-          let annot_a = infer_poly_a vardef tenv env pannot_a a in
-          typeof_a vardef tenv env annot_a a)
-        i
+      let aux expl pannot_a = infer_mono_a_iterated vardef tenv expl env pannot_a a in
+      infer_mono_inter expl aux i
       |> map_res (fun x -> InterA x)
     | _, TypA -> Ok (TypA)
     | _, EmptyA -> Ok (EmptyA)
@@ -509,13 +477,8 @@ and infer_mono tenv expl env pannot e =
     | Var v, Infer ->
       if memvar v then Ok Typ else needvar v Infer Untyp
     | Bind _, Inter i ->
-      infer_mono_inter
-        expl env
-        (fun expl pannot -> infer_mono_iterated tenv expl env pannot e)
-        (fun pannot ->
-          let annot = infer_poly tenv env pannot e in
-          typeof tenv env annot e)
-        i
+      let aux expl pannot = infer_mono_iterated tenv expl env pannot e in
+      infer_mono_inter expl aux i
       |> map_res (fun x -> Inter x)
     | Bind _, Infer -> aux (TrySkip Infer) e
     | Bind (v, _, e) as ee, TrySkip pannot ->

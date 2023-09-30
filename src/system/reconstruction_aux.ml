@@ -59,18 +59,8 @@ let clear_cache () =
   Hashtbl.clear fv_def_htbl
 
 (* ====================================== *)
-(* ============= POLY INFER ============= *)
+(* =========== SIMPLIFICATION =========== *)
 (* ====================================== *)
-
-let tallying_nonempty constr =
-  match tallying constr with
-  | [] -> assert false
-  | sols -> sols
-
-let tallying_one constr =
-  match tallying constr with
-  | [] -> assert false
-  | sol::_ -> sol
 
 let replace_vars t vs v =
   vars_with_polarity t |> List.filter_map (fun (v', k) ->
@@ -116,8 +106,11 @@ let simplify_tallying res sols =
 let rec approximate_arrow is_poly t =
   let factorize v t =
     let (f,r) = factorize (TVarSet.construct [v], TVarSet.empty) t in
-    if is_empty f then factorize (TVarSet.empty, TVarSet.construct [v]) t
-    else (f,r)
+    if is_empty f
+    then
+      let (f,r) = factorize (TVarSet.empty, TVarSet.construct [v]) t in
+      (TVar.typ v |> neg,f,r)
+    else (TVar.typ v,f,r)
   in
   if subtype t arrow_any
   then begin
@@ -125,7 +118,6 @@ let rec approximate_arrow is_poly t =
     match TVarSet.destruct tv with
     | [] ->
       let dnf = dnf t |> simplify_dnf in
-      let dnf = match dnf with [] -> [[(any, empty)]] | lst -> lst in
       dnf |> List.map (fun arrows ->
           (* Keep all branches with no var in their domain, split the others *)
           (* let (keep, split) = arrows |> List.partition (fun (a,_) ->
@@ -140,54 +132,68 @@ let rec approximate_arrow is_poly t =
           |> List.map (fun (a,b) -> cup a b)
         ) [empty]
     | v::_ ->
-      let (f,r) = factorize v t in
+      let (v,f,r) = factorize v t in
       let fres = [f] in
       let rres = approximate_arrow is_poly r in
       carthesian_product fres rres |> List.map
-        (fun (f, r) -> cup (cap (TVar.typ v) f) r)
+        (fun (f, r) -> cup (cap v f) r)
   end else [t]
 let is_opened_arrow t =
   subtype t arrow_any &&
-  match dnf t with
-  | [conj] ->
+  dnf t |> List.for_all (fun conj ->
     conj |> List.exists (fun (a,b) ->
       subtype a arrow_any &&
       subtype b arrow_any &&
       TVarSet.inter (vars_poly a) (vars_poly b)
       |> TVarSet.is_empty |> not
     )
-  | _ -> false
+  )
+let too_many_tvars is_poly t =
+  vars t |> TVarSet.filter is_poly |> TVarSet.destruct |> List.length > 3
 (* Approximation for "fixpoint-like" tallying instances *)
 let approximate_app infer t1 t2 resvar =
-  let exception NoApprox in
   let tallying = if infer then tallying_infer else tallying in
-  try
-    if is_opened_arrow t2 |> not then raise NoApprox ;
-    let is_poly = if infer then TVar.can_infer else TVar.is_poly in
-    let t2s = approximate_arrow is_poly t2 in
-    let res =
-      t2s |> List.map (fun t2 ->
-        let arrow_type = mk_arrow (cons t2) (TVar.typ resvar |> cons) in
-        tallying [(t1, arrow_type)]
-      ) |> List.flatten
-    in
-    if res = [] && List.length t2s > 1 then raise NoApprox else res
-  with NoApprox ->
+  let is_poly = if infer then TVar.can_infer else TVar.is_poly in
+  let t2s = if too_many_tvars is_poly t2 && is_opened_arrow t2
+    then approximate_arrow is_poly t2
+    else [t2] in
+  let res =
+    t2s |> List.map (fun t2 ->
+      let arrow_type = mk_arrow (cons t2) (TVar.typ resvar |> cons) in
+      tallying [(t1, arrow_type)]
+    ) |> List.flatten
+  in
+  if res = [] && List.length t2s <> 1
+  then
     let arrow_type = mk_arrow (cons t2) (TVar.typ resvar |> cons) in
     tallying [(t1, arrow_type)]
-(* Approximation for tallying instances for the application *)
+  else res
+(* Approximation for tallying instances for applications *)
 let approximate_app ~infer t1 t2 resvar =
-  (* let is_poly = if infer then TVar.can_infer else TVar.is_poly in
-  let t1s = approximate_arrow is_poly t1 in *)
-  (* NOTE: this approximation is disabled (it does not seem to have a big impact
-     on classical examples, and it can produce weaker types) *)
-  let t1s = [t1] in
+  let is_poly = if infer then TVar.can_infer else TVar.is_poly in
+  let t1s = if too_many_tvars is_poly t1
+    then approximate_arrow is_poly t1
+    else [t1] in
   let res =
     t1s |> List.map (fun t1 -> approximate_app infer t1 t2 resvar) |> List.flatten
   in
-  if res = [] && List.length t1s > 1
+  if res = [] && List.length t1s <> 1
   then approximate_app infer t1 t2 resvar
   else res
+
+(* ====================================== *)
+(* ============= POLY INFER ============= *)
+(* ====================================== *)
+
+let tallying_nonempty constr =
+  match tallying constr with
+  | [] -> assert false
+  | sols -> sols
+
+let tallying_one constr =
+  match tallying constr with
+  | [] -> assert false
+  | sol::_ -> sol
 
 let rec infer_poly_a vardef tenv env pannot_a a =
   let open PartialAnnot in

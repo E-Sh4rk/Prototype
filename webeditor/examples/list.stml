@@ -4,7 +4,7 @@ let (=) = < 'a -> 'a -> Bool >
 
 let failwith : String -> Empty = magic
 
-let rec length_aux n (l:['a*]) =
+let rec length_aux n l =
   match l with
       | :Nil -> n
       | (_, l) -> length_aux (n+1) l

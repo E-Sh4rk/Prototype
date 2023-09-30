@@ -34,7 +34,7 @@ let type_check_def tenv env (var,expr,typ_annot) =
   let type_additionnal env (v, nf) =
     let typ = Reconstruct.typeof_simple tenv env nf |> generalize_all ~uncorrelate:true in
     (* NOTE: ~uncorrelate:false can reduce the number of tvars in fixpoint instances,
-       BUT might also yield an unprecise type (expansion becomes necessary)... *)
+       BUT it might also yield an unprecise type (expansion becomes necessary)... *)
     Env.add v typ env
   in
   try

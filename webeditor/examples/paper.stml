@@ -39,7 +39,7 @@ let rec (concat : ['a*] -> ['b*] -> ['a* ; 'b*]) x y =
 let rec flatten x = match x with
  | :[] -> []
  | (h, t) & :List -> concat (flatten h) (flatten t)
- | _ -> [x] 
+ | _ -> [x]
 end
 
 let rec filter f (l:['a*]) =

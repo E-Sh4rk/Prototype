@@ -529,16 +529,28 @@ let rec uncorrelate_tvars keep t =
     then t
     else
         let dnf, non_arrow = dnf t, cap t (neg arrow_any) in
+        (* Refresh branches *)
         let dnf = dnf |> List.map (fun arrows ->
             arrows |> List.map (fun (a,b) ->
                 let to_rename = TVarSet.diff (vars_poly a) keep in
                 let rename = refresh to_rename in
-                let keep = TVarSet.union keep (Subst.codom rename) in
+                let keep = Subst.codom rename in
                 let a = Subst.apply rename a in
                 let b = Subst.apply rename b |> uncorrelate_tvars keep in
                 (a, b)
             )
         ) in
+        (* Avoid useless branches *)
+        let mono = monomorphize keep in
+        let dnf = dnf |> List.map (fun arrows ->
+            arrows |> Utils.filter_among_others (fun c lst ->
+            let others = branch_type lst in
+            let others = Subst.apply mono others in
+            let current = branch_type [c] in
+            let current = Subst.apply mono current in
+            subtype_poly others current |> not
+        )) in
+        (* Rebuild type *)
         let t = List.map branch_type dnf |> disj in
         cup t non_arrow
 

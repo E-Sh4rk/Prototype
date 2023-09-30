@@ -593,3 +593,59 @@ let rec eval_ann (e:Expr) =
   | (:"uminus", e) -> 0 - (eval_ann e)
   | (:"const", x) -> x
   end
+
+(* ===== EXAMPLES FROM THE PAPER ===== *)
+
+let toBoolean x =
+    if x is Truthy then true else false
+
+let lOr (x,y) =
+    if toBoolean x then x else y
+
+let (id : 'a -> 'a) x =
+    lOr (x,x)
+
+let fixpoint = fun f ->
+  let delta = fun x ->
+      f ( fun  v -> ( x x v ))
+  in delta delta
+
+let map_stub map f lst =
+  if lst is Nil then nil
+  else (f (fst lst), map f (snd lst))
+
+let map = fixpoint map_stub
+
+let filter_stub filter (f: ('a->Any) & ('b -> ~True)) (l:[('a|'b)*]) =
+  if l is Nil then nil
+  else if f(fst(l)) is True
+  then (fst(l), filter f (snd(l)))
+  else filter f (snd(l))
+
+let filter = fixpoint filter_stub
+
+let rec (concat : ['a*] -> ['b*] -> ['a* ; 'b*]) x y =
+  match x with
+  | :[] -> y
+  | (h, t) -> (h, concat t y)
+  end
+
+let rec flatten x = match x with
+ | :[] -> []
+ | (h, t) & :List -> concat (flatten h) (flatten t)
+ | _ -> [x]
+end
+
+let rec filter f (l:['a*]) =
+  match l with
+  | :[] -> []
+  | (h,t) & :List -> if f h
+             then (h, filter f t)
+             else filter f t
+  end
+
+let rec fold_right f acc l =
+  match l with
+  :Nil -> acc
+  | (x, ll) -> f x (fold_right f acc ll)
+end

@@ -320,7 +320,7 @@ let concat_stub concat x y =
 
 let concat : ['a*] -> ['b*] -> ['a* ; 'b*] = fixpoint concat_stub
 
-let flatten_ocaml flatten (x:['_a*]) =
+let flatten_ocaml flatten x =
   if x is Nil then nil else
   if x is (Any, Any) then concat (fst x) (flatten (snd x)) else
   (x,nil)

@@ -144,18 +144,6 @@ let is_compatible env gamma =
     is_empty t || (cap t s |> non_empty)
   )
 
-let remove_split i (ex,d,u) =
-  let rec aux i ex =
-    match i, ex with
-    | 0, (t,_)::ex -> (t, ex)
-    | i, h::ex ->
-      let (t, ex) = aux (i-1) ex in
-      (t, h::ex)
-    | _ -> assert false
-  in
-  let (t, ex) = aux i ex in
-  (ex,d,t::u)
-
 let generalize_inferable tvars =
   let tvars = TVarSet.filter TVar.can_infer tvars in
   generalize tvars
@@ -508,18 +496,28 @@ and infer_mono tenv expl env pannot e =
       | Fail -> aux (Skip pannot2) e
       | res -> map_res (fun x -> TryKeep (x, pannot1, pannot2)) res
       end
-    | Bind (v,_,_), Propagate (pannot_a, gammas, union) ->
-      let propagate = gammas |>
-        Utils.find_among_others (fun (env',_) _ -> is_compatible env env') in
+    | Bind (v,_,_), Propagate (pannot_a, (envs1,typ1,t1), (envs2,typ2,t2), union) ->
+      let add_to_ex_u exs us (ex,d,u) = (exs@ex,d,us@u) in
+      let find_compat envs =
+        envs |> Utils.find_among_others (fun env' _ -> is_compatible env env')
+      in
+      let propagate =
+        match find_compat envs1 with
+        | Some (env,envs) -> Some (env,envs,envs2,(typ2, t2),typ1)
+        | None ->
+          begin match find_compat envs2 with
+          | Some (env,envs) -> Some (env,envs1,envs,(typ1, t1),typ2)
+          | None -> None
+          end
+      in
       begin match propagate with
-      | Some ((env',i'),gammas) ->
+      | Some (env',envs1,envs2,ex,u) ->
         log ~level:1 "Var %a is ok but its DNF needs a split.@." Variable.pp v ;
-        let union' = remove_split i' union in
-        let pannot1 = Keep (pannot_a, union') in
-        let pannot2 = Propagate (pannot_a, gammas, union) in
+        let pannot1 = Keep (pannot_a, add_to_ex_u [ex] [u] union) in
+        let pannot2 = Propagate (pannot_a, (envs1,typ1,t1), (envs2,typ2,t2), union) in
         let env' = Env.filter (fun v t -> subtype_poly (Env.find v env) t |> not) env' in
         Split (env', pannot1, pannot2)
-      | None -> aux (Keep (pannot_a, union)) e
+      | None -> aux (Keep (pannot_a, add_to_ex_u [(typ1, t1);(typ2,t2)] [] union)) e
       end
     | Bind (v, a, e), Keep (pannot_a, splits) ->
       let rec aux_splits splits =
@@ -539,14 +537,11 @@ and infer_mono tenv expl env pannot e =
             let s' = Env.find v env' in
             let t1 = cap_o s s' |> simplify_typ in
             let t2 = diff_o s s' |> simplify_typ in
-            let gammas1 = refine_a tenv env a (neg t1)
-              |> List.map (fun g -> (g, 0))
+            let gammas1 = refine_a tenv env a (neg t1) in
+            let gammas2 = refine_a tenv env a (neg t2) in
+            let res1 =
+              Propagate (pannot_a,(gammas1,t1,pannot1),(gammas2,t2,pannot2),(ex,d,u))
             in
-            let gammas2 = refine_a tenv env a (neg t2)
-              |> List.map (fun g -> (g, 1))
-            in
-            let res1 = Propagate (pannot_a, gammas1@gammas2,
-              ((t1,pannot1)::(t2,pannot2)::ex,d,u)) in
             let res2 = Keep (pannot_a, ((s,pannot2)::ex,d,u)) in
             Split (Env.rm v env', res1, res2)
           | res -> res |> map_res (fun x -> ((s, x)::ex,d,u)) |> keep

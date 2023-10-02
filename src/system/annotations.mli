@@ -52,6 +52,7 @@ module PartialAnnot : sig
     and union_done = (typ * t) list
     and union_unr = typ list
     and union = union_expl * union_done * union_unr
+    and conditional_part = Env.t list * typ * t
     and 'a pending_branch =
         'a
         * Domains.t (* Domains involved (used to prune branches) *)
@@ -73,7 +74,7 @@ module PartialAnnot : sig
         | Skip of t
         | TrySkip of t
         | TryKeep of a * t * t
-        | Propagate of a * (Env.t * int) list * union
+        | Propagate of a * conditional_part * conditional_part * union
         | Inter of t inter
 
     val pp_a : Format.formatter -> a -> unit

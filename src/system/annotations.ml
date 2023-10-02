@@ -109,6 +109,8 @@ module PartialAnnot = struct
   [@@deriving show]
   and union = union_expl * union_done * union_unr
   [@@deriving show]
+  and conditional_part = Env.t list * typ * t
+  [@@deriving show]
   and 'a pending_branch =
       'a
       * Domains.t (* Domains involved (used to prune branches) *)
@@ -133,7 +135,7 @@ module PartialAnnot = struct
       | Skip of t
       | TrySkip of t
       | TryKeep of a * t * t
-      | Propagate of a * (Env.t * int) list * union
+      | Propagate of a * conditional_part * conditional_part * union
       | Inter of t inter
   [@@deriving show]
 
@@ -184,9 +186,10 @@ module PartialAnnot = struct
         | TrySkip t -> TrySkip (apply_subst t)
         | TryKeep (a, t1, t2) ->
           TryKeep (apply_subst_a a, apply_subst t1, apply_subst t2)
-        | Propagate (a, envs, t) ->
-          let aux2 (env, i) = (Env.apply_subst s env, i) in
-          Propagate (apply_subst_a a, List.map aux2 envs, apply_subst_union t)
+        | Propagate (a, cp1, cp2, t) ->
+          let aux (envs, ty, t) =
+            (List.map (Env.apply_subst s) envs, apply_typ ty, apply_subst t) in
+          Propagate (apply_subst_a a, aux cp1, aux cp2, apply_subst_union t)
         | Inter i -> Inter (apply_inter apply_subst i)
       in
       ((fun t -> let res = apply t in (res, !change)),
@@ -233,9 +236,12 @@ module PartialAnnot = struct
     | Infer, Infer | Typ, Typ | Untyp, Untyp -> true
     | Skip t1, Skip t2 -> equals t1 t2
     | TrySkip t1, TrySkip t2 -> equals t1 t2
-    | Propagate (a1, envs1, u1), Propagate (a2, envs2, u2) ->
-      let aux (env1,i1) (env2,i2) = i1=i2 && Env.equiv env1 env2 in  
-      List.for_all2 aux envs1 envs2 &&
+    | Propagate (a1, cp1, cp1', u1), Propagate (a2, cp2, cp2', u2) ->
+      let aux (envs1,typ1,t1) (envs2,typ2,t2) =
+        List.for_all2 Env.equiv envs1 envs2 &&
+        equiv typ1 typ2 && equals t1 t2
+      in  
+      aux cp1 cp2 && aux cp1' cp2' &&
       equals_a a1 a2 && equals_union u1 u2
     | Keep (a1, u1), Keep (a2, u2) ->
       equals_a a1 a2 && equals_union u1 u2

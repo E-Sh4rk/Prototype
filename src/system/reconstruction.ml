@@ -160,17 +160,20 @@ let simplify_tallying_infer env res_type sols =
     let sol = Subst.restrict sol dom in
     TVarSet.union (Subst.codom sol) dom
   in
-  let is_minimal_sol (_,r) ss =
-    let r = Subst.apply (vars r |> generalize) r in
-    ss |> List.for_all (fun (_,r') ->
-      let r' = Subst.apply (vars r' |> generalize) r' in
-      subtype_poly r r' || not (subtype_poly r' r)
-    )
+  let leq_sol (_,r1) (_,r2) =
+    let r1 = Subst.apply (vars r1 |> generalize) r1 in
+    subtype_poly r1 r2
   in
-  let rec order sols =
-    match find_among_others is_minimal_sol sols with
-    | None -> sols
-    | Some (h, sols) -> h::(order sols)
+  let order sols =
+    let arr = Array.of_list sols in
+    let elts = 0 -- ((Array.length arr) - 1) in
+    let inst = elts |> add_others |> List.map (fun (e,es) ->
+      let t = arr.(e) in
+      let edges = es |> List.filter (fun e' -> leq_sol (arr.(e')) t) in
+      (e,edges)
+    ) in
+    Tsort.sort_strongly_connected_components inst
+    |> List.flatten |> List.map (fun e -> arr.(e))
   in
   sols
   (* Restrict to tvars and store result *)

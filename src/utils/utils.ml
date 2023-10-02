@@ -19,9 +19,6 @@ let log_level = ref log_disabled
 let log ?(level=0) a =
   if level <= !log_level then Format.fprintf Format.std_formatter a
   else Format.ifprintf Format.std_formatter a
-
-let option_chain fs e =
-  List.fold_left (fun acc f -> match acc with None -> None | Some e -> f e) (Some e) fs
   
 let identity x = x
 let filter_options x = List.filter_map identity x
@@ -38,23 +35,6 @@ let rec split4 lst =
   | (a,b,c,d)::lst ->
     let (ar,br,cr,dr) = split4 lst in
     (a::ar,b::br,c::cr,d::dr)
-
-let memoize f input_transform ht =
-  let rec aux input =
-    let htbl_key = input_transform input in
-    try Hashtbl.find ht htbl_key
-    with Not_found ->
-    (
-      let res = f aux input in
-      Hashtbl.replace ht htbl_key res ;
-      res
-    )
-  in aux
-
-let do_not_memoize f =
-  let rec aux input =
-    f aux input
-  in aux
 
 let rec regroup_equiv equiv lst =
   let extract_eq elt = List.partition (equiv elt) in
@@ -164,6 +144,12 @@ let rec insert x lst =
   | h::t ->
     (x::lst) :: (List.map (fun el -> h::el) (insert x t))
 
+let rec perm lst =
+  match lst with
+  | [] -> [[]]
+  | h::t ->
+    List.flatten (List.map (insert h) (perm t))
+
 let carthesian_product l1 l2 =
   l1 |> List.map (fun e1 ->
     l2 |> List.map (fun e2 ->
@@ -171,8 +157,7 @@ let carthesian_product l1 l2 =
     )
   ) |> List.flatten
 
-let rec perm lst =
-  match lst with
-  | [] -> [[]]
-  | h::t ->
-    List.flatten (List.map (insert h) (perm t))
+let (--) i j =
+  let rec aux n acc =
+    if n < i then acc else aux (n-1) (n :: acc)
+  in aux j []

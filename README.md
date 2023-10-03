@@ -23,7 +23,7 @@ Once CDuce is installed, our prototype can be built using
 ```
 git clone git@github.com:E-Sh4rk/Prototype.git
 cd Prototype/src
-opam install ppx_inline_test ppx_expect ppx_deriving pomap tsort
+opam install ppx_inline_test ppx_deriving pomap tsort
 make
 ```
 

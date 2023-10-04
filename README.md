@@ -1,4 +1,6 @@
-# Set-Theoretic and Polymorphic Type System Prototype
+# Prototype for: Polymorphic Type Inference for Dynamic Languages
+
+[![DOI](https://zenodo.org/badge/308046842.svg)](https://zenodo.org/badge/latestdoi/308046842)
 
 The web version of this prototype can be tested [here](https://e-sh4rk.github.io/Prototype/).
 

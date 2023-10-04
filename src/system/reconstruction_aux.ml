@@ -41,13 +41,13 @@ let inter_cache = Hashtbl.create 100
 let add_to_inter_cache x env pannot res =
   if !caching then
     let fv = fv_def x in
-    let env = Env.filter (fun v _ -> VarSet.mem v fv) env in
+    let env = Env.restrict (VarSet.elements fv) env in
     Hashtbl.add inter_cache x { context=env; pannot=pannot; res=res }
 
 let get_inter_cache x env pannot =
   if !caching then
     let fv = fv_def x in
-    let env = Env.filter (fun v _ -> VarSet.mem v fv) env in
+    let env = Env.restrict (VarSet.elements fv) env in
     let caches = Hashtbl.find_all inter_cache x in
     caches |> List.find_opt
       (fun ic -> PartialAnnot.equals_a pannot ic.pannot && Env.equiv env ic.context)
@@ -71,9 +71,6 @@ let replace_vars t vs v =
     | `Both -> (* Cases like Bool & 'a \ 'b  |  Int & 'a & 'b *) None
     else None
     ) |> Subst.construct
-(* let replace_vars _ vs v =
-  TVarSet.destruct vs |> List.map (fun v' -> (v', TVar.typ v))
-  |> Subst.construct *)
 
 let simplify_tallying res sols =
   let is_better_sol s1 s2 =

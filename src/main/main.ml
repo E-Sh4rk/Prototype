@@ -32,7 +32,7 @@ let type_check_def tenv env (var,expr,typ_annot) =
     (msc_time, typ_time)
   in
   let type_additionnal env (v, nf) =
-    let typ = Reconstruct.typeof_simple tenv env nf |> generalize_all ~uncorrelate:true in
+    let typ = Reconstruct.typeof_infer tenv env nf |> generalize_all ~uncorrelate:true in
     (* NOTE: ~uncorrelate:false can reduce the number of tvars in fixpoint instances,
        BUT it might also yield an unprecise type (expansion becomes necessary)... *)
     Env.add v typ env
@@ -41,9 +41,9 @@ let type_check_def tenv env (var,expr,typ_annot) =
     Utils.log "%a@." Msc.pp_e nf_expr ;
     let env = List.fold_left type_additionnal env nf_addition in
     Reconstruct.set_caching_status true ;
-    let typ = Reconstruct.typeof_simple tenv env nf_expr |> generalize_all ~uncorrelate:true in
+    let typ = Reconstruct.typeof_infer tenv env nf_expr |> generalize_all ~uncorrelate:true in
     (* Reconstruct.set_caching_status false ;
-    let typ' = Reconstruct.typeof_simple tenv env nf_expr |> generalize_all in
+    let typ' = Reconstruct.typeof_infer tenv env nf_expr |> generalize_all in
     assert (subtype_poly typ typ' && subtype_poly typ' typ) ; *)
     let typ =
       match typ_annot with

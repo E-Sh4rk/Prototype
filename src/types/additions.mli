@@ -96,9 +96,20 @@ val instantiate : Subst.t list -> typ -> typ
 
 val bot_instance : typ -> typ
 val top_instance : typ -> typ
+
 val subtypes_poly : (typ * typ) list -> bool
 val supertypes_poly : (typ * typ) list -> bool
 val subtype_poly : typ -> typ -> bool
 val supertype_poly : typ -> typ -> bool
 
 val uncorrelate_tvars : typ -> typ
+(**
+    [uncorrelate_tvars t] uncorrelates the different branches of the
+    arrow part of [t] by renaming its polymorphic type variables. It also
+    removes redundant branches in order to get a simpler type.
+    The type returned by this function is NOT equivalent to [t].
+    In particular, it removes negative arrows (for simplification purposes),
+    and it may remove some branches and rename some occurrences of type variables.
+    Consequently, it should NOT be used to simplify types during the typing of an
+    expression: it should ONLY be used to simplify types at top-level, after generalization.
+*)

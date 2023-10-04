@@ -7,7 +7,7 @@ module Domains = struct
   type t = Env.t list
   [@@deriving show]
   let add lst mono e =
-    let e = Env.filter (fun x _ -> Variable.is_lambda_var x) e in
+    assert (Env.bindings e |> List.for_all (fun (v,_) -> Variable.is_lambda_var v)) ;
     let tvars = Env.tvars e |> TVarSet.filter TVar.can_infer in
     let tvars = TVarSet.diff tvars mono in
     let e = Env.apply_subst (generalize tvars) e in
@@ -111,21 +111,16 @@ module PartialAnnot = struct
   [@@deriving show]
   and conditional_part = Env.t list * typ * t
   [@@deriving show]
-  and 'a pending_branch =
-      'a
-      * Domains.t (* Domains involved (used to prune branches) *)
-      * bool (* Low priority default: type only if no other branch is typeable *)
+  and 'a pending_branch = 'a * Domains.t * bool 
   [@@deriving show]
-  and 'a inter = ('a pending_branch) list (* Pending *)
-               * 'a list (* Explored *)
-               * (Domains.t (* Explored domains *)
-                  * bool (* Typing finished? *)
-                  * bool (* User defined *))
+  and 'a inter = ('a pending_branch) list
+               * 'a list
+               * (Domains.t * bool * bool)
   [@@deriving show]
   and a =
       | InferA | TypA | UntypA
       | ThenVarA | ElseVarA
-      | EmptyA | ThenA | ElseA (* NOTE: not in the paper, small optimisation *)
+      | EmptyA | ThenA | ElseA
       | LambdaA of typ * t
       | InterA of a inter
   [@@deriving show]

@@ -312,7 +312,6 @@ let tallying_infer constr =
     Subst.compose_restr mono_subst s
   )
 
-(* Some additions *)
 let factorize (pvs, nvs) t =
   let open Iter in
   let treat_kind m t =

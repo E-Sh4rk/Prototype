@@ -106,13 +106,13 @@ let inter_cache = Hashtbl.create 100
 let add_to_inter_cache x env pannot res =
   if Aux.caching_status () then
     let fv = fv_def x in
-    let env = Env.filter (fun v _ -> VarSet.mem v fv) env in
+    let env = Env.restrict (VarSet.elements fv) env in
     Hashtbl.add inter_cache x { context=env; pannot=pannot; res=res }
 
 let get_inter_cache x env pannot =
   if Aux.caching_status () then
     let fv = fv_def x in
-    let env = Env.filter (fun v _ -> VarSet.mem v fv) env in
+    let env = Env.restrict (VarSet.elements fv) env in
     let caches = Hashtbl.find_all inter_cache x in
     caches |> List.find_opt
       (fun ic -> PartialAnnot.equals_a pannot ic.pannot && Env.equiv env ic.context)
@@ -610,7 +610,7 @@ let infer tenv env e =
   in
   clear_cache () ; Aux.clear_cache () ; res
 
-let typeof_simple tenv env e =
+let typeof_infer tenv env e =
   let annot = infer tenv env e in
   (* let annot = FullAnnot.clear_cache annot in *)
   typeof_nofail tenv env annot e

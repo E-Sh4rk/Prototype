@@ -88,20 +88,31 @@ val string_of_type_short : Base.typ -> string
 (* Operations on types *)
 
 module Raw : sig
+    (** This module contains raw Cduce functions. In particular,
+        they make no distinction between between polymorphic type variables
+        and monomorphic type variables.
+        Functions defined outside of this module should be preferred. *)
+
     val clean_type : pos:Base.typ -> neg:Base.typ -> TVarSet.t -> Base.typ -> Base.typ
-    val rectype : Base.typ -> TVar.t -> Base.typ (* [rectype t u] returns the type corresponding to the equation u=t *)
-    (* Variables not in var_order are considered greater. In the result, a variable will be expressed
-    in term of the variables that are greater. Thus, greater variables (in particular variables not in var_order)
+
+    (** [rectype t u] returns the type corresponding to the equation [u=t] *)
+    val rectype : Base.typ -> TVar.t -> Base.typ
+
+    (** In the functions below, type variables not in [var_order]
+    are considered greater. In the solutions returned by those functions,
+    a variable will be expressed in term of the variables that are greater.
+    Thus, greater variables (in particular variables not in [var_order])
     are less likely to be constrained. *)
+
     val tallying : var_order:(TVar.t list) -> TVarSet.t -> (Base.typ * Base.typ) list -> Subst.t list
     val test_tallying : var_order:(TVar.t list) -> TVarSet.t -> (Base.typ * Base.typ) list -> bool
 end
 
 val clean_type : pos:Base.typ -> neg:Base.typ -> Base.typ -> Base.typ
 val clean_type_subst : pos:Base.typ -> neg:Base.typ -> Base.typ -> Subst.t
+
 val test_tallying : (Base.typ * Base.typ) list -> bool
 val tallying : (Base.typ * Base.typ) list -> Subst.t list
 val tallying_infer : (Base.typ * Base.typ) list -> Subst.t list
 
-(* Some additions *)
 val factorize : TVarSet.t * TVarSet.t -> Base.typ -> Base.typ * Base.typ

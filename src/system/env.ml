@@ -18,9 +18,6 @@ let bindings (m, _) = VarMap.bindings m
 
 let mem v (m, _) = (VarMap.mem v m)
 
-let mem_not_absent v (m, _) =
-  VarMap.mem v m && has_absent (VarMap.find v m) |> not
-
 let reconstruct m = VarMap.bindings m |> construct
 
 let rm v (m, _) = VarMap.remove v m |> reconstruct
@@ -51,6 +48,10 @@ let filter f (m, _) = VarMap.filter f m |> reconstruct
 let rms vs t =
   let vs = VarSet.of_list vs in
   t |> filter (fun v _ -> VarSet.mem v vs |> not)
+
+let restrict vs t =
+  let vs = VarSet.of_list vs in
+  t |> filter (fun v _ -> VarSet.mem v vs)
 
 let leq (m1,_) (m2,_) =
   VarMap.for_all (fun v t ->

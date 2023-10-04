@@ -3,6 +3,10 @@ open Types.Tvar
 open Parsing.Variable
 
 module Domains : sig
+    (** This module is used for comparing domains of the branches
+        of an intersection annotation. Used for trimming,
+        in order to avoid typing redundant branches. *)
+
     type t
     val empty : t
     val singleton : TVarSet.t -> Env.t -> t
@@ -13,6 +17,8 @@ module Domains : sig
 end
 
 module FullAnnot : sig
+    (** This module defines annotations for the algorithmic type system. *)
+
     type cache = { mutable typ: typ option }
     type 'a inter = 'a list
     type inst = Subst.t list
@@ -48,6 +54,9 @@ module FullAnnot : sig
 end
 
 module PartialAnnot : sig
+    (** This module defines intermediate annotations
+        (used by the main reconstruction system). *)
+
     type union_expl = (typ * t) list
     and union_done = (typ * t) list
     and union_unr = typ list
@@ -55,17 +64,19 @@ module PartialAnnot : sig
     and conditional_part = Env.t list * typ * t
     and 'a pending_branch =
         'a
-        * Domains.t (* Domains involved (used to prune branches) *)
-        * bool (* Low priority default: type only if no other branch is typeable *)
+        * Domains.t (* Domains involved (used to trim branches) *)
+        * bool (* Low priority default flag (currently unused):
+           indicates to type the default branch only if no other branch is typeable *)
     and 'a inter = ('a pending_branch) list (* Pending *)
                  * 'a list (* Explored *)
                  * (Domains.t (* Explored domains *)
-                    * bool (* Typing finished? *)
-                    * bool (* User defined *))
+                    * bool (* Typing finished?
+                       (flag introduced for a former version, currently unused) *)
+                    * bool (* User-defined intersection? (no trimming should be performed) *))
     and a =
         | InferA | TypA | UntypA
         | ThenVarA | ElseVarA
-        | EmptyA | ThenA | ElseA (* NOTE: not in the paper, small optimisation *)
+        | EmptyA | ThenA | ElseA (* NOTE: In the paper, TypA is used instead of these *)
         | LambdaA of typ * t
         | InterA of a inter
     and t =

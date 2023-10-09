@@ -1,7 +1,7 @@
 FROM ubuntu:20.04
 LABEL maintainer="Kim Nguyen <kim.nguyen@universite-paris-saclay.fr>"
 
-ARG poly_version=1.0.1
+ARG poly_version=1.0.2
 
 
 RUN apt-get update -y && \

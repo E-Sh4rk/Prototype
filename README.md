@@ -77,3 +77,9 @@ npm ci
 ```
 
 Then either serve the whole content of the `./webeditor/` directory through a Web server or open the file `./webeditor/index.html` directly from a browser (**warning** : the later will not allow you to load the examples nor benefit from web-workers due to security policies).
+
+## Hacking the sources
+
+The main concepts of the paper *Polymorphic Type Inference for Dynamic Languages* are implemented in the `src/system` directory, where one can find the implementation of MSC-forms, the algorithmic typechecking system, and the reconstruction and reconstruction auxiliary type inference systems.
+
+This software is distributed under the terms contained in the [LICENSE](LICENSE) file.

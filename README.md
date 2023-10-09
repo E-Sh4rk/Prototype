@@ -1,4 +1,4 @@
-# Prototype for: Polymorphic Type Inference for Dynamic Languages
+# Prototype: Polymorphic Type Inference for Dynamic Languages
 
 [![DOI](https://zenodo.org/badge/308046842.svg)](https://zenodo.org/badge/latestdoi/308046842)
 

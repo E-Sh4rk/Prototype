@@ -602,7 +602,7 @@ let toBoolean x =
 let lOr (x,y) =
     if toBoolean x then x else y
 
-let (id : 'a -> 'a) x =
+let id x =
     lOr (x,x)
 
 let fixpoint = fun f ->

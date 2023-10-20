@@ -6,7 +6,16 @@
   let enter_newline lexbuf =
     Lexing.new_line lexbuf;
     lexbuf
+
+  let char_for_backslash = function
+    | 'n' -> '\010'
+    | 'r' -> '\013'
+    | 'b' -> '\008'
+    | 't' -> '\009'
+    | c   -> c
 }
+
+let backslash_escapes = ['\\' '\'' '"' 'n' 't' 'b' 'r' ' ']
 
 let newline = ('\010' | '\013' | "\013\010")
 
@@ -25,10 +34,6 @@ let float_comma = decimal '.' decimal (['e' 'E'] ['-' '+']? decimal)?
 let float = (float_e | float_comma)
 
 let type_var = '\'' ['a'-'z''A'-'Z''0'-'9''_']+
-
-let char = '\'' ['a'-'z''A'-'Z''0'-'9''_'' ''-'] '\''
-
-let string = '"' ['a'-'z''A'-'Z''0'-'9''_'' ''-']* '"'
 
 let op_char =  '!' | '$' | '%' | '&' | '*' | '+' | '-' |
                '.' | '/' | ':' | ';' | '<' | '=' | '>' |
@@ -109,8 +114,9 @@ rule token = parse
 | "unit"  { LUNIT }
 | infix_op as s  { INFIX s }
 | prefix_op as s { PREFIX s }
-| string as s { LSTRING (String.sub s 1 ((String.length s) - 2)) }
-| char as c { LCHAR (c.[1]) }
+| '"' { read_string (Buffer.create 17) lexbuf }
+| '\'' ([^ '\'' '\\' '\010' '\013'] as c) '\'' { LCHAR c }
+| '\'' '\\' (backslash_escapes as c) '\'' { LCHAR (char_for_backslash c) }
 | id as s { ID s }
 | type_id as s { TID s }
 | type_var as s { TVAR (String.sub s 1 ((String.length s) - 1)) }
@@ -129,3 +135,14 @@ and comment depth = parse
 | _ {
   comment depth lexbuf
 }
+
+and read_string buf = parse
+| newline { enter_newline lexbuf |> read_string buf }
+| '"' { LSTRING (Buffer.contents buf) }
+| '\\' (backslash_escapes as c) { Buffer.add_char buf (char_for_backslash c); read_string buf lexbuf }
+| [^ '"' '\\' '\010' '\013']+
+  { Buffer.add_string buf (Lexing.lexeme lexbuf);
+    read_string buf lexbuf
+  }
+| _ { raise (LexerError ("Illegal string character: " ^ Lexing.lexeme lexbuf)) }
+| eof { raise (LexerError ("String is not terminated")) }

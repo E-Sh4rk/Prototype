@@ -96,7 +96,7 @@
 %right ARROW
 %left OR
 %left AND
-%nonassoc DIFF
+%left DIFF
 %nonassoc NEG
 
 %%

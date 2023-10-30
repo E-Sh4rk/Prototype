@@ -7,6 +7,9 @@ build:
 run:
 	dune exec ./main/prototype.exe
 
+benchmark:
+	dune exec ./main/prototype.exe -- benchmark.ml
+
 clean:
 	dune clean
 	rm -f ../webeditor/typechecker.js

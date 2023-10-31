@@ -544,10 +544,12 @@ let rec uncorrelate_tvars keep t =
         let mono = monomorphize keep in
         let dnf = dnf |> List.map (fun arrows ->
             arrows |> Utils.filter_among_others (fun c lst ->
-            let others = branch_type lst in
-            let others = Subst.apply mono others in
-            let current = branch_type [c] in
-            let current = Subst.apply mono current in
+            let others = List.map (fun a -> branch_type [a] |> Subst.apply mono) lst in
+            let current = branch_type [c] |> Subst.apply mono in
+            others |> List.exists (fun o -> subtype_poly o current) |> not
+        ) |> Utils.filter_among_others (fun c lst ->
+            let others = branch_type lst |> Subst.apply mono in
+            let current = branch_type [c] |> Subst.apply mono in
             subtype_poly others current |> not
         )) in
         (* Rebuild type *)

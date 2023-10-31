@@ -66,6 +66,12 @@ let rec concat x y =
   end
 let concat : ['a*] -> ['b*] -> ['a* ; 'b*] = concat
 
+let rec concat_ann (x:['a*]) (y:['b*]) =
+  match x with
+  | :[] -> y
+  | (h, t) -> (h, concat_ann t y)
+  end
+
 type Tree 'a = ('a \ List) | [(Tree 'a)*]
 
 let rec flatten x =

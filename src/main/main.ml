@@ -39,12 +39,9 @@ let type_check_def tenv env (var,expr,typ_annot) =
   in
   try
     Utils.log "%a@." Msc.pp_e nf_expr ;
-    let env = List.fold_left type_additionnal env nf_addition in
     Reconstruct.set_caching_status true ;
+    let env = List.fold_left type_additionnal env nf_addition in
     let typ = Reconstruct.typeof_infer tenv env nf_expr |> generalize_all ~uncorrelate:true in
-    (* Reconstruct.set_caching_status false ;
-    let typ' = Reconstruct.typeof_infer tenv env nf_expr |> generalize_all in
-    assert (subtype_poly typ typ' && subtype_poly typ' typ) ; *)
     let typ =
       match typ_annot with
       | None -> typ

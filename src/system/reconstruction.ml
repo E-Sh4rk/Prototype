@@ -322,9 +322,6 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
       infer_mono_inter expl aux i
       |> map_res (fun x -> InterA x)
     | _, TypA -> Ok (TypA)
-    | _, EmptyA -> Ok (EmptyA)
-    | _, ThenA -> Ok (ThenA)
-    | _, ElseA -> Ok (ElseA)
     | _, UntypA -> log ~level:3 "Untyp annot generated a fail.@." ; Fail
     | Alias v, InferA when memvar v -> Ok (TypA)
     | Alias v, InferA -> log ~level:3 "Unknown var %s generated a fail.@." (Variable.show v) ; Fail
@@ -409,27 +406,27 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
     | Ite (v, tau, _, _), InferA ->
       if memvar v then
         let t = vartype v in
-        if subtype t empty then Ok EmptyA
+        if subtype t empty then Ok TypA
         else if subtype t tau
         then
           let res = tallying_infer [(t, empty)] in
           let res = simplify_tallying_infer env empty res in
           if List.exists Subst.is_identity res
-          then Ok EmptyA
-          else needsubst_no_lpd res EmptyA ThenVarA
+          then Ok TypA
+          else needsubst_no_lpd res TypA ThenVarA
         else if subtype t (neg tau)
         then
           let res = tallying_infer [(t, empty)] in
           let res = simplify_tallying_infer env empty res in
           if List.exists Subst.is_identity res
-          then Ok EmptyA
-          else needsubst_no_lpd res EmptyA ElseVarA
+          then Ok TypA
+          else needsubst_no_lpd res TypA ElseVarA
         else Split (Env.singleton v tau, InferA, InferA)
       else needvar v InferA UntypA
     | Ite (_, _, v1, _), ThenVarA ->
-      if memvar v1 then Ok ThenA else needvar v1 ThenA UntypA
+      if memvar v1 then Ok TypA else needvar v1 TypA UntypA
     | Ite (_, _, _, v2), ElseVarA ->
-      if memvar v2 then Ok ElseA else needvar v2 ElseA UntypA
+      if memvar v2 then Ok TypA else needvar v2 TypA UntypA
     | Lambda (Unnanoted, _, _), InferA ->
       let alpha = TVar.mk_mono (Some (Variable.show vardef)) |> TVar.typ in
       let pannot_a = LambdaA (alpha, Infer) in

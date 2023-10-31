@@ -69,9 +69,7 @@ let pp fmt (m, _) =
 let show = Format.asprintf "%a" pp
 
 let pp_filtered names fmt env =
-  let env = filter (fun v _ -> match Variable.get_name v with
-    | None -> false
-    | Some str -> List.mem str names) env in
+  let env = filter (fun v _ -> List.mem (Variable.show v) names) env in
   pp fmt env
 
 let add v t e = assert (mem v e |> not) ; add v t e

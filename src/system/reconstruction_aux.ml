@@ -260,12 +260,15 @@ let rec infer_poly_a vardef tenv env pannot_a a =
         (Subst.compose_restr s r1, Subst.compose_restr s r2)
       ) |> List.split in
       AppA (s1, s2)
-    | Ite (v, _, _, _), EmptyA ->
-      EmptyA [tallying_one [(vartype v, empty)]]
-    | Ite (v, s, _, _), ThenA ->
-      ThenA [tallying_one [(vartype v, s)]]
-    | Ite (v, s, _, _), ElseA ->
-      ElseA [tallying_one [(vartype v, neg s)]]
+    | Ite (v, s, _, _), TypA ->
+      begin match tallying [(vartype v, empty)] with
+      | sol::_ -> EmptyA [sol]
+      | [] ->
+        begin match tallying [(vartype v, s)] with
+        | sol::_ -> ThenA [sol]
+        | [] -> ElseA [tallying_one [(vartype v, neg s)]]
+        end
+      end
     | Lambda (_, v, e), PartialAnnot.LambdaA (s, pannot) ->
       let env = Env.add v s env in
       let annot = infer_poly tenv env pannot e in

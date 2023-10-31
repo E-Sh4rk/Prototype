@@ -76,7 +76,6 @@ module PartialAnnot : sig
     and a =
         | InferA | TypA | UntypA
         | ThenVarA | ElseVarA
-        | EmptyA | ThenA | ElseA (* NOTE: In the paper, TypA is used instead of these *)
         | LambdaA of typ * t
         | InterA of a inter
     and t =

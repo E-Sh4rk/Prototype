@@ -145,13 +145,14 @@ let is_opened_arrow t =
       |> TVarSet.is_empty |> not
     )
   )
-let too_many_tvars is_poly t =
-  vars t |> TVarSet.filter is_poly |> TVarSet.destruct |> List.length > 3
+(* NOTE: the two approximations below may be a source of incompleteness,
+   even for user-annotated functions *)
 (* Approximation for "fixpoint-like" tallying instances *)
 let approximate_app infer t1 t2 resvar =
   let tallying = if infer then tallying_infer else tallying in
   let is_poly = if infer then TVar.can_infer else TVar.is_poly in
-  let t2s = if too_many_tvars is_poly t2 && is_opened_arrow t2
+  let nbv = vars t2 |> TVarSet.filter is_poly |> TVarSet.destruct |> List.length in
+  let t2s = if nbv > 3 && is_opened_arrow t2
     then approximate_arrow is_poly t2
     else [t2] in
   let res =
@@ -168,7 +169,8 @@ let approximate_app infer t1 t2 resvar =
 (* Approximation for tallying instances for applications *)
 let approximate_app ~infer t1 t2 resvar =
   let is_poly = if infer then TVar.can_infer else TVar.is_poly in
-  let t1s = if too_many_tvars is_poly t1
+  let nb_branches = dnf t1 |> List.flatten |> List.length in
+  let t1s = if nb_branches > 3
     then approximate_arrow is_poly t1
     else [t1] in
   let res =

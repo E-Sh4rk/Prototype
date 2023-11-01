@@ -85,7 +85,7 @@ let flatten : Tree 'a -> ['a*] = flatten
 let rec flatten_ann (x: Tree 'a) =
   match x with
   | :[] -> []
-  | (h, t) & :List -> concat (flatten h) (flatten t)
+  | (h, t) & :List -> concat (flatten_ann h) (flatten_ann t)
   | _ -> [x]
   end
 

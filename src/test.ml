@@ -535,7 +535,7 @@ let map_pat = fixpoint map_pat_stub
 let rec map_noannot f lst =
   match lst with
   | :[] -> []
-  | (e,lst) & :List -> ((f e), map f lst)
+  | (e,lst) & :List -> ((f e), map_noannot f lst)
   end
 
 let rec map f (lst:['a*]) =

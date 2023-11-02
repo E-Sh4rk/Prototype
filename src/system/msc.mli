@@ -7,7 +7,7 @@ type a =
   | Alias of Variable.t
   | Abstract of typ
   | Const of Ast.const
-  | Lambda of (typ Ast.type_annot) * Variable.t * e
+  | Lambda of (typ list) * Variable.t * e
   | Ite of Variable.t * typ * Variable.t * Variable.t
   | App of Variable.t * Variable.t
   | Pair of Variable.t * Variable.t

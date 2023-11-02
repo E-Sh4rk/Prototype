@@ -8,7 +8,7 @@ type a =
   | Alias of Variable.t
   | Abstract of typ
   | Const of Ast.const
-  | Lambda of (typ Ast.type_annot) * Variable.t * e
+  | Lambda of (typ list) * Variable.t * e
   | Ite of Variable.t * typ * Variable.t * Variable.t
   | App of Variable.t * Variable.t
   | Pair of Variable.t * Variable.t
@@ -251,6 +251,10 @@ let convert_to_msc ast =
       | Ast.Var v when Variable.is_binding_var v -> raise (IsVar v)
       | Ast.Var v -> ([], expr_var_map, Alias v)
       | Ast.Lambda (t, v, e) ->
+        let ts = match t with
+        | Unnanoted -> [ TVar.mk_mono ~infer:true (Variable.get_name v) |> TVar.typ ]
+        | ADomain ts -> ts
+        in
         (*let e = aux expr_var_map e in
         ([], expr_var_map, Lambda (t, v, e))*)
         (* We try to factorize as much as possible *)
@@ -262,7 +266,7 @@ let convert_to_msc ast =
           filter_expr_map (defs |> List.map fst |> VarSet.of_list) in
         let (defs, defs') = (List.rev defs, List.rev defs') in
         let e = defs_and_x_to_e defs' x in
-        (defs, expr_var_map, Lambda (t, v, e))
+        (defs, expr_var_map, Lambda (ts, v, e))
       | Ast.Ite (e, t, e1, e2) ->
         let (defs, expr_var_map, x) = to_defs_and_x expr_var_map e in
         let (defs1, expr_var_map, x1) = to_defs_and_x expr_var_map e1 in

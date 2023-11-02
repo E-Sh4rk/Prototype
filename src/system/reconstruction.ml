@@ -427,11 +427,7 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
       if memvar v1 then Ok TypA else needvar v1 TypA UntypA
     | Ite (_, _, _, v2), ElseVarA ->
       if memvar v2 then Ok TypA else needvar v2 TypA UntypA
-    | Lambda (Unnanoted, _, _), InferA ->
-      let alpha = TVar.mk_mono (Some (Variable.show vardef)) |> TVar.typ in
-      let pannot_a = LambdaA (alpha, Infer) in
-      aux pannot_a a
-    | Lambda (ADomain ts, _, _), InferA ->
+    | Lambda (ts, _, _), InferA ->
       let pannot_a_s = List.map (fun t -> LambdaA (t, Infer)) ts in
       let pannot_a = match pannot_a_s with
       | [pannot_a] -> pannot_a

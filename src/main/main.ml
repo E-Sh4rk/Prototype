@@ -114,7 +114,7 @@ let parse_and_resolve f varm =
         let tenv = List.fold_left define_atom tenv lst in
         (tenv,varm,defs)
       | Ast.Types lst ->
-        let (tenv, _) = define_types tenv empty_vtenv lst in
+        let tenv = define_types tenv empty_vtenv lst in
         (tenv,varm,defs)
     in
     let (tenv, _, defs) =

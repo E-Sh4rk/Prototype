@@ -36,7 +36,7 @@ and type_expr =
 
 type type_alias = TVar.t list * node
 type type_env = type_alias StrMap.t (* User-defined types *) * StrSet.t (* Atoms *)
-type var_type_env = typ StrMap.t (* Var types *)
+type var_type_env = TVar.t StrMap.t (* Var types *)
 
 let empty_tenv = (StrMap.empty, StrSet.empty)
 let empty_vtenv = StrMap.empty
@@ -107,11 +107,12 @@ let derecurse_types env venv defs =
         match t with
         | TVar v ->
             begin match StrMap.find_opt v lcl, Hashtbl.find_opt venv v with
-            | Some t, _ | None, Some t -> Typepat.mk_type t
+            | Some t, _ -> Typepat.mk_type t
+            | None, Some t -> Typepat.mk_type (TVar.typ t)
             | None, None ->
-                let t = TVar.mk_mono ~infer:(is_infer_var_name v) (Some v) |> TVar.typ in
+                let t = TVar.mk_mono ~infer:(is_infer_var_name v) (Some v) in
                 Hashtbl.add venv v t ;
-                Typepat.mk_type t
+                Typepat.mk_type (TVar.typ t)
             end
         | TBase tb -> Typepat.mk_type (type_base_to_typ tb)
         | TCustom (args, n) ->
@@ -162,8 +163,11 @@ let derecurse_types env venv defs =
     (res, venv)
 
 let type_expr_to_typ (tenv, _) venv t = 
+    let remove_inferable_from_vtenv vtenv =
+        StrMap.filter (fun _ v -> TVar.can_infer v |> not) vtenv
+    in
     match derecurse_types tenv venv [ ("", [], t) ] with
-    | ([ _, _, n ], venv) -> (n, venv)
+    | ([ _, _, n ], venv) -> (n, remove_inferable_from_vtenv venv)
     | _ -> assert false
 
 let define_types (tenv, aenv) venv defs =
@@ -171,14 +175,14 @@ let define_types (tenv, aenv) venv defs =
         (fun (name, params, decl) -> (String.capitalize_ascii name, params, decl))
         defs
     in
-    let (res, venv) = derecurse_types tenv venv defs in
+    let (res, _) = derecurse_types tenv venv defs in
     let tenv = List.fold_left
         (fun acc (name, params, typ) ->
             if params = [] then register name typ ;
             StrMap.add name (params, cons typ) acc)
         tenv
         res
-    in ((tenv, aenv), venv)
+    in (tenv, aenv)
 
 let define_atom (env, atoms) name =
     let atom = String.uncapitalize_ascii name in

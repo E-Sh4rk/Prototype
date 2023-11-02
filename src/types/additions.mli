@@ -46,7 +46,7 @@ val type_expr_to_typ : type_env -> var_type_env -> type_expr -> typ * var_type_e
 
 val define_atom : type_env -> string -> type_env
 
-val define_types : type_env -> var_type_env -> (string * string list * type_expr) list -> type_env * var_type_env
+val define_types : type_env -> var_type_env -> (string * string list * type_expr) list -> type_env
 
 val get_atom_type : type_env -> string -> typ
 

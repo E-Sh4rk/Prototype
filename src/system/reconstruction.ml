@@ -432,15 +432,13 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
       let pannot_a = LambdaA (alpha, Infer) in
       aux pannot_a a
     | Lambda (ADomain ts, _, _), InferA ->
-      let branches = ts |> List.map (fun t ->
-        (* It is necessary to refresh inferable tvars to avoid correlations,
-           as the same tvar might already have been substituted in the environment. *)
-        let r = vars t |> TVarSet.filter TVar.can_infer |> refresh in
-        let t = Subst.apply r t in
-        let pannot_a = LambdaA (t, Infer) in
-        (pannot_a, Domains.empty, false)
-      ) in
-      let pannot_a = InterA (branches, [], (Domains.empty, false, true)) in
+      let pannot_a_s = List.map (fun t -> LambdaA (t, Infer)) ts in
+      let pannot_a = match pannot_a_s with
+      | [pannot_a] -> pannot_a
+      | pannot_a_s ->
+        let branches = pannot_a_s |> List.map (fun t -> (t, Domains.empty, false)) in
+        InterA (branches, [], (Domains.empty, false, true))
+      in
       aux pannot_a a
     | Lambda (_, v, e), LambdaA (s, pannot) ->
       log ~level:2 "Entering lambda for %a with domain %a.@." Variable.pp v pp_typ s ;

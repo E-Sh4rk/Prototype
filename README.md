@@ -1,4 +1,6 @@
-# Set-Theoretic and Polymorphic Type System Prototype
+# Prototype: Polymorphic Type Inference for Dynamic Languages
+
+[![DOI](https://zenodo.org/badge/308046842.svg)](https://zenodo.org/badge/latestdoi/308046842)
 
 The web version of this prototype can be tested [here](https://e-sh4rk.github.io/Prototype/).
 
@@ -17,7 +19,7 @@ docker run --rm -p 9090:9090 --name poly_container poly
 This exposes the Web version of the prototype on http://localhost:9090. The native version can
 be used from within the container. To start a shell inside the running container, do:
 ```
-docker run -ti poly_container bash
+docker exec -ti poly_container bash
 ```
 You can then follow the instructions in the [Running the prototype](#running-the-prototype) section below. Within the container, the text editors `nano`, `vim` and `emacs` are available.
 

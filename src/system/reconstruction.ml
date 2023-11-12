@@ -514,13 +514,14 @@ and infer_mono tenv expl env pannot e =
       | None -> aux (Keep (pannot_a, add_to_ex_u [(typ1, t1);(typ2,t2)] [] union)) e
       end
     | Bind (v, a, e), Keep (pannot_a, splits) ->
+      let annot_a = infer_poly_a v tenv env pannot_a a in
+      let t = typeof_a_nofail v tenv env annot_a a in
       let rec aux_splits splits =
         match splits with
         | ([],[],_) -> assert false
         | ([],d,u) -> Ok (Keep (pannot_a, ([],d,u)))
+        | ((s,_)::ex,d,u) when non_empty t && disjoint t s -> aux_splits (ex,d,s::u)
         | ((s,pannot)::ex,d,u) ->
-          let annot_a = infer_poly_a v tenv env pannot_a a in
-          let t = typeof_a_nofail v tenv env annot_a a in
           let keep = map_res (fun x -> Keep (pannot_a, x)) in
           log ~level:1 "Var %a typed with type %a.@." Variable.pp v pp_typ t ;  
           let t = cap_o t s in

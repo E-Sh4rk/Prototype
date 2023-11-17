@@ -49,6 +49,14 @@ jobs:
           opam exec -- dune build --profile release main/lib_js.bc.js
           cp _build/default/main/lib_js.bc.js ../webeditor/typechecker.js
 
+      # Version info
+      - name: Git describe
+        id: ghd
+        uses: proudust/gh-describe@v1
+      - name: Write version info
+        run: |
+          echo "${{ steps.ghd.outputs.describe }}" > ../webeditor/version.txt
+
       # Node dependencies
       - name: Use Node.js
         uses: actions/setup-node@v3

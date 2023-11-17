@@ -1,5 +1,5 @@
 (library
  (name utils)
  (wrapped false)
- (libraries)
+ (libraries str)
  (modules (:standard)))

@@ -27,7 +27,9 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: 'true'
 
       # OCaml build
       - name: Use OCaml ${{ matrix.ocaml-compiler }}
@@ -50,12 +52,9 @@ jobs:
           cp _build/default/main/lib_js.bc.js ../webeditor/typechecker.js
 
       # Version info
-      - name: Git describe
-        id: ghd
-        uses: proudust/gh-describe@v1
-      - name: Write version info
+      - name: Get and write version info
         run: |
-          echo "${{ steps.ghd.outputs.describe }}" > ../webeditor/version.txt
+          git describe --always --tags HEAD > ../webeditor/version.txt
 
       # Node dependencies
       - name: Use Node.js

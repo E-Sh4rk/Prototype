@@ -438,6 +438,7 @@ let simplify_typ t =
     in
     let t' = aux (cons t) |> descr in
     assert (equiv t t') ; t'
+    (* TODO: remove assertion when the Cduce subtyping issue will be fixed *)
 
 let split_typ t =
     let res = ref [] in

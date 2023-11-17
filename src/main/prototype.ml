@@ -16,16 +16,15 @@ let () =
                     Format.printf "%s (checked in %.02fms)\n%!" 
                         (Types.Tvar.string_of_type_short t) time ;
                     env
-                | TFailure (pos, msg, time) ->
-                    Format.printf "Ill typed (checked in %.02fms)\n%!" time ;
-                    Utils.error Format.std_formatter pos msg ;
+                | TFailure (_, msg, time) ->
+                    Format.printf "Untypeable: %s (checked in %.02fms)\n%!" msg time ;
                     env
             ) initial_env lst |> ignore ;
             let time1 = Unix.gettimeofday () in
             Format.printf "@.Total time: %.02fs@." (time1 -. time0)
         | PFailure (pos, msg) ->
-            Format.printf "Error at pos %s: %s\n%!" (Position.string_of_pos pos) msg
+            Format.printf "Error at pos %s: %s@." (Position.string_of_pos pos) msg
     with e ->
         let msg = Printexc.to_string e
         and stack = Printexc.get_backtrace () in
-        Format.printf "Uncaught exception: %s\n%s\n%!" msg stack
+        Format.printf "@.Uncaught exception: %s\n%s@." msg stack

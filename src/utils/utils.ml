@@ -1,17 +1,24 @@
 
-let warning fmt pos msg =
-  let pos = List.fold_left (
-    fun acc pos ->
-    Format.asprintf "%s %s" acc (Position.string_of_pos pos)
-  ) "" pos in
-  Format.fprintf fmt "Warning:%s\t%s\n" pos msg
+let warning fmt (pos, msg) =
+  if pos <> [] then
+    let pos = List.fold_left (
+      fun acc pos ->
+      Format.asprintf "%s %s" acc (Position.string_of_pos pos)
+    ) "" pos in
+    Format.fprintf fmt "Warning (%s): %s@." pos msg
+  else Format.fprintf fmt "Warning: %s@." msg
 
-let error fmt pos msg =
-  let pos = List.fold_left (
-    fun acc pos ->
-    Format.asprintf "%s %s" acc (Position.string_of_pos pos)
-  ) "" pos in
-  Format.fprintf fmt "Error:%s\t%s\n" pos msg
+let error fmt (pos, msg) =
+  if pos <> [] then
+    let pos = List.fold_left (
+      fun acc pos ->
+      Format.asprintf "%s %s" acc (Position.string_of_pos pos)
+    ) "" pos in
+    Format.fprintf fmt "Error (%s): %s@." pos msg
+  else Format.fprintf fmt "Error: %s@." msg
+
+let success fmt msg =
+  Format.fprintf fmt "Success: %s@." msg
 
 let log_disabled = -1
 let log_full = 10

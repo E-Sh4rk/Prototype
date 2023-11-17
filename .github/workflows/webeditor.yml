@@ -54,7 +54,7 @@ jobs:
       # Version info
       - name: Get and write version info
         run: |
-          git describe --always --tags HEAD > ../webeditor/version.txt
+          git describe --always --tags HEAD > ./webeditor/version.txt
 
       # Node dependencies
       - name: Use Node.js

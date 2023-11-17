@@ -9,8 +9,8 @@ open Types.Tvar
 type def = Variable.t * Ast.annot_expr * typ option
 
 type typecheck_result =
-| TSuccess of typ * Env.t * (float * float)
-| TFailure of (Position.t list) * string * (float * float)
+| TSuccess of typ * Env.t * float
+| TFailure of (Position.t list) * string * float
 
 module Reconstruct = Reconstruction.Make ()
 
@@ -24,12 +24,9 @@ let type_check_def tenv env (var,expr,typ_annot) =
   let (expr, addition) = Msc.remove_patterns_and_fixpoints expr in
   let nf_expr = Msc.convert_to_msc expr in
   let nf_addition = addition |> List.map (fun (v,e) -> v, Msc.convert_to_msc e) in
-  let time1 = Unix.gettimeofday () in
-  let retrieve_times () =
-    let time2 = Unix.gettimeofday () in
-    let msc_time = (time1 -. time0 ) *. 1000. in
-    let typ_time = (time2 -. time1) *. 1000. in
-    (msc_time, typ_time)
+  let retrieve_time () =
+    let time1 = Unix.gettimeofday () in
+    (time1 -. time0 ) *. 1000.
   in
   let type_additionnal env (v, nf) =
     let typ = Reconstruct.typeof_infer tenv env nf |> generalize_all ~uncorrelate:true in
@@ -51,14 +48,14 @@ let type_check_def tenv env (var,expr,typ_annot) =
         else raise (IncompatibleType typ)
     in
     let env = Env.add var typ env in
-    TSuccess (typ, env, retrieve_times ())
+    TSuccess (typ, env, retrieve_time ())
   with
   | Algorithmic.Untypeable (pos, str) ->
-    TFailure (pos, str, retrieve_times ())
+    TFailure (pos, str, retrieve_time ())
   | IncompatibleType _ ->
     TFailure (Variable.get_locations var,
       "the type inferred is not a subtype of the type specified",
-      retrieve_times ())
+      retrieve_time ())
 
 type parsing_result =
 | PSuccess of type_env * ((int * def) list)

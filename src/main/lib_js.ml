@@ -29,16 +29,14 @@ let typecheck code callback =
             let def_pos = Parsing.Variable.Variable.get_locations v |> List.hd in
             let (env, res) =
               match type_check_def tenv env (v,e,ta) with
-              | TSuccess (t, env, (tmsc, ttype)) ->
+              | TSuccess (t, env, time) ->
                 let typ = Types.Tvar.string_of_type_short t in
-                let time = tmsc +. ttype in
                 let typ =
                   `Assoc [("name", `String name) ; ("def_pos", json_of_pos def_pos) ;
                   ("typeable", `Bool true) ; ("type", `String typ) ; ("time", `Float time)]
                 in
                 (env, typ::res)
-              | TFailure (pos, msg, (tmsc, ttype)) ->
-                let time = tmsc +. ttype in
+              | TFailure (pos, msg, time) ->
                 let untyp =
                   `Assoc [("name", `String name) ; ("def_pos", json_of_pos def_pos) ; ("time", `Float time) ;
                   ("typeable", `Bool false) ; ("message", `String msg) ; ("pos", json_of_pos_list pos)]

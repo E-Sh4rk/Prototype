@@ -15,11 +15,11 @@ let () =
                     (Parsing.Variable.Variable.get_name v |> Option.get) ;
                 match type_check_def tenv env (v,e,ta) with
                 | TSuccess (t, env, time) ->
-                    Format.printf "%s @{<italic;yellow>(checked in %.02fms)@}\n%!"
+                    Format.printf "%s @{<italic;yellow>(checked in %.00fms)@}\n%!"
                         (Types.Tvar.string_of_type_short t) time ;
                     env
                 | TFailure (_, msg, time) ->
-                    Format.printf "@{<red>%s@} @{<italic;purple>(failed in %.02fms)@}\n%!" msg time ;
+                    Format.printf "@{<red>%s@} @{<italic;purple>(failed in %.00fms)@}\n%!" msg time ;
                     env
             ) initial_env lst |> ignore ;
             let time1 = Unix.gettimeofday () in

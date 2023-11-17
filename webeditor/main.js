@@ -15,7 +15,7 @@ requirejs(['vs/editor/editor.main'], function () {
 		}	
 	});
 	let editor = monaco.editor.create(document.getElementById('container'), {
-		value: '(* Press CTRL-Enter to type the current buffer. *)\n(* Press F2 (or right-click) to load an example. *)\n\n',
+		value: '(* Press F2 to load an example. *)\n(* Press Ctrl-Enter to type the current buffer. *)\n(* (also accessible via context menu) *)\n\n',
 		theme: 'vs-custom',
 		language: 'stml',
 		automaticLayout: true,

@@ -142,3 +142,13 @@ html, body {
   color: #ddd;
   font-weight: bold;
 }
+
+#version {
+  font-weight: bold;
+  color: green;
+}
+
+.keybinding {
+  font-weight: bold;
+  color: yellowgreen;
+}

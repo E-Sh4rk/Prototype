@@ -5,6 +5,8 @@ let modal_callback = null;
 let lock = false;
 let examples_dir = "examples/"
 let list_path = examples_dir+"list.json";
+let version_elt = document.getElementById("version");
+let version_path = "version.txt";
 
 function closeLoadModal(str) {
     modal.style.display = "none";
@@ -60,3 +62,7 @@ function showLoadModal(callback) {
     modal_callback = callback;
     modal.style.display = "block";
 }
+
+getFile(version_path, (content) => {
+    version_elt.textContent = content;
+});

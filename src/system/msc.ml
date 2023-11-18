@@ -32,7 +32,8 @@ let fixpoint_typ =
   let fc = cap f c |> cons in
   let arg = mk_arrow (cons f) fc |> cons in
   mk_arrow arg fc
-let initial_env = Env.singleton fixpoint_var fixpoint_typ
+let initial_env =
+  Env.construct [(fixpoint_var, fixpoint_typ)]
 
 let map ef af =
   let rec aux_a a =
@@ -193,10 +194,7 @@ let rec def_of_var_pat pat v e =
   | PatAssign _ -> assert false
   | PatType _ -> assert false
 
-(* TODO: refactor: fixpoints should only occur at toplevel
-   and should not be part of the AST like that *)
 let remove_patterns_and_fixpoints e =
-  let aux_defs = ref [] in
   let aux (annot,e) =
     let e =
       match e with
@@ -224,17 +222,57 @@ let remove_patterns_and_fixpoints e =
         Variable.attach_location x (Position.position annot) ;
         Ast.Let (x, (annot, Ast.TypeConstr (e, t)), body)
       | Ast.Fixpoint e ->
-        let v = Variable.create_other (Some "fixpoint_aux") in
-        aux_defs := (v,e)::(!aux_defs) ;
         let lhs = (annot, Ast.Var fixpoint_var) in
-        let rhs = (annot, Ast.Var v) in
+        let rhs = (annot, Ast.TopLevel e) in
         Ast.App (lhs, rhs)
       | e -> e
     in
     (annot, e)
   in
-  let res = Ast.map_ast aux e in
-  (res, !aux_defs)
+  Ast.map_ast aux e
+
+let vhole = Variable.create_lambda None
+let vhole_ann = (Ast.new_annot Position.dummy, Ast.Var vhole)
+let insert_in_ctx e' e = Ast.substitute e vhole e'
+let remove_toplevel e =
+  let open Ast in
+  let ctx = vhole_ann in
+  let es = ref [] in
+  let rec aux ctx cur_args (annot,e) =
+    let aux' = aux ctx cur_args in
+    let e = match e with
+    | TopLevel e ->
+      let e = aux' e in
+      let e' = insert_in_ctx e ctx in
+      let x = Variable.create_other (Some "toplevel_aux") in
+      Variable.attach_location x (Position.position annot) ;
+      es := (x,e')::!es ;
+      let app = List.fold_right
+        (fun arg acc -> App ((annot, acc), (annot, Var arg)))
+        cur_args (Var x) in
+      app
+    | Lambda (ts, v, e) ->
+      let ctx = insert_in_ctx
+        (annot, Lambda (ts, v, vhole_ann)) ctx in
+      let cur_args = v::cur_args in
+      Lambda (ts, v, aux ctx cur_args e)
+    | Abstract t -> Abstract t
+    | Const c -> Const c
+    | Var v -> Var v
+    | Ite (e, t, e1, e2) -> Ite (aux' e, t, aux' e1, aux' e2)
+    | App (e1, e2) -> App (aux' e1, aux' e2)
+    | Let (v, e1, e2) -> Let (v, aux' e1, aux' e2)
+    | Pair (e1, e2) -> Pair (aux' e1, aux' e2)
+    | Projection (p, e) -> Projection (p, aux' e)
+    | RecordUpdate (e, str, eo) ->
+      RecordUpdate (aux' e, str, Option.map aux' eo)
+    | TypeConstr (e, t) -> TypeConstr (aux' e, t)
+    | Fixpoint _ | PatMatch _ -> assert false
+    in
+    (annot, e)
+  in
+  let e = aux ctx [] e in
+  (e, List.rev !es)  
   
 let convert_to_msc ast =
   let aux expr_var_map ast =
@@ -299,7 +337,7 @@ let convert_to_msc ast =
       | Ast.TypeConstr (e, t) ->
         let (defs, expr_var_map, x) = to_defs_and_x expr_var_map e in
         (defs, expr_var_map, TypeConstr (x, t))
-      | Ast.PatMatch _ | Ast.Fixpoint _ -> assert false
+      | Ast.PatMatch _ | Ast.Fixpoint _ | Ast.TopLevel _ -> assert false
 
     and to_defs_and_x ?(name=None) expr_var_map ast =
       let ((_, pos), _) = ast in
@@ -326,3 +364,12 @@ let convert_to_msc ast =
     defs_and_x_to_e defs x
 
   in aux ExprMap.empty ast
+
+(* let remove_useless_bindings e =
+  let remove_useless e =
+    match e with
+    | Bind (v, a, e) when VarSet.mem v (fv_e e) -> Bind (v, a, e)
+    | Bind (_, _, e) -> e
+    | Var v -> Var v
+  in
+  map_e remove_useless Utils.identity e *)

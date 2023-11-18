@@ -27,10 +27,15 @@ and e =
 val initial_env : Env.t
 
 (** [remove_patterns_and_fixpoints e] eliminates pattern matching and
-    recursive function constructs by encoding them using other constructs.
-    Returns a pair containing the resulting expression and a list of
-    intermediate definitions that need to be typed first. *)
+    recursive function constructs by encoding them using other constructs. *)
 val remove_patterns_and_fixpoints :
+  Ast.annot_expr -> Ast.annot_expr
+
+(** [remove_toplevel e] eliminates TopLevel constructs in the expression [e].
+    Returns a pair containing the resulting expression and a list of
+    intermediate definitions that need to be typed first.
+    This function assumes that there is no fixpoint nor pattern matching in [e]. *)
+val remove_toplevel :
   Ast.annot_expr -> Ast.annot_expr * (Variable.t * Ast.annot_expr) list
 
 (** [convert_to_msc e] assumes that there is no fixpoint nor pattern matching

@@ -68,7 +68,7 @@
 %}
 
 %token EOF
-%token FUN LET REC IN FST SND DEBUG
+%token FUN LET REC TOPLEVEL IN FST SND DEBUG
 %token IF IS THEN ELSE
 %token LPAREN RPAREN EQUAL COMMA COLON INTERROGATION_MARK
 %token ARROW AND OR NEG DIFF
@@ -152,12 +152,17 @@ term:
     let td = multi_param_abstraction $startpos $endpos ais td in
     annot $startpos $endpos (Let (id, td, t))
   }
-// NOTE: Disabled because fixpoints are only available at top-level (for now)
-// | LET REC id=generalized_identifier ais=parameter* oty=optional_typ EQUAL td=term IN t=term
-//   { 
-//     let td = multi_param_rec_abstraction $startpos $endpos id ais oty td in
-//     annot $symbolstartpos $endpos (Let (id, td, t))
-//   }
+| LET REC id=generalized_identifier ais=parameter* oty=optional_typ EQUAL td=term IN t=term
+  { 
+    let td = multi_param_rec_abstraction $startpos $endpos id ais oty td in
+    annot $symbolstartpos $endpos (Let (id, td, t))
+  }
+| LET TOPLEVEL id=generalized_identifier ais=parameter* EQUAL td=term IN t=term
+  { 
+    let td = multi_param_abstraction $startpos $endpos ais td in
+    let td = annot $symbolstartpos $endpos (TopLevel td) in
+    annot $symbolstartpos $endpos (Let (id, td, t))
+  }
 | LET LPAREN p = pattern RPAREN EQUAL td=term IN t=term { let_pattern $startpos $endpos p td t }
 | IF t=term ott=optional_test_type THEN t1=term ELSE t2=term { annot $startpos $endpos (Ite (t,ott,t1,t2)) }
 | MATCH t=term WITH pats=patterns END { annot $startpos $endpos (PatMatch (t,pats)) }

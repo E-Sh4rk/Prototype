@@ -21,7 +21,8 @@ let generalize_all ~uncorrelate t =
 exception IncompatibleType of typ
 let type_check_def tenv env (var,expr,typ_annot) =
   let time0 = Unix.gettimeofday () in
-  let (expr, addition) = Msc.remove_patterns_and_fixpoints expr in
+  let expr = Msc.remove_patterns_and_fixpoints expr in
+  let (expr, addition) = Msc.remove_toplevel expr in
   let nf_expr = Msc.convert_to_msc expr in
   let nf_addition = addition |> List.map (fun (v,e) -> v, Msc.convert_to_msc e) in
   let retrieve_time () =

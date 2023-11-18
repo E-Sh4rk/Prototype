@@ -49,6 +49,7 @@ and ('a, 'typ, 'v) ast =
 | RecordUpdate of ('a, 'typ, 'v) t * string * ('a, 'typ, 'v) t option
 | TypeConstr of ('a, 'typ, 'v) t * 'typ
 | PatMatch of ('a, 'typ, 'v) t * (('a, 'typ, 'v) pattern * ('a, 'typ, 'v) t) list
+| TopLevel of ('a, 'typ, 'v) t
 
 and ('a, 'typ, 'v) t = 'a * ('a, 'typ, 'v) ast
 

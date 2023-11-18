@@ -53,6 +53,7 @@ and ('a, 'typ, 'v) ast =
 | RecordUpdate of ('a, 'typ, 'v) t * string * ('a, 'typ, 'v) t option
 | TypeConstr of ('a, 'typ, 'v) t * 'typ
 | PatMatch of ('a, 'typ, 'v) t * (('a, 'typ, 'v) pattern * ('a, 'typ, 'v) t) list
+| TopLevel of ('a, 'typ, 'v) t
 [@@deriving ord]
 
 and ('a, 'typ, 'v) t = 'a * ('a, 'typ, 'v) ast
@@ -163,6 +164,7 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
             else raise (SymbolError ("type constraints must be a valid test type"))
         | PatMatch (e, pats) ->
             PatMatch (aux vtenv env e, List.map (aux_pat pos vtenv env) pats)
+        | TopLevel e -> TopLevel (aux vtenv env e)
         in
         ((exprid,pos),e)
     and aux_pat pos vtenv env (pat, e) =
@@ -264,6 +266,7 @@ let rec unannot (_,e) =
     | PatMatch (e, pats) ->
         PatMatch (unannot e, pats |>
             List.map (fun (p, e) -> (unannot_pat p, unannot e)))
+    | TopLevel e -> TopLevel (unannot e)
     in
     ( (), e )
 
@@ -324,6 +327,7 @@ let normalize_bvs e =
             let pats = pats |> List.map (fun (p,e) ->
                 (aux_p depth map p, aux depth map e)) in
             PatMatch (e, pats)
+        | TopLevel e -> TopLevel (aux depth map e)
         in (a, e)
     and aux_p (*depth map*) _ _ pat =
         let pa pat =
@@ -371,6 +375,7 @@ let map_ast f e =
         | PatMatch (e, pats) ->
             let pats = pats |> List.map (fun (p,e) -> (aux_p p, aux e)) in
             PatMatch (aux e, pats)
+        | TopLevel e -> TopLevel (aux e)
         in
         f (annot, e)
     and aux_p p =

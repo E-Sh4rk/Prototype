@@ -74,6 +74,7 @@ rule token = parse
 | "fun"   { FUN }
 | "let"   { LET }
 | "rec"   { REC }
+| "gen"   { TOPLEVEL }
 | "in"    { IN }
 | "fst"   { FST }
 | "snd"   { SND }

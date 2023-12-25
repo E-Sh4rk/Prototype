@@ -649,3 +649,11 @@ let rec fold_right f acc l =
   :Nil -> acc
   | (x, ll) -> f x (fold_right f acc ll)
 end
+
+(* UNCOMPLETENESS & ANNOTATIONS *)
+
+let id x = x
+
+let test_expansion_noannot =
+    let f = (fun x -> (x 123, x true)) in
+    f id

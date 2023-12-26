@@ -2,7 +2,7 @@
 
 [![DOI](https://zenodo.org/badge/308046842.svg)](https://zenodo.org/badge/latestdoi/308046842)
 
-The web version of this prototype can be tested [here](https://e-sh4rk.github.io/Prototype/).
+The web version of this prototype can be tested [here](https://www.cduce.org/dynlang/) (or [there](https://e-sh4rk.github.io/Prototype/) for a more experimental version).
 
 ## Using the docker image
 

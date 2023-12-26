@@ -657,3 +657,7 @@ let id x = x
 let test_expansion_noannot =
     let f = (fun x -> (x 123, x true)) in
     f id
+
+let test_expansion =
+  let f = (fun x -> (x 123, x true)) in
+  f (id :> (123 -> 123) & (True -> True))

@@ -70,7 +70,7 @@
 %token EOF
 %token FUN LET REC TOPLEVEL IN FST SND DEBUG
 %token IF IS THEN ELSE
-%token LPAREN RPAREN EQUAL COMMA COLON INTERROGATION_MARK
+%token LPAREN RPAREN EQUAL COMMA COLON COERCE INTERROGATION_MARK
 %token ARROW AND OR NEG DIFF
 %token ANY EMPTY BOOL CHAR FLOAT INT TRUE FALSE UNIT NIL STRING LIST
 %token DOUBLEDASH TIMES PLUS MINUS DIV
@@ -192,6 +192,7 @@ atomic_term:
 | LPAREN RPAREN { annot $startpos $endpos (Const Unit) }
 | LPAREN t=term RPAREN { t }
 | LPAREN t=term COLON ty=typ RPAREN { annot $startpos $endpos (TypeConstr (t,ty)) }
+| LPAREN t=term COERCE ty=typ RPAREN { annot $startpos $endpos (TypeCoercion (t,ty)) }
 | LBRACE obr=optional_base_record fs=separated_nonempty_list(COMMA, field_term) RBRACE
 { record_update $startpos $endpos obr fs }
 | LBRACKET lst=separated_list(SEMICOLON, term) RBRACKET

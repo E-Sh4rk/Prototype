@@ -104,6 +104,11 @@ let rec typeof_a vardef tenv env (annot_a,c_a) a =
       if subtype (instantiate_check ss t) s
       then t
       else untypeable ("Type constraint not satisfied.")
+    | TypeCoercion (v, s), CoercA ss ->
+      let t = var_type v in
+      if subtype (instantiate_check ss t) s
+      then s
+      else untypeable ("Type coercion not possible.")
     | App (v1, v2), AppA (ss1, ss2) ->
       let apply t1 t2 =
         if subtype t1 arrow_any

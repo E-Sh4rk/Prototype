@@ -32,7 +32,7 @@ module FullAnnot : sig
         | ProjA of inst
         | EmptyA of inst | ThenA of inst | ElseA of inst
         | RecordUpdateA of inst * (renaming option)
-        | ConstrA of inst
+        | ConstrA of inst | CoercA of inst
         | InterA of a_cached inter
     and t =
         | BVar of renaming

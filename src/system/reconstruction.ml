@@ -26,9 +26,10 @@ let refine_a tenv env a t =
   match a with
   | Lambda _ -> []
   | Abstract t' when subtype t' t -> [Env.empty]
+  | TypeCoercion (_, t') when subtype t' t -> [Env.empty]
   | Const c when subtype (typeof_const_atom tenv c) t -> [Env.empty]
   | Alias v when subtype (Env.find v env) t -> [Env.empty]
-  | Alias _ | Abstract _ | Const _ -> []
+  | Alias _ | Abstract _ | TypeCoercion _ | Const _ -> []
   | Pair (v1, v2) ->
     pair_dnf t
     |> List.filter (fun b -> subtype (pair_branch_type b) t)
@@ -380,6 +381,14 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
         let res = tallying_infer [(vartype v, s)] in
         let res = simplify_tallying_infer env empty res in
         needsubst res TypA UntypA
+      else
+        needvar v InferA UntypA
+    | TypeCoercion (v, s), InferA ->
+      if memvar v then
+        begin match subtype_expand (vartype v) s with
+        | None -> Fail
+        | Some _ -> Ok TypA
+        end
       else
         needvar v InferA UntypA
     | App (v1, v2), InferA ->

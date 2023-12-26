@@ -16,6 +16,7 @@ type a =
   | RecordUpdate of Variable.t * string * Variable.t option
   | Let of Variable.t * Variable.t
   | TypeConstr of Variable.t * typ
+  | TypeCoercion of Variable.t * typ
   [@@deriving show]
 
 and e =
@@ -49,6 +50,7 @@ let map ef af =
     | RecordUpdate (v, str, vo) -> RecordUpdate (v, str, vo)
     | Let (v1, v2) -> Let (v1, v2)
     | TypeConstr (v, t) -> TypeConstr (v, t)
+    | TypeCoercion (v, t) -> TypeCoercion (v, t)
     end
     |> af
   and aux_e e =
@@ -67,7 +69,7 @@ let fold ef af =
     begin match a with
     | Alias _ | Abstract _ | Const _ | App _ | Pair _
     | Projection _ | RecordUpdate _ | Ite _ | Let _
-    | TypeConstr _ -> []
+    | TypeConstr _ | TypeCoercion _ -> []
     | Lambda (_, _, e) -> [aux_e e]
     end
     |> af a
@@ -92,7 +94,7 @@ let fv_a' a acc =
   match a with
   | Lambda (_, v, _) -> VarSet.remove v acc
   | Alias v | Projection (_, v) | RecordUpdate (v, _, None)
-  | TypeConstr (v, _) -> VarSet.add v acc
+  | TypeConstr (v, _) | TypeCoercion (v, _) -> VarSet.add v acc
   | Ite (v, _, x1, x2) -> VarSet.add v acc |> VarSet.add x1 |> VarSet.add x2
   | App (v1, v2) | Pair (v1, v2) | Let (v1, v2) | RecordUpdate (v1, _, Some v2) ->
     VarSet.add v1 acc |> VarSet.add v2

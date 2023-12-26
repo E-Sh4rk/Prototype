@@ -63,7 +63,7 @@ module FullAnnot = struct
       | ProjA of inst
       | EmptyA of inst | ThenA of inst | ElseA of inst
       | RecordUpdateA of inst * (renaming option)
-      | ConstrA of inst
+      | ConstrA of inst | CoercA of inst
       | InterA of a_cached inter
   [@@deriving show]
   and t =
@@ -93,7 +93,8 @@ module FullAnnot = struct
   and clear_cache_a (a, _) =
   let a = match a with
   | ConstA | AliasA | LetA | AbstractA |PairA _ | AppA _ | ProjA _
-  | EmptyA _ | ThenA _ | ElseA _ | RecordUpdateA _ | ConstrA _ -> a
+  | EmptyA _ | ThenA _ | ElseA _ | RecordUpdateA _
+  | ConstrA _ | CoercA _ -> a
   | InterA lst -> InterA (List.map clear_cache_a lst)
   | LambdaA (typ, t) -> LambdaA (typ, clear_cache t)
   in

@@ -101,7 +101,7 @@ let rec typeof_a vardef tenv env (annot_a,c_a) a =
       else untypeable ("Invalid field update: not a record.")
     | TypeConstr (v, s), ConstrA ss ->
       let t = var_type v in
-      if subtype (instantiate_check ss t) s
+      if subtype (instantiate_check ss t) (disj s)
       then t
       else untypeable ("Type constraint not satisfied.")
     | TypeCoercion (v, s), CoercA ss ->

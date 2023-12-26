@@ -15,7 +15,7 @@ type a =
   | Projection of Ast.projection * Variable.t
   | RecordUpdate of Variable.t * string * Variable.t option
   | Let of Variable.t * Variable.t
-  | TypeConstr of Variable.t * typ
+  | TypeConstr of Variable.t * typ list
   | TypeCoercion of Variable.t * typ
   [@@deriving show]
 
@@ -49,7 +49,7 @@ let map ef af =
     | Projection (p, v) -> Projection (p, v)
     | RecordUpdate (v, str, vo) -> RecordUpdate (v, str, vo)
     | Let (v1, v2) -> Let (v1, v2)
-    | TypeConstr (v, t) -> TypeConstr (v, t)
+    | TypeConstr (v, ts) -> TypeConstr (v, ts)
     | TypeCoercion (v, t) -> TypeCoercion (v, t)
     end
     |> af
@@ -268,7 +268,7 @@ let remove_toplevel e =
     | Projection (p, e) -> Projection (p, aux' e)
     | RecordUpdate (e, str, eo) ->
       RecordUpdate (aux' e, str, Option.map aux' eo)
-    | TypeConstr (e, t) -> TypeConstr (aux' e, t)
+    | TypeConstr (e, ts) -> TypeConstr (aux' e, ts)
     | TypeCoercion (e, t) -> TypeCoercion (aux' e, t)
     | Fixpoint _ | PatMatch _ -> assert false
     in
@@ -339,7 +339,7 @@ let convert_to_msc ast =
         (defs'@defs, expr_var_map, RecordUpdate (x, str, Some x'))
       | Ast.TypeConstr (e, t) ->
         let (defs, expr_var_map, x) = to_defs_and_x expr_var_map e in
-        (defs, expr_var_map, TypeConstr (x, t))
+        (defs, expr_var_map, TypeConstr (x, [t]))
       | Ast.TypeCoercion (e, t) ->
         let (defs, expr_var_map, x) = to_defs_and_x expr_var_map e in
         (defs, expr_var_map, TypeCoercion (x, t))  

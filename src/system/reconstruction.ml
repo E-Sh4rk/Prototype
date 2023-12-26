@@ -378,11 +378,21 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
         needsubst res TypA UntypA
     | TypeConstr (v, s), InferA ->
       if memvar v then
-        let res = tallying_infer [(vartype v, s)] in
+        let res = tallying_infer [(vartype v, disj s)] in
         let res = simplify_tallying_infer env empty res in
-        needsubst res TypA UntypA
+        needsubst res ConstrA UntypA
       else
         needvar v InferA UntypA
+    | TypeConstr (v, s), ConstrA ->
+      let tv = vartype v in
+      let rec split_if_needed ts =
+        match ts with
+        | [] -> Ok TypA
+        | s::ts when subtype tv s || disjoint tv s ->
+          split_if_needed ts
+        | s::_ -> Split (Env.singleton v s, ConstrA, ConstrA)
+      in
+      split_if_needed s
     | TypeCoercion (v, s), InferA ->
       if memvar v then
         begin match subtype_expand (vartype v) s with

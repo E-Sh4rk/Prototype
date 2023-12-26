@@ -14,7 +14,7 @@ type a =
   | Projection of Ast.projection * Variable.t
   | RecordUpdate of Variable.t * string * Variable.t option
   | Let of Variable.t * Variable.t
-  | TypeConstr of Variable.t * typ
+  | TypeConstr of Variable.t * typ list
   | TypeCoercion of Variable.t * typ
 
 (** Type for canonical forms. *)

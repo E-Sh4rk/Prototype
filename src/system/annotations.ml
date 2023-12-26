@@ -120,7 +120,7 @@ module PartialAnnot = struct
   [@@deriving show]
   and a =
       | InferA | TypA | UntypA
-      | ThenVarA | ElseVarA
+      | ThenVarA | ElseVarA | ConstrA
       | LambdaA of typ * t
       | InterA of a inter
   [@@deriving show]
@@ -163,7 +163,7 @@ module PartialAnnot = struct
         | InferA -> InferA
         | TypA -> TypA
         | UntypA -> UntypA
-        | ThenVarA -> ThenVarA | ElseVarA -> ElseVarA
+        | ThenVarA -> ThenVarA | ElseVarA -> ElseVarA | ConstrA -> ConstrA
         | LambdaA (ty, t) -> LambdaA (apply_typ ty, apply_subst t)
         | InterA i -> InterA (apply_inter apply_subst_a i)
       and apply t =
@@ -209,7 +209,7 @@ module PartialAnnot = struct
   let rec equals_a a1 a2 =
     match a1, a2 with
     | InferA, InferA | TypA, TypA | UntypA, UntypA
-    | ThenVarA, ThenVarA | ElseVarA, ElseVarA -> true
+    | ThenVarA, ThenVarA | ElseVarA, ElseVarA | ConstrA, ConstrA -> true
     | LambdaA (s1, t1), LambdaA (s2, t2) ->
       equiv s1 s2 && equals t1 t2
     | InterA (i1,i1',_), InterA (i2,i2',_) ->

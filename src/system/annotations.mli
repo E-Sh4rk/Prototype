@@ -75,7 +75,7 @@ module PartialAnnot : sig
                     * bool (* User-defined intersection? (no trimming should be performed) *))
     and a =
         | InferA | TypA | UntypA
-        | ThenVarA | ElseVarA
+        | ThenVarA | ElseVarA | ConstrA
         | LambdaA of typ * t
         | InterA of a inter
     and t =

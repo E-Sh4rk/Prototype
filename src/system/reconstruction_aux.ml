@@ -243,7 +243,7 @@ let rec infer_poly_a vardef tenv env pannot_a a =
       let r = refresh (vartype v2 |> vars_poly) in
       RecordUpdateA (res, Some r)
     | TypeConstr (v, s), TypA ->
-      ConstrA [tallying_one [(vartype v, s)]]
+      ConstrA [tallying_one [(vartype v, disj s)]]
     | TypeCoercion (v, s), TypA ->
       begin match subtype_expand (vartype v) s with
       | None -> assert false

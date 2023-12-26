@@ -538,13 +538,10 @@ let subtype_expand t1 t2 =
     let rec test_subtype exp =
         if List.length exp > max_exp then None
         else
-            let t1 = instantiate exp t1 in
-            match tallying [(t1, t2)] with
+            match tallying [(instantiate exp t1, t2)] with
             | [] -> test_subtype ((refresh t1)::exp)
             | sol::_ ->
-                let inst =
-                    exp |> List.map (Subst.compose_restr sol)
-                in
+                let inst = exp |> List.map (Subst.compose_restr sol) in
                 Some inst
     in
     test_subtype [refresh t1]

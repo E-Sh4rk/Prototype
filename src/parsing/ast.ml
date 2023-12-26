@@ -52,6 +52,7 @@ and ('a, 'typ, 'v) ast =
 | Projection of projection * ('a, 'typ, 'v) t
 | RecordUpdate of ('a, 'typ, 'v) t * string * ('a, 'typ, 'v) t option
 | TypeConstr of ('a, 'typ, 'v) t * 'typ
+| TypeCoercion of ('a, 'typ, 'v) t * 'typ
 | PatMatch of ('a, 'typ, 'v) t * (('a, 'typ, 'v) pattern * ('a, 'typ, 'v) t) list
 | TopLevel of ('a, 'typ, 'v) t
 [@@deriving ord]
@@ -162,6 +163,12 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
             if is_test_type t
             then TypeConstr (aux vtenv env e, t)
             else raise (SymbolError ("type constraints must be a valid test type"))
+        | TypeCoercion (e, t) ->
+            let open Types.Tvar in
+            let (t, vtenv) = type_expr_to_typ tenv vtenv t in
+            if vars t |> TVarSet.filter TVar.can_infer |> TVarSet.is_empty
+            then TypeCoercion (aux vtenv env e, t)
+            else raise (SymbolError ("type in coercion should not have inferable type variable"))
         | PatMatch (e, pats) ->
             PatMatch (aux vtenv env e, List.map (aux_pat pos vtenv env) pats)
         | TopLevel e -> TopLevel (aux vtenv env e)
@@ -263,6 +270,7 @@ let rec unannot (_,e) =
     | RecordUpdate (e1, l, e2) ->
         RecordUpdate (unannot e1, l, Option.map unannot e2)
     | TypeConstr (e, t) -> TypeConstr (unannot e, t)
+    | TypeCoercion (e, t) -> TypeCoercion (unannot e, t)
     | PatMatch (e, pats) ->
         PatMatch (unannot e, pats |>
             List.map (fun (p, e) -> (unannot_pat p, unannot e)))
@@ -319,6 +327,7 @@ let normalize_bvs e =
         | RecordUpdate (e1, l, e2) ->
             RecordUpdate (aux depth map e1, l, Option.map (aux depth map) e2)
         | TypeConstr (e, t) -> TypeConstr (aux depth map e, t)
+        | TypeCoercion (e, t) -> TypeCoercion (aux depth map e, t)
         | PatMatch (e, pats) ->
             let e = aux depth map e in
             (* NOTE: We do not normalize pattern variables,
@@ -372,6 +381,7 @@ let map_ast f e =
         | Projection (p, e) -> Projection (p, aux e)
         | RecordUpdate (e, str, eo) -> RecordUpdate (aux e, str, Option.map aux eo)
         | TypeConstr (e, t) -> TypeConstr (aux e, t)
+        | TypeCoercion (e, t) -> TypeCoercion (aux e, t)
         | PatMatch (e, pats) ->
             let pats = pats |> List.map (fun (p,e) -> (aux_p p, aux e)) in
             PatMatch (aux e, pats)

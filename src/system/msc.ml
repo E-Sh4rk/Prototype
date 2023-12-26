@@ -269,6 +269,7 @@ let remove_toplevel e =
     | RecordUpdate (e, str, eo) ->
       RecordUpdate (aux' e, str, Option.map aux' eo)
     | TypeConstr (e, t) -> TypeConstr (aux' e, t)
+    | TypeCoercion (e, t) -> TypeCoercion (aux' e, t)
     | Fixpoint _ | PatMatch _ -> assert false
     in
     (annot, e)
@@ -339,6 +340,9 @@ let convert_to_msc ast =
       | Ast.TypeConstr (e, t) ->
         let (defs, expr_var_map, x) = to_defs_and_x expr_var_map e in
         (defs, expr_var_map, TypeConstr (x, t))
+      | Ast.TypeCoercion (e, t) ->
+        let (defs, expr_var_map, x) = to_defs_and_x expr_var_map e in
+        (defs, expr_var_map, TypeCoercion (x, t))  
       | Ast.PatMatch _ | Ast.Fixpoint _ | Ast.TopLevel _ -> assert false
 
     and to_defs_and_x ?(name=None) expr_var_map ast =

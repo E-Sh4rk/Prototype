@@ -47,7 +47,7 @@ and ('a, 'typ, 'v) ast =
 | Pair of ('a, 'typ, 'v) t * ('a, 'typ, 'v) t
 | Projection of projection * ('a, 'typ, 'v) t
 | RecordUpdate of ('a, 'typ, 'v) t * string * ('a, 'typ, 'v) t option
-| TypeConstr of ('a, 'typ, 'v) t * 'typ
+| TypeConstr of ('a, 'typ, 'v) t * 'typ list
 | TypeCoercion of ('a, 'typ, 'v) t * 'typ
 | PatMatch of ('a, 'typ, 'v) t * (('a, 'typ, 'v) pattern * ('a, 'typ, 'v) t) list
 | TopLevel of ('a, 'typ, 'v) t

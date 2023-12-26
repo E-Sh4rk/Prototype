@@ -222,7 +222,7 @@ let remove_patterns_and_fixpoints e =
         in
         let x = Variable.create_other None in
         Variable.attach_location x (Position.position annot) ;
-        Ast.Let (x, (annot, Ast.TypeConstr (e, t)), body)
+        Ast.Let (x, (annot, Ast.TypeConstr (e, [t])), body)
       | Ast.Fixpoint e ->
         let lhs = (annot, Ast.Var fixpoint_var) in
         let rhs = (annot, Ast.TopLevel e) in
@@ -337,9 +337,9 @@ let convert_to_msc ast =
         let (defs, expr_var_map, x) = to_defs_and_x expr_var_map e in
         let (defs', expr_var_map, x') = to_defs_and_x expr_var_map e' in
         (defs'@defs, expr_var_map, RecordUpdate (x, str, Some x'))
-      | Ast.TypeConstr (e, t) ->
+      | Ast.TypeConstr (e, ts) ->
         let (defs, expr_var_map, x) = to_defs_and_x expr_var_map e in
-        (defs, expr_var_map, TypeConstr (x, [t]))
+        (defs, expr_var_map, TypeConstr (x, ts))
       | Ast.TypeCoercion (e, t) ->
         let (defs, expr_var_map, x) = to_defs_and_x expr_var_map e in
         (defs, expr_var_map, TypeCoercion (x, t))  

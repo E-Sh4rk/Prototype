@@ -51,7 +51,7 @@ and ('a, 'typ, 'v) ast =
 | Pair of ('a, 'typ, 'v) t * ('a, 'typ, 'v) t
 | Projection of projection * ('a, 'typ, 'v) t
 | RecordUpdate of ('a, 'typ, 'v) t * string * ('a, 'typ, 'v) t option
-| TypeConstr of ('a, 'typ, 'v) t * 'typ
+| TypeConstr of ('a, 'typ, 'v) t * 'typ list
 | TypeCoercion of ('a, 'typ, 'v) t * 'typ
 | PatMatch of ('a, 'typ, 'v) t * (('a, 'typ, 'v) pattern * ('a, 'typ, 'v) t) list
 | TopLevel of ('a, 'typ, 'v) t
@@ -113,6 +113,18 @@ let dummy_pat_var_str = "_"
 let dummy_pat_var =
     Variable.create_other (Some dummy_pat_var_str)
 
+let type_exprs_to_typs tenv vtenv ts =
+    let vtenv = ref vtenv in
+    let ts = List.map (fun t ->
+        let (t, vtenv') = type_expr_to_typ tenv !vtenv t in
+        vtenv := vtenv' ; t
+    ) ts in
+    (ts, !vtenv)
+
+let no_infer_var t =
+    let open Types.Tvar in
+    vars t |> TVarSet.filter TVar.can_infer |> TVarSet.is_empty
+
 let parser_expr_to_annot_expr tenv vtenv name_var_map e =
     let rec aux vtenv env ((exprid,pos),e) =
         let e = match e with
@@ -130,12 +142,8 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
             let (t, vtenv) = match t with
             | Unnanoted -> (Unnanoted, vtenv)
             | ADomain ts ->
-                let vtenv = ref vtenv in
-                let ts = List.map (fun t ->
-                    let (t, vtenv') = type_expr_to_typ tenv !vtenv t in
-                    vtenv := vtenv' ; t
-                ) ts in
-                (ADomain (ts), !vtenv)
+                let (ts, vtenv) = type_exprs_to_typs tenv vtenv ts in
+                (ADomain (ts), vtenv)
             in
             let var = Variable.create_lambda (Some str) in
             Variable.attach_location var pos ;
@@ -158,15 +166,14 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
         | Projection (p, e) -> Projection (p, aux vtenv env e)
         | RecordUpdate (e1, l, e2) ->
             RecordUpdate (aux vtenv env e1, l, Option.map (aux vtenv env) e2)
-        | TypeConstr (e, t) ->
-            let (t, vtenv) = type_expr_to_typ tenv vtenv t in
-            if is_test_type t
-            then TypeConstr (aux vtenv env e, t)
-            else raise (SymbolError ("type constraints must be a valid test type"))
+        | TypeConstr (e, ts) ->
+            let (ts, vtenv) = type_exprs_to_typs tenv vtenv ts in
+            if is_test_type (disj ts) && List.for_all no_infer_var ts
+            then TypeConstr (aux vtenv env e, ts)
+            else raise (SymbolError ("type constraints should not have inferable type variable and should cover a test type"))
         | TypeCoercion (e, t) ->
-            let open Types.Tvar in
             let (t, vtenv) = type_expr_to_typ tenv vtenv t in
-            if vars t |> TVarSet.filter TVar.can_infer |> TVarSet.is_empty
+            if no_infer_var t
             then TypeCoercion (aux vtenv env e, t)
             else raise (SymbolError ("type in coercion should not have inferable type variable"))
         | PatMatch (e, pats) ->

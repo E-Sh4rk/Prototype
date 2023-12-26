@@ -661,3 +661,16 @@ let test_expansion_noannot =
 let test_expansion =
   let f = (fun x -> (x 123, x true)) in
   f (id :> (123 -> 123) & (True -> True))
+
+let bool = <Unit -> Bool>
+let neg = <(True -> False) & (False -> True)>
+let lor = <(True -> Bool -> True)
+  & (Bool -> True -> True) & (False -> False -> False)>
+
+let test_split_noannot =
+  let b = bool () in
+  lor (neg b) b
+
+let test_split =
+  let b = (bool () : True ; False) in
+  lor (neg b) b

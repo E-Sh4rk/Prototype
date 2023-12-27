@@ -660,7 +660,16 @@ let test_expansion_noannot =
 
 let test_expansion =
   let f = (fun x -> (x 123, x true)) in
-  f (id :> (123 -> 123) & (True -> True))
+  f (id :> (123 -> 123) ; (True -> True))
+
+let f = < ('a -> 'a) -> ('a -> 'a) >
+let x = < (Int -> Int) | (Bool -> Bool) >
+
+let test_expansion2_noannot = f x
+
+let test_expansion2 =
+  (f :> (Int -> Int) | (Bool -> Bool) ->
+        (Int -> Int) | (Bool -> Bool)) x
 
 let bool = <Unit -> Bool>
 let neg = <(True -> False) & (False -> True)>

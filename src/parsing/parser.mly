@@ -191,8 +191,8 @@ atomic_term:
 | MAGIC { annot $startpos $endpos (Abstract (TBase TEmpty)) }
 | LPAREN RPAREN { annot $startpos $endpos (Const Unit) }
 | LPAREN t=term RPAREN { t }
-| LPAREN t=term COLON tys = separated_nonempty_list(SEMICOLON, typ) RPAREN { annot $startpos $endpos (TypeConstr (t,tys)) }
-| LPAREN t=term COERCE ty=typ RPAREN { annot $startpos $endpos (TypeCoercion (t,ty)) }
+| LPAREN t=term COLON tys=separated_nonempty_list(SEMICOLON, typ) RPAREN { annot $startpos $endpos (TypeConstr (t,tys)) }
+| LPAREN t=term COERCE tys=separated_nonempty_list(SEMICOLON, typ) RPAREN { annot $startpos $endpos (TypeCoercion (t,tys)) }
 | LBRACE obr=optional_base_record fs=separated_nonempty_list(COMMA, field_term) RBRACE
 { record_update $startpos $endpos obr fs }
 | LBRACKET lst=separated_list(SEMICOLON, term) RBRACKET

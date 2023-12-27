@@ -26,7 +26,7 @@ let refine_a tenv env a t =
   match a with
   | Lambda _ -> []
   | Abstract t' when subtype t' t -> [Env.empty]
-  | TypeCoercion (_, t') when subtype t' t -> [Env.empty]
+  | TypeCoercion (_, t') when subtype (conj t') t -> [Env.empty]
   | Const c when subtype (typeof_const_atom tenv c) t -> [Env.empty]
   | Alias v when subtype (Env.find v env) t -> [Env.empty]
   | Alias _ | Abstract _ | TypeCoercion _ | Const _ -> []
@@ -395,7 +395,7 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
       split_if_needed s
     | TypeCoercion (v, s), InferA ->
       if memvar v then
-        begin match subtype_expand (vartype v) s with
+        begin match subtypes_expand (vartype v) s with
         | None -> Fail
         | Some _ -> Ok TypA
         end

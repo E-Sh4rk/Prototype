@@ -106,6 +106,7 @@ let rec typeof_a vardef tenv env (annot_a,c_a) a =
       else untypeable ("Type constraint not satisfied.")
     | TypeCoercion (v, s), CoercA ss ->
       let t = var_type v in
+      let s = conj s in
       if subtype (instantiate_check ss t) s
       then s
       else untypeable ("Type coercion not possible.")

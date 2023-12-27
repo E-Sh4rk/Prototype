@@ -16,7 +16,7 @@ type a =
   | RecordUpdate of Variable.t * string * Variable.t option
   | Let of Variable.t * Variable.t
   | TypeConstr of Variable.t * typ list
-  | TypeCoercion of Variable.t * typ
+  | TypeCoercion of Variable.t * typ list
   [@@deriving show]
 
 and e =
@@ -340,9 +340,9 @@ let convert_to_msc ast =
       | Ast.TypeConstr (e, ts) ->
         let (defs, expr_var_map, x) = to_defs_and_x expr_var_map e in
         (defs, expr_var_map, TypeConstr (x, ts))
-      | Ast.TypeCoercion (e, t) ->
+      | Ast.TypeCoercion (e, ts) ->
         let (defs, expr_var_map, x) = to_defs_and_x expr_var_map e in
-        (defs, expr_var_map, TypeCoercion (x, t))  
+        (defs, expr_var_map, TypeCoercion (x, ts))
       | Ast.PatMatch _ | Ast.Fixpoint _ | Ast.TopLevel _ -> assert false
 
     and to_defs_and_x ?(name=None) expr_var_map ast =

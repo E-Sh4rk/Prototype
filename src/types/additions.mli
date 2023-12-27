@@ -103,6 +103,7 @@ val subtype_poly : typ -> typ -> bool
 val supertype_poly : typ -> typ -> bool
 
 val subtype_expand : typ -> typ -> Subst.t list option
+val subtypes_expand : typ -> typ list -> Subst.t list option
 
 val uncorrelate_tvars : typ -> typ
 (**

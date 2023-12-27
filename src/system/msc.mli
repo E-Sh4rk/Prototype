@@ -15,7 +15,7 @@ type a =
   | RecordUpdate of Variable.t * string * Variable.t option
   | Let of Variable.t * Variable.t
   | TypeConstr of Variable.t * typ list
-  | TypeCoercion of Variable.t * typ
+  | TypeCoercion of Variable.t * typ list
 
 (** Type for canonical forms. *)
 and e =

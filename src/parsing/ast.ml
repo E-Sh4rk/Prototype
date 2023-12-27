@@ -52,7 +52,7 @@ and ('a, 'typ, 'v) ast =
 | Projection of projection * ('a, 'typ, 'v) t
 | RecordUpdate of ('a, 'typ, 'v) t * string * ('a, 'typ, 'v) t option
 | TypeConstr of ('a, 'typ, 'v) t * 'typ list
-| TypeCoercion of ('a, 'typ, 'v) t * 'typ
+| TypeCoercion of ('a, 'typ, 'v) t * 'typ list
 | PatMatch of ('a, 'typ, 'v) t * (('a, 'typ, 'v) pattern * ('a, 'typ, 'v) t) list
 | TopLevel of ('a, 'typ, 'v) t
 [@@deriving ord]
@@ -171,10 +171,10 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
             if is_test_type (disj ts) && List.for_all no_infer_var ts
             then TypeConstr (aux vtenv env e, ts)
             else raise (SymbolError ("type constraints should not have inferable type variable and should cover a test type"))
-        | TypeCoercion (e, t) ->
-            let (t, vtenv) = type_expr_to_typ tenv vtenv t in
-            if no_infer_var t
-            then TypeCoercion (aux vtenv env e, t)
+        | TypeCoercion (e, ts) ->
+            let (ts, vtenv) = type_exprs_to_typs tenv vtenv ts in
+            if List.for_all no_infer_var ts
+            then TypeCoercion (aux vtenv env e, ts)
             else raise (SymbolError ("type in coercion should not have inferable type variable"))
         | PatMatch (e, pats) ->
             PatMatch (aux vtenv env e, List.map (aux_pat pos vtenv env) pats)

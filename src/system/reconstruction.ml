@@ -387,7 +387,7 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
       let tv = vartype v in
       let rec split_if_needed ts =
         match ts with
-        | [] -> Ok TypA
+        | [] | [_] -> Ok TypA
         | s::ts when subtype tv s || disjoint tv s ->
           split_if_needed ts
         | s::_ -> Split (Env.singleton v s, ConstrA, ConstrA)

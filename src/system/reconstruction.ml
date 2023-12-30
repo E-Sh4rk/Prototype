@@ -395,7 +395,7 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
       split_if_needed s
     | TypeCoercion (v, s), InferA ->
       if memvar v then
-        begin match subtypes_expand (vartype v) s with
+        begin match subtypes_expand ~max_exp:1 (vartype v) s with
         | None -> Fail
         | Some _ -> Ok TypA
         end

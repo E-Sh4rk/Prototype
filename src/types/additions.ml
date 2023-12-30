@@ -529,9 +529,8 @@ let supertypes_poly lst =
 let subtype_poly t1 t2 = subtypes_poly [t1,t2]
 let supertype_poly t1 t2 = supertypes_poly [t1,t2]
 
-let subtype_expand t1 t2 =
+let subtype_expand ~max_exp t1 t2 =
     assert (vars_poly t2 |> TVarSet.is_empty) ;
-    let max_exp = 2 in (* NOTE: arbitrary limit *)
     let refresh t = refresh (vars_poly t) in
     let rec test_subtype exp =
         if List.length exp > max_exp then None
@@ -544,8 +543,8 @@ let subtype_expand t1 t2 =
     in
     test_subtype [refresh t1]
 
-let subtypes_expand t1 t2s =
-    let res = List.map (subtype_expand t1) t2s in
+let subtypes_expand ~max_exp t1 t2s =
+    let res = List.map (subtype_expand ~max_exp t1) t2s in
     if List.mem None res
     then None
     else Some (List.map Option.get res |> List.flatten)

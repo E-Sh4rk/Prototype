@@ -668,8 +668,8 @@ let x = < (Int -> Int) | (Bool -> Bool) >
 let test_expansion2_noannot = f x
 
 let test_expansion2 =
-  (f :> (Int -> Int) | (Bool -> Bool) ->
-        (Int -> Int) | (Bool -> Bool)) x
+  (f :> ((Int -> Int) -> (Int -> Int)) ;
+        ((Bool -> Bool) -> (Bool -> Bool))) x
 
 let bool = <Unit -> Bool>
 let neg = <(True -> False) & (False -> True)>

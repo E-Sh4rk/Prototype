@@ -245,7 +245,7 @@ let rec infer_poly_a vardef tenv env pannot_a a =
     | TypeConstr (v, s), TypA ->
       ConstrA [tallying_one [(vartype v, disj s)]]
     | TypeCoercion (v, s), TypA ->
-      begin match subtypes_expand (vartype v) s with
+      begin match subtypes_expand ~max_exp:1 (vartype v) s with
       | None -> assert false
       | Some inst -> CoercA inst
       end

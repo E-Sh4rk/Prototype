@@ -39,7 +39,9 @@ jobs:
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
       - name: Install OCaml dependencies
+        # TODO: 'opam install num.1.4' is a temporary fix for missing js_of_ocaml primitive
         run: |
+          opam install num.1.4
           opam pin add cduce-types 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#dev'
           opam pin add cduce 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#dev'
           opam install ppx_deriving pomap tsort

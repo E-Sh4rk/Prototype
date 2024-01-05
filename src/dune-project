@@ -14,5 +14,5 @@
 (package
  (name dynlang_tc)
  (synopsis "A prototype type-checker for dynamic languages")
- (depends (ocaml (>= 4.14.1)) dune (num (= 1.4)) cduce-types cduce ppx_deriving pomap tsort yojson js_of_ocaml-ppx)
+ (depends (ocaml (>= 4.14.1)) dune (num (= 1.4)) (cduce-types (= popl24ae)) (cduce  (= popl24ae)) ppx_deriving pomap tsort yojson js_of_ocaml-ppx)
 )

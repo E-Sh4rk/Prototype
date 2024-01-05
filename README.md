@@ -33,7 +33,7 @@ cd Prototype/src
 
 The easiest way to build the native version is through [opam](https://opam.ocaml.org/), the OCaml Package Manager.
 This prototype has been tested on OCaml 4.14.1, that can be installed, together with
-the dependencies, by doing the following (answer 'yes' when asked):
+the dependencies, by doing the following (answer 'y' when asked):
 ```
 opam switch create dynlang_tc 4.14.1
 eval $(opam env --switch=dynlang_tc)

@@ -8,8 +8,8 @@ depends: [
   "ocaml" {>= "4.14.1"}
   "dune" {>= "3.12"}
   "num" {= "1.4"}
-  "cduce-types"
-  "cduce"
+  "cduce-types" {= "popl24ae"}
+  "cduce" {= "popl24ae"}
   "ppx_deriving"
   "pomap"
   "tsort"

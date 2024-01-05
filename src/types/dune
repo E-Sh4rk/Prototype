@@ -1,4 +1,5 @@
 (library
  (name types)
+ (public_name dynlang_tc.types)
  (libraries utils cduce-types cduce.lib.core unix pomap)
  (modules (:standard)))

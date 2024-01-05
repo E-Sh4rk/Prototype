@@ -25,30 +25,24 @@ You can then follow the instructions in the [Running the prototype](#running-the
 
 ## Building the native version
 
-The easiest way to build the native version is through [opam](https://opam.ocaml.org/), the OCaml Package Manager.
-This prototype has been tested on OCaml 4.14.1, that can be installed by doing
-```
-opam switch create 4.14.1
-```
-
-### Installing CDuce
-
-The main dependency is the CDuce library. It can be installed this way:
-
-```
-opam pin add cduce-types 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#popl24ae'
-opam pin add cduce 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#popl24ae'
-```
-
-### Building the prototype
-
-Once CDuce is installed, our prototype can be built using
-
+First, clone and open this repository by doing
 ```
 git clone git@github.com:E-Sh4rk/Prototype.git
 cd Prototype/src
-opam install ppx_deriving pomap tsort
-make
+```
+
+The easiest way to build the native version is through [opam](https://opam.ocaml.org/), the OCaml Package Manager.
+This prototype has been tested on OCaml 4.14.1, that can be installed, together with
+the dependencies, by doing the following (answer 'yes' when asked):
+```
+opam switch create dynlang_tc 4.14.1
+eval $(opam env --switch=dynlang_tc)
+make deps
+```
+
+Then, the prototype can be built using
+```
+make build
 ```
 
 ## Running the prototype
@@ -60,6 +54,10 @@ help](https://e-sh4rk.github.io/Prototype/doc.html).
 ### Native version
 Once compiled, the prototype can be executed from the `src` directory with
 ```
+make run
+```
+or alternatively
+```
 dune exec -- ./main/prototype.exe [file]
 ```
 If no file is given, the file `test.ml` from the current path is used.
@@ -68,9 +66,7 @@ If no file is given, the file `test.ml` from the current path is used.
 
 You will need [npm](https://www.npmjs.com/) to install the dependencies of the Javascript version.
 First, build the native version, then:
-
 ```
-opam install yojson js_of_ocaml-ppx
 make libjs
 cd ../webeditor
 npm ci

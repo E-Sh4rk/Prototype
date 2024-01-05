@@ -1,0 +1,4 @@
+pin-depends: [
+  [ "cduce-types.popl24ae" "git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#popl24ae" ]
+  [ "cduce.popl24ae" "git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#popl24ae" ]
+]

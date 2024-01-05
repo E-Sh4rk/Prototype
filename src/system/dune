@@ -1,5 +1,6 @@
 (library
  (name system)
+ (public_name dynlang_tc.system)
  (libraries types parsing utils tsort)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.ord ppx_deriving.eq))

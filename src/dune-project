@@ -1,2 +1,18 @@
-(lang dune 2.7)
+(lang dune 3.12)
 (using menhir 2.1)
+
+(name dynlang_tc)
+
+(generate_opam_files true)
+
+(authors "Mickael Laurent")
+
+(maintainers "Mickael Laurent")
+
+(license "MIT")
+
+(package
+ (name dynlang_tc)
+ (synopsis "A prototype type-checker for dynamic languages")
+ (depends (ocaml (>= 4.14.1)) dune (num (= 1.4)) cduce-types cduce ppx_deriving pomap tsort yojson js_of_ocaml-ppx)
+)

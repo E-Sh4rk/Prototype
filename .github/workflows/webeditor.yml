@@ -39,26 +39,13 @@ jobs:
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
       - name: Install OCaml dependencies
-        # TODO: 'opam install num.1.4' is a temporary fix for missing js_of_ocaml primitive
         run: |
-          opam install num.1.4
-          opam pin add cduce-types 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#dev'
-          opam pin add cduce 'git+https://gitlab.math.univ-paris-diderot.fr/cduce/cduce#dev'
-          opam install ppx_deriving pomap tsort
-          opam install yojson js_of_ocaml-ppx
-      # - run: |
-      #     cd src
-      #     opam install . --deps-only
+          cd src
+          make deps
       - name: Build
         run: |
           cd src
-          opam exec -- dune build --profile release main/lib_js.bc.js
-          cp _build/default/main/lib_js.bc.js ../webeditor/typechecker.js
-
-      # Version info
-      - name: Get and write version info
-        run: |
-          git describe --always --tags HEAD > ./webeditor/version.txt
+          make libjs
 
       # Node dependencies
       - name: Use Node.js

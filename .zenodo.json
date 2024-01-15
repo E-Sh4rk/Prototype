@@ -1,0 +1,21 @@
+{
+	"creators": [
+		{
+			"orcid": "0000-0003-0951-7535",
+			"name": "Castagna, Giuseppe"
+		},
+		{
+			"orcid": "0000-0003-1590-2392",
+			"name": "Laurent, Micka\u00ebl"
+		},
+		{
+			"orcid": "0000-0002-1729-870X",
+			"name": "Nguyen, Kim"
+		}
+	],
+	"upload_type": "software",
+	"title": "Prototype: Polymorphic Type Inference for Dynamic Languages",
+	"description": "<p>This is a prototype for the article: Polymorphic Type Inference for Dynamic Languages.\nSee <code>README.md</code> for instructions.</p>",
+	"access_right": "open",
+	"license": "MIT"
+}

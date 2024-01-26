@@ -50,17 +50,17 @@ html, body {
     padding: 0;
     background-color: rgba(0,0,0,0.4);
     text-align: center;
-  }
+}
   
 .modal-content {
   display: block;
   position: relative;
-  background-color: #1e1e1e;
+  background-color: /*#1e1e1e;*/ var(--modal-background);
   /* margin: 10% auto; */
   padding: 20px;
   top: 10%;
   left: calc(50% - 200px);
-  border: 1px solid #ccc;
+  border: 1px solid /*#ccc*/ var(--modal-color);
   overflow: auto;
   width: 400px;
   height: 80%;
@@ -68,7 +68,7 @@ html, body {
   animation-name: animatetop;
   animation-duration: 0.25s;
   /* border-radius: 25px; */
-  color: #ccc;
+  color: /*#ccc;*/ var(--modal-color);
   font-family: Arial, Helvetica, sans-serif;
 }
 
@@ -87,13 +87,13 @@ html, body {
     box-sizing: border-box;
     padding: 10px 15px;
     display: block;
-    color: #ccc;
+    color: /*#ccc;*/ var(--modal-color);
     text-decoration: none;
     width: 100%;
 }
 
 .modal-content ul li a:hover {
-    background-color: #444;
+    background-color: /*#444;*/ var(--modal-hover);
     transition: 0.25s;
 }
 
@@ -123,11 +123,11 @@ html, body {
   overflow: auto;
   /* margin: 0; */
   padding: 10px;
-  border: 1px solid #ccc;
-  background-color: rgba(0,0,0,0.25);
+  border: 1px solid /*#ccc*/ var(--overlay-color);
+  background-color: /*rgba(0,0,0,0.25);*/ var(--overlay-background);
   text-align: left;
   box-sizing: border-box;
-  color: #ccc;
+  color: /*#ccc;*/ var(--overlay-color);
   font-family: Arial, Helvetica, sans-serif;
   /* border-radius: 25px; */
 }
@@ -139,16 +139,43 @@ html, body {
 }
 
 .overlay ul li a {
-  color: #ddd;
+  color: /*#ddd;*/ var(--overlay-a-color);
   font-weight: bold;
 }
 
 #version {
   font-weight: bold;
-  color: green;
+  color: /*#008000;*/ var(--overlay-version);
 }
 
 .keybinding {
   font-weight: bold;
-  color: yellowgreen;
+  color: /*#9acd32;*/ var(--overlay-shortcut);
+}
+
+.close {
+  position: absolute;
+  right: 5px;
+  top: 5px;
+  width: 10px;
+  height: 10px;
+  opacity: 0.5;
+}
+.close:hover {
+  opacity: 1;
+}
+.close:before, .close:after {
+  position: absolute;
+  right: 4px;
+  top: 0px;
+  content: ' ';
+  height: 10px;
+  width: 2px;
+  background-color: var(--overlay-color);
+}
+.close:before {
+  transform: rotate(45deg);
+}
+.close:after {
+  transform: rotate(-45deg);
 }

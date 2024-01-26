@@ -180,9 +180,10 @@
         <var>e</var> ::= <var>lit</var>
             | <var>gid</var>
             | <kbd>magic</kbd>
-            | <kbd>(</kbd><var>e</var> [<kbd>:</kbd> <var>t</var>] <kbd>)</kbd>
+            | <kbd>(</kbd><var>e</var> <kbd>:</kbd> <var>t</var> <kbd>;</kbd> ... <kbd>;</kbd> <var>t</var> <kbd>)</kbd>
+            | <kbd>(</kbd><var>e</var> <kbd>:&gt;</kbd> <var>t</var> <kbd>;</kbd> ... <kbd>;</kbd> <var>t</var> <kbd>)</kbd>
             | <kbd>{</kbd> [<var>e</var> <kbd>with</kbd>] <var>id</var><kbd>=</kbd><var>e</var><kbd>,</kbd>...<kbd>,</kbd><var>id</var><kbd>=</kbd><var>e</var><kbd>}</kbd>
-            | <kbd>[</kbd> <var>e</var><kbd>;</kbd> ...<kbd>;</kbd><var>e</var> <kbd>]</kbd>
+            | <kbd>[</kbd> <var>e</var><kbd>;</kbd> ... <kbd>;</kbd><var>e</var> <kbd>]</kbd>
             | <var>e</var><kbd>,</kbd><var>e</var>
             | <kbd>fun</kbd> <var>param</var> ... <var>param</var> <kbd>-></kbd> <var>e</var>
             | <kbd>let</kbd> <var>gid</var> <kbd>=</kbd> <var>e</var> <kbd>in</kbd> <var>e</var>
@@ -207,9 +208,12 @@
             <li>a <tt><kbd>magic</kbd></tt> constant with type <tt>'a</tt>,
             which can be used to define a variable of any type (without having
             to give a proper definition)</li>
-            <li>type annotated expressions, e.g. <kbd> (42 : Int)</kbd> which
-            can be used locally to give hints to the type reconstruction
-            algorithm</li>
+            <li>type annotated expressions, e.g. <kbd> (x : Bool ; Int)</kbd> which
+            can be used locally to suggest a type constraint and/or
+            a decomposition to the type reconstruction algorithm</li>
+            <li>type coerced expressions, e.g. <kbd> (42 :> Int)</kbd> which
+            can be used locally to coerce the type of an expression into
+            a (conjunction of) supertype(s)</li>
             <li>constructors for products, lists and records</li>
             <li>anonymous functions</li>
             <li>local let binding (defined using either a variable or a <a href="#pattern">pattern</a>)</li>

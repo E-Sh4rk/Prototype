@@ -14,10 +14,10 @@ function closeLoadModal(str) {
         modal_callback(str);
 }
 
-// let span = document.getElementsByClassName("close")[0];
-// span.onclick = function() {
-//     closeLoadModal(null);
-// }
+let closeButton = document.getElementById("closeModal");
+closeButton.onclick = function() {
+    closeLoadModal(null);
+}
 window.onclick = function(event) {
   if (event.target == modal) {
     closeLoadModal(null);

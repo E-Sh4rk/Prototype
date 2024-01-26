@@ -1,0 +1,47 @@
+
+(* JavaScript Logical Or *)
+
+atom null
+type Falsy = False | "" | 0 | Null
+type Truthy = ~ Falsy
+
+let toBoolean x =
+    if x is Truthy then true else false
+
+let lOr (x,y) = if toBoolean x then x else y
+
+let id x = lOr (x,x)
+
+
+
+
+
+(* Fixpoint and recursive functions *)
+
+let fixpoint = fun f ->
+    let delta = fun x -> f ( fun v -> x x v ) in
+    delta delta
+
+let map_stub map f lst =
+    match lst with
+    | :[] -> []
+    | (e,lst) -> (f e, map f lst)
+    end
+
+let map = fixpoint map_stub
+
+
+
+
+
+(* Filter *)
+
+let rec filter (f: ('a -> Any) & ('b -> Falsy)) (l: [('a | 'b)*]) =
+    match l with
+    | :Nil -> nil
+    | (e,l) -> if f e is Truthy then (e, filter f l) else filter f l
+    end
+
+let filtered_list = filter toBoolean [42;37;null;42;"";4]
+
+let test = map ((+) 1) filtered_list

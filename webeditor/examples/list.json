@@ -1,5 +1,9 @@
 [
     {
+        "name": "JFLA demonstration",
+        "path": "jfla.stml"
+    },
+    {
         "name": "Examples from POPL24 submission",
         "path": "paper.stml"
     },

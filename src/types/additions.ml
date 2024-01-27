@@ -559,7 +559,7 @@ let rec uncorrelate_tvars keep t =
             arrows |> List.map (fun (a,b) ->
                 let to_rename = TVarSet.diff (vars_poly a) keep in
                 let rename = refresh to_rename in
-                let keep = TVarSet.union keep (Subst.codom rename) in
+                let keep = TVarSet.union keep (Subst.vars rename) in
                 let a = Subst.apply rename a in
                 let b = Subst.apply rename b |> uncorrelate_tvars keep in
                 (a, b)

@@ -38,7 +38,7 @@ let check_mono pos t =
 let rename_check pos r t =
   if Subst.is_renaming r &&
     Subst.dom r |> TVarSet.filter TVar.is_mono |> TVarSet.is_empty &&
-    Subst.codom r |> TVarSet.filter TVar.is_mono |> TVarSet.is_empty
+    Subst.vars r |> TVarSet.filter TVar.is_mono |> TVarSet.is_empty
   then Subst.apply r t
   else raise (Untypeable (pos, "Invalid renaming."))
 

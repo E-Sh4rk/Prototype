@@ -131,12 +131,12 @@ module Subst = struct
       let vars = TVarSet.inter (dom s) vars in
       vars |> TVarSet.destruct |> List.map (fun v -> (v, find s v)) |> construct
   let remove s vars =
-      let nvars = TVarSet.diff (dom s) vars in
-      restrict s nvars
+      let vars = TVarSet.diff (dom s) vars in
+      restrict s vars
   let split s vars =
       (restrict s vars, remove s vars)
-  let codom s =
-      destruct s |> List.map (fun (_, t) -> vars t)
+  let vars s =
+      destruct s |> List.map (fun (v, t) -> TVarSet.rm v (vars t))
       |> TVarSet.union_many
   let is_renaming t =
     destruct t |>
@@ -286,7 +286,7 @@ let tallying constr =
   (* let poly = vars |> TVarSet.filter TVar.is_poly in *)
   Raw.tallying ~var_order:[] mono constr
   |> List.map (fun s ->
-    let reg_subst = generalize_unregistered (Subst.codom s) in
+    let reg_subst = generalize_unregistered (Subst.vars s) in
     (* let ref_subst = refresh poly in *)
     Subst.compose_restr reg_subst s
     (* |> Subst.compose ref_subst *)
@@ -308,7 +308,7 @@ let tallying_infer constr =
   in
   tallying constr |> List.map (fun s ->
     let s = Subst.compose_restr s gen in
-    let mono_subst = monomorphize (Subst.codom s) in
+    let mono_subst = monomorphize (Subst.vars s) in
     Subst.compose_restr mono_subst s
   )
 

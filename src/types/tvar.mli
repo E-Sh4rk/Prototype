@@ -49,7 +49,7 @@ module Subst : sig
     val identity : t
     val is_identity : t -> bool
     val dom : t -> TVarSet.t
-    val codom : t -> TVarSet.t
+    val vars : t -> TVarSet.t
     val mem : t -> TVar.t -> bool
     val rm: TVar.t -> t -> t
     val find : t -> TVar.t -> Base.typ

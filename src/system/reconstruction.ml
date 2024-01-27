@@ -159,7 +159,7 @@ let simplify_tallying_infer env res_type sols =
   let tvars = mono_tvars env in
   let vars_involved dom sol =
     let sol = Subst.restrict sol dom in
-    TVarSet.union (Subst.codom sol) dom
+    TVarSet.union (Subst.vars sol) dom
   in
   let leq_sol (_,r1) (_,r2) =
     let r1 = Subst.apply (vars r1 |> generalize) r1 in
@@ -213,7 +213,7 @@ let simplify_tallying_infer env res_type sols =
       let tallying_res = tallying [(TVar.typ v, t) ; (t, TVar.typ v)]
       |> List.map (fun s ->
         let s = Subst.compose_restr s g in
-        Subst.compose_restr (Subst.codom s |> monomorphize) s
+        Subst.compose_restr (Subst.vars s |> monomorphize) s
       )
       |> List.filter (fun s ->
         let res' = Subst.apply s res in

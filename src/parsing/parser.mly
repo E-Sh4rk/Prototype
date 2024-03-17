@@ -81,7 +81,7 @@
 %token<string> TID
 %token<string> TVAR
 %token<float> LFLOAT
-%token<int> LINT
+%token<Z.t> LINT
 %token<bool> LBOOL
 %token<char> LCHAR
 %token<string> LSTRING
@@ -133,8 +133,8 @@ element:
 
 %inline optional_debug:
   { Utils.log_disabled }
-| DEBUG {Utils.log_full}
-| DEBUG i=lint { i }
+| DEBUG { Utils.log_full }
+| DEBUG i=lint { Z.to_int i }
 
 %inline param_type_def: name=TID params=list(TVAR) EQUAL t=typ { (name, params, t) }
 
@@ -206,7 +206,7 @@ atomic_term:
   id=ID EQUAL t=simple_term { (id, t) }
 
 literal:
-  f=LFLOAT { Float f }
+  f=lfloat { Float f }
 | i=lint   { Int i }
 | c=LCHAR  { Char c }
 | b=LBOOL  { Bool b }
@@ -217,7 +217,12 @@ literal:
 lint:
 | i=LINT { i }
 | LPAREN PLUS i=LINT RPAREN { i }
-| LPAREN MINUS i=LINT RPAREN { -i }
+| LPAREN MINUS i=LINT RPAREN { Z.neg i }
+
+lfloat:
+| f=LFLOAT { f }
+| LPAREN PLUS f=LFLOAT RPAREN { f }
+| LPAREN MINUS f=LFLOAT RPAREN { -.f }
 
 parameter:
   arg = ID { (Unnanoted, PatVar arg) }

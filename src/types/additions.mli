@@ -9,7 +9,7 @@ exception TypeDefinitionError of string
 (* Construction of types *)
 
 type type_base =
-    | TInt of int option * int option | TSChar of char | TSString of string
+    | TInt of Z.t option * Z.t option | TSChar of char | TSString of string
     | TBool | TTrue | TFalse | TUnit | TChar | TAny | TEmpty | TNil
     | TString | TList | TFloat
 

@@ -108,7 +108,7 @@ rule token = parse
 | "magic" { MAGIC }
 | "<"     { LT }
 | ">"     { GT }
-| int as i { LINT (int_of_string i) }
+| int as i { LINT (Z.of_string i) }
 | float as f { LFLOAT (float_of_string f) }
 | "true"  { LBOOL true }
 | "false" { LBOOL false }

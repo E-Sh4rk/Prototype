@@ -12,11 +12,16 @@ type exprid = int
 
 type annotation = exprid Position.located
 
+module Zd = struct
+    type t = Z.t
+    let pp = Z.pp_print
+    let compare = Z.compare
+end
 type const =
 | Unit | Nil
 | EmptyRecord
 | Bool of bool
-| Int of int
+| Int of Zd.t
 | Float of float
 | Char of char
 | String of string

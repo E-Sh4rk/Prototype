@@ -30,7 +30,7 @@ val unit_typ : typ
 val nil_typ : typ
 val string_typ : typ
 val list_typ : typ
-val interval : int option -> int option -> typ
+val interval : Z.t option -> Z.t option -> typ
 val single_char : char -> typ
 val single_string : string -> typ
 

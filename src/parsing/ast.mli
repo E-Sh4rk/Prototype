@@ -16,7 +16,7 @@ type const =
 | Unit | Nil
 | EmptyRecord
 | Bool of bool
-| Int of int
+| Int of Z.t
 | Float of float
 | Char of char
 | String of string

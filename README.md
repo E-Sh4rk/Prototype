@@ -6,7 +6,10 @@ The web version of this prototype can be tested [here](https://www.cduce.org/dyn
 
 ## Using the docker image
 
-For convenience, a [Dockerfile](Dockerfile) is provided. Assuming the current directory contains the `Dockerfile`, the image can be built with:
+For convenience, a [Dockerfile](Dockerfile) is provided.  
+*Note: This docker image is for an older version. Please build the native prototype or use the web version for an up-to-date version.*
+
+Assuming the current directory contains the `Dockerfile`, the image can be built with:
 ```
 docker build -t poly --rm .
 ```

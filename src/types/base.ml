@@ -85,16 +85,16 @@ let list_typ =
 let interval i1 i2 =
   match i1, i2 with
   | Some i1, Some i2 -> 
-    let i1 = CD.Intervals.V.from_int i1 in
-    let i2 = CD.Intervals.V.from_int i2 in
+    let i1 = CD.Intervals.V.from_Z i1 in
+    let i2 = CD.Intervals.V.from_Z i2 in
     let i = CD.Intervals.bounded i1 i2 in
     CD.Types.interval i
   | Some i1, None ->
-    let i1 = CD.Intervals.V.from_int i1 in
+    let i1 = CD.Intervals.V.from_Z i1 in
     let i = CD.Intervals.right i1 in
     CD.Types.interval i
   | None, Some i2 ->
-    let i2 = CD.Intervals.V.from_int i2 in
+    let i2 = CD.Intervals.V.from_Z i2 in
     let i = CD.Intervals.left i2 in
     CD.Types.interval i
   | None, None ->

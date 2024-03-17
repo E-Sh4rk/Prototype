@@ -15,6 +15,7 @@ depends: [
   "tsort"
   "yojson"
   "js_of_ocaml-ppx"
+  "zarith_stubs_js"
   "odoc" {with-doc}
 ]
 build: [

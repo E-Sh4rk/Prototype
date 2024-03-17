@@ -1,8 +1,7 @@
 FROM ubuntu:20.04
 LABEL maintainer="Kim Nguyen <kim.nguyen@universite-paris-saclay.fr>"
 
-ARG poly_version=1.0.2
-
+ARG poly_tag=main
 
 RUN apt-get update -y && \
  apt-get dist-upgrade -y && \
@@ -19,7 +18,8 @@ RUN apt-get update -y && \
          libncurses5-dev libpipeline1 libpthread-stubs0-dev libquadmath0 \
          libsigsegv2 libstdc++-9-dev libsub-override-perl libtool libtsan0 libubsan1\
          libuchardet0 linux-libc-dev m4 make man-db pkg-config po-debconf \
-         libcurl4-gnutls-dev libssl-dev libexpat1-dev pkg-config python3 wget unzip gnupg
+         libcurl4-gnutls-dev libssl-dev libexpat1-dev pkg-config python3 wget unzip \
+         gnupg libgmp-dev
 RUN mkdir -p /etc/apt/keyrings
 RUN wget -q -nd -O - https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | \
     	 gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
@@ -40,7 +40,7 @@ USER poly
 
 ARG OPAMYES=true
 ARG ocaml_version=4.14.1
-ARG packages="conf-libssl dune js_of_ocaml-compiler js_of_ocaml-ppx markup menhir menhirLib num ocaml ocaml-compiler-libs ocaml-expat ocamlfind ocamlnet ocurl odoc pomap  ppx_deriving pxp sedlex tsort yojson"
+ARG packages="conf-libssl dune"
 
 
 ENV HOME "/home/poly"
@@ -55,14 +55,9 @@ RUN opam init  --disable-sandboxing --bare && \
 RUN echo 'test -r $HOME/.opam/opam-init/init.sh && . $HOME/.opam/opam-init/init.sh > /dev/null 2> /dev/null || true' >> "$HOME"/.bashrc
 
 RUN eval "$(opam config env)" && \
-    wget -O "Prototype-${poly_version}.tar.gz" -nd "https://github.com/E-Sh4rk/Prototype/archive/refs/tags/v${poly_version}.tar.gz" && \
-    tar xf Prototype-${poly_version}.tar.gz && \
-    rm -f Prototype-${poly_version}.tar.gz && \
-    ln -s Prototype-${poly_version} Prototype && \
+    git clone --branch "${poly_tag}" "https://github.com/E-Sh4rk/Prototype.git" && \
     cd Prototype/src && \
-    wget -nd https://gitlab.math.univ-paris-diderot.fr/cduce/cduce/-/archive/popl24ae/cduce-popl24ae.tar.gz && \
-    tar xf cduce-popl24ae.tar.gz && \
-    rm -f cduce-popl24ae.tar.gz && \
+    opam install -y . --deps-only && \
     make build libjs && \
     cd ../webeditor && \
     npm ci

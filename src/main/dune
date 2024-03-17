@@ -14,7 +14,7 @@
 
 (executable
  (name lib_js)
- (libraries main yojson)
+ (libraries main yojson zarith_stubs_js)
  (modes js)
  (preprocess (pps js_of_ocaml-ppx))
  (modules lib_js))

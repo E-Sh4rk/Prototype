@@ -216,7 +216,7 @@ module Raw = struct
     CD.Types.Subst.clean_type ~pos ~neg vars t
   let rectype = CD.Types.Subst.solve_rectype
 
-  let [@warning "-32"] print_tallying_instance var_order delta constr =
+  let [@warning "-32"] print_tallying_instance delta constr =
     Format.printf "Constraints:@." ;
     let allvars = ref TVarSet.empty in
     constr |> List.iter (fun (l,r) ->
@@ -224,9 +224,8 @@ module Raw = struct
         allvars := TVarSet.union (!allvars) (vars r) ;
         Format.printf "(%a, %a)@." Base.pp_typ l Base.pp_typ r ;
     );
-    Format.printf "With delta=%a, var order=%a, and natural var order=%a@."
+    Format.printf "With delta=%a, and var order=%a@."
         (Utils.pp_list TVar.pp) (TVarSet.destruct delta)
-        (Utils.pp_list TVar.pp) var_order
         (Utils.pp_list TVar.pp) (TVarSet.destruct !allvars)
 
   let [@warning "-32"] check_tallying_solution constr res =
@@ -247,13 +246,13 @@ module Raw = struct
         Format.printf "===== WARNING: Cduce tallying issue.@. ====="
     end ; res
 
-  let tallying ~var_order d cs =
-      CD.Types.Tallying.tallying ~var_order d cs
+  let tallying d cs =
+      CD.Types.Tallying.tallying d cs
       (* |> (check_tallying_solution cs) *)
 
-  let test_tallying ~var_order d cs =
-    let res = CD.Types.Tallying.test_tallying ~var_order d cs in
-    (* let res' = tallying ~var_order d cs <> [] in *)
+  let test_tallying d cs =
+    let res = CD.Types.Tallying.test_tallying d cs in
+    (* let res' = tallying d cs <> [] in *)
     (* assert (res = res') ; *)
     res
 end
@@ -276,7 +275,7 @@ let test_tallying constr =
     List.map (fun (a,b) -> [vars_mono a ; vars_mono b]) |>
     List.flatten in
   let mono = TVarSet.union_many mono in
-  Raw.test_tallying ~var_order:[] mono constr
+  Raw.test_tallying mono constr
 
 let tallying constr =
   let vars = constr |>
@@ -284,7 +283,7 @@ let tallying constr =
     List.flatten |> TVarSet.union_many in
   let mono = vars |> TVarSet.filter TVar.is_mono in
   (* let poly = vars |> TVarSet.filter TVar.is_poly in *)
-  Raw.tallying ~var_order:[] mono constr
+  Raw.tallying mono constr
   |> List.map (fun s ->
     let reg_subst = generalize_unregistered (Subst.vars s) in
     (* let ref_subst = refresh poly in *)
@@ -293,7 +292,6 @@ let tallying constr =
   )
 
 let tallying_infer constr =
-  (* TODO: set var_order for the tallying instance *)
   let infer = constr |>
     List.map (fun (a,b) -> [vars_infer a ; vars_infer b]) |>
     List.flatten |> TVarSet.union_many in

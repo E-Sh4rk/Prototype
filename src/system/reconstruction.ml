@@ -244,11 +244,8 @@ let simplify_tallying_infer env res_type sols =
   |> List.map fst
 
 let infer_mono_inter expl' infer_branch (b1, b2, (expl, tf,ud)) =
-  let uNb = List.length b1 and eNb = List.length b2 in
-  let nontrivial = uNb + eNb > 1 in
-  if nontrivial then begin
-    log ~level:0 "Typing intersection with %n unexplored branches (and %n explored).@." uNb eNb
-  end ;
+  let prune_redundant = Settings.prune_redundant_branches () in
+  let lpd_setting = Settings.prune_low_priority_default_branches () in
   let rec aux explored expl pending =
     match pending with
     | [] when explored = [] -> log ~level:3 "Intersection generated a fail (0 branch)@." ; Fail
@@ -256,18 +253,20 @@ let infer_mono_inter expl' infer_branch (b1, b2, (expl, tf,ud)) =
     | (pannot, est, lpd)::pending ->
       (* Remove branch if it is estimated not to add anything *)
       let expl' = Domains.cup expl expl' in
-      if not ud && Domains.covers expl' est then aux explored expl pending
+      if prune_redundant && not ud && Domains.covers expl' est
+      then aux explored expl pending
       else begin
-        (* NOTE: the order matters (priority to the first) *)
-        if nontrivial then (
-          log ~level:3 "Exploring intersection issued from %a@." Domains.pp est
-        ) ;
+        log ~level:3 "Exploring intersection issued from %a@." Domains.pp est ;
         let res = infer_branch expl' pannot in
         match res with
         | Ok pannot ->
           log ~level:3 "Success of intersection issued from %a@." Domains.pp est;
           (* Remove low-priority default branches *)
-          let pending = pending |> List.filter (fun (_,_,lpd) -> not lpd) in
+          let pending =
+            if lpd_setting
+            then pending |> List.filter (fun (_,_,lpd) -> not lpd)
+            else pending
+          in
           aux (pannot::explored) (Domains.cup expl est) pending
         | Fail when not ud && (explored <> [] || pending <> []) ->
           log ~level:3 "Failure of intersection issued from %a@." Domains.pp est;
@@ -309,8 +308,7 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
   let memvar v = Env.mem v env in
   let vartype v = Env.find v env in
   let needvar v a1 a2 = NeedVar (v, a1, a2) in
-  let lpd_setting = Settings.prune_low_priority_default_branches () in
-  let needsubst ss a1 a2 = Subst ((Env.empty, lpd_setting), ss, a1, a2) in
+  let needsubst ss a1 a2 = Subst ((Env.empty, true), ss, a1, a2) in
   let needsubst_no_lpd ss a1 a2 = Subst ((Env.empty, false), ss, a1, a2) in
   let rec aux pannot_a a =
     let open PartialAnnot in

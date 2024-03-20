@@ -9,13 +9,11 @@ let impossible_branch = fun x ->
 let impossible_branch2 = fun x -> fun y ->
   if y is Int then y+1 else x+1
 
-(* TODO: uncomment (Cduce issue) *)
-(*
- let switch1 f s a b =
-    if s then f a else f b
+let switch1 f s a b =
+  if s then f a else f b
 
 let switch2 s f a b =
-    if s then f a else f b *)
+  if s then f a else f b
 
 let typeof x =
   if x is Unit|Nil then "Nil"

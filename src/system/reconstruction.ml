@@ -97,21 +97,18 @@ type 'a res =
 | NeedVar of Variable.t * 'a * 'a
 (* [@@deriving show] *)
 
-let caching_status = Aux.caching_status
-let set_caching_status = Aux.set_caching_status
-
 type icache = { context: Env.t ; pannot: PartialAnnot.a ; res: PartialAnnot.a res }
 
 let inter_cache = Hashtbl.create 100
 
 let add_to_inter_cache x env pannot res =
-  if Aux.caching_status () then
+  if Settings.enable_caching () then
     let fv = fv_def x in
     let env = Env.restrict (VarSet.elements fv) env in
     Hashtbl.add inter_cache x { context=env; pannot=pannot; res=res }
 
 let get_inter_cache x env pannot =
-  if Aux.caching_status () then
+  if Settings.enable_caching () then
     let fv = fv_def x in
     let env = Env.restrict (VarSet.elements fv) env in
     let caches = Hashtbl.find_all inter_cache x in
@@ -312,8 +309,8 @@ let rec infer_mono_a vardef tenv expl env pannot_a a =
   let memvar v = Env.mem v env in
   let vartype v = Env.find v env in
   let needvar v a1 a2 = NeedVar (v, a1, a2) in
-  (* TODO: enable the lpd flag? (prune some uninteresting branches) *)
-  let needsubst ss a1 a2 = Subst ((Env.empty, (*true*) false), ss, a1, a2) in
+  let lpd_setting = Settings.prune_low_priority_default_branches () in
+  let needsubst ss a1 a2 = Subst ((Env.empty, lpd_setting), ss, a1, a2) in
   let needsubst_no_lpd ss a1 a2 = Subst ((Env.empty, false), ss, a1, a2) in
   let rec aux pannot_a a =
     let open PartialAnnot in
@@ -603,7 +600,7 @@ and infer_mono_iterated tenv expl env pannot e =
 
 let infer tenv env e =
   let open PartialAnnot in
-  Aux.init_fv_htbl e ;
+  Aux.init e ;
   let initial_pannot = Infer in
   let res =
     match infer_mono_iterated tenv Domains.empty env initial_pannot e with

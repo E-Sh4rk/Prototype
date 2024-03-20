@@ -14,7 +14,7 @@ module Make () = struct
 (* ====================================== *)
 
 let fv_def_htbl = Hashtbl.create 100
-let init_fv_htbl =
+let init =
   let rec init_a v a =
     Hashtbl.add fv_def_htbl v (Msc.fv_a a) ;
     match a with
@@ -30,22 +30,18 @@ let init_fv_htbl =
 
 let fv_def v = Hashtbl.find fv_def_htbl v
 
-let caching = ref true
-let caching_status () = !caching
-let set_caching_status b = caching := b
-
 type icache = { context: Env.t ; pannot: PartialAnnot.a ; res: FullAnnot.a_cached }
 
 let inter_cache = Hashtbl.create 100
 
 let add_to_inter_cache x env pannot res =
-  if !caching then
+  if Settings.enable_caching () then
     let fv = fv_def x in
     let env = Env.restrict (VarSet.elements fv) env in
     Hashtbl.add inter_cache x { context=env; pannot=pannot; res=res }
 
 let get_inter_cache x env pannot =
-  if !caching then
+  if Settings.enable_caching () then
     let fv = fv_def x in
     let env = Env.restrict (VarSet.elements fv) env in
     let caches = Hashtbl.find_all inter_cache x in
@@ -65,7 +61,7 @@ let clear_cache () =
 let replace_vars t vs v =
   vars_with_polarity t |> List.filter_map (fun (v', k) ->
     if TVarSet.mem vs v' then
-    match k with (* TODO: only top-level occurences polarity should be considered. *)
+    match k with
     | `Pos -> Some (v', TVar.typ v)
     | `Neg -> Some (v', TVar.typ v |> neg)
     | `Both -> (* Cases like Bool & 'a \ 'b  |  Int & 'a & 'b *) None

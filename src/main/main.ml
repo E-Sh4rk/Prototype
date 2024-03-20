@@ -37,7 +37,6 @@ let type_check_def tenv env (var,expr,typ_annot) =
   in
   try
     Utils.log "%a@." Msc.pp_e nf_expr ;
-    Reconstruct.set_caching_status true ;
     let env = List.fold_left type_additionnal env nf_addition in
     let typ = Reconstruct.typeof_infer tenv env nf_expr |> generalize_all ~uncorrelate:true in
     let typ =

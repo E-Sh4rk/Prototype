@@ -16,16 +16,18 @@ module Make () : sig
 
     (** Functions relative to the caching/memoisation. *)
 
-    (** [init_fv_htbl e] should be called once before calling [infer_poly]
+    (** [init e] should be called once before calling [infer_poly]
         or [infer_poly_a] on a (sub)-expression of [e]. *)
-    val init_fv_htbl : e -> unit
+    val init : e -> unit
 
     (** [fv_def x] returns the free variables of the definition
-    associated to [x]. In O(1). *)
+        associated to [x]. In O(1). *)
     val fv_def : Variable.t -> VarSet.t
     
-    val caching_status : unit -> bool
-    val set_caching_status : bool -> unit
+    (** [clear_cache ()] clears the cache used for memoisation
+        and the free-variable hashtable.
+        After calling this function, [init] should be called again
+        before any call to [infer_poly] or [infer_poly_a]. *)
     val clear_cache : unit -> unit
 
     (** Functions relative to the auxiliary reconstruction system. *)

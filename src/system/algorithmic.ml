@@ -51,7 +51,7 @@ let typeof_inter typeof_branch pos branches =
     |> List.map (fun annot -> typeof_branch annot)
     |> conj_o
 
-let cache c t = c.FullAnnot.typ <- Some t ; t
+let cache c t = if Settings.enable_caching_algorithmic () then c.FullAnnot.typ <- Some t ; t
 
 let rec typeof_a vardef tenv env (annot_a,c_a) a =
   let open FullAnnot in

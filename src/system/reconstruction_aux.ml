@@ -35,13 +35,13 @@ type icache = { context: Env.t ; pannot: PartialAnnot.a ; res: FullAnnot.a_cache
 let inter_cache = Hashtbl.create 100
 
 let add_to_inter_cache x env pannot res =
-  if Settings.enable_caching () then
+  if Settings.enable_caching_reconstruction () then
     let fv = fv_def x in
     let env = Env.restrict (VarSet.elements fv) env in
     Hashtbl.add inter_cache x { context=env; pannot=pannot; res=res }
 
 let get_inter_cache x env pannot =
-  if Settings.enable_caching () then
+  if Settings.enable_caching_reconstruction () then
     let fv = fv_def x in
     let env = Env.restrict (VarSet.elements fv) env in
     let caches = Hashtbl.find_all inter_cache x in

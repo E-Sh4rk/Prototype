@@ -49,6 +49,7 @@ rule token = parse
 | "atoms" { ATOMS }
 | "atom"  { ATOMS }
 | "type"  { TYPE }
+| "where" { WHERE }
 | "and"   { TYPE_AND }
 | "||"    { DOUBLE_OR }
 (* | "&&"    { DOUBLE_AND } *)

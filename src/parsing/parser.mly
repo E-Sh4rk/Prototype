@@ -88,7 +88,7 @@
 %token ANY EMPTY BOOL CHAR FLOAT INT TRUE FALSE UNIT NIL STRING LIST
 %token DOUBLEDASH TIMES PLUS MINUS DIV
 %token LBRACE RBRACE DOUBLEPOINT MATCH WITH END EQUAL_OPT POINT LT GT
-%token ATOMS TYPE TYPE_AND DOUBLE_OR (*DOUBLE_AND*)
+%token ATOMS TYPE TYPE_AND WHERE DOUBLE_OR (*DOUBLE_AND*)
 %token LBRACKET RBRACKET SEMICOLON
 %token<string> ID
 %token<string> TID
@@ -148,8 +148,6 @@ element:
   { Utils.log_disabled }
 | DEBUG { Utils.log_full }
 | DEBUG i=lint { Z.to_int i }
-
-%inline param_type_def: name=TID params=list(TVAR) EQUAL t=typ { (name, params, t) }
 
 (* ===== TERMS ===== *)
 
@@ -266,11 +264,16 @@ prefix:
 
 (* ===== TYPES ===== *)
 
-(* TODO: one-line syntax for recursive types? *)
+%inline param_type_def: name=TID params=list(TVAR) EQUAL t=typ_norec { (name, params, t) }
 
 typ:
+  t=typ_norec { t }
+| t=typ_norec WHERE ts=separated_nonempty_list(TYPE_AND, param_type_def)
+  { TWhere (t, ts) }
+
+typ_norec:
   t=simple_typ { t }
-| lhs=simple_typ COMMA rhs=typ { TPair (lhs, rhs) }
+| lhs=simple_typ COMMA rhs=typ_norec { TPair (lhs, rhs) }
 
 simple_typ:
   t=atomic_typ { t }

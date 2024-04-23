@@ -70,12 +70,20 @@
     | x::xs ->
       let left = x in let right = list_of_pats xs in
       PatPair (left,right)
+
+  let cons_encode startpos endpos lhs (rannot,rhs) =
+    let rhs = (rannot, (TypeConstr ((rannot,rhs), [TBase TList]))) in
+    annot startpos endpos (Pair (lhs, rhs))
+
+  let cons_pat_encode lhs rhs =
+    let rhs = PatAnd (rhs, PatType (TBase TList)) in
+    PatPair (lhs, rhs)
 %}
 
 %token EOF
 %token FUN LET REC TOPLEVEL IN FST SND DEBUG
 %token IF IS THEN ELSE
-%token LPAREN RPAREN EQUAL COMMA COLON COERCE INTERROGATION_MARK
+%token LPAREN RPAREN EQUAL COMMA CONS COLON COERCE INTERROGATION_MARK
 %token ARROW AND OR NEG DIFF
 %token ANY EMPTY BOOL CHAR FLOAT INT TRUE FALSE UNIT NIL STRING LIST
 %token DOUBLEDASH TIMES PLUS MINUS DIV
@@ -105,8 +113,6 @@
 %nonassoc NEG
 
 %%
-
-(* TODO: :: syntax for list cons (and the associated pattern) *)
 
 program: e=element* EOF { e }
 
@@ -174,6 +180,7 @@ term:
 | IF t=term ott=optional_test_type THEN t1=term ELSE t2=term { annot $startpos $endpos (Ite (t,ott,t1,t2)) }
 | MATCH t=term WITH pats=patterns END { annot $startpos $endpos (PatMatch (t,pats)) }
 | lhs=simple_term COMMA rhs=term { annot $startpos $endpos (Pair (lhs, rhs)) }
+| lhs=simple_term CONS rhs=term { cons_encode $startpos $endpos lhs rhs }
 
 simple_term:
   a=atomic_term { a }
@@ -352,6 +359,7 @@ atomic_re:
 pattern:
   p=simple_pattern { p }
 | lhs=simple_pattern COMMA rhs=pattern { PatPair (lhs, rhs) }
+| lhs=simple_pattern CONS rhs=pattern { cons_pat_encode lhs rhs }
 
 simple_pattern:
   p=atomic_pattern { p }

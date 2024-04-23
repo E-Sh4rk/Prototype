@@ -59,6 +59,7 @@ rule token = parse
 | "\\"    { DIFF }
 | "~"     { NEG  }
 | ":"     { COLON }
+| "::"    { CONS }
 | ":>"    { COERCE }
 | ","     { COMMA }
 | "."     { POINT }

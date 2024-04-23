@@ -681,3 +681,14 @@ let test_split_noannot =
 let test_split =
   let b = (bool () : True ; False) in
   lor (neg b) b
+
+(* Cons syntax *)
+
+let hd2 x =
+  match x with
+  | _::b::_ -> b
+  end
+
+let cons2 x y z = x::y::z
+
+let test_cons = hd2 (cons2 'a' 'b' ['c';'d'])

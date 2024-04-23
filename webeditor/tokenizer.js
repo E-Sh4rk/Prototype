@@ -4,7 +4,7 @@ function getTokenizer() {
         tokenPostfix: '.stml',
     
         keywords: [
-            'atoms', 'atom', 'type', 'and', 'if', 'is', 'then',
+            'atoms', 'atom', 'type', 'where', 'and', 'if', 'is', 'then',
             'else', 'match', 'with', 'end', 'fun', 'let', 'in',
             'fst', 'snd',  'magic', 'true', 'false',
             'nil', 'unit', 'rec', 'gen'
@@ -17,7 +17,7 @@ function getTokenizer() {
     
         operators: [
             '||', '->', '&', '|', '\\', '~', ':',
-            '=', '=?', '?', ';', '*', '--',
+            '=', '=?', '?', ';', '*', '--', '::',
             '..', '-', '+', '/'
         ],
 

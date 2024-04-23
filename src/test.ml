@@ -692,3 +692,10 @@ let hd2 x =
 let cons2 x y z = x::y::z
 
 let test_cons = hd2 (cons2 'a' 'b' ['c';'d'])
+
+let rec first_leaf (x : T | Unit where T = [T+] | Int) =
+  match x with
+  | () -> nil
+  | b::_ -> first_leaf b
+  | i -> i
+  end

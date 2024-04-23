@@ -33,6 +33,7 @@ and type_expr =
     | TCap of type_expr * type_expr
     | TDiff of type_expr * type_expr
     | TNeg of type_expr
+    | TWhere of type_expr * (string * string list * type_expr) list
 
 type type_alias = TVar.t list * node
 type type_env = type_alias StrMap.t (* User-defined types *) * StrSet.t (* Atoms *)
@@ -74,91 +75,102 @@ let derecurse_types env venv defs =
         h
     in
     let henv = Hashtbl.create 16 in
-    let () =
-        List.iter (fun (name, params, def) ->
-                if StrMap.mem name env then 
-                    raise (TypeDefinitionError (Printf.sprintf "Type %s already defined!" name))
-                else
-                    Hashtbl.add henv name (def, params, [])) defs
-    in
-    let rec get_name ~nd args name =
-        match Hashtbl.find henv name with
-        | def, params, lst ->
-            if nd then raise (TypeDefinitionError (Printf.sprintf "Cannot use a reference to %s here!" name)) ;
-            let cached = lst |> List.find_opt (fun (args',_) ->
-                try List.for_all2 equiv args args' with Invalid_argument _ -> false) in
-            begin match cached with
-            | None ->
-                begin try
-                    let v = Typepat.mk_delayed () in
-                    Hashtbl.replace henv name (def, params, (args, v)::lst);
-                    let local = List.combine params args |> List.to_seq |> StrMap.of_seq in
-                    let t = aux ~nd local def in
-                    Typepat.link v t;
-                    v
-                with Invalid_argument _ ->
-                    raise (TypeDefinitionError (Printf.sprintf "Wrong arity for type %s!" name))
+    let rec derecurse_types defs =
+        let () =
+            List.iter (fun (name, params, def) ->
+                    if StrMap.mem name env then 
+                        raise (TypeDefinitionError (Printf.sprintf "Type %s already defined!" name))
+                    else
+                        Hashtbl.add henv name (def, params, [])) defs
+        in
+        let rec get_name ~nd args name =
+            match Hashtbl.find henv name with
+            | def, params, lst ->
+                if nd then raise (TypeDefinitionError (Printf.sprintf "Cannot use a reference to %s here!" name)) ;
+                let cached = lst |> List.find_opt (fun (args',_) ->
+                    try List.for_all2 equiv args args' with Invalid_argument _ -> false) in
+                begin match cached with
+                | None ->
+                    begin try
+                        let v = Typepat.mk_delayed () in
+                        Hashtbl.replace henv name (def, params, (args, v)::lst);
+                        let local = List.combine params args |> List.to_seq |> StrMap.of_seq in
+                        let t = aux ~nd local def in
+                        Typepat.link v t;
+                        v
+                    with Invalid_argument _ ->
+                        raise (TypeDefinitionError (Printf.sprintf "Wrong arity for type %s!" name))
+                    end
+                | Some (_, v) -> v
                 end
-            | Some (_, v) -> v
-            end
-        | exception Not_found -> 
-            Typepat.mk_type (instantiate_alias env args name)
-    and aux ~nd (* no delayed: disallow relying on delayed vars *) lcl t =
-        match t with
-        | TVar v ->
-            begin match StrMap.find_opt v lcl, Hashtbl.find_opt venv v with
-            | Some t, _ -> Typepat.mk_type t
-            | None, Some t -> Typepat.mk_type (TVar.typ t)
-            | None, None ->
-                let t = TVar.mk_mono ~infer:(is_infer_var_name v) (Some v) in
-                Hashtbl.add venv v t ;
-                Typepat.mk_type (TVar.typ t)
-            end
-        | TBase tb -> Typepat.mk_type (type_base_to_typ tb)
-        | TCustom (args, n) ->
-            let args = args |> List.map (aux ~nd:true lcl) |> List.map Typepat.typ in
-            get_name ~nd args n
-        | TPair (t1,t2) -> Typepat.mk_prod (aux ~nd lcl t1) (aux ~nd lcl t2)
-        | TRecord (is_open, fields) ->
-            let aux' (label,t,opt) =
-                let n = aux ~nd lcl t in
-                let n = if opt then Typepat.mk_optional n else n in
-                (to_label label, (n, None))
-            in
-            let lmap = 
-                Cduce_types.Ident.LabelMap.from_list_disj (List.map aux' fields)
-            in
-            Typepat.mk_record is_open lmap
-        | TSList lst -> Typepat.rexp (aux_re ~nd lcl lst)
-        | TArrow (t1,t2) -> Typepat.mk_arrow (aux ~nd lcl t1) (aux ~nd lcl t2)
-        | TCup (t1,t2) ->
-            let t1 = aux ~nd lcl t1 in
-            let t2 = aux ~nd lcl t2 in
-            Typepat.mk_or t1 t2
-        | TCap (t1,t2) ->
-            let t1 = aux ~nd lcl t1 in
-            let t2 = aux ~nd lcl t2 in
-            Typepat.mk_and t1 t2
-        | TDiff (t1,t2) ->
-            let t1 = aux ~nd lcl t1 in
-            let t2 = aux ~nd lcl t2 in
-            Typepat.mk_diff t1 t2
-        | TNeg t -> Typepat.mk_diff (Typepat.mk_type any) (aux ~nd lcl t)
-    and aux_re ~nd lcl r =
-        match r with
-        | ReEmpty -> Typepat.mk_empty
-        | ReEpsilon -> Typepat.mk_epsilon
-        | ReType t -> Typepat.mk_elem (aux ~nd lcl t)
-        | ReSeq (r1, r2) -> Typepat.mk_seq (aux_re ~nd lcl r1) (aux_re ~nd lcl r2)
-        | ReAlt (r1, r2) -> Typepat.mk_alt (aux_re ~nd lcl r1) (aux_re ~nd lcl r2)
-        | ReStar r -> Typepat.mk_star (aux_re ~nd lcl r)
+            | exception Not_found -> 
+                Typepat.mk_type (instantiate_alias env args name)
+        and aux ~nd (* no delayed: disallow relying on delayed vars *) lcl t =
+            match t with
+            | TVar v ->
+                begin match StrMap.find_opt v lcl, Hashtbl.find_opt venv v with
+                | Some t, _ -> Typepat.mk_type t
+                | None, Some t -> Typepat.mk_type (TVar.typ t)
+                | None, None ->
+                    let t = TVar.mk_mono ~infer:(is_infer_var_name v) (Some v) in
+                    Hashtbl.add venv v t ;
+                    Typepat.mk_type (TVar.typ t)
+                end
+            | TBase tb -> Typepat.mk_type (type_base_to_typ tb)
+            | TCustom (args, n) ->
+                let args = args |> List.map (aux ~nd:true lcl) |> List.map Typepat.typ in
+                get_name ~nd args n
+            | TPair (t1,t2) -> Typepat.mk_prod (aux ~nd lcl t1) (aux ~nd lcl t2)
+            | TRecord (is_open, fields) ->
+                let aux' (label,t,opt) =
+                    let n = aux ~nd lcl t in
+                    let n = if opt then Typepat.mk_optional n else n in
+                    (to_label label, (n, None))
+                in
+                let lmap = 
+                    Cduce_types.Ident.LabelMap.from_list_disj (List.map aux' fields)
+                in
+                Typepat.mk_record is_open lmap
+            | TSList lst -> Typepat.rexp (aux_re ~nd lcl lst)
+            | TArrow (t1,t2) -> Typepat.mk_arrow (aux ~nd lcl t1) (aux ~nd lcl t2)
+            | TCup (t1,t2) ->
+                let t1 = aux ~nd lcl t1 in
+                let t2 = aux ~nd lcl t2 in
+                Typepat.mk_or t1 t2
+            | TCap (t1,t2) ->
+                let t1 = aux ~nd lcl t1 in
+                let t2 = aux ~nd lcl t2 in
+                Typepat.mk_and t1 t2
+            | TDiff (t1,t2) ->
+                let t1 = aux ~nd lcl t1 in
+                let t2 = aux ~nd lcl t2 in
+                Typepat.mk_diff t1 t2
+            | TNeg t -> Typepat.mk_diff (Typepat.mk_type any) (aux ~nd lcl t)
+            | TWhere (t, defs) ->
+                begin match derecurse_types (("", [], t)::defs) with
+                | ("", [], n)::_ -> n
+                | _ -> assert false
+                end
+        and aux_re ~nd lcl r =
+            match r with
+            | ReEmpty -> Typepat.mk_empty
+            | ReEpsilon -> Typepat.mk_epsilon
+            | ReType t -> Typepat.mk_elem (aux ~nd lcl t)
+            | ReSeq (r1, r2) -> Typepat.mk_seq (aux_re ~nd lcl r1) (aux_re ~nd lcl r2)
+            | ReAlt (r1, r2) -> Typepat.mk_alt (aux_re ~nd lcl r1) (aux_re ~nd lcl r2)
+            | ReStar r -> Typepat.mk_star (aux_re ~nd lcl r)
+        in
+        let res = defs |> List.map (fun (name, params, _) ->
+            let params = List.map (fun _ -> TVar.mk_unregistered ()) params in
+            let args = List.map TVar.typ params in
+            let node = get_name ~nd:false args name in
+            (* Typepat.internalize node ; *)
+            name, params, node) in
+        let () = List.iter (fun (name, _, _) -> Hashtbl.remove henv name) defs in
+        res
     in
-    let res = defs |> List.map (fun (name, params, _) ->
-        let params = List.map (fun _ -> TVar.mk_unregistered ()) params in
-        let args = List.map TVar.typ params in
-        let node = get_name ~nd:false args name in
-        (* Typepat.internalize node ; *)
-        name, params, Typepat.typ node) in
+    let res = derecurse_types defs |>
+        List.map (fun (a,b,n) -> (a,b,Typepat.typ n)) in
     let venv = Hashtbl.fold StrMap.add venv StrMap.empty in
     (res, venv)
 
@@ -167,7 +179,7 @@ let type_expr_to_typ (tenv, _) venv t =
         StrMap.filter (fun _ v -> TVar.can_infer v |> not) vtenv
     in
     match derecurse_types tenv venv [ ("", [], t) ] with
-    | ([ _, _, n ], venv) -> (n, remove_inferable_from_vtenv venv)
+    | ([ "", [], t ], venv) -> (t, remove_inferable_from_vtenv venv)
     | _ -> assert false
 
 let define_types (tenv, aenv) venv defs =

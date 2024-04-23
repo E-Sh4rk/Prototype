@@ -32,6 +32,7 @@ and type_expr =
     | TCap of type_expr * type_expr
     | TDiff of type_expr * type_expr
     | TNeg of type_expr
+    | TWhere of type_expr * (string * string list * type_expr) list
 
 type type_env
 type var_type_env

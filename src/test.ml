@@ -514,7 +514,7 @@ let fact_pat = fixpoint fact_pat_stub
 
 let length_pat_stub length lst =
   match lst with
-  | :[] -> 0
+  | [] -> 0
   | (_, tl & :List) -> succ (length tl)
   end
 
@@ -522,7 +522,7 @@ let length_pat = fixpoint length_pat_stub
 
 let map_pat_stub map f lst =
   match lst with
-  | :[] -> []
+  | [] -> []
   | (hd, tl) & :List -> (f hd, map f tl)
   end
 
@@ -532,13 +532,13 @@ let map_pat = fixpoint map_pat_stub
 
 let rec map_noannot f lst =
   match lst with
-  | :[] -> []
+  | [] -> []
   | (e,lst) & :List -> ((f e), map_noannot f lst)
   end
 
 let rec map f (lst:['a*]) =
   match lst with
-  | :[] -> []
+  | [] -> []
   | (e,lst) & :List -> ((f e), map f lst)
   end
 
@@ -624,19 +624,19 @@ let filter = fixpoint filter_stub
 
 let rec (concat : ['a*] -> ['b*] -> ['a* ; 'b*]) x y =
   match x with
-  | :[] -> y
+  | [] -> y
   | (h, t) -> (h, concat t y)
   end
 
 let rec flatten x = match x with
- | :[] -> []
+ | [] -> []
  | (h, t) & :List -> concat (flatten h) (flatten t)
  | _ -> [x]
 end
 
 let rec filter f (l:['a*]) =
   match l with
-  | :[] -> []
+  | [] -> []
   | (h,t) & :List -> if f h
              then (h, filter f t)
              else filter f t

@@ -66,7 +66,7 @@
       record_update startpos endpos base fields
 
   let rec list_of_pats = function
-    | [] -> (PatType (TBase TUnit))
+    | [] -> (PatType (TBase TNil))
     | x::xs ->
       let left = x in let right = list_of_pats xs in
       PatPair (left,right)

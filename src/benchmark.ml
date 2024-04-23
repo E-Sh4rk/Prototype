@@ -27,13 +27,13 @@ let rec eval_ann (e:Expr) =
 
 let rec map f lst =
   match lst with
-  | :[] -> []
+  | [] -> []
   | (e,lst) & :List -> ((f e), map f lst)
   end  
 
 let rec map_ann f (lst:['a*]) =
   match lst with
-  | :[] -> []
+  | [] -> []
   | (e,lst) -> ((f e), map_ann f lst)
   end
 
@@ -61,14 +61,14 @@ let filtered_list = filter_ann not_nil [1;3;nil;42]
 
 let rec concat x y =
   match x with
-  | :[] -> y
+  | [] -> y
   | (h, t) -> (h, concat t y)
   end
 let concat : ['a*] -> ['b*] -> ['a* ; 'b*] = concat
 
 let rec concat_ann (x:['a*]) (y:['b*]) =
   match x with
-  | :[] -> y
+  | [] -> y
   | (h, t) -> (h, concat_ann t y)
   end
 
@@ -76,7 +76,7 @@ type Tree 'a = ('a \ List) | [(Tree 'a)*]
 
 let rec flatten x =
     match x with
-    | :[] -> []
+    | [] -> []
     | (h, t) & :List -> concat (flatten h) (flatten t)
     | _ -> [x]
     end
@@ -84,7 +84,7 @@ let flatten : Tree 'a -> ['a*] = flatten
 
 let rec flatten_ann (x: Tree 'a) =
   match x with
-  | :[] -> []
+  | [] -> []
   | (h, t) & :List -> concat (flatten_ann h) (flatten_ann t)
   | _ -> [x]
   end

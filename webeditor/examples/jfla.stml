@@ -24,7 +24,7 @@ let fixpoint = fun f ->
 
 let map_stub map f lst =
     match lst with
-    | :[] -> []
+    | [] -> []
     | (e,lst) -> (f e, map f lst)
     end
 

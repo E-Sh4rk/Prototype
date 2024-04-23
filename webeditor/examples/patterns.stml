@@ -36,19 +36,19 @@ let rec fact n =
 
 let rec length lst =
   match lst with
-  | :[] -> 0
+  | [] -> 0
   | (_, tl & :List) -> succ (length tl)
   end
 
 let rec map f lst =
   match lst with
-  | :[] -> []
+  | [] -> []
   | (e,lst) & :List -> ((f e), map f lst)
   end
 
 let rec map f (lst:['a*]) =
   match lst with
-  | :[] -> []
+  | [] -> []
   | (e,lst) -> ((f e), map f lst)
   end
 

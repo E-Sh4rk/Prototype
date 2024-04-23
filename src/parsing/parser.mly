@@ -65,6 +65,11 @@
       let base = annot startpos endpos (RecordUpdate (base, label, Some e)) in
       record_update startpos endpos base fields
 
+  let rec list_of_pats = function
+    | [] -> (PatType (TBase TUnit))
+    | x::xs ->
+      let left = x in let right = list_of_pats xs in
+      PatPair (left,right)
 %}
 
 %token EOF
@@ -100,6 +105,8 @@
 %nonassoc NEG
 
 %%
+
+(* TODO: :: syntax for list cons (and the associated pattern) *)
 
 program: e=element* EOF { e }
 
@@ -252,6 +259,8 @@ prefix:
 
 (* ===== TYPES ===== *)
 
+(* TODO: one-line syntax for recursive types? *)
+
 typ:
   t=simple_typ { t }
 | lhs=simple_typ COMMA rhs=typ { TPair (lhs, rhs) }
@@ -357,6 +366,7 @@ atomic_pattern:
 | LBRACE fs=separated_list(COMMA, pat_field) o=optional_open RBRACE { PatRecord (fs, o) }
 | LPAREN p=pattern RPAREN { p }
 | v=ID EQUAL c=literal { PatAssign (v, c) }
+| LBRACKET lst=separated_list(SEMICOLON, pattern) RBRACKET { list_of_pats lst }
 
 %inline pat_field:
   id=ID EQUAL p=simple_pattern { (id, p) }

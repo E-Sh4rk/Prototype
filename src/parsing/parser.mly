@@ -178,11 +178,14 @@ term:
 | IF t=term ott=optional_test_type THEN t1=term ELSE t2=term { annot $startpos $endpos (Ite (t,ott,t1,t2)) }
 | MATCH t=term WITH pats=patterns END { annot $startpos $endpos (PatMatch (t,pats)) }
 | lhs=simple_term COMMA rhs=term { annot $startpos $endpos (Pair (lhs, rhs)) }
-| lhs=simple_term CONS rhs=term { cons_encode $startpos $endpos lhs rhs }
 
 simple_term:
+  a=simple_term_nocons { a }
+| lhs=simple_term_nocons CONS rhs=simple_term { cons_encode $startpos $endpos lhs rhs }
+
+simple_term_nocons:
   a=atomic_term { a }
-| a=simple_term b=atomic_term { annot $startpos $endpos (App (a, b)) }
+| a=simple_term_nocons b=atomic_term { annot $startpos $endpos (App (a, b)) }
 | FST a=atomic_term { annot $startpos $endpos (Projection (Fst, a)) }
 | SND a=atomic_term { annot $startpos $endpos (Projection (Snd, a)) }
 | a=atomic_term s=infix_term b=atomic_term { double_app $startpos $endpos s a b }
@@ -362,13 +365,15 @@ atomic_re:
 pattern:
   p=simple_pattern { p }
 | lhs=simple_pattern COMMA rhs=pattern { PatPair (lhs, rhs) }
-| lhs=simple_pattern CONS rhs=pattern { cons_pat_encode lhs rhs }
 
 simple_pattern:
+  a=simple_pattern_nocons { a }
+| lhs=simple_pattern_nocons CONS rhs=simple_pattern { cons_pat_encode lhs rhs }
+
+simple_pattern_nocons:
   p=atomic_pattern { p }
-| lhs=simple_pattern AND rhs=atomic_pattern { PatAnd (lhs, rhs) }
-| lhs=simple_pattern OR rhs=atomic_pattern { PatOr (lhs, rhs) }
-// | v=ID EQUAL t=simple_term { PatAssign (v, t) }
+| lhs=simple_pattern_nocons AND rhs=atomic_pattern { PatAnd (lhs, rhs) }
+| lhs=simple_pattern_nocons OR rhs=atomic_pattern { PatOr (lhs, rhs) }
 
 atomic_pattern:
   COLON t=atomic_typ { PatType t }

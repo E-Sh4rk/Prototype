@@ -139,14 +139,15 @@
         <h2 id="type">Type expressions</h2>
         <code>
     <var>t</var> ::= <var>simple_type</var>
-        | t <kbd>-></kbd> t
-        | t <kbd>,</kbd> t
+        | <var>t</var> <kbd>-></kbd> <var>t</var>
+        | <var>t</var> <kbd>,</kbd> <var>t</var>
         | <kbd>[</kbd> <var>tregex</var> <kbd>]</kbd>
         | <kbd>{</kbd> <var>id</var> <kbd>=</kbd>[<kbd>?</kbd>] <var>t</var><kbd>,</kbd>...<kbd>,</kbd> <var>id</var> <kbd>=</kbd>[<kbd>?</kbd>] <var>t</var> [<kbd>..</kbd>]<kbd>}</kbd>
         | <var>t</var> <kbd>|</kbd> <var>t</var>
         | <var>t</var> <kbd>&</kbd> <var>t</var>
         | <var>t</var> <kbd>\\</kbd> <var>t</var>
         | <kbd>~</kbd> <var>t</var>
+        | <var>t</var> <kbd>where</kbd> <var>tid</var> <var>tvar</var>* <kbd>=</kbd> <var>t</var> [<kbd>and</kbd> ...]
 
     <var>simple_type</var> ::= <var>b</var>
                 | <var>tid</var> [<var>t</var> ... <var>t</var>]

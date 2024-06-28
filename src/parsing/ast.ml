@@ -118,14 +118,6 @@ let dummy_pat_var_str = "_"
 let dummy_pat_var =
     Variable.create_other (Some dummy_pat_var_str)
 
-let type_exprs_to_typs tenv vtenv ts =
-    let vtenv = ref vtenv in
-    let ts = List.map (fun t ->
-        let (t, vtenv') = type_expr_to_typ tenv !vtenv t in
-        vtenv := vtenv' ; t
-    ) ts in
-    (ts, !vtenv)
-
 let no_infer_var t =
     let open Types.Tvar in
     vars t |> TVarSet.filter TVar.can_infer |> TVarSet.is_empty

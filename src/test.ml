@@ -7,15 +7,6 @@
   end
    *)
 
-(* TODO: why does it takes more time than unnanotated? *)
-(* let concat = < ['a*] -> ['b*] -> ['a* ; 'b*] >
-
-let rec flatten (x:['_a*] ; '_b\List) = match x with
- | [] -> []
- | (h, t) & :List -> concat (flatten h) (flatten t)
- | _ -> [x]
-end *)
-
 let succ = <Int->Int>
 
 let aliasing (x : Any -> Any) = 

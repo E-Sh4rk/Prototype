@@ -44,6 +44,7 @@ val infer_prefix : string
 val type_base_to_typ : type_base -> typ
 
 val type_expr_to_typ : type_env -> var_type_env -> type_expr -> typ * var_type_env
+val type_exprs_to_typs : type_env -> var_type_env -> type_expr list -> typ list * var_type_env
 
 val define_atom : type_env -> string -> type_env
 

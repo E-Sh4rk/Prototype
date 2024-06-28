@@ -174,13 +174,25 @@ let derecurse_types env venv defs =
     let venv = Hashtbl.fold StrMap.add venv StrMap.empty in
     (res, venv)
 
-let type_expr_to_typ (tenv, _) venv t = 
-    let remove_inferable_from_vtenv vtenv =
-        StrMap.filter (fun _ v -> TVar.can_infer v |> not) vtenv
-    in
+let type_expr_to_typ_aux (tenv, _) venv t =
     match derecurse_types tenv venv [ ("", [], t) ] with
-    | ([ "", [], t ], venv) -> (t, remove_inferable_from_vtenv venv)
+    | ([ "", [], t ], venv) -> (t, venv)
     | _ -> assert false
+
+let remove_inferable_from_vtenv vtenv =
+    StrMap.filter (fun _ v -> TVar.can_infer v |> not) vtenv
+
+let type_expr_to_typ env venv t =
+    let (t, venv) = type_expr_to_typ_aux env venv t in
+    (t, remove_inferable_from_vtenv venv)
+
+let type_exprs_to_typs env venv ts =
+    let venv = ref venv in
+    let ts = List.map (fun t ->
+        let (t, venv') = type_expr_to_typ_aux env !venv t in
+        venv := venv' ; t
+    ) ts in
+    (ts, remove_inferable_from_vtenv (!venv))
 
 let define_types (tenv, aenv) venv defs =
     let defs = List.map

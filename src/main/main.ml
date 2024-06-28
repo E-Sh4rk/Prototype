@@ -30,6 +30,7 @@ let type_check_def tenv env (var,expr,typ_annot) =
     (time1 -. time0 ) *. 1000.
   in
   let type_additionnal env (v, nf) =
+    Utils.log "%a@." Msc.pp_e nf ;
     let typ = Reconstruct.typeof_infer tenv env nf |> generalize_all ~uncorrelate:true in
     (* NOTE: ~uncorrelate:false can reduce the number of tvars in fixpoint instances,
        BUT it might also yield an unprecise type (expansion becomes necessary)... *)

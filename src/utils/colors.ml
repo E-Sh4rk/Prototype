@@ -68,6 +68,7 @@ let style_of_tag = function
   | "bg_cyan"    -> BgCyan
   | "bg_white"   -> BgWhite
   | "bg_default" -> BgDefault
+  | "prettify"   -> Normal
   | _ -> raise Not_found
 
 let styles_of_tag = function

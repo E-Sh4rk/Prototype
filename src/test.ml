@@ -1,3 +1,12 @@
+(* TODO: fix *)
+(* let rec mapic_aux (i,f,l) =
+  match l with
+  :Nil -> []
+  | (x,ll) -> let r = f i x in
+  (r, mapic_aux (i+1,f,ll))
+  end
+   *)
+
 let succ = <Int->Int>
 
 let aliasing (x : Any -> Any) = 

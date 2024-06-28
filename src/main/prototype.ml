@@ -2,7 +2,7 @@ open Main
 
 let () =
     (* Printexc.record_backtrace true; *)
-    Colors.add_ansi_marking Format.std_formatter;
+    if Unix.isatty Unix.stdout then Colors.add_ansi_marking Format.std_formatter ;
     try
         let fn = ref "test.ml" in
         if Array.length Sys.argv > 1 then fn := Sys.argv.(1) ;

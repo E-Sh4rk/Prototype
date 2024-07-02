@@ -1,11 +1,6 @@
-(* TODO: fix *)
-(* let rec mapic_aux (i,f,l) =
-  match l with
-  :Nil -> []
-  | (x,ll) -> let r = f i x in
-  (r, mapic_aux (i+1,f,ll))
-  end
-   *)
+(* TODO: fix (issue tallying cdcue?) *)
+(* debug let rec test (f,(x,ll)) =
+  (f x, test (f,ll)) *)
 
 let succ = <Int->Int>
 

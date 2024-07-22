@@ -254,9 +254,9 @@ let rec infer_poly_a vardef tenv env pannot_a a =
       let t2 = Subst.apply r2 t2 in
       let alpha = TVar.mk_poly None in
       let arrow_type = mk_arrow (cons t2) (TVar.typ alpha |> cons) in
-      log ~level:4 "@.Approximate tallying for %a: %a <= %a@."
+      log ~level:4 "@.Tallying for %a: %a <= %a@."
         Variable.pp vardef pp_typ t1 pp_typ arrow_type ;
-      let res = approximate_app ~infer:false t1 t2 alpha in
+      let res = tallying [t1, arrow_type] in
       assert (List.length res > 0) ;
       let res = simplify_tallying (TVar.typ alpha) res in
       let (s1, s2) = res |> List.map (fun s ->

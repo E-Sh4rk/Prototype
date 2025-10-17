@@ -2,6 +2,10 @@
 
 [![DOI](https://zenodo.org/badge/308046842.svg)](https://zenodo.org/badge/latestdoi/308046842)
 
+> [!IMPORTANT]
+> This repository is not maintained anymore.  
+> But you can take look at its successor: [MLsem](https://e-sh4rk.github.io/MLsem/)
+
 The web version of this prototype can be tested [here](https://www.cduce.org/dynlang/) (or [there](https://e-sh4rk.github.io/Prototype/) for a more experimental version).
 
 ## Using the docker image
